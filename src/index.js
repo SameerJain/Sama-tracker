@@ -42,12 +42,22 @@ client.once(Events.ClientReady, async () => {
   startTracking(channel);
 });
 
+// One command per person at a time, so nobody can stack up start.gg requests by spamming.
+const busy = new Set();
+
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isAutocomplete()) {
     await handleAutocomplete(interaction).catch(console.error);
     return;
   }
   if (!interaction.isChatInputCommand() || interaction.commandName !== 'df') return;
+
+  const userId = interaction.user.id;
+  if (busy.has(userId)) {
+    await interaction.reply({ content: 'Still working on your last command.', flags: MessageFlags.Ephemeral }).catch(console.error);
+    return;
+  }
+  busy.add(userId);
 
   try {
     await handleCommand(interaction);
@@ -59,10 +69,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } else {
       await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);
     }
+  } finally {
+    busy.delete(userId);
   }
 });
 
 // Without a listener, Node treats an 'error' event as a crash.
 client.on(Events.Error, console.error);
+// Same for a rejected promise nobody caught. Log it and keep tracking.
+process.on('unhandledRejection', console.error);
 
 client.login(process.env.DISCORD_TOKEN).catch((err) => quit(`Discord didn't accept DISCORD_TOKEN. ${err.message}`));

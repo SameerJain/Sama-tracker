@@ -9,6 +9,10 @@ const ROLL_CALL_HOURS_BEFORE = 1;
 const ROLL_CALL_MIN_PLAYERS = 3;
 // If start.gg never marks the events finished, post whatever placements exist this long after the end date.
 const RESULTS_GIVE_UP_HOURS = 24;
+// After the bot has been off, only post sets from this far back instead of everything it missed.
+const CATCH_UP_HOURS = 3;
+// TOs sometimes set the end date years out by mistake. Treat every tournament as over this long after it starts.
+const MAX_TOURNAMENT_DAYS = 7;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -19,11 +23,7 @@ export function secondsNow() {
 
 let channel;
 
-// Each check waits for the previous one to finish, so nothing gets posted twice.
-let setCheck = Promise.resolve();
-let tournamentCheck = Promise.resolve();
-let profileCheck = Promise.resolve();
-
+// Runs every check once now, then each on its own timer.
 export function startTracking(postChannel) {
   channel = postChannel;
   checkTournaments();
@@ -34,17 +34,28 @@ export function startTracking(postChannel) {
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
 }
 
-export function checkSets() {
-  setCheck = setCheck.then(postNewSets).then(postStreamAlerts).catch(console.error);
+// Each run of a check waits for the one before it, so nothing gets posted twice. Asking again while
+// a run is already waiting does nothing, since that run will see the latest players anyway.
+// Ten people running /df track add at once then costs one tournament check, not ten.
+function queued(check) {
+  let last = Promise.resolve();
+  let waiting = false;
+  return () => {
+    if (waiting) return;
+    waiting = true;
+    last = last.then(() => {
+      waiting = false;
+      return check();
+    }).catch(console.error);
+  };
 }
 
-export function checkTournaments() {
-  tournamentCheck = tournamentCheck.then(updateTournaments).catch(console.error);
-}
-
-function checkProfiles() {
-  profileCheck = profileCheck.then(updateProfiles).catch(console.error);
-}
+export const checkSets = queued(async () => {
+  await postNewSets();
+  await postStreamAlerts();
+});
+export const checkTournaments = queued(updateTournaments);
+const checkProfiles = queued(updateProfiles);
 
 // People change their tag and avatar on start.gg. Pick up the new ones.
 async function updateProfiles() {
@@ -62,30 +73,36 @@ async function updateProfiles() {
 }
 
 async function postNewSets() {
-  for (const player of Object.values(state.players)) {
-    const checkedAt = secondsNow();
-    try {
-      // Look back 2 extra minutes so a set reported during the last check isn't missed.
-      const sets = await startgg.getSets(player.playerId, { since: player.lastCheck - 120 });
-      sets.sort((a, b) => a.completedAt - b.completedAt);
+  const players = Object.values(state.players);
+  const playerIds = players.map((player) => player.playerId);
+  const checkedAt = secondsNow();
+  // Everyone shares one request, so start from the oldest last check and nobody's sets get skipped.
+  // A just-added player overlaps by a minute or two at most, and `posted` stops repeats.
+  const lastCheck = Math.min(checkedAt, ...players.map((player) => player.lastCheck));
+  const since = Math.max(lastCheck, checkedAt - CATCH_UP_HOURS * HOUR);
+  try {
+    // Look back 2 extra minutes so a set reported during the last check isn't missed.
+    const sets = await startgg.getSets(playerIds, { since: since - 120 });
+    sets.sort((a, b) => a.completedAt - b.completedAt);
 
-      for (const set of sets) {
-        if (state.posted.includes(set.id)) continue;
-        // Old sets come back when someone edits them. Don't post those.
-        if (set.completedAt < player.lastCheck - HOUR) continue;
-        // start.gg reports a DQ as a score of -1, and DQs a player from the rest of their bracket once they DQ.
-        // Post their first one so people know they're out, then skip the rest.
-        const dqed = set.sides.find((side) => side.score === -1);
-        if (dqed && (!dqed.playerIds.includes(player.playerId) || state.dqs.includes(dqed.id))) continue;
+    for (const set of sets) {
+      if (state.posted.includes(set.id)) continue;
+      // Old sets come back when someone edits them. Don't post those.
+      if (set.completedAt < since - HOUR) continue;
+      // start.gg reports a DQ as a score of -1, and DQs a player from the rest of their bracket once they DQ.
+      // Post their first one so people know they're out, then skip the rest.
+      // Wins by DQ are skipped too. Nobody needs a post about an opponent not showing up.
+      const dqed = set.sides.find((side) => side.score === -1);
+      if (dqed && (!dqed.playerIds.some((id) => playerIds.includes(id)) || state.dqs.includes(dqed.id))) continue;
 
-        await channel.send({ embeds: [embeds.setResult(set, state.players)] });
-        state.posted.push(set.id);
-        if (dqed) state.dqs.push(dqed.id);
-      }
-      player.lastCheck = checkedAt;
-    } catch (err) {
-      console.error(`Checking sets for ${player.tag} failed:`, err.message);
+      await channel.send({ embeds: [embeds.setResult(set, state.players)] });
+      state.posted.push(set.id);
+      if (dqed) state.dqs.push(dqed.id);
     }
+    // Only moved up when the check worked, so a failed one gets covered next time.
+    for (const player of players) player.lastCheck = checkedAt;
+  } catch (err) {
+    console.error('Checking sets failed:', err.message);
   }
 
   state.posted = state.posted.slice(-1000);
@@ -94,18 +111,15 @@ async function postNewSets() {
 }
 
 async function postStreamAlerts() {
-  for (const player of Object.values(state.players)) {
-    if (player.streamAlerts === false) continue;
-    try {
-      for (const set of await startgg.getStreamedSets(player.playerId)) {
-        // Two tracked players can share a set. Post it once.
-        if (state.streamed.includes(set.id)) continue;
-        await channel.send({ embeds: [embeds.onStream(set, state.players)] });
-        state.streamed.push(set.id);
-      }
-    } catch (err) {
-      console.error(`Checking streams for ${player.tag} failed:`, err.message);
+  try {
+    const playerIds = Object.values(state.players).filter(alertsOn).map((player) => player.playerId);
+    for (const set of await startgg.getStreamedSets(playerIds)) {
+      if (state.streamed.includes(set.id)) continue;
+      await channel.send({ embeds: [embeds.onStream(set, state.players)] });
+      state.streamed.push(set.id);
     }
+  } catch (err) {
+    console.error('Checking streams failed:', err.message);
   }
 
   // Many TOs never press "call" on start.gg, so the check above never sees the set go live.
@@ -164,6 +178,8 @@ async function updateTournaments() {
   for (const userId of userIds) {
     try {
       for (const tournament of await startgg.getUpcomingTournaments(userId)) {
+        // A bad end date makes start.gg list a tournament from years ago as upcoming.
+        if (secondsNow() > endTime(tournament)) continue;
         if (!state.tournaments[tournament.id]) {
           state.tournaments[tournament.id] = { id: tournament.id, entries: [] };
         }
@@ -175,12 +191,14 @@ async function updateTournaments() {
 
   for (const tournament of Object.values(state.tournaments)) {
     if (tournament.resultsPosted) {
+      // Kept until well after it ends. Otherwise start.gg still listing it as upcoming would add it back and post the results again.
       if (secondsNow() > endTime(tournament) + 7 * DAY) delete state.tournaments[tournament.id];
       continue;
     }
 
     try {
       const latest = await startgg.getTournament(tournament.id, userIds);
+      // Deleted or unpublished on start.gg.
       if (!latest) {
         delete state.tournaments[tournament.id];
         continue;
@@ -224,6 +242,6 @@ async function postResults(tournament) {
   tournament.resultsPosted = true;
 }
 
-function endTime(tournament) {
-  return tournament.endAt ?? tournament.startAt;
+export function endTime(tournament) {
+  return Math.min(tournament.endAt ?? tournament.startAt, tournament.startAt + MAX_TOURNAMENT_DAYS * DAY);
 }
