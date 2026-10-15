@@ -1,5 +1,9 @@
 # Dark Fundies Bot
 
+<img src="screenshots/predict.png" alt="/df predict" width="56%"> <img src="screenshots/h2h.png" alt="/df h2h" width="42%">
+
+<img src="screenshots/sm4sh.png" alt="/df sm4sh" width="53%"> <img src="screenshots/recent.png" alt="/df recent" width="45%">
+
 Follows start.gg players and posts to a Discord channel when one of them:
 
 - finishes a set. Only their first DQ in an event gets posted, and big wins over higher seeds are marked as major upsets
