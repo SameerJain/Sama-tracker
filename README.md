@@ -26,7 +26,7 @@ Run one copy per token. A second copy posts everything twice.
 /df upcoming player:<name or all>                 their tournaments, live ones first
 /df recent player:<name or all>                   latest sets, 5 for one player or 3 each for all
 /df h2h player:<name> opponent:<name>             singles record against each other, DQs left out
-/df stats player:<name>                           set record, finishes vs seed, best finish, biggest upset
+/df stats player:<name>                           recent set record, best finish, biggest upset
 /df predict player:<name> opponent:<name>         odds of one beating the other
 /df stream player:<name or all> alerts:<on|off>   on-stream alerts on or off
 /df sm4sh                                         I LOVE SMASH BROS FOR WII U

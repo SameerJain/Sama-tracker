@@ -324,8 +324,7 @@ export function prediction(a, b, odds) {
   return embed.setDescription(lines.join('\n'));
 }
 
-// A snapshot of the player: set record per game, how they finish against their seed, best finish,
-// biggest upset, then their latest few events.
+// A snapshot of the player: set record per game, best finish, biggest upset, then their latest few events.
 export function stats(player, standings, sets) {
   const embed = baseEmbed(colors.brand)
     .setAuthor({ name: 'Stats' })
@@ -346,15 +345,7 @@ export function stats(player, standings, sets) {
       records.get(game)[won ? 'wins' : 'losses']++;
     }
     const recordText = [...records].map(([game, { wins, losses }]) => `${game} ${wins}-${losses} (${percent(wins, wins + losses)})`);
-    lines.push(`**Sets:** ${recordText.join(' · ')}`);
-  }
-
-  // Where they finished against where their seed was expected to. A 1 seed can only match it. DQs say nothing about it.
-  const seeded = standings.filter(({ seed, dq }) => seed && !dq);
-  if (seeded.length) {
-    const above = seeded.filter(({ placement, seed }) => step(placement) < step(seed)).length;
-    const below = seeded.filter(({ placement, seed }) => step(placement) > step(seed)).length;
-    lines.push(`**Vs seed:** beat it ${above}, matched it ${seeded.length - above - below}, fell short ${below}`);
+    lines.push(`**Recent sets:** ${recordText.join(' · ')}`);
   }
 
   // Best by how far up the bracket they finished, so 4th of 84 beats 3rd of 20. Ties go to the most recent.
