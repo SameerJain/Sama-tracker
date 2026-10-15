@@ -26,7 +26,7 @@ const STYLES = [
   'a gushing superfan defending it as the best Smash ever like someone just said otherwise: an over-the-top opener, two or three short bolded bullet point reasons, then a sign-off, under 100 words',
 ];
 
-// Haiku mixes up the Smash games on its own, so each post gets a few real ones to work from.
+// haiku mixes up the smash games without real facts to go off
 const TALKING_POINTS = [
   'Ryu as DLC, with real fighting game inputs that make his specials stronger',
   'Diddy Kong\'s down throw to up air, the hoo-hah, ran early Smash 4 until patches toned it down',
@@ -50,18 +50,17 @@ const TALKING_POINTS = [
   'big events like Genesis, CEO, EVO, The Big House, 2GG and Umebura in Japan',
 ];
 
-// A short timeout so the line goes out quickly when Claude is down. Without a key the command just yells the line.
+// short timeout so it falls back to the line fast if claude is down
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 20_000, maxRetries: 1 }) : null;
 
 export const enabled = Boolean(client);
 
-// Every Wii U screenshot on SmashWiki, about 1800. Fetched once and kept.
+// all ~1800 wii u screenshots on smashwiki, fetched once
 let screenshots;
 
 function allScreenshots() {
   if (!screenshots) {
     screenshots = fetchScreenshots();
-    // A failed fetch shouldn't stick around for the next person.
     screenshots.catch(() => { screenshots = null; });
   }
   return screenshots;
@@ -94,29 +93,28 @@ async function fetchScreenshots() {
     for (const page of data.query.pages) {
       const info = page.imageinfo?.[0];
       if (!info) continue;
-      // "File:Animal Crossing Stage SSB4.jpg" becomes "Animal Crossing Stage SSB4".
+      // "File:Animal_Crossing_Stage_SSB4.jpg" -> "Animal Crossing Stage SSB4"
       const name = page.title.replace(/^File:/, '').replace(/\.\w+$/, '').replaceAll('_', ' ');
       files.push({ name, url: info.url, page: info.descriptionurl });
     }
-    // SmashWiki sends 500 at a time, with a `continue` token until there's nothing left.
     next = data.continue;
   }
   return files;
 }
 
-// Discord can't always load images straight from SmashWiki, so the bot sends the file itself.
+// discord can't always load smashwiki images, so upload the file
 async function download(screenshot) {
   const res = await wiki(screenshot.url);
   const extension = screenshot.url.split('.').pop().toLowerCase();
   return { attachment: Buffer.from(await res.arrayBuffer()), name: `sm4sh.${extension}` };
 }
 
-// Takes the pick out of the list, so picking from it again can't repeat.
+// removes what it picks
 function pickFrom(list) {
   return list.splice(Math.floor(Math.random() * list.length), 1)[0];
 }
 
-// Every screenshot gets shown once before any of them repeat. Starts over when the bot restarts.
+// no repeats until every screenshot has been shown
 let unseen = [];
 
 function pickScreenshot(files) {
@@ -129,7 +127,7 @@ async function loveLetter() {
   const response = await client.messages.create({
     model: 'claude-haiku-5-5',
     max_tokens: 16000,
-    // Low effort ignores the length limit. Posts are made ahead of time, so the extra second doesn't matter.
+    // low effort ignores the word limit
     output_config: { effort: 'medium' },
     system: PROMPT,
     messages: [{
@@ -152,19 +150,18 @@ async function makePost() {
   return { text, screenshot, image };
 }
 
-// The next post is made ahead of time so /df sm4sh can answer right away.
+// made ahead of time so /df sm4sh replies right away
 let nextPost;
 
 function prepare() {
   nextPost = makePost();
-  // Errors are dealt with when the post gets used.
-  nextPost.catch(() => {});
+  nextPost.catch(() => {}); // handled in takePost
 }
 
 export function takePost() {
   const ready = nextPost;
   prepare();
-  // If the one made ahead failed, say Claude was down at the time, try once more now.
+  // if the prefetched one failed, try again now
   return ready.catch(makePost);
 }
 

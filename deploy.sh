@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Pushes your commits, then pulls them on the VM and restarts the bot.
-# Expects a "dfbot" host in ~/.ssh/config pointing at the VM.
+# push, pull on the vm, restart. needs a "dfbot" host in ~/.ssh/config
 set -e
 
 if [ -n "$(git status --porcelain)" ]; then
-  echo "Warning: you have uncommitted changes. Only committed work gets deployed."
+  echo "heads up, uncommitted changes won't get deployed"
 fi
 
 git push

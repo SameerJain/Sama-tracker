@@ -6,25 +6,21 @@ const colors = {
   brand: 0x5b21b6,
   win: 0x22c55e,
   loss: 0xef4444,
-  // Two tracked players against each other.
-  clash: 0xf59e0b,
+  clash: 0xf59e0b, // tracked vs tracked
   results: 0xfacc15,
   stream: 0x9146ff,
   live: 0xe11d48,
   sm4sh: 0x00a2e8,
 };
 
-// Where each seed is expected to finish in double elimination: 1st, 2nd, 3rd, 4th, 5th, 7th, 9th, 13th...
+// double elim placements: 1, 2, 3, 4, 5, 7, 9, 13, 17, 25...
 const PLACEMENTS = [1, 2];
 for (let n = 2; n <= 4096; n *= 2) PLACEMENTS.push(n + 1, n * 1.5 + 1);
 
-// How many placements down the list a seed or placement is. Seed 9 and 9th place are both 6.
+// index into PLACEMENTS, so seed 9 and 9th place are both 6
 const step = (n) => PLACEMENTS.findLastIndex((place) => place <= n);
 
-// A win over a seed expected to finish this many placements higher is a major upset. Seed 9 over seed 2 is 5.
-const MAJOR_UPSET = 5;
-
-// /df stats lists this many of the latest events.
+const MAJOR_UPSET = 5; // seed 9 beating seed 2
 const RECENT_EVENTS = 4;
 
 function baseEmbed(color, footer = 'Dark Fundies') {
@@ -50,7 +46,6 @@ function setUrl(set) {
   return startggUrl(`${set.event.slug}/set/${set.id}`);
 }
 
-// The tournament name, linking to the set itself.
 function setLink(set) {
   return `[${escapeMarkdown(set.event.tournament.name)}](${setUrl(set)})`;
 }
@@ -59,7 +54,7 @@ function percent(part, whole) {
   return `${Math.round((part / whole) * 100)}%`;
 }
 
-// Discord shows this in each reader's own timezone, plus a countdown like "in 3 hours".
+// discord shows these in everyone's own timezone
 function timeText(seconds) {
   return `<t:${seconds}:F> (<t:${seconds}:R>)`;
 }
@@ -94,24 +89,20 @@ function medal(placement) {
 }
 
 function scoreText(me, them) {
-  // start.gg reports a DQ as a score of -1.
-  if (me.score === -1 || them.score === -1) return 'DQ';
+  if (me.score === -1 || them.score === -1) return 'DQ'; // start.gg's DQ score
   if (me.score === null || them.score === null) return 'vs';
   return `${me.score}-${them.score}`;
 }
 
-// Upset factor: how many placements apart the two seeds were expected to finish.
 function upsetFactor(winner, loser) {
   if (!winner.seed || !loser.seed) return 0;
   return step(winner.seed) - step(loser.seed);
 }
 
-// The tracked player on this side of a set, if there is one.
 function findTracked(side, players) {
   return Object.values(players).find((player) => side.playerIds.includes(player.playerId));
 }
 
-// Tracked players' entries, grouped by event.
 function groupByEvent(tournament, players) {
   const groups = new Map();
   for (const entry of tournament.entries) {
@@ -124,7 +115,6 @@ function groupByEvent(tournament, players) {
   return [...groups.values()];
 }
 
-// Round, event and tournament, shared by set results and stream alerts.
 function setEmbed(set, color, player) {
   const game = set.event.videogame?.displayName;
   const tournament = set.event.tournament;
@@ -144,7 +134,7 @@ export function onStream(set, players) {
   const trackedA = findTracked(a, players);
   const [me, them] = trackedA ? [a, b] : [b, a];
 
-  // Only Twitch has a link format we can count on. Other sources just show the stream name.
+  // twitch is the only source with a url we can build, otherwise just the name
   const { streamName, streamSource } = set.stream;
   const twitch = streamSource === 'TWITCH' ? `https://twitch.tv/${streamName}` : null;
   const watch = twitch ? `[twitch.tv/${escapeMarkdown(streamName)}](${twitch})` : escapeMarkdown(streamName);
@@ -161,7 +151,7 @@ export function setResult(set, players) {
   const trackedB = findTracked(b, players);
   const clash = Boolean(trackedA && trackedB);
 
-  // The tracked player goes first. If both are tracked, the winner goes first.
+  // tracked player first, or the winner if both are tracked
   const bFirst = clash ? b.id === set.winnerId : !trackedA;
   const me = bFirst ? b : a;
   const them = bFirst ? a : b;
@@ -169,7 +159,7 @@ export function setResult(set, players) {
   const won = me.id === set.winnerId;
 
   let label = won ? 'W' : 'L';
-  // Only when the tracked player is the one pulling it off. A DQ win doesn't count.
+  // DQ wins aren't upsets
   if (won && scoreText(me, them) !== 'DQ' && upsetFactor(me, them) >= MAJOR_UPSET) label = 'Major upset';
   let color = won ? colors.win : colors.loss;
   if (clash) color = colors.clash;
@@ -201,7 +191,7 @@ export function rollCall(tournament, players) {
   return embed;
 }
 
-// One embed per event the crew entered: where each of them placed, best first.
+// one embed per event, best placement first
 export function results(tournament, players) {
   return groupByEvent(tournament, players).map((entries) => {
     entries.sort((a, b) => (a.placement ?? Infinity) - (b.placement ?? Infinity));
@@ -217,8 +207,7 @@ function placementText(entry) {
   return `${medal(entry.placement)}${ordinal(entry.placement)} ${name}`;
 }
 
-// One card per tournament so each one shows its own image. Discord allows 10 per message.
-// Sorted by start time, so tournaments already underway come first, marked Live.
+// a card per tournament so each one gets its own image
 export function upcoming(tournaments, players, who) {
   if (!tournaments.length) {
     return [baseEmbed(colors.brand).setTitle(`Upcoming · ${who}`).setDescription('Nobody is registered for anything yet.')];
@@ -251,17 +240,14 @@ function upcomingCard(tournament, players, label, color) {
   return tournamentEmbed(color, label, tournament).setDescription(lines.join('\n'));
 }
 
-// Record from a's side, then the last 10 sets between them.
 export function headToHead(a, b, sets) {
   const results = sets.map((set) => fromSide(set, a.playerId));
   const wins = results.filter((result) => result.won).length;
   const losses = results.length - wins;
 
-  // a's picture top left as the author icon, the opponent's top right as the thumbnail.
   const embed = baseEmbed(colors.clash).setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) });
   if (b.image) embed.setThumbnail(b.image);
 
-  // A 0-0 title would read like a record, so say so plainly instead.
   if (!results.length) {
     return embed
       .setTitle(`${escapeMarkdown(a.tag)} vs ${escapeMarkdown(b.tag)}`)
@@ -270,7 +256,7 @@ export function headToHead(a, b, sets) {
 
   embed.setTitle(`${escapeMarkdown(a.tag)} ${wins}-${losses} ${escapeMarkdown(b.tag)}`);
 
-  // Games from a's side, like the title. Some sets only have a winner reported, so those are left out.
+  // some sets only have a winner reported, no score
   const scored = results.filter(({ me, them }) => me.score !== null && them.score !== null);
   const gamesWon = scored.reduce((sum, { me }) => sum + me.score, 0);
   const gamesLost = scored.reduce((sum, { them }) => sum + them.score, 0);
@@ -279,7 +265,6 @@ export function headToHead(a, b, sets) {
   if (gamesWon + gamesLost) {
     lines.push(`-# Games ${gamesWon}-${gamesLost} (${percent(gamesWon, gamesWon + gamesLost)} won)`);
   }
-  // Call out whoever is ahead. A tie gets nothing.
   if (wins !== losses) {
     const leader = wins > losses ? a : b;
     lines.push(`**${escapeMarkdown(leader.tag)} leads ${Math.max(wins, losses)}-${Math.min(wins, losses)}**`);
@@ -292,9 +277,7 @@ export function headToHead(a, b, sets) {
   return embed.setDescription(lines.join('\n'));
 }
 
-// The odds, then the stats behind them. Every line names who it favors.
 export function prediction(a, b, odds) {
-  // Never a sure thing either way.
   const chanceA = Math.min(99, Math.max(1, Math.round(odds.chance * 100)));
   const embed = baseEmbed(colors.clash, `Dark Fundies · ${odds.game}`)
     .setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) })
@@ -324,7 +307,6 @@ export function prediction(a, b, odds) {
   return embed.setDescription(lines.join('\n'));
 }
 
-// A snapshot of the player: set record per game, best finish, biggest upset, then their latest few events.
 export function stats(player, standings, sets) {
   const embed = baseEmbed(colors.brand)
     .setAuthor({ name: 'Stats' })
@@ -332,7 +314,6 @@ export function stats(player, standings, sets) {
     .setURL(startggUrl(player.slug));
   if (player.image) embed.setThumbnail(player.image);
 
-  // DQs don't count, same as h2h.
   const played = sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
   if (!played.length && !standings.length) return embed.setDescription('Nothing on start.gg yet.');
 
@@ -348,13 +329,13 @@ export function stats(player, standings, sets) {
     lines.push(`**Recent sets:** ${recordText.join(' · ')}`);
   }
 
-  // Best by how far up the bracket they finished, so 4th of 84 beats 3rd of 20. Ties go to the most recent.
+  // relative to bracket size, so 4th of 84 beats 3rd of 20
   const best = standings
     .filter(({ event }) => event.numEntrants)
     .sort((x, y) => x.placement / x.event.numEntrants - y.placement / y.event.numEntrants)[0];
   if (best) lines.push(`**Best finish:** ${placementLine(best)}`);
 
-  // Ties go to the most recent, since sets come newest first.
+  // sets are newest first, so ties go to the latest one
   const upset = played
     .filter(({ me, them, won }) => won && upsetFactor(me, them) > 0)
     .sort((x, y) => upsetFactor(y.me, y.them) - upsetFactor(x.me, x.them))[0];
@@ -376,7 +357,7 @@ export function stats(player, standings, sets) {
   return embed.setDescription(lines.join('\n'));
 }
 
-// 🥉 3rd of 20 (seed 2) · Ultimate Singles · Tournament · date
+// 3rd of 20 (seed 2) · Ultimate Singles · Tournament · date
 function placementLine({ placement, seed, dq, event }) {
   let text = `${medal(placement)}**${ordinal(placement)}**`;
   if (event.numEntrants) text += ` of ${event.numEntrants}`;
@@ -404,7 +385,6 @@ export function added(player) {
   return embed;
 }
 
-// The image is attached to the message as `file`.
 export function sm4sh(title, text, screenshot, file) {
   return baseEmbed(colors.sm4sh, `Dark Fundies · ${screenshot.name}`)
     .setTitle(title)

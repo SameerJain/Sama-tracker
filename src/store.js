@@ -2,25 +2,23 @@ import fs from 'node:fs';
 
 const FILE = 'data/state.json';
 
-// players: tracked players by start.gg user ID. tournaments: ones they're entered in.
-// posted, streamed and dqs remember what's already been announced, so a restart doesn't repeat it.
+// players are keyed by start.gg user id. posted/streamed/dqs are ids already announced
 const empty = { players: {}, tournaments: {}, posted: [], streamed: [], dqs: [] };
 
 function load() {
   if (!fs.existsSync(FILE)) return empty;
   try {
-    // Fill in anything added since the file was last saved.
     return { ...empty, ...JSON.parse(fs.readFileSync(FILE, 'utf8')) };
   } catch (err) {
-    // Starting empty would overwrite it on the next save, so stop and let someone look at it.
-    console.error(`${FILE} couldn't be read (${err.message}). Fix it, or delete it to start over.`);
+    // don't start empty, the next save would wipe it
+    console.error(`couldn't read ${FILE} (${err.message}), fix or delete it`);
     process.exit(1);
   }
 }
 
 export const state = load();
 
-// Write to a temp file first so a crash mid-write can't wipe the saved state.
+// write + rename so a crash can't leave it half written
 export function save() {
   fs.mkdirSync('data', { recursive: true });
   fs.writeFileSync(`${FILE}.tmp`, JSON.stringify(state, null, 2));

@@ -6,15 +6,13 @@ import { checkTournaments, endTime, secondsNow } from './tracker.js';
 import * as smash4 from './sm4sh.js';
 import { predict as predictOdds } from './predict.js';
 
-// h2h and predict search this many pages of a player's sets, 40 per page.
-const HISTORY_PAGES = 15;
+const HISTORY_PAGES = 15; // 40 sets a page
 const HISTORY_CACHE_MINUTES = 10;
 
 function playerOption(description, name = 'player') {
   return { type: Option.String, name, description, required: true, autocomplete: true };
 }
 
-// The one /df command with all its subcommands. index.js registers it with Discord on startup.
 export const command = {
   name: 'df',
   description: 'Dark Fundies',
@@ -124,7 +122,7 @@ export async function handleAutocomplete(interaction) {
   const typed = interaction.options.getFocused().toLowerCase();
   const choices = [];
 
-  // These need a real player, so `all` isn't offered there.
+  // no "all" for the ones that need a single player
   if (!['remove', 'h2h', 'stats', 'predict'].includes(interaction.options.getSubcommand()) && 'all'.startsWith(typed)) {
     choices.push({ name: 'all', value: 'all' });
   }
@@ -134,28 +132,25 @@ export async function handleAutocomplete(interaction) {
     }
   }
 
-  // Discord shows at most 25 choices.
   await interaction.respond(choices.slice(0, 25));
 }
 
-// Returns 'all', a tracked player, or undefined.
 function readChoice(interaction, name = 'player') {
   const value = interaction.options.getString(name, true).toLowerCase();
   if (value === 'all') return 'all';
 
-  // Picking from the autocomplete list sends the user ID. Typing a name sends the name.
-  // hasOwn so a name like "constructor" doesn't match a built-in property.
+  // autocomplete sends the user id, typing it out sends the tag
+  // hasOwn so typing "constructor" doesn't match Object.prototype
   if (Object.hasOwn(state.players, value)) return state.players[value];
   return Object.values(state.players).find((player) => player.tag.toLowerCase() === value);
 }
 
-// For commands that need one real player, where `all` doesn't make sense.
 function readPlayer(interaction, name = 'player') {
   const choice = readChoice(interaction, name);
   return choice === 'all' ? undefined : choice;
 }
 
-// Discord allows 10 embeds and 6000 characters per message, so long replies continue in follow-ups.
+// discord allows 10 embeds and 6000 chars per message, the rest go in follow-ups
 async function sendEmbeds(interaction, list) {
   const messages = [[]];
   let size = 0;
@@ -186,7 +181,6 @@ function replyNotTracked(interaction) {
 
 async function trackAdd(interaction) {
   const input = interaction.options.getString('profile', true).trim();
-  // Accept a full profile link or just the ID at the end of it.
   const slug = input.match(/user\/([\w-]+)/)?.[1] ?? input;
 
   await interaction.deferReply();
@@ -202,7 +196,7 @@ async function trackAdd(interaction) {
   save();
   await interaction.editReply({ embeds: [embeds.added(player)] });
 
-  // Look up their tournaments now instead of waiting for the next check.
+  // don't wait 15 min for their tournaments to show up
   checkTournaments();
 }
 
@@ -222,7 +216,6 @@ function upcoming(interaction) {
   const now = secondsNow();
   const tournaments = [];
   for (const tournament of Object.values(state.tournaments)) {
-    // Skip ones that are over, even if their results haven't posted yet.
     if (tournament.resultsPosted || now > endTime(tournament)) continue;
 
     const entries = tournament.entries.filter((entry) => {
@@ -243,26 +236,24 @@ async function recent(interaction) {
 
   await interaction.deferReply();
   const players = choice === 'all' ? Object.values(state.players) : [choice];
-  // For everyone, a few each so one busy player doesn't crowd out the rest.
   const perPlayer = choice === 'all' ? 3 : 5;
 
   const sets = await startgg.getSets(players.map((player) => player.playerId), { perPage: perPlayer });
 
-  // Capped at two messages so a long tracked list doesn't flood the channel.
+  // 20 max so it's two messages at most
   const latest = sets
     .sort((a, b) => b.completedAt - a.completedAt)
     .slice(0, 20);
   if (!latest.length) return interaction.editReply('No sets found.');
 
   const cards = latest.map((set) => embeds.setResult(set, state.players));
-  // Grouped by player, newest first within each. A set between two tracked players goes under its winner, like the card.
+  // sort is stable, so each player's sets stay newest first
   if (choice === 'all') cards.sort((a, b) => (a.data.author?.name ?? '').localeCompare(b.data.author?.name ?? ''));
 
   await sendEmbeds(interaction, cards);
 }
 
-// Histories are kept a few minutes, so a burst of h2h or predict lookups for the same player only fetches once.
-// The promise is stored, not the sets, so two lookups at the same moment share one fetch too.
+// caching the promise means two lookups at once share a fetch
 const histories = new Map();
 
 function setHistory(playerId) {
@@ -271,7 +262,6 @@ function setHistory(playerId) {
 
   const sets = fetchHistory(playerId);
   histories.set(playerId, { at: Date.now(), sets });
-  // A failed fetch shouldn't stick around for the next person.
   sets.catch(() => histories.delete(playerId));
   return sets;
 }
@@ -293,8 +283,8 @@ async function headToHead(interaction) {
   if (a === b) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
 
   await interaction.deferReply();
-  // start.gg can't search for sets between two players, so go through their histories. Both, since either
-  // one can stop short of older sets, and keyed by set so none count twice. DQs don't count.
+  // start.gg can't search sets between two players, so go through both histories
+  // (either one can get cut off before older sets) and dedupe by set id
   const [historyA, historyB] = await Promise.all([setHistory(a.playerId), setHistory(b.playerId)]);
   const played = new Map();
   for (const set of [...historyA, ...historyB]) {
@@ -350,7 +340,7 @@ async function sm4sh(interaction) {
     const { text, screenshot, image } = await smash4.takePost();
     await interaction.editReply({ embeds: [embeds.sm4sh(smash4.LINE, text, screenshot, image.name)], files: [image] });
   } catch (err) {
-    // Claude is down or out of credits, or SmashWiki is down. Say it anyway.
+    // claude or smashwiki is down, just say it
     console.error('sm4sh failed:', err.message);
     await interaction.editReply(smash4.LINE);
   }

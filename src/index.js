@@ -3,19 +3,18 @@ import { command, handleAutocomplete, handleCommand } from './commands.js';
 import { checkToken } from './startgg.js';
 import { startTracking } from './tracker.js';
 
-// Setup mistakes stop the bot with a plain message instead of a stack trace.
 function quit(message) {
   console.error(message);
   process.exit(1);
 }
 
 for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN', 'GUILD_ID', 'CHANNEL_ID']) {
-  if (!process.env[name]) quit(`${name} is missing from .env.`);
+  if (!process.env[name]) quit(`${name} is missing from .env`);
 }
 
-await checkToken().catch((err) => quit(`Couldn't use STARTGG_TOKEN (${err.message}). Make a new one under start.gg Settings > Developer Settings.`));
+await checkToken().catch((err) => quit(`bad STARTGG_TOKEN (${err.message}), make a new one in start.gg Settings > Developer Settings`));
 
-// Set here instead of after login so Discord gets it again on every reconnect.
+// set here and not after login so it comes back after reconnects
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
   presence: { activities: [{ name: 'playing melee', type: ActivityType.Custom }] },
@@ -23,26 +22,26 @@ const client = new Client({
 
 client.once(Events.ClientReady, async () => {
   const guild = await client.guilds.fetch(process.env.GUILD_ID).catch(() => null);
-  if (!guild) quit(`The bot isn't in a server with ID ${process.env.GUILD_ID}. Check GUILD_ID and that the bot was invited.`);
+  if (!guild) quit(`bot isn't in server ${process.env.GUILD_ID}, check GUILD_ID or invite it`);
 
-  await guild.commands.set([command]).catch(() => quit('Discord refused the /df command. Re-invite the bot with the applications.commands scope.'));
+  await guild.commands.set([command]).catch(() => quit('couldn\'t register /df, re-invite the bot with the applications.commands scope'));
 
   const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch(() => null);
-  if (!channel?.isTextBased()) quit(`Can't find a text channel with ID ${process.env.CHANNEL_ID}, or the bot can't see it. Check CHANNEL_ID.`);
+  if (!channel?.isTextBased()) quit(`can't see a text channel with id ${process.env.CHANNEL_ID}, check CHANNEL_ID`);
 
   const missing = channel.permissionsFor(client.user).missing([
     PermissionFlagsBits.ViewChannel,
     PermissionFlagsBits.SendMessages,
     PermissionFlagsBits.EmbedLinks,
   ]);
-  if (missing.length) quit(`The bot is missing these permissions in #${channel.name}: ${missing.join(', ')}.`);
+  if (missing.length) quit(`missing permissions in #${channel.name}: ${missing.join(', ')}`);
 
-  console.log(`Logged in as ${client.user.tag}, posting to #${channel.name}`);
+  console.log(`logged in as ${client.user.tag}, posting in #${channel.name}`);
 
   startTracking(channel);
 });
 
-// One command per person at a time, so nobody can stack up start.gg requests by spamming.
+// one command per person at a time so spamming can't pile up start.gg requests
 const busy = new Set();
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -64,7 +63,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (err) {
     console.error(err);
     const message = `Something went wrong: ${err.message}`;
-    // If part of the answer already went out, add the error below it instead of replacing it.
     if (interaction.replied) {
       await interaction.followUp({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);
     } else if (interaction.deferred) {
@@ -77,9 +75,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Without a listener, Node treats an 'error' event as a crash.
+// log instead of crashing
 client.on(Events.Error, console.error);
-// Same for a rejected promise nobody caught. Log it and keep tracking.
 process.on('unhandledRejection', console.error);
 
-client.login(process.env.DISCORD_TOKEN).catch((err) => quit(`Discord didn't accept DISCORD_TOKEN. ${err.message}`));
+client.login(process.env.DISCORD_TOKEN).catch((err) => quit(`discord login failed: ${err.message}`));

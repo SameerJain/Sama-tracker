@@ -16,9 +16,9 @@ Follows start.gg players and posts to a Discord channel when one of them:
 1. Create an app at https://discord.com/developers/applications and add a bot. Invite it with the `bot` and `applications.commands` scopes and the View Channel, Send Messages, Embed Links and Attach Files permissions.
 2. Make a start.gg API token under Settings > Developer Settings.
 3. Copy `.env.example` to `.env` and fill it in. With Developer Mode on in Discord, right-click the server and the channel to copy their IDs. `ANTHROPIC_API_KEY` is optional.
-4. `npm install`, then `npm start`. Needs Node 20.6 or newer. `npm run dev` restarts the bot whenever you save a file.
+4. `npm install` and `npm start`. Needs Node 20.6+. `npm run dev` restarts it when you save a file.
 
-Run one copy per token. A second copy posts everything twice.
+Only run one copy at a time or everything gets posted twice.
 
 ## Commands
 
@@ -40,6 +40,6 @@ Run one copy per token. A second copy posts everything twice.
 
 `/df predict` weighs head-to-head, results against common opponents, seeding at shared brackets and their last 40 sets.
 
-With `ANTHROPIC_API_KEY` set, `/df sm4sh` has Claude Haiku write a new Smash 4 love letter with a random SmashWiki screenshot. Without a key, or if Claude is down, it just says the line.
+With `ANTHROPIC_API_KEY` set, `/df sm4sh` gets Claude Haiku to write a Smash 4 love letter and attaches a random SmashWiki screenshot. Otherwise it just says the line.
 
-start.gg requests are spaced out to stay under its rate limit, so `/df h2h` and `/df predict` take 10 to 30 seconds the first time for a player. Everything the bot remembers is in `data/state.json`.
+start.gg is rate limited, so `/df h2h` and `/df predict` take 10 to 30 seconds the first time for a player. State is saved in `data/state.json`.
