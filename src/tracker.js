@@ -131,8 +131,11 @@ async function postStreamAlerts() {
 // Which sets in a stream queue to announce. `queueSets` is in queue order, front first.
 // Each set has `state`: 1 waiting, 2 in progress, 3 finished, 6 called.
 function setsToAnnounce(queueSets) {
-  // TODO(human)
-  return [];
+  const unfinished = queueSets.filter((set) => set.state !== 3);
+  // Called or in progress means it's live. The front of the queue is up next even if the TO never pressed anything.
+  const live = unfinished.filter((set, i) => i === 0 || set.state === 2 || set.state === 6);
+  // Some streams on start.gg have no name, which leaves nothing to link to.
+  return live.filter((set) => set.stream?.streamName);
 }
 
 // Tournaments happening now with someone entered who has stream alerts on.
