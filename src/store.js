@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 const FILE = 'data/state.json';
 
-const empty = { players: {}, tournaments: {}, posted: [], streamed: [] };
+const empty = { players: {}, tournaments: {}, posted: [], streamed: [], dqs: [] };
 
 function load() {
   if (!fs.existsSync(FILE)) return empty;

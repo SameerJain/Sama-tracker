@@ -1,15 +1,42 @@
-import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
+import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { command, handleAutocomplete, handleCommand } from './commands.js';
+import { checkToken } from './startgg.js';
 import { startTracking } from './tracker.js';
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// Setup mistakes stop the bot with a plain message instead of a stack trace.
+function quit(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN', 'GUILD_ID', 'CHANNEL_ID']) {
+  if (!process.env[name]) quit(`${name} is missing from .env.`);
+}
+
+await checkToken().catch((err) => quit(`Couldn't use STARTGG_TOKEN (${err.message}). Make a new one under start.gg Settings > Developer Settings.`));
+
+// Set here instead of after login so Discord gets it again on every reconnect.
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds],
+  presence: { activities: [{ name: 'playing melee', type: ActivityType.Custom }] },
+});
 
 client.once(Events.ClientReady, async () => {
-  const guild = await client.guilds.fetch(process.env.GUILD_ID);
-  await guild.commands.set([command]);
+  const guild = await client.guilds.fetch(process.env.GUILD_ID).catch(() => null);
+  if (!guild) quit(`The bot isn't in a server with ID ${process.env.GUILD_ID}. Check GUILD_ID and that the bot was invited.`);
 
-  const channel = await client.channels.fetch(process.env.CHANNEL_ID);
-  client.user.setActivity('brackets', { type: ActivityType.Watching });
+  await guild.commands.set([command]).catch(() => quit('Discord refused the /df command. Re-invite the bot with the applications.commands scope.'));
+
+  const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch(() => null);
+  if (!channel?.isTextBased()) quit(`Can't find a text channel with ID ${process.env.CHANNEL_ID}, or the bot can't see it. Check CHANNEL_ID.`);
+
+  const missing = channel.permissionsFor(client.user).missing([
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks,
+  ]);
+  if (missing.length) quit(`The bot is missing these permissions in #${channel.name}: ${missing.join(', ')}.`);
+
   console.log(`Logged in as ${client.user.tag}, posting to #${channel.name}`);
 
   startTracking(channel);
@@ -35,4 +62,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+// Without a listener, Node treats an 'error' event as a crash.
+client.on(Events.Error, console.error);
+
+client.login(process.env.DISCORD_TOKEN).catch((err) => quit(`Discord didn't accept DISCORD_TOKEN. ${err.message}`));

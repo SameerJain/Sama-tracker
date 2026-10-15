@@ -4,6 +4,7 @@ import { state, save } from './store.js';
 
 const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
+const PROFILE_CHECK_HOURS = 24;
 const ROLL_CALL_HOURS_BEFORE = 1;
 const ROLL_CALL_MIN_PLAYERS = 3;
 // If start.gg never marks the events finished, post whatever placements exist this long after the end date.
@@ -21,13 +22,16 @@ let channel;
 // Each check waits for the previous one to finish, so nothing gets posted twice.
 let setCheck = Promise.resolve();
 let tournamentCheck = Promise.resolve();
+let profileCheck = Promise.resolve();
 
 export function startTracking(postChannel) {
   channel = postChannel;
   checkTournaments();
   checkSets();
+  checkProfiles();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
+  setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
 }
 
 export function checkSets() {
@@ -36,6 +40,25 @@ export function checkSets() {
 
 export function checkTournaments() {
   tournamentCheck = tournamentCheck.then(updateTournaments).catch(console.error);
+}
+
+function checkProfiles() {
+  profileCheck = profileCheck.then(updateProfiles).catch(console.error);
+}
+
+// People change their tag and avatar on start.gg. Pick up the new ones.
+async function updateProfiles() {
+  for (const player of Object.values(state.players)) {
+    try {
+      const latest = await startgg.getPlayer(player.slug);
+      if (!latest) continue;
+      player.tag = latest.tag;
+      player.image = latest.image;
+    } catch (err) {
+      console.error(`Refreshing ${player.tag} failed:`, err.message);
+    }
+  }
+  save();
 }
 
 async function postNewSets() {
@@ -50,9 +73,14 @@ async function postNewSets() {
         if (state.posted.includes(set.id)) continue;
         // Old sets come back when someone edits them. Don't post those.
         if (set.completedAt < player.lastCheck - HOUR) continue;
+        // start.gg reports a DQ as a score of -1, and DQs a player from the rest of their bracket once they DQ.
+        // Post their first one so people know they're out, then skip the rest.
+        const dqed = set.sides.find((side) => side.score === -1);
+        if (dqed && (!dqed.playerIds.includes(player.playerId) || state.dqs.includes(dqed.id))) continue;
 
         await channel.send({ embeds: [embeds.setResult(set, state.players)] });
         state.posted.push(set.id);
+        if (dqed) state.dqs.push(dqed.id);
       }
       player.lastCheck = checkedAt;
     } catch (err) {
@@ -61,6 +89,7 @@ async function postNewSets() {
   }
 
   state.posted = state.posted.slice(-1000);
+  state.dqs = state.dqs.slice(-200);
   save();
 }
 

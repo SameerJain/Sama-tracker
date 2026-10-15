@@ -134,7 +134,7 @@ async function trackAdd(interaction) {
     return interaction.editReply(`Already tracking ${player.tag}.`);
   }
 
-  state.players[player.userId] = { ...player, lastCheck: secondsNow() };
+  state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true };
   save();
   await interaction.editReply({ embeds: [embeds.added(player)] });
 
@@ -155,9 +155,11 @@ function upcoming(interaction) {
   const choice = readPlayerOption(interaction);
   if (!choice) return replyNotTracked(interaction);
 
+  const now = secondsNow();
   const tournaments = [];
   for (const tournament of Object.values(state.tournaments)) {
-    if (tournament.resultsPosted) continue;
+    // Skip ones that are over, even if their results haven't posted yet.
+    if (tournament.resultsPosted || now > (tournament.endAt ?? Infinity)) continue;
 
     const entries = tournament.entries.filter((entry) => {
       if (!state.players[entry.userId]) return false;

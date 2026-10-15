@@ -8,6 +8,7 @@ const colors = {
   clash: 0xf59e0b,
   results: 0xfacc15,
   stream: 0x9146ff,
+  live: 0xe11d48,
 };
 
 function baseEmbed(color, footer = 'Dark Fundies') {
@@ -131,12 +132,9 @@ export function setResult(set, players) {
   const player = bFirst ? trackedB : trackedA;
   const won = me.id === set.winnerId;
 
-  let label = won ? 'W' : 'L';
+  const label = won ? 'W' : 'L';
   let color = won ? colors.win : colors.loss;
-  if (clash) {
-    label = 'Crew clash';
-    color = colors.clash;
-  }
+  if (clash) color = colors.clash;
 
   const embed = setEmbed(set, color, player)
     .setTitle(`${label} · ${escapeMarkdown(me.name)} ${scoreText(me, them)} ${escapeMarkdown(them.name)}`)
@@ -182,17 +180,21 @@ function placementText(entry) {
 }
 
 // One card per tournament so each one shows its own image. Discord allows 10 per message.
+// Sorted by start time, so tournaments already underway come first, marked Live.
 export function upcoming(tournaments, players, who) {
   if (!tournaments.length) {
     return [baseEmbed(colors.brand).setTitle(`Upcoming · ${who}`).setDescription('Nobody is registered for anything yet.')];
   }
 
-  let label = `Upcoming · ${who}`;
-  if (tournaments.length > 10) label += ` · next 10 of ${tournaments.length}`;
-  return tournaments.slice(0, 10).map((tournament) => upcomingCard(tournament, players, label));
+  const now = Math.floor(Date.now() / 1000);
+  const more = tournaments.length > 10 ? ` · next 10 of ${tournaments.length}` : '';
+  return tournaments.slice(0, 10).map((tournament) => {
+    if (tournament.startAt <= now) return upcomingCard(tournament, players, `Live · ${who}${more}`, colors.live);
+    return upcomingCard(tournament, players, `Upcoming · ${who}${more}`, colors.brand);
+  });
 }
 
-function upcomingCard(tournament, players, label) {
+function upcomingCard(tournament, players, label, color) {
   const eventsByUser = new Map();
   for (const entry of tournament.entries) {
     if (!eventsByUser.has(entry.userId)) eventsByUser.set(entry.userId, []);
@@ -208,7 +210,7 @@ function upcomingCard(tournament, players, label) {
     lines.push(`${playerLink(players[userId])}: ${events.join(', ')}`);
   }
 
-  return tournamentEmbed(colors.brand, label, tournament).setDescription(lines.join('\n'));
+  return tournamentEmbed(color, label, tournament).setDescription(lines.join('\n'));
 }
 
 export function trackedList(players) {
@@ -223,7 +225,8 @@ export function trackedList(players) {
 }
 
 export function added(player) {
-  const embed = baseEmbed(colors.brand).setDescription(`Now tracking ${playerLink(player)}`);
+  const embed = baseEmbed(colors.brand)
+    .setDescription(`Now tracking ${playerLink(player)}. Stream alerts are on. Turn them off with \`/df stream\`.`);
   if (player.image) embed.setThumbnail(player.image);
   return embed;
 }
@@ -233,12 +236,12 @@ export function help() {
     '`/df track add` track a start.gg player by profile link or ID',
     '`/df track remove` stop tracking someone',
     '`/df track list` everyone being tracked',
-    '`/df upcoming` tournaments a player (or `all`) is registered for',
+    '`/df upcoming` live and upcoming tournaments for a player (or `all`)',
     '`/df recent` latest sets for a player (or `all`)',
     '`/df stream` turn on-stream alerts on or off for a player (or `all`)',
     '',
     'Posted to this channel automatically:',
-    '• every set a tracked player finishes',
+    '• every set a tracked player finishes (only their first DQ in an event)',
     '• when a tracked player\'s set is called on stream',
     '• who is entered, an hour before a tournament with 3+ of the crew starts',
     '• where the crew placed once their events are done',

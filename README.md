@@ -2,7 +2,7 @@
 
 Follows start.gg accounts and posts to a Discord channel when a tracked player:
 
-- finishes a set
+- finishes a set (only their first DQ in an event, so people know they dropped out)
 - has a set called on stream (with the Twitch link)
 - is entered in a tournament starting within the hour (only when 3 or more are entered)
 - finishes a tournament (posts where the crew placed, best first)
@@ -23,7 +23,7 @@ While editing the code, use `npm run dev` instead. It restarts the bot every tim
 /df track add profile:<link or ID>                start tracking a start.gg player
 /df track remove player:<name>                    stop tracking someone
 /df track list                                    everyone being tracked
-/df upcoming player:<name or all>                 tournaments they're registered for, soonest first
+/df upcoming player:<name or all>                 tournaments they're in, live ones first
 /df recent player:<name or all>                   the 5 latest sets
 /df stream player:<name or all> alerts:<on|off>   turn on-stream alerts on or off
 ```

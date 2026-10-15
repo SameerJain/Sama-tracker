@@ -21,15 +21,23 @@ async function query(text, variables) {
       Authorization: `Bearer ${process.env.STARTGG_TOKEN}`,
     },
     body: JSON.stringify({ query: text, variables }),
+    // Without this a stuck request holds up every check behind it for minutes.
+    signal: AbortSignal.timeout(30_000),
   });
-  if (!res.ok) throw new Error(`start.gg returned HTTP ${res.status}`);
-
-  const body = await res.json();
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`start.gg: ${body.message ?? `HTTP ${res.status}`}`);
   if (body.errors) throw new Error(`start.gg: ${body.errors[0].message}`);
   return body.data;
 }
 
-export async function getPlayer(slug) {
+// Fails if STARTGG_TOKEN is wrong, so a bad .env shows up at startup.
+export async function checkToken() {
+  await query('{ currentUser { id } }');
+}
+
+// Takes a profile ID like f64a83c8, or a slug like user/f64a83c8.
+export async function getPlayer(id) {
+  const slug = id.startsWith('user/') ? id : `user/${id}`;
   const data = await query(`
     query ($slug: String) {
       user(slug: $slug) {
@@ -39,7 +47,7 @@ export async function getPlayer(slug) {
         player { id gamerTag }
       }
     }
-  `, { slug: `user/${slug}` });
+  `, { slug });
 
   const user = data.user;
   if (!user?.player) return null;
@@ -90,6 +98,14 @@ export async function getSets(playerId, { since, perPage = 10, states = [3] } = 
     // Skip sets that don't have two players.
     if (node.slots?.length !== 2 || !node.slots[0].entrant || !node.slots[1].entrant) continue;
 
+    const sides = node.slots.map((slot) => ({
+      id: slot.entrant.id,
+      name: slot.entrant.name,
+      playerIds: slot.entrant.participants.map((participant) => participant.player?.id),
+      score: slot.standing?.stats?.score?.value ?? null,
+      characters: charactersPlayed(node.games, slot.entrant.id),
+    }));
+
     sets.push({
       id: String(node.id),
       completedAt: node.completedAt,
@@ -97,13 +113,7 @@ export async function getSets(playerId, { since, perPage = 10, states = [3] } = 
       winnerId: node.winnerId,
       stream: node.stream,
       event: node.event,
-      sides: node.slots.map((slot) => ({
-        id: slot.entrant.id,
-        name: slot.entrant.name,
-        playerIds: slot.entrant.participants.map((participant) => participant.player?.id),
-        score: slot.standing?.stats?.score?.value ?? null,
-        characters: charactersPlayed(node.games, slot.entrant.id),
-      })),
+      sides,
     });
   }
   return sets;
@@ -114,7 +124,8 @@ export async function getStreamedSets(playerId) {
   // Only sets updated in the last hour, so one left in progress at some old tournament doesn't count.
   const since = Math.floor(Date.now() / 1000) - 60 * 60;
   const sets = await getSets(playerId, { since, perPage: 3, states: [2, 6] });
-  return sets.filter((set) => set.stream);
+  // Some streams on start.gg have no name, which leaves nothing to link to.
+  return sets.filter((set) => set.stream?.streamName);
 }
 
 function charactersPlayed(games, entrantId) {
@@ -153,8 +164,50 @@ export async function getUpcomingTournaments(userId) {
   return data.user?.tournaments?.nodes ?? [];
 }
 
+// start.gg caps how much one request can return. Asking about every player in every event
+// at a big major can go over, so ask about a few players per request.
+const PLAYERS_PER_LOOKUP = 5;
+
 // A tournament plus which events each user is entered in, with placements once they exist.
 export async function getTournament(tournamentId, userIds) {
+  const groups = [];
+  for (let i = 0; i < userIds.length; i += PLAYERS_PER_LOOKUP) {
+    groups.push(userIds.slice(i, i + PLAYERS_PER_LOOKUP));
+  }
+  // With nobody tracked, still look up the tournament itself.
+  if (!groups.length) groups.push([]);
+
+  let info;
+  const entries = [];
+  for (const group of groups) {
+    const tournament = await lookupEntries(tournamentId, group);
+    if (!tournament) return null;
+
+    const { events, ...rest } = tournament;
+    info = rest;
+    for (const event of events ?? []) {
+      for (const userId of group) {
+        const entrant = event[`u${userId}`];
+        if (!entrant) continue;
+
+        entries.push({
+          userId,
+          eventId: event.id,
+          event: event.name,
+          eventSlug: event.slug,
+          entrants: event.numEntrants,
+          done: event.state === 'COMPLETED',
+          placement: entrant.standing?.placement ?? null,
+          dq: entrant.isDisqualified,
+        });
+      }
+    }
+  }
+
+  return { ...info, entries };
+}
+
+async function lookupEntries(tournamentId, userIds) {
   // One userEntrant lookup per user. The u123 aliases keep the answers apart.
   const entrantLookups = userIds
     .map((id) => `u${id}: userEntrant(userId: ${id}) { id isDisqualified standing { placement } }`)
@@ -176,28 +229,5 @@ export async function getTournament(tournamentId, userIds) {
     }
   `, { id: tournamentId });
 
-  const tournament = data.tournament;
-  if (!tournament) return null;
-
-  const entries = [];
-  for (const event of tournament.events ?? []) {
-    for (const userId of userIds) {
-      const entrant = event[`u${userId}`];
-      if (!entrant) continue;
-
-      entries.push({
-        userId,
-        eventId: event.id,
-        event: event.name,
-        eventSlug: event.slug,
-        entrants: event.numEntrants,
-        done: event.state === 'COMPLETED',
-        placement: entrant.standing?.placement ?? null,
-        dq: entrant.isDisqualified,
-      });
-    }
-  }
-
-  delete tournament.events;
-  return { ...tournament, entries };
+  return data.tournament;
 }
