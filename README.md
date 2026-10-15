@@ -3,8 +3,9 @@
 Follows start.gg accounts and posts to a Discord channel when a tracked player:
 
 - finishes a set
-- is entered in a tournament starting within 6 hours
-- gets a final placement
+- has a set called on stream (with the Twitch link)
+- is entered in a tournament starting within the hour (only when 3 or more are entered)
+- finishes a tournament (posts where the crew placed, best first)
 
 ## Setup
 
@@ -13,15 +14,20 @@ Follows start.gg accounts and posts to a Discord channel when a tracked player:
 3. Copy `.env.example` to `.env` and fill it in. With Developer Mode on in Discord, right-click the server and the channel to copy their IDs.
 4. `npm install`, then `npm start`.
 
+While editing the code, use `npm run dev` instead. It restarts the bot every time you save a file.
+
 ## Commands
 
 ```
-/df help
-/df track add profile:<link or ID>
-/df track remove player:<name>
-/df track list
-/df upcoming player:<name or all>
-/df recent player:<name or all>
+/df help                                          show the commands
+/df track add profile:<link or ID>                start tracking a start.gg player
+/df track remove player:<name>                    stop tracking someone
+/df track list                                    everyone being tracked
+/df upcoming player:<name or all>                 tournaments they're registered for, soonest first
+/df recent player:<name or all>                   the 5 latest sets
+/df stream player:<name or all> alerts:<on|off>   turn on-stream alerts on or off
 ```
+
+For `profile`, paste their start.gg profile link (like `start.gg/user/f64a83c8`) or just the ID at the end. `player` autocompletes from the tracked list.
 
 Tracked players and posted sets are saved in `data/state.json`.
