@@ -7,7 +7,7 @@ import * as smash4 from './sm4sh.js';
 import { predict as predictOdds } from './predict.js';
 
 // h2h and predict search this many pages of a player's sets, 40 per page.
-const H2H_PAGES = 15;
+const HISTORY_PAGES = 15;
 const HISTORY_CACHE_MINUTES = 10;
 
 function playerOption(description, name = 'player') {
@@ -139,7 +139,7 @@ export async function handleAutocomplete(interaction) {
 }
 
 // Returns 'all', a tracked player, or undefined.
-function readPlayerOption(interaction, name = 'player') {
+function readChoice(interaction, name = 'player') {
   const value = interaction.options.getString(name, true).toLowerCase();
   if (value === 'all') return 'all';
 
@@ -147,6 +147,12 @@ function readPlayerOption(interaction, name = 'player') {
   // hasOwn so a name like "constructor" doesn't match a built-in property.
   if (Object.hasOwn(state.players, value)) return state.players[value];
   return Object.values(state.players).find((player) => player.tag.toLowerCase() === value);
+}
+
+// For commands that need one real player, where `all` doesn't make sense.
+function readPlayer(interaction, name = 'player') {
+  const choice = readChoice(interaction, name);
+  return choice === 'all' ? undefined : choice;
 }
 
 // Discord allows 10 embeds and 6000 characters per message, so long replies continue in follow-ups.
@@ -201,8 +207,8 @@ async function trackAdd(interaction) {
 }
 
 async function trackRemove(interaction) {
-  const player = readPlayerOption(interaction);
-  if (!player || player === 'all') return replyNotTracked(interaction);
+  const player = readPlayer(interaction);
+  if (!player) return replyNotTracked(interaction);
 
   delete state.players[player.userId];
   save();
@@ -210,7 +216,7 @@ async function trackRemove(interaction) {
 }
 
 function upcoming(interaction) {
-  const choice = readPlayerOption(interaction);
+  const choice = readChoice(interaction);
   if (!choice) return replyNotTracked(interaction);
 
   const now = secondsNow();
@@ -232,7 +238,7 @@ function upcoming(interaction) {
 }
 
 async function recent(interaction) {
-  const choice = readPlayerOption(interaction);
+  const choice = readChoice(interaction);
   if (!choice) return replyNotTracked(interaction);
 
   await interaction.deferReply();
@@ -272,7 +278,7 @@ function setHistory(playerId) {
 
 async function fetchHistory(playerId) {
   const sets = [];
-  for (let page = 1; page <= H2H_PAGES; page++) {
+  for (let page = 1; page <= HISTORY_PAGES; page++) {
     const batch = await startgg.getSetHistory(playerId, page);
     if (!batch.length) break;
     sets.push(...batch);
@@ -281,29 +287,28 @@ async function fetchHistory(playerId) {
 }
 
 async function headToHead(interaction) {
-  const a = readPlayerOption(interaction);
-  const b = readPlayerOption(interaction, 'opponent');
-  if (!a || !b || a === 'all' || b === 'all') return replyNotTracked(interaction);
+  const a = readPlayer(interaction);
+  const b = readPlayer(interaction, 'opponent');
+  if (!a || !b) return replyNotTracked(interaction);
   if (a === b) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
 
   await interaction.deferReply();
-  // start.gg can't search for sets between two players, so go through one player's history.
-  const sets = await setHistory(a.playerId);
+  // start.gg can't search for sets between two players, so go through their histories. Both, since either
+  // one can stop short of older sets, and keyed by set so none count twice. DQs don't count.
+  const [historyA, historyB] = await Promise.all([setHistory(a.playerId), setHistory(b.playerId)]);
+  const played = new Map();
+  for (const set of [...historyA, ...historyB]) {
+    const result = startgg.fromSide(set, a.playerId);
+    if (result?.them.playerIds.includes(b.playerId) && !result.dq) played.set(set.id, set);
+  }
+  const sets = [...played.values()].sort((x, y) => y.completedAt - x.completedAt);
 
-  // Singles only, and DQs don't count.
-  const solo = (side, player) => side.playerIds.length === 1 && side.playerIds[0] === player.playerId;
-  const played = sets.filter(({ sides: [x, y] }) => {
-    const meetUp = (solo(x, a) && solo(y, b)) || (solo(x, b) && solo(y, a));
-    return meetUp && x.score !== -1 && y.score !== -1;
-  });
-  played.sort((x, y) => y.completedAt - x.completedAt);
-
-  await interaction.editReply({ embeds: [embeds.headToHead(a, b, played)] });
+  await interaction.editReply({ embeds: [embeds.headToHead(a, b, sets)] });
 }
 
 async function stats(interaction) {
-  const player = readPlayerOption(interaction);
-  if (!player || player === 'all') return replyNotTracked(interaction);
+  const player = readPlayer(interaction);
+  if (!player) return replyNotTracked(interaction);
 
   await interaction.deferReply();
   const { standings, sets } = await startgg.getStats(player.playerId);
@@ -311,9 +316,9 @@ async function stats(interaction) {
 }
 
 async function predict(interaction) {
-  const a = readPlayerOption(interaction);
-  const b = readPlayerOption(interaction, 'opponent');
-  if (!a || !b || a === 'all' || b === 'all') return replyNotTracked(interaction);
+  const a = readPlayer(interaction);
+  const b = readPlayer(interaction, 'opponent');
+  if (!a || !b) return replyNotTracked(interaction);
   if (a === b) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
 
   await interaction.deferReply();
@@ -325,7 +330,7 @@ async function predict(interaction) {
 }
 
 function streamAlerts(interaction) {
-  const choice = readPlayerOption(interaction);
+  const choice = readChoice(interaction);
   if (!choice) return replyNotTracked(interaction);
 
   const on = interaction.options.getString('alerts', true) === 'on';

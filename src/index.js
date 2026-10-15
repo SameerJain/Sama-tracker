@@ -64,7 +64,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (err) {
     console.error(err);
     const message = `Something went wrong: ${err.message}`;
-    if (interaction.deferred) {
+    // If part of the answer already went out, add the error below it instead of replacing it.
+    if (interaction.replied) {
+      await interaction.followUp({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);
+    } else if (interaction.deferred) {
       await interaction.editReply(message).catch(console.error);
     } else {
       await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);

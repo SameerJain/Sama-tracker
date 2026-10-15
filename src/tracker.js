@@ -50,7 +50,7 @@ function queued(check) {
   };
 }
 
-export const checkSets = queued(async () => {
+const checkSets = queued(async () => {
   await postNewSets();
   await postStreamAlerts();
 });

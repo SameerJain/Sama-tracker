@@ -1,5 +1,5 @@
 import { EmbedBuilder, escapeMarkdown } from 'discord.js';
-import { startggUrl } from './startgg.js';
+import { fromSide, startggUrl } from './startgg.js';
 import { FORM_SETS } from './predict.js';
 
 const colors = {
@@ -44,6 +44,19 @@ function tournamentEmbed(color, label, tournament) {
 
 function playerLink(player) {
   return `[${escapeMarkdown(player.tag)}](${startggUrl(player.slug)})`;
+}
+
+function setUrl(set) {
+  return startggUrl(`${set.event.slug}/set/${set.id}`);
+}
+
+// The tournament name, linking to the set itself.
+function setLink(set) {
+  return `[${escapeMarkdown(set.event.tournament.name)}](${setUrl(set)})`;
+}
+
+function percent(part, whole) {
+  return `${Math.round((part / whole) * 100)}%`;
 }
 
 // Discord shows this in each reader's own timezone, plus a countdown like "in 3 hours".
@@ -93,6 +106,7 @@ function upsetFactor(winner, loser) {
   return step(winner.seed) - step(loser.seed);
 }
 
+// The tracked player on this side of a set, if there is one.
 function findTracked(side, players) {
   return Object.values(players).find((player) => side.playerIds.includes(player.playerId));
 }
@@ -116,7 +130,7 @@ function setEmbed(set, color, player) {
   const tournament = set.event.tournament;
 
   const embed = baseEmbed(color, game ? `Dark Fundies · ${game}` : undefined)
-    .setDescription(`**${set.round}** · ${set.event.name}\n[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})`);
+    .setDescription(`**${set.round}** · ${escapeMarkdown(set.event.name)}\n[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})`);
 
   if (player) embed.setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) });
 
@@ -137,7 +151,7 @@ export function onStream(set, players) {
 
   return setEmbed(set, colors.stream, trackedA ?? findTracked(b, players))
     .setTitle(`On stream · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
-    .setURL(twitch ?? startggUrl(`${set.event.slug}/set/${set.id}`))
+    .setURL(twitch ?? setUrl(set))
     .addFields({ name: 'Watch', value: watch });
 }
 
@@ -162,7 +176,7 @@ export function setResult(set, players) {
 
   const embed = setEmbed(set, color, player)
     .setTitle(`${label} · ${escapeMarkdown(me.name)} ${scoreText(me, them)} ${escapeMarkdown(them.name)}`)
-    .setURL(startggUrl(`${set.event.slug}/set/${set.id}`))
+    .setURL(setUrl(set))
     .setTimestamp(set.completedAt * 1000);
 
   const characterLines = [];
@@ -239,11 +253,7 @@ function upcomingCard(tournament, players, label, color) {
 
 // Record from a's side, then the last 10 sets between them.
 export function headToHead(a, b, sets) {
-  const results = sets.map((set) => {
-    const me = set.sides.find((side) => side.playerIds.includes(a.playerId));
-    const them = set.sides.find((side) => side !== me);
-    return { set, me, them, won: me.id === set.winnerId };
-  });
+  const results = sets.map((set) => fromSide(set, a.playerId));
   const wins = results.filter((result) => result.won).length;
   const losses = results.length - wins;
 
@@ -267,7 +277,7 @@ export function headToHead(a, b, sets) {
 
   const lines = [];
   if (gamesWon + gamesLost) {
-    lines.push(`-# Games ${gamesWon}-${gamesLost} (${Math.round((gamesWon / (gamesWon + gamesLost)) * 100)}% won)`);
+    lines.push(`-# Games ${gamesWon}-${gamesLost} (${percent(gamesWon, gamesWon + gamesLost)} won)`);
   }
   // Call out whoever is ahead. A tie gets nothing.
   if (wins !== losses) {
@@ -277,18 +287,18 @@ export function headToHead(a, b, sets) {
   if (lines.length) lines.push('');
 
   for (const { set, me, them, won } of results.slice(0, 10)) {
-    const link = `[${escapeMarkdown(set.event.tournament.name)}](${startggUrl(`${set.event.slug}/set/${set.id}`)})`;
-    lines.push(`${won ? 'W' : 'L'} ${scoreText(me, them)} · ${set.round} · ${link} · <t:${set.completedAt}:d>`);
+    lines.push(`${won ? 'W' : 'L'} ${scoreText(me, them)} · ${set.round} · ${setLink(set)} · <t:${set.completedAt}:d>`);
   }
   return embed.setDescription(lines.join('\n'));
 }
 
 // The odds, then the stats behind them. Every line names who it favors.
 export function prediction(a, b, odds) {
-  const percent = Math.min(99, Math.max(1, Math.round(odds.chance * 100)));
+  // Never a sure thing either way.
+  const chanceA = Math.min(99, Math.max(1, Math.round(odds.chance * 100)));
   const embed = baseEmbed(colors.clash, `Dark Fundies · ${odds.game}`)
     .setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) })
-    .setTitle(`${escapeMarkdown(a.tag)} ${percent}% · ${100 - percent}% ${escapeMarkdown(b.tag)}`);
+    .setTitle(`${escapeMarkdown(a.tag)} ${chanceA}% · ${100 - chanceA}% ${escapeMarkdown(b.tag)}`);
   if (b.image) embed.setThumbnail(b.image);
 
   const tagA = escapeMarkdown(a.tag);
@@ -308,7 +318,7 @@ export function prediction(a, b, odds) {
     const higher = seeding.higher >= seeding.total - seeding.higher ? [tagA, seeding.higher] : [tagB, seeding.total - seeding.higher];
     lines.push(`**Seeding:** ${higher[0]} seeded higher in ${higher[1]} of ${seeding.total} shared brackets`);
   }
-  const record = ({ wins, total }) => `${wins}-${total - wins}${total ? ` (${Math.round((wins / total) * 100)}%)` : ''}`;
+  const record = ({ wins, total }) => `${wins}-${total - wins}${total ? ` (${percent(wins, total)})` : ''}`;
   lines.push(`**Form:** ${tagA} ${record(form.a)} · ${tagB} ${record(form.b)}, last ${FORM_SETS} sets each`);
 
   return embed.setDescription(lines.join('\n'));
@@ -324,12 +334,7 @@ export function stats(player, standings, sets) {
   if (player.image) embed.setThumbnail(player.image);
 
   // DQs don't count, same as h2h.
-  const played = [];
-  for (const set of sets) {
-    const me = set.sides.find((side) => side.playerIds.includes(player.playerId));
-    const them = set.sides.find((side) => side !== me);
-    if (me && scoreText(me, them) !== 'DQ') played.push({ set, me, them, won: me.id === set.winnerId });
-  }
+  const played = sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
   if (!played.length && !standings.length) return embed.setDescription('Nothing on start.gg yet.');
 
   const lines = [];
@@ -340,9 +345,7 @@ export function stats(player, standings, sets) {
       if (!records.has(game)) records.set(game, { wins: 0, losses: 0 });
       records.get(game)[won ? 'wins' : 'losses']++;
     }
-    const recordText = [...records].map(([game, { wins, losses }]) => {
-      return `${game} ${wins}-${losses} (${Math.round((wins / (wins + losses)) * 100)}%)`;
-    });
+    const recordText = [...records].map(([game, { wins, losses }]) => `${game} ${wins}-${losses} (${percent(wins, wins + losses)})`);
     lines.push(`**Sets:** ${recordText.join(' · ')}`);
   }
 
@@ -367,8 +370,7 @@ export function stats(player, standings, sets) {
   if (upset) {
     const { set, me, them } = upset;
     const score = scoreText(me, them) === 'vs' ? '' : ` ${scoreText(me, them)}`;
-    const link = `[${escapeMarkdown(set.event.tournament.name)}](${startggUrl(`${set.event.slug}/set/${set.id}`)})`;
-    lines.push(`**Biggest upset:** beat ${escapeMarkdown(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${link}`);
+    lines.push(`**Biggest upset:** beat ${escapeMarkdown(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}`);
   }
 
   if (standings.length) {
@@ -376,8 +378,8 @@ export function stats(player, standings, sets) {
   }
 
   const from = [];
-  if (played.length) from.push(`${played.length} singles sets`);
-  if (standings.length) from.push(`${standings.length} events`);
+  if (played.length) from.push(played.length === 1 ? '1 singles set' : `${played.length} singles sets`);
+  if (standings.length) from.push(standings.length === 1 ? '1 event' : `${standings.length} events`);
   lines.push(`-# From their last ${from.join(' and ')} on start.gg`);
 
   return embed.setDescription(lines.join('\n'));
@@ -422,22 +424,23 @@ export function sm4sh(title, text, screenshot, file) {
 
 export function help() {
   const lines = [
-    '`/df track add` track a start.gg player by profile link or ID',
+    '`/df track add` track someone by start.gg link or ID',
     '`/df track remove` stop tracking someone',
-    '`/df track list` everyone being tracked',
-    '`/df upcoming` live and upcoming tournaments for a player (or `all`)',
-    '`/df recent` latest sets for a player (or `all`)',
-    '`/df h2h` head-to-head record between two tracked players',
-    '`/df stats` recent placements, set record and biggest upset for a player',
-    '`/df predict` odds of one tracked player beating another, and why',
-    '`/df stream` turn on-stream alerts on or off for a player (or `all`)',
-    '`/df sm4sh` a new love letter to Smash 4, with a random Wii U screenshot',
+    '`/df track list` everyone tracked',
+    '`/df upcoming` live and upcoming tournaments',
+    '`/df recent` latest sets',
+    '`/df h2h` record between two players',
+    '`/df stats` set record, placements and best upset',
+    '`/df predict` odds of one player beating another',
+    '`/df stream` stream alerts on or off',
+    '`/df sm4sh` a love letter to Smash 4',
+    '-# upcoming, recent and stream also take `all` as the player',
     '',
-    'Posted to this channel automatically:',
-    '• every set a tracked player finishes (only their first DQ in an event)',
-    '• when a tracked player\'s set is on stream or up next in the stream queue',
-    '• who is entered, an hour before a tournament with 3+ of the crew starts',
-    '• where the crew placed once their events are done',
+    'Posted here automatically:',
+    '• finished sets, and a player\'s first DQ in an event',
+    '• sets on stream or up next in the stream queue',
+    '• a roll call an hour before a tournament with 3+ of the crew',
+    '• where everyone placed once it\'s over',
   ];
   return baseEmbed(colors.brand).setTitle('Dark Fundies').setDescription(lines.join('\n'));
 }

@@ -1,3 +1,5 @@
+import { fromSide } from './startgg.js';
+
 // Odds of a beating b, worked out from their start.gg singles history. No AI, just their records.
 
 // Form looks at this many of each player's latest sets.
@@ -8,6 +10,7 @@ const WEIGHTS = { h2h: 3, common: 2, seeding: 1.5, form: 1 };
 
 // Pulled toward 50% so a 1-0 record reads as 67%, not 100%.
 const rate = (wins, total) => (wins + 1) / (total + 2);
+// Turns a rate into a lean: 0 at 50%, positive for a, negative for b. Leans can be averaged, rates can't.
 const logit = (p) => Math.log(p / (1 - p));
 
 // The game they've both played the most.
@@ -33,22 +36,19 @@ function sharedGame(historyA, historyB) {
 
 // A player's sets in one game from their side, newest first. DQs don't count.
 function results(history, player, game) {
-  const list = [];
-  for (const set of history) {
-    if (set.event.videogame?.displayName !== game) continue;
-    const me = set.sides.find((side) => side.playerIds.includes(player.playerId));
-    const them = set.sides.find((side) => side !== me);
-    if (!me || me.score === -1 || them.score === -1) continue;
-    list.push({ set, me, opponent: them.playerIds[0], won: me.id === set.winnerId });
-  }
-  return list;
+  return history
+    .filter((set) => set.event.videogame?.displayName === game)
+    .map((set) => fromSide(set, player.playerId))
+    .filter((result) => result && !result.dq)
+    .map((result) => ({ ...result, opponent: result.them.playerIds[0] }));
 }
 
 // Record against each opponent, leaving out the two players being compared.
 function recordsByOpponent(list, skip) {
   const records = new Map();
   for (const { opponent, won } of list) {
-    if (skip.includes(opponent)) continue;
+    // An opponent with no start.gg account has no ID to match on.
+    if (!opponent || skip.includes(opponent)) continue;
     const record = records.get(opponent) ?? { wins: 0, total: 0 };
     record.total++;
     if (won) record.wins++;
@@ -113,10 +113,12 @@ export function predict(a, b, historyA, historyB) {
   let sum = 0;
   let totalWeight = 0;
   for (const [weight, n, lean] of signals) {
+    // 3 sets behind a signal gives it half its weight, 30 gives it about 90%.
     const w = weight * (n / (n + 3));
     sum += w * lean;
     totalWeight += w;
   }
+  // The weighted average lean, turned back into a chance.
   const chance = totalWeight ? 1 / (1 + Math.exp(-sum / totalWeight)) : 0.5;
 
   return { game, chance, h2h, common, seeding, form };

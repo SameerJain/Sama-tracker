@@ -6,6 +6,13 @@ export function startggUrl(slug) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// [1, 2, 3, 4, 5] in groups of 2 is [[1, 2], [3, 4], [5]].
+function chunk(list, size) {
+  const groups = [];
+  for (let i = 0; i < list.length; i += size) groups.push(list.slice(i, i + size));
+  return groups;
+}
+
 // start.gg allows 80 requests a minute. Each request takes the next free slot, 800ms apart.
 let nextSlot = 0;
 
@@ -116,19 +123,23 @@ function toSet(node) {
   };
 }
 
+// A set from one player's side, or null if they weren't in it. start.gg reports a DQ as a score of -1.
+export function fromSide(set, playerId) {
+  const me = set.sides.find((side) => side.playerIds.includes(playerId));
+  if (!me) return null;
+  const them = set.sides.find((side) => side !== me);
+  return { set, me, them, won: me.id === set.winnerId, dq: me.score === -1 || them.score === -1 };
+}
+
 // Sets for some players, optionally only ones changed after `since`. Finished ones by default.
 // start.gg set states: 1 is waiting, 2 is in progress, 3 is finished, 6 is called.
 export async function getSets(playerIds, { since, perPage = 10, states = [3] } = {}) {
   // start.gg rejects a request that could return over 1000 objects. Each player costs 3, plus up to
   // about 35 per set. Sets with more games cost more.
   const size = Math.max(1, Math.floor(1000 / (3 + 35 * perPage)));
-  const groups = [];
-  for (let i = 0; i < playerIds.length; i += size) {
-    groups.push(playerIds.slice(i, i + size));
-  }
 
   // One request per group instead of per player. The p123 aliases keep the answers apart.
-  const results = await Promise.all(groups.map((group) => query(`
+  const results = await Promise.all(chunk(playerIds, size).map((group) => query(`
     query ($perPage: Int!, $filters: SetFilters) {
       ${group.map((id) => `p${id}: player(id: ${id}) { sets(perPage: $perPage, page: 1, filters: $filters) { nodes { ${SET_FIELDS} } } }`).join('\n')}
     }
@@ -239,6 +250,7 @@ export async function getStreamedSets(playerIds) {
   return sets.filter((set) => set.stream?.streamName);
 }
 
+// Every character one entrant picked across the set's games.
 function charactersPlayed(games, entrantId) {
   const names = new Set();
   for (const game of games ?? []) {
@@ -261,6 +273,8 @@ const TOURNAMENT_FIELDS = `
   images(type: "profile") { url }
 `;
 
+// Tournaments the user is entered in or helping run that haven't ended yet. Ones they only run
+// end up with no entries, so nothing gets posted for them.
 export async function getUpcomingTournaments(userId) {
   const data = await query(`
     query ($id: ID!) {
@@ -281,10 +295,7 @@ const PLAYERS_PER_LOOKUP = 5;
 
 // A tournament plus which events each user is entered in, with placements once they exist.
 export async function getTournament(tournamentId, userIds) {
-  const groups = [];
-  for (let i = 0; i < userIds.length; i += PLAYERS_PER_LOOKUP) {
-    groups.push(userIds.slice(i, i + PLAYERS_PER_LOOKUP));
-  }
+  const groups = chunk(userIds, PLAYERS_PER_LOOKUP);
   // With nobody tracked, still look up the tournament itself.
   if (!groups.length) groups.push([]);
 
