@@ -38,7 +38,7 @@ Run one copy per token. A second copy posts everything twice.
 
 `profile` takes a link like `start.gg/user/f64a83c8` or just the ID at the end. `player` autocompletes from the tracked list.
 
-`/df predict` is plain math, no AI. In the game both players have played most, it weighs head-to-head, results against common opponents, seeding at shared brackets and their last 40 sets.
+`/df predict` weighs head-to-head, results against common opponents, seeding at shared brackets and their last 40 sets.
 
 With `ANTHROPIC_API_KEY` set, `/df sm4sh` has Claude Haiku write a new Smash 4 love letter with a random SmashWiki screenshot. Without a key, or if Claude is down, it just says the line.
 
