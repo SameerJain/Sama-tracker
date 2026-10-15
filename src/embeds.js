@@ -242,7 +242,7 @@ export function help() {
     '',
     'Posted to this channel automatically:',
     '• every set a tracked player finishes (only their first DQ in an event)',
-    '• when a tracked player\'s set is called on stream',
+    '• when a tracked player\'s set is on stream or up next in the stream queue',
     '• who is entered, an hour before a tournament with 3+ of the crew starts',
     '• where the crew placed once their events are done',
   ];

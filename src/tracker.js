@@ -108,8 +108,51 @@ async function postStreamAlerts() {
     }
   }
 
+  // Many TOs never press "call" on start.gg, so the check above never sees the set go live.
+  // They still line sets up in the stream queue for their overlay, so watch that too.
+  for (const tournament of liveTournaments()) {
+    try {
+      for (const queue of await startgg.getStreamQueues(tournament.id)) {
+        for (const set of setsToAnnounce(queue.sets)) {
+          if (state.streamed.includes(set.id) || !hasPlayerWithAlerts(set)) continue;
+          await channel.send({ embeds: [embeds.onStream(set, state.players)] });
+          state.streamed.push(set.id);
+        }
+      }
+    } catch (err) {
+      console.error(`Checking stream queues at ${tournament.name} failed:`, err.message);
+    }
+  }
+
   state.streamed = state.streamed.slice(-200);
   save();
+}
+
+// Which sets in a stream queue to announce. `queueSets` is in queue order, front first.
+// Each set has `state`: 1 waiting, 2 in progress, 3 finished, 6 called.
+function setsToAnnounce(queueSets) {
+  // TODO(human)
+  return [];
+}
+
+// Tournaments happening now with someone entered who has stream alerts on.
+function liveTournaments() {
+  const now = secondsNow();
+  return Object.values(state.tournaments).filter((tournament) => {
+    if (tournament.resultsPosted || now < tournament.startAt) return false;
+    // Locals often run past their listed end time.
+    if (now > endTime(tournament) + 6 * HOUR) return false;
+    return tournament.entries.some((entry) => alertsOn(state.players[entry.userId]));
+  });
+}
+
+function hasPlayerWithAlerts(set) {
+  const players = Object.values(state.players).filter(alertsOn);
+  return set.sides.some((side) => players.some((player) => side.playerIds.includes(player.playerId)));
+}
+
+function alertsOn(player) {
+  return Boolean(player) && player.streamAlerts !== false;
 }
 
 async function updateTournaments() {

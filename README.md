@@ -3,7 +3,7 @@
 Follows start.gg accounts and posts to a Discord channel when a tracked player:
 
 - finishes a set (only their first DQ in an event, so people know they dropped out)
-- has a set called on stream (with the Twitch link)
+- has a set on stream, either called or at the front of the stream queue (with the Twitch link)
 - is entered in a tournament starting within the hour (only when 3 or more are entered)
 - finishes a tournament (posts where the crew placed, best first)
 

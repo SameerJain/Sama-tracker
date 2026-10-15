@@ -61,62 +61,89 @@ export async function getPlayer(id) {
   };
 }
 
+// What every set query asks for. toSet turns each result into the shape the embeds use.
+const SET_FIELDS = `
+  id
+  state
+  completedAt
+  fullRoundText
+  winnerId
+  stream { streamName streamSource }
+  event {
+    name
+    slug
+    videogame { displayName }
+    tournament { name slug images(type: "profile") { url } }
+  }
+  slots {
+    entrant { id name participants { player { id } } }
+    standing { stats { score { value } } }
+  }
+  games {
+    selections { entrant { id } character { name } }
+  }
+`;
+
+function toSet(node) {
+  // Skip sets that don't have two players yet.
+  if (node.slots?.length !== 2 || !node.slots[0].entrant || !node.slots[1].entrant) return null;
+
+  const sides = node.slots.map((slot) => ({
+    id: slot.entrant.id,
+    name: slot.entrant.name,
+    playerIds: slot.entrant.participants.map((participant) => participant.player?.id),
+    score: slot.standing?.stats?.score?.value ?? null,
+    characters: charactersPlayed(node.games, slot.entrant.id),
+  }));
+
+  return {
+    id: String(node.id),
+    state: node.state,
+    completedAt: node.completedAt,
+    round: node.fullRoundText,
+    winnerId: node.winnerId,
+    stream: node.stream,
+    event: node.event,
+    sides,
+  };
+}
+
 // Sets for a player, optionally only ones changed after `since`. Finished ones by default.
-// start.gg set states: 2 is in progress, 3 is finished, 6 is called.
+// start.gg set states: 1 is waiting, 2 is in progress, 3 is finished, 6 is called.
 export async function getSets(playerId, { since, perPage = 10, states = [3] } = {}) {
   const data = await query(`
     query ($id: ID!, $perPage: Int!, $filters: SetFilters) {
       player(id: $id) {
         sets(perPage: $perPage, page: 1, filters: $filters) {
-          nodes {
-            id
-            completedAt
-            fullRoundText
-            winnerId
-            stream { streamName streamSource }
-            event {
-              name
-              slug
-              videogame { displayName }
-              tournament { name slug images(type: "profile") { url } }
-            }
-            slots {
-              entrant { id name participants { player { id } } }
-              standing { stats { score { value } } }
-            }
-            games {
-              selections { entrant { id } character { name } }
-            }
-          }
+          nodes { ${SET_FIELDS} }
         }
       }
     }
   `, { id: playerId, perPage, filters: { state: states, updatedAfter: since } });
 
-  const sets = [];
-  for (const node of data.player?.sets?.nodes ?? []) {
-    // Skip sets that don't have two players.
-    if (node.slots?.length !== 2 || !node.slots[0].entrant || !node.slots[1].entrant) continue;
+  return (data.player?.sets?.nodes ?? []).map(toSet).filter(Boolean);
+}
 
-    const sides = node.slots.map((slot) => ({
-      id: slot.entrant.id,
-      name: slot.entrant.name,
-      playerIds: slot.entrant.participants.map((participant) => participant.player?.id),
-      score: slot.standing?.stats?.score?.value ?? null,
-      characters: charactersPlayed(node.games, slot.entrant.id),
-    }));
+// Each stream at a tournament with its queued sets, in the order the TO lined them up.
+export async function getStreamQueues(tournamentId) {
+  const data = await query(`
+    query ($id: ID!) {
+      tournament(id: $id) {
+        streamQueue {
+          stream { streamName streamSource }
+          sets { ${SET_FIELDS} }
+        }
+      }
+    }
+  `, { id: tournamentId });
 
-    sets.push({
-      id: String(node.id),
-      completedAt: node.completedAt,
-      round: node.fullRoundText,
-      winnerId: node.winnerId,
-      stream: node.stream,
-      event: node.event,
-      sides,
-    });
+  const queues = [];
+  for (const queue of data.tournament?.streamQueue ?? []) {
+    // A queued set may not name its stream itself. The queue always does.
+    const sets = (queue.sets ?? []).map(toSet).filter(Boolean).map((set) => ({ ...set, stream: set.stream ?? queue.stream }));
+    queues.push({ stream: queue.stream, sets });
   }
-  return sets;
+  return queues;
 }
 
 // Sets a player is playing on stream right now: called or in progress, with a stream assigned.
