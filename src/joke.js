@@ -41,7 +41,7 @@ async function fetchScreenshots(category) {
 
 // same for every game, the prompts only set the character
 const RULES = `Format it the way the style calls for, not as a bullet list by default. No headings, the post already has a title.
-Let the joke set the length. Most posts land around 60 to 100 words, but anywhere from 40 to 150 is fine: a hot take can hit and stop, while a story, list or copypasta that builds can use the room. Haiku can come in under that. Don't pad, end once the last joke lands.
+Let the joke set the length. Most posts land around 80 to 130 words, but anywhere from 50 to 180 is fine: a hot take can hit and stop, while a story, list or copypasta that builds can use the room. Haiku can come in under that. Don't pad, end once the last joke lands.
 Reply with only the post, no notes about how you're writing it.`;
 
 // removes what it picks

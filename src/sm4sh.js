@@ -19,7 +19,7 @@ const STYLES = [
   'a winner\'s interview after taking a major',
   'two or three haiku',
   'a five star review',
-  'a gushing superfan defending it as the best Smash ever like someone just said otherwise: an over-the-top opener, two or three short bolded bullet point reasons, then a sign-off, under 100 words',
+  'a gushing superfan defending it as the best Smash ever like someone just said otherwise: an over-the-top opener, two or three short bolded bullet point reasons, then a sign-off, under 130 words',
 ];
 
 // haiku mixes up the smash games without real facts to go off
