@@ -27,7 +27,7 @@ export function secondsNow() {
   return Math.floor(Date.now() / 1000);
 }
 
-// for /df status
+// for /status
 export const health = { startedAt: secondsNow(), downSince: null, skippedBefore: null, setCheck: null, setError: null, tournamentCheck: null };
 
 let channel;
@@ -115,7 +115,7 @@ async function postNewSets() {
     sets.sort((a, b) => a.completedAt - b.completedAt);
 
     for (const set of sets) {
-      // for /df recent all
+      // for /recent all
       for (const player of players) {
         if (!set.sides.some((side) => side.playerIds.includes(player.playerId))) continue;
         // edits bring back old sets

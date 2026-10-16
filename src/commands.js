@@ -13,8 +13,9 @@ import { characterUsage } from './characters.js';
 const HISTORY_PAGES = 15; // 40 sets a page
 // 3000 sets, about a minute the first time for someone who's played that many
 const LIFETIME_PAGES = 75;
+const PAGES_AT_ONCE = 5;
 const HISTORY_CACHE_MINUTES = 10;
-// /df recent all only asks start.gg about whoever played most recently
+// /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
 
 const jokes = { sm4sh, melee, ult };
@@ -26,119 +27,108 @@ function playerOption(description, name = 'player') {
   return { type: Option.String, name, description, required: true, autocomplete: true };
 }
 
-export const command = {
-  name: 'df',
-  description: 'Dark Fundies',
-  options: [
-    { type: Option.Subcommand, name: 'help', description: 'Show commands' },
-    {
-      type: Option.SubcommandGroup,
-      name: 'track',
-      description: 'Manage tracked players',
-      options: [
-        {
-          type: Option.Subcommand,
-          name: 'add',
-          description: 'Track a start.gg player',
-          options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
-        },
-        {
-          type: Option.Subcommand,
-          name: 'remove',
-          description: 'Stop tracking a player',
-          options: [playerOption('Tracked player')],
-        },
-        { type: Option.Subcommand, name: 'list', description: 'List tracked players' },
-      ],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'upcoming',
-      description: 'Upcoming tournaments',
-      options: [playerOption('Tracked player, or all')],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'recent',
-      description: 'Latest reported sets',
-      options: [playerOption('Tracked player, or all')],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'h2h',
-      description: 'Head-to-head record between two tracked players',
-      options: [playerOption('Tracked player'), playerOption('Tracked player', 'opponent')],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'stats',
-      description: 'Recent placements and set record',
-      options: [
-        playerOption('Tracked player'),
-        { type: Option.Boolean, name: 'verbose', description: 'Full lifetime report, slower' },
-      ],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'characters',
-      description: 'Ultimate characters a tracked player has reported',
-      options: [playerOption('Tracked player')],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'predict',
-      description: 'Odds of one tracked player beating another',
-      options: [playerOption('Tracked player'), playerOption('Tracked player', 'opponent')],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'stream',
-      description: 'Turn on-stream alerts on or off',
-      options: [
-        playerOption('Tracked player, or all'),
-        {
-          type: Option.String,
-          name: 'alerts',
-          description: 'on or off',
-          required: true,
-          choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
-        },
-      ],
-    },
-    { type: Option.Subcommand, name: 'status', description: 'Uptime and the last start.gg checks' },
-    {
-      type: Option.Subcommand,
-      name: 'set_reg_reminder',
-      description: 'Ping people with reg pings on as a tournament\'s registration deadline gets close',
-      options: [{ type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true }],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'delete_reg_reminder',
-      description: 'Cancel a registration reminder',
-      options: [{ type: Option.String, name: 'tournament', description: 'Tournament with a reminder', required: true, autocomplete: true }],
-    },
-    {
-      type: Option.Subcommand,
-      name: 'reg_role',
-      description: 'Reg reminder pings for yourself, on or off',
-      options: [{
+export const commands = [
+  { name: 'help', description: 'Show commands' },
+  {
+    name: 'track',
+    description: 'Manage tracked players',
+    options: [
+      {
+        type: Option.Subcommand,
+        name: 'add',
+        description: 'Track a start.gg player',
+        options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'remove',
+        description: 'Stop tracking a player',
+        options: [playerOption('Tracked player')],
+      },
+      { type: Option.Subcommand, name: 'list', description: 'List tracked players' },
+    ],
+  },
+  {
+    name: 'upcoming',
+    description: 'Upcoming tournaments',
+    options: [playerOption('Tracked player, or all')],
+  },
+  {
+    name: 'recent',
+    description: 'Latest reported sets',
+    options: [playerOption('Tracked player, or all')],
+  },
+  {
+    name: 'h2h',
+    description: 'Head-to-head record between two tracked players',
+    options: [playerOption('Tracked player'), playerOption('Tracked player', 'opponent')],
+  },
+  {
+    name: 'stats',
+    description: 'Recent placements and set record',
+    options: [
+      playerOption('Tracked player'),
+      { type: Option.Boolean, name: 'verbose', description: 'Full lifetime report, slower' },
+    ],
+  },
+  {
+    name: 'characters',
+    description: 'Ultimate characters a tracked player has reported',
+    options: [playerOption('Tracked player')],
+  },
+  {
+    name: 'predict',
+    description: 'Odds of one tracked player beating another',
+    options: [playerOption('Tracked player'), playerOption('Tracked player', 'opponent')],
+  },
+  {
+    name: 'stream',
+    description: 'Turn on-stream alerts on or off',
+    options: [
+      playerOption('Tracked player, or all'),
+      {
         type: Option.String,
-        name: 'ping',
+        name: 'alerts',
         description: 'on or off',
         required: true,
         choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
-      }],
-    },
-    ...Object.values(jokes).map((joke) => ({ type: Option.Subcommand, name: joke.name, description: joke.line })),
-    { type: Option.Subcommand, name: 'pfp', description: 'My profile picture, full size' },
-  ],
-};
+      },
+    ],
+  },
+  { name: 'status', description: 'Uptime and the last start.gg checks' },
+  {
+    name: 'set_reg_reminder',
+    description: 'Ping people with reg pings on as a tournament\'s registration deadline gets close',
+    options: [{ type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true }],
+  },
+  {
+    name: 'delete_reg_reminder',
+    description: 'Cancel a registration reminder',
+    options: [{ type: Option.String, name: 'tournament', description: 'Tournament with a reminder', required: true, autocomplete: true }],
+  },
+  {
+    name: 'reg_role',
+    description: 'Reg reminder pings for yourself, on or off',
+    options: [{
+      type: Option.String,
+      name: 'ping',
+      description: 'on or off',
+      required: true,
+      choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
+    }],
+  },
+  ...Object.values(jokes).map((joke) => ({ name: joke.name, description: joke.line })),
+  { name: 'pfp', description: 'My profile picture, full size' },
+];
+
+// "track add", or just the command for the ones without subcommands
+function commandName(interaction) {
+  const subcommand = interaction.options.getSubcommand(false);
+  return subcommand ? `${interaction.commandName} ${subcommand}` : interaction.commandName;
+}
 
 export async function handleCommand(interaction) {
-  const group = interaction.options.getSubcommandGroup();
-  const subcommand = interaction.options.getSubcommand();
-  const name = group ? `${group} ${subcommand}` : subcommand;
+  const name = commandName(interaction);
 
   switch (name) {
     case 'help':
@@ -182,9 +172,10 @@ export async function handleCommand(interaction) {
 
 export async function handleAutocomplete(interaction) {
   const typed = interaction.options.getFocused().toLowerCase();
+  const name = commandName(interaction);
   const choices = [];
 
-  if (interaction.options.getSubcommand() === 'delete_reg_reminder') {
+  if (name === 'delete_reg_reminder') {
     for (const reminder of Object.values(state.regReminders)) {
       if (reminder.name.toLowerCase().includes(typed)) choices.push({ name: reminder.name.slice(0, 100), value: String(reminder.id) });
     }
@@ -192,7 +183,7 @@ export async function handleAutocomplete(interaction) {
   }
 
   // no "all" for the ones that need a single player
-  if (!['remove', 'h2h', 'stats', 'characters', 'predict'].includes(interaction.options.getSubcommand()) && 'all'.startsWith(typed)) {
+  if (!['track remove', 'h2h', 'stats', 'characters', 'predict'].includes(name) && 'all'.startsWith(typed)) {
     choices.push({ name: 'all', value: 'all' });
   }
   // only 25 fit, so tags that start with what's typed go first
@@ -230,7 +221,7 @@ async function sendEmbeds(interaction, list) {
 
 function replyNotTracked(interaction) {
   return interaction.reply({
-    content: 'That player isn\'t tracked. See `/df track list`.',
+    content: 'That player isn\'t tracked. See `/track list`.',
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -330,12 +321,14 @@ function cachedHistory(getPage, pages = HISTORY_PAGES) {
   };
 }
 
+// a few pages at a time so start.gg's slow responses overlap. the rate limit still spaces them out
 async function fetchHistory(getPage, playerId, pages) {
   const sets = [];
-  for (let page = 1; page <= pages; page++) {
-    const batch = await getPage(playerId, page);
-    if (!batch.length) break;
-    sets.push(...batch);
+  for (let first = 1; first <= pages; first += PAGES_AT_ONCE) {
+    const numbers = Array.from({ length: Math.min(PAGES_AT_ONCE, pages - first + 1) }, (_, i) => first + i);
+    const batch = await Promise.all(numbers.map((page) => getPage(playerId, page)));
+    sets.push(...batch.flat());
+    if (batch.some((page) => !page.length)) break;
   }
   return sets;
 }
@@ -447,7 +440,7 @@ async function setRegReminder(interaction) {
   }
 
   if (state.regReminders[tournament.id]) {
-    return interaction.editReply(`${tournament.name} already has reminders set. \`/df delete_reg_reminder\` cancels them.`);
+    return interaction.editReply(`${tournament.name} already has reminders set. \`/delete_reg_reminder\` cancels them.`);
   }
 
   const deadline = regDeadline(tournament);
@@ -468,7 +461,7 @@ async function setRegReminder(interaction) {
   }
   const duration = (hours) => (hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`);
   const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(duration));
-  return interaction.editReply(`Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/df reg_role\` to turn yours on.`);
+  return interaction.editReply(`Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/reg_role\` to turn yours on.`);
 }
 
 function deleteRegReminder(interaction) {
@@ -500,7 +493,7 @@ async function regRole(interaction) {
   try {
     let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
     if (on) {
-      role ??= await guild.roles.create({ name: REG_ROLE, reason: 'shows who has /df reg_role on' });
+      role ??= await guild.roles.create({ name: REG_ROLE, reason: 'shows who has /reg_role on' });
       await member.roles.add(role);
     } else if (role) {
       await member.roles.remove(role);

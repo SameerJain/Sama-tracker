@@ -1,5 +1,5 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
-import { command, handleAutocomplete, handleCommand } from './commands.js';
+import { commands, handleAutocomplete, handleCommand } from './commands.js';
 import { asCommand, checkToken } from './startgg.js';
 import { startTracking } from './tracker.js';
 
@@ -24,7 +24,8 @@ client.once(Events.ClientReady, async () => {
   const guild = await client.guilds.fetch(process.env.GUILD_ID).catch(() => null);
   if (!guild) quit(`bot isn't in server ${process.env.GUILD_ID}, check GUILD_ID or invite it`);
 
-  await guild.commands.set([command]).catch(() => quit('couldn\'t register /df, re-invite the bot with the applications.commands scope'));
+  // replaces whatever was registered before, so old commands go away
+  await guild.commands.set(commands).catch(() => quit('couldn\'t register the commands, re-invite the bot with the applications.commands scope'));
 
   const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch(() => null);
   if (!channel?.isTextBased()) quit(`can't see a text channel with id ${process.env.CHANNEL_ID}, check CHANNEL_ID`);
@@ -49,7 +50,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await handleAutocomplete(interaction).catch(console.error);
     return;
   }
-  if (!interaction.isChatInputCommand() || interaction.commandName !== 'df') return;
+  if (!interaction.isChatInputCommand()) return;
 
   const userId = interaction.user.id;
   if (busy.has(userId)) {

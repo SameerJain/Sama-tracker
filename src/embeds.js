@@ -616,7 +616,7 @@ function placementLine({ placement, seed, dq, event }) {
 export function trackedList(players) {
   const all = Object.values(players).sort((a, b) => a.tag.localeCompare(b.tag));
   const embed = baseEmbed(colors.brand).setTitle(`Tracking ${all.length}`);
-  if (!all.length) return [embed.setDescription('Nobody yet. Add someone with `/df track add`.')];
+  if (!all.length) return [embed.setDescription('Nobody yet. Add someone with `/track add`.')];
   const lines = all.map((player) => {
     if (player.streamAlerts === false) return `${playerLink(player)} · stream alerts off`;
     return playerLink(player);
@@ -663,24 +663,24 @@ export function joke(name, title, { text, screenshot, image }) {
 
 export function help() {
   const lines = [
-    '`/df track add` track someone by start.gg link or ID',
-    '`/df track remove` stop tracking someone',
-    '`/df track list` everyone tracked',
-    '`/df upcoming` live and upcoming tournaments',
-    '`/df recent` latest sets',
-    '`/df h2h` record between two players',
-    '`/df stats` set record, placements and best upset. `verbose:True` for a lifetime report',
-    '`/df characters` Ultimate characters someone has reported and how they do on each',
-    '`/df predict` odds of one player beating another',
-    '`/df stream` stream alerts on or off',
-    '`/df status` uptime and the last start.gg checks',
-    '`/df set_reg_reminder` ping Reg Reminders as a tournament\'s registration deadline gets close',
-    '`/df delete_reg_reminder` cancel one',
-    '`/df reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is linked on start.gg',
-    '`/df sm4sh` a love letter to Smash 4',
-    '`/df melee` a Melee purist with a take',
-    '`/df ult` an Ultimate player who hates Ultimate',
-    '`/df pfp` my profile picture, full size',
+    '`/track add` track someone by start.gg link or ID',
+    '`/track remove` stop tracking someone',
+    '`/track list` everyone tracked',
+    '`/upcoming` live and upcoming tournaments',
+    '`/recent` latest sets',
+    '`/h2h` record between two players',
+    '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
+    '`/characters` Ultimate characters someone has reported and how they do on each',
+    '`/predict` odds of one player beating another',
+    '`/stream` stream alerts on or off',
+    '`/status` uptime and the last start.gg checks',
+    '`/set_reg_reminder` ping Reg Reminders as a tournament\'s registration deadline gets close',
+    '`/delete_reg_reminder` cancel one',
+    '`/reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is linked on start.gg',
+    '`/sm4sh` a love letter to Smash 4',
+    '`/melee` a Melee purist with a take',
+    '`/ult` an Ultimate player who hates Ultimate',
+    '`/pfp` my profile picture, full size',
     '-# upcoming, recent and stream also take `all` as the player',
     '',
     'Posted here automatically:',

@@ -286,7 +286,7 @@ export async function getStats(playerId) {
   return { standings, sets };
 }
 
-// for /df characters. every game they reported a character for, newest set first.
+// for /characters. every game they reported a character for, newest set first.
 // the limit counts what comes back, and a bo5 with characters is ~46 objects, so only 20 fit
 export async function getCharacterSets(playerId, page) {
   const data = await query(`
