@@ -27,6 +27,10 @@ const step = (n) => PLACEMENTS.findLastIndex((place) => place <= n);
 const MAJOR_UPSET = 5; // seed 9 beating seed 2
 const RECENT_EVENTS = 4;
 const CHARACTERS_SHOWN = 5;
+const LIFETIME_EVENTS = 5;
+const UPSETS_SHOWN = 3;
+const OPPONENTS_SHOWN = 8;
+const GAMES_SHOWN = 6;
 
 function baseEmbed(color, footer = 'Dark Fundies') {
   return new EmbedBuilder().setColor(color).setFooter({ text: footer });
@@ -406,11 +410,7 @@ export function stats(player, standings, sets) {
   const upset = played
     .filter(({ me, them, won }) => won && upsetFactor(me, them) > 0)
     .sort((x, y) => upsetFactor(y.me, y.them) - upsetFactor(x.me, x.them))[0];
-  if (upset) {
-    const { set, me, them } = upset;
-    const score = scoreText(me, them) === 'vs' ? '' : ` ${scoreText(me, them)}`;
-    lines.push(`**Biggest upset:** beat ${escapeMarkdown(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}`);
-  }
+  if (upset) lines.push(`**Biggest upset:** ${upsetLine(upset)}`);
 
   if (standings.length) {
     lines.push('', '**Latest events**', ...standings.slice(0, RECENT_EVENTS).map(placementLine));
@@ -422,6 +422,158 @@ export function stats(player, standings, sets) {
   lines.push(`-# From their last ${from.join(' and ')} on start.gg`);
 
   return embed.setDescription(lines.join('\n'));
+}
+
+// beat Foo (seed 2) 3-1 as seed 9 at Tournament
+function upsetLine({ set, me, them, won }) {
+  const score = scoreText(me, them) === 'vs' ? '' : ` ${scoreText(me, them)}`;
+  return `${won ? 'beat' : 'lost to'} ${escapeMarkdown(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}`;
+}
+
+// how big an upset the set was, whichever way it went
+function upsetSize(result) {
+  return result.won ? upsetFactor(result.me, result.them) : upsetFactor(result.them, result.me);
+}
+
+function winLoss(wins, losses) {
+  return `${wins}-${losses} (${percent(wins, wins + losses)})`;
+}
+
+// relative to bracket size, so 4th of 84 beats 3rd of 20
+const finish = (entry) => entry.placement / entry.event.numEntrants;
+const byFinish = (x, y) => finish(x) - finish(y) || y.event.numEntrants - x.event.numEntrants;
+
+// events entered and set record, grouped by game or year
+function breakdown(entered, played, eventKey, setKey) {
+  const groups = new Map();
+  const group = (key) => {
+    if (!groups.has(key)) groups.set(key, { key, events: [], wins: 0, losses: 0 });
+    return groups.get(key);
+  };
+  for (const entry of entered) group(eventKey(entry.event)).events.push(entry);
+  for (const { set, won } of played) group(setKey(set))[won ? 'wins' : 'losses']++;
+  return [...groups.values()];
+}
+
+// Ultimate · 180 events · won 3 · sets 420-300 (58%)
+function breakdownLine({ key, events, wins, losses }) {
+  const parts = [`**${escapeMarkdown(String(key))}**`];
+  if (events.length) parts.push(count(events.length, 'event'));
+  const firsts = events.filter((entry) => entry.placement === 1).length;
+  const best = events.filter((entry) => entry.event.numEntrants).sort(byFinish)[0];
+  if (firsts) parts.push(`won ${firsts}`);
+  else if (best) parts.push(`best ${ordinal(best.placement)} of ${best.event.numEntrants}`);
+  if (wins + losses) parts.push(`sets ${winLoss(wins, losses)}`);
+  return parts.join(' · ');
+}
+
+function section(lines, title, list) {
+  if (!list.length) return;
+  if (lines.length) lines.push('');
+  lines.push(`**${title}**`, ...list);
+}
+
+// two cards: the lifetime numbers, then the results behind them
+export function lifetimeStats(player, events, sets, players) {
+  const overview = baseEmbed(colors.brand)
+    .setAuthor({ name: 'Lifetime stats' })
+    .setTitle(escapeMarkdown(player.tag))
+    .setURL(startggUrl(player.slug));
+  if (player.image) overview.setThumbnail(player.image);
+
+  const entered = events.filter((entry) => !entry.dq);
+  const played = sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
+  if (!entered.length && !played.length) return [overview.setDescription('Nothing on start.gg yet.')];
+
+  const from = [];
+  if (played.length) from.push(`${count(played.length, 'singles set')} since <t:${played.at(-1).set.completedAt}:D>`);
+  if (entered.length) from.push(`${count(entered.length, 'event')} since <t:${entered.at(-1).event.startAt}:D>`);
+  const dqs = events.length - entered.length;
+  const latest = Math.max(played[0]?.set.completedAt ?? 0, entered[0]?.event.startAt ?? 0);
+  overview.setDescription(`Last played <t:${latest}:R>\n-# From ${from.join(' and ')} on start.gg${dqs ? `, ${count(dqs, 'DQ')} left out` : ''}`);
+
+  const sized = entered.filter((entry) => entry.event.numEntrants);
+  const seeded = entered.filter((entry) => entry.seed);
+  const stat = (name, value) => overview.addFields({ name, value: String(value), inline: true });
+
+  if (entered.length) stat('Events', entered.length);
+  if (played.length) {
+    const wins = played.filter((result) => result.won).length;
+    stat('Sets', winLoss(wins, played.length - wins));
+  }
+  const scored = played.filter(({ me, them }) => me.score !== null && them.score !== null);
+  const gamesWon = scored.reduce((sum, { me }) => sum + me.score, 0);
+  const gamesLost = scored.reduce((sum, { them }) => sum + them.score, 0);
+  if (gamesWon + gamesLost) stat('Games', winLoss(gamesWon, gamesLost));
+
+  if (entered.length) {
+    stat('1st places', entered.filter((entry) => entry.placement === 1).length);
+    stat('Top 3s', entered.filter((entry) => entry.placement <= 3).length);
+    // top 8 of an 8 person bracket doesn't count
+    stat('Top 8s', sized.filter((entry) => entry.event.numEntrants > 8 && entry.placement <= 8).length);
+  }
+  if (sized.length) {
+    const finishes = sized.map(finish).sort((a, b) => a - b);
+    stat('Typical finish', `top ${Math.ceil(finishes[Math.floor(finishes.length / 2)] * 100)}%`);
+  }
+  if (seeded.length) {
+    const better = seeded.filter((entry) => step(entry.placement) < step(entry.seed)).length;
+    const worse = seeded.filter((entry) => step(entry.placement) > step(entry.seed)).length;
+    stat('Finish vs seed', `better ${percent(better, seeded.length)} · worse ${percent(worse, seeded.length)}`);
+  }
+  if (played.length) {
+    let run = 0;
+    let longest = 0;
+    for (const { won } of played) {
+      run = won ? run + 1 : 0;
+      longest = Math.max(longest, run);
+    }
+    const streak = played.findIndex((result) => result.won !== played[0].won);
+    stat('Win streak', `best ${longest}, now ${played[0].won ? 'W' : 'L'}${streak === -1 ? played.length : streak}`);
+  }
+
+  const gameOf = (event) => event.videogame?.displayName ?? 'Other';
+  const byGame = breakdown(entered, played, gameOf, (set) => gameOf(set.event))
+    .sort((a, b) => b.events.length - a.events.length || b.wins + b.losses - (a.wins + a.losses));
+  if (byGame.length > 1) overview.addFields({ name: 'By game', value: byGame.slice(0, GAMES_SHOWN).map(breakdownLine).join('\n') });
+
+  const yearOf = (seconds) => new Date(seconds * 1000).getUTCFullYear();
+  const byYear = breakdown(entered, played, (event) => yearOf(event.startAt), (set) => yearOf(set.completedAt))
+    .sort((a, b) => b.key - a.key);
+  if (byYear.length > 1) overview.addFields({ name: 'By year', value: byYear.map(breakdownLine).join('\n') });
+
+  const lines = [];
+  const upsets = played.filter((result) => upsetSize(result) > 0).sort((x, y) => upsetSize(y) - upsetSize(x));
+  // one per event, a bracket reset in grands is the same upset twice
+  const top = (list) => list
+    .filter((result, i) => list.findIndex((other) => other.set.event.slug === result.set.event.slug) === i)
+    .slice(0, UPSETS_SHOWN)
+    .map((result) => `${upsetLine(result)} · <t:${result.set.completedAt}:d>`);
+  section(lines, 'Best finishes', sized.toSorted(byFinish).slice(0, LIFETIME_EVENTS).map(placementLine));
+  section(lines, 'Latest events', entered.slice(0, LIFETIME_EVENTS).map(placementLine));
+  section(lines, 'Biggest wins', top(upsets.filter((result) => result.won)));
+  section(lines, 'Toughest losses', top(upsets.filter((result) => !result.won)));
+
+  const results = baseEmbed(colors.brand);
+  // way past what fits only with a lot of long tournament names
+  if (lines.length) results.setDescription(split(lines)[0].join('\n'));
+
+  const tracked = new Map(Object.values(players).map((each) => [each.playerId, each]));
+  const opponents = new Map();
+  for (const { them, won } of played) {
+    // no start.gg account means no id, so those go by name
+    const id = them.playerIds[0] ?? them.name;
+    if (!opponents.has(id)) opponents.set(id, { name: tracked.get(id)?.tag ?? them.name, crew: tracked.has(id), wins: 0, losses: 0 });
+    opponents.get(id)[won ? 'wins' : 'losses']++;
+  }
+  // sort is stable and sets are newest first, so ties go to who they played last
+  const mostPlayed = [...opponents.values()].sort((a, b) => b.wins + b.losses - (a.wins + a.losses));
+  const crew = mostPlayed.filter((each) => each.crew);
+  const opponentLines = (list) => list.slice(0, OPPONENTS_SHOWN).map(({ name, wins, losses }) => `${escapeMarkdown(name)} ${wins}-${losses}`).join('\n');
+  if (mostPlayed.length) results.addFields({ name: 'Most played', value: opponentLines(mostPlayed), inline: true });
+  if (crew.length) results.addFields({ name: 'Vs the crew', value: opponentLines(crew), inline: true });
+
+  return [overview, results];
 }
 
 // file is the uploaded render of their main
@@ -517,7 +669,7 @@ export function help() {
     '`/df upcoming` live and upcoming tournaments',
     '`/df recent` latest sets',
     '`/df h2h` record between two players',
-    '`/df stats` set record, placements and best upset',
+    '`/df stats` set record, placements and best upset. `verbose:True` for a lifetime report',
     '`/df characters` Ultimate characters someone has reported and how they do on each',
     '`/df predict` odds of one player beating another',
     '`/df stream` stream alerts on or off',

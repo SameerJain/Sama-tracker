@@ -40,7 +40,7 @@ Pushing to GitHub redeploys it.
 /df upcoming player:<name or all>                 their tournaments, live ones first
 /df recent player:<name or all>                   latest sets, 5 for one player or 3 each for all
 /df h2h player:<name> opponent:<name>             singles record against each other, DQs left out
-/df stats player:<name>                           recent set record, best finish, biggest upset
+/df stats player:<name> [verbose:True]            recent set record, best finish, biggest upset, or a lifetime report
 /df characters player:<name>                      Ultimate characters from reported games, with records
 /df predict player:<name> opponent:<name>         odds of one beating the other
 /df stream player:<name or all> alerts:<on|off>   on-stream alerts on or off
@@ -66,4 +66,6 @@ With `ANTHROPIC_API_KEY` set, `/df sm4sh`, `/df melee` and `/df ult` get Claude 
 
 `/df characters` is Ultimate only and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's render.
 
-start.gg is rate limited, so `/df h2h`, `/df predict` and `/df characters` take 10 to 30 seconds the first time for a player. State is saved in `data/state.json`, or on the volume on Railway.
+`/df stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, best runs, biggest wins and losses, most played opponents and the record against everyone else tracked.
+
+start.gg is rate limited, so `/df h2h`, `/df predict` and `/df characters` take 10 to 30 seconds the first time for a player. `/df stats verbose:True` can take a minute for someone with a couple thousand sets. State is saved in `data/state.json`, or on the volume on Railway.
