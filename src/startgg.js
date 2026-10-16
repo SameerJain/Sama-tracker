@@ -13,19 +13,24 @@ function chunk(list, size) {
 }
 
 // start.gg allows 80 requests a minute, so one goes out every 800ms.
-// requests for a command go ahead of the background checks
+// requests for a command go ahead of the background checks, and commands take turns
+// so one that needs a lot of pages doesn't hold up everyone else's
 const fromCommand = new AsyncLocalStorage();
-const waiting = { command: [], background: [] };
+// one queue per command, in here while it has requests waiting
+const commandQueues = [];
+const background = [];
 let nextSlot = 0;
 let timer;
 
-export const asCommand = (fn) => fromCommand.run(true, fn);
-export const inBackground = (fn) => fromCommand.run(false, fn);
-export const queueLength = () => waiting.command.length + waiting.background.length;
+export const asCommand = (fn) => fromCommand.run([], fn);
+export const inBackground = (fn) => fromCommand.run(background, fn);
+export const queueLength = () => commandQueues.reduce((sum, queue) => sum + queue.length, background.length);
 
 function takeTurn() {
   return new Promise((resolve) => {
-    waiting[fromCommand.getStore() ? 'command' : 'background'].push(resolve);
+    const queue = fromCommand.getStore() ?? background;
+    if (queue !== background && !queue.length) commandQueues.push(queue);
+    queue.push(resolve);
     sendNext();
   });
 }
@@ -36,8 +41,11 @@ function sendNext() {
     timer = null;
     // a 429 pushed everything back since this was scheduled
     if (Date.now() < nextSlot) return sendNext();
-    const next = waiting.command.shift() ?? waiting.background.shift();
+    const queue = commandQueues.shift() ?? background;
+    const next = queue.shift();
     if (!next) return;
+    // back of the line for its next one
+    if (queue !== background && queue.length) commandQueues.push(queue);
     nextSlot = Date.now() + 800;
     next();
     sendNext();
@@ -117,6 +125,18 @@ export async function getPlayer(id) {
   };
 }
 
+// [userId, { tag, image }] for each of them, null if they're gone from start.gg
+export async function getProfiles(userIds) {
+  const data = await lookupMany(userIds, (group) => `{
+    ${group.map((id) => `u${id}: user(id: ${id}) { images(type: "profile") { url } player { gamerTag } }`).join('\n')}
+  }`);
+
+  return userIds.map((userId) => {
+    const user = data[`u${userId}`];
+    return [userId, user?.player ? { tag: user.player.gamerTag, image: user.images?.[0]?.url } : null];
+  });
+}
+
 const SET_FIELDS = `
   id
   state
@@ -190,12 +210,14 @@ export async function getSets(playerIds, { since, perPage = 10, states = [3] } =
   return [...setsById.values()];
 }
 
-// for h2h/predict. no games or characters, so a set is ~22 objects and 40 fit under the limit
+// for h2h/predict. no games or characters, so a set is ~22 objects and 40 fit under the limit.
+// pages can come back short or empty in the middle, so totalPages is the only way to know it's the end
 export async function getSetHistory(playerId, page) {
   const data = await query(`
     query ($id: ID!, $page: Int!) {
       player(id: $id) {
         sets(perPage: 40, page: $page, filters: { state: [3], entrantSize: [1] }) {
+          pageInfo { totalPages }
           nodes {
             id
             completedAt
@@ -212,7 +234,8 @@ export async function getSetHistory(playerId, page) {
     }
   `, { id: playerId, page });
 
-  return (data.player?.sets?.nodes ?? []).map(toSet).filter(Boolean);
+  const connection = data.player?.sets;
+  return { totalPages: connection?.pageInfo?.totalPages ?? 0, sets: (connection?.nodes ?? []).map(toSet).filter(Boolean) };
 }
 
 // every finished singles event they entered, newest first. an event is ~7 objects, so 120 a page
@@ -287,13 +310,16 @@ export async function getStats(playerId) {
 }
 
 // for /characters. every game they reported a character for, newest set first.
-// the limit counts what comes back, and a bo5 with characters is ~46 objects, so only 20 fit
-export async function getCharacterSets(playerId, page) {
+// the limit counts what comes back, and a bo5 with characters is ~46 objects. most sets have
+// nothing reported so 40 usually fit, and a page that goes over gets asked for again as two of 20
+export async function getCharacterSets(playerId, page, perPage = 40) {
   const data = await query(`
-    query ($id: ID!, $page: Int!) {
+    query ($id: ID!, $page: Int!, $perPage: Int!) {
       player(id: $id) {
-        sets(perPage: 20, page: $page, filters: { state: [3], entrantSize: [1] }) {
+        sets(perPage: $perPage, page: $page, filters: { state: [3], entrantSize: [1] }) {
+          pageInfo { totalPages }
           nodes {
+            id
             completedAt
             event { videogame { id displayName } }
             slots { entrant { id participants { player { id } } } }
@@ -302,9 +328,16 @@ export async function getCharacterSets(playerId, page) {
         }
       }
     }
-  `, { id: playerId, page });
+  `, { id: playerId, page, perPage }).catch((err) => {
+    if (perPage === 20 || !err.message.includes('complexity')) throw err;
+  });
+  if (!data) {
+    const halves = await Promise.all([getCharacterSets(playerId, page * 2 - 1, 20), getCharacterSets(playerId, page * 2, 20)]);
+    return { totalPages: Math.ceil(halves[0].totalPages / 2), sets: halves.flatMap((half) => half.sets) };
+  }
 
-  return (data.player?.sets?.nodes ?? []).map((node) => {
+  const connection = data.player?.sets;
+  const sets = (connection?.nodes ?? []).map((node) => {
     const mine = node.slots.find((slot) => slot.entrant?.participants.some((participant) => participant.player?.id === playerId))?.entrant.id;
     const games = [];
     for (const game of node.games ?? []) {
@@ -313,8 +346,9 @@ export async function getCharacterSets(playerId, page) {
       const against = picks.find((pick) => pick.entrant?.id !== mine)?.character?.name;
       if (character && game.winnerId) games.push({ character, against, won: game.winnerId === mine });
     }
-    return { completedAt: node.completedAt, videogame: node.event.videogame, games };
+    return { id: String(node.id), completedAt: node.completedAt, videogame: node.event.videogame, games };
   });
+  return { totalPages: connection?.pageInfo?.totalPages ?? 0, sets };
 }
 
 export const ULTIMATE = 1386;
@@ -405,6 +439,15 @@ export async function getUpcomingTournaments(userIds) {
   return userIds.map((userId) => [userId, data[`u${userId}`]?.tournaments?.nodes ?? []]);
 }
 
+// only ones they're an admin of, not ones they entered
+export async function getAdminTournaments(userIds) {
+  const data = await lookupMany(userIds, (group) => `{
+    ${group.map((id) => `u${id}: user(id: ${id}) { tournaments(query: { perPage: 20, filter: { tournamentView: "admin", upcoming: true, past: false } }) { nodes { id name slug startAt endAt } } }`).join('\n')}
+  }`);
+
+  return Object.values(data).flatMap((user) => user?.tournaments?.nodes ?? []);
+}
+
 // every player in every event at a major goes over the object limit
 const PLAYERS_PER_LOOKUP = 5;
 
@@ -433,7 +476,11 @@ export async function getTournament(tournamentId, userIds) {
           eventSlug: event.slug,
           entrants: event.numEntrants,
           done: event.state === 'COMPLETED',
+          // raffles and registration-only events never start
+          started: event.state !== 'CREATED',
           placement: entrant.standing?.placement ?? null,
+          // false while they're still in, then it's where they'd finish losing their next set
+          final: entrant.standing?.isFinal ?? false,
           dq: entrant.isDisqualified,
         });
       }
@@ -445,7 +492,7 @@ export async function getTournament(tournamentId, userIds) {
 
 async function lookupEntries(tournamentId, userIds) {
   const entrantLookups = userIds
-    .map((id) => `u${id}: userEntrant(userId: ${id}) { id isDisqualified standing { placement } }`)
+    .map((id) => `u${id}: userEntrant(userId: ${id}) { id isDisqualified standing { placement isFinal } }`)
     .join('\n');
 
   const data = await query(`
@@ -476,6 +523,7 @@ export async function getRegistration(slug) {
         name
         slug
         startAt
+        endAt
         registrationClosesAt
         isRegistrationOpen
         numAttendees
@@ -483,6 +531,7 @@ export async function getRegistration(slug) {
         addrState
         isOnline
         images { type url }
+        events { name slug }
       }
     }
   `, { slug });

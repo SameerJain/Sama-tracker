@@ -7,7 +7,9 @@ const TOURNAMENT_CHECK_MINUTES = 15;
 const PROFILE_CHECK_HOURS = 24;
 const ROLL_CALL_HOURS_BEFORE = 1;
 const ROLL_CALL_MIN_PLAYERS = 3;
-// post results anyway this long after the end if start.gg never marks events done
+// results wait this long after the end since TOs often report top 4 late
+const RESULTS_WAIT_HOURS = 12;
+// then this long if something's still missing, after that they go out with projected placements
 const RESULTS_GIVE_UP_HOURS = 24;
 // after downtime, don't post sets older than this
 const CATCH_UP_HOURS = 3;
@@ -19,6 +21,8 @@ const FAR_OFF_CHECK_HOURS = 6;
 const MENTIONS_PER_MESSAGE = 80;
 // hours before registration closes. the last one is the last call
 export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
+// locals run late, so a tournament still counts as live this long after its end time
+export const RUNS_LATE_HOURS = 6;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -87,17 +91,18 @@ export const checkTournaments = queued(updateTournaments);
 const checkProfiles = queued(updateProfiles);
 export const checkRegReminders = queued(postRegReminders);
 
-// picks up tag and avatar changes
+// picks up tag and avatar changes, 20 people a request
 async function updateProfiles() {
-  for (const player of Object.values(state.players)) {
-    try {
-      const latest = await startgg.getPlayer(player.slug);
-      if (!latest) continue;
+  try {
+    for (const [userId, latest] of await startgg.getProfiles(Object.keys(state.players))) {
+      // removed while this was running
+      const player = state.players[userId];
+      if (!latest || !player) continue;
       player.tag = latest.tag;
       player.image = latest.image;
-    } catch (err) {
-      console.error(`refreshing ${player.tag} failed:`, err.message);
     }
+  } catch (err) {
+    console.error('refreshing profiles failed:', err.message);
   }
   save();
 }
@@ -189,9 +194,9 @@ function setsToAnnounce(queueSets) {
 function liveTournaments() {
   const now = secondsNow();
   return Object.values(state.tournaments).filter((tournament) => {
-    if (tournament.resultsPosted || now < tournament.startAt) return false;
-    // locals run late
-    if (now > endTime(tournament) + 6 * HOUR) return false;
+    // doneAt means every event they're in has finished
+    if (tournament.resultsPosted || tournament.doneAt || now < tournament.startAt) return false;
+    if (now > endTime(tournament) + RUNS_LATE_HOURS * HOUR) return false;
     return tournament.entries.some((entry) => alertsOn(state.players[entry.userId]));
   });
 }
@@ -233,6 +238,8 @@ async function updateTournaments() {
     }
     const farOff = tournament.startAt - secondsNow() > DAY;
     if (farOff && secondsNow() - (tournament.checkedAt ?? 0) < FAR_OFF_CHECK_HOURS * HOUR) continue;
+    // only waiting on results now, so hourly is plenty
+    if (secondsNow() > overAt(tournament) && secondsNow() - (tournament.checkedAt ?? 0) < HOUR) continue;
 
     try {
       // only the people who signed up. everyone at every tournament gets slow with a big crew
@@ -245,9 +252,14 @@ async function updateTournaments() {
       }
       Object.assign(tournament, latest, { checkedAt: secondsNow() });
       await postRollCall(tournament);
-      await postResults(tournament);
     } catch (err) {
       console.error(`updating ${tournament.name ?? tournament.id} failed:`, err.message);
+    }
+    // even if the lookup failed, so a tournament start.gg keeps erroring on still gets results from the last good check
+    try {
+      await postResults(tournament);
+    } catch (err) {
+      console.error(`posting results for ${tournament.name ?? tournament.id} failed:`, err.message);
     }
   }
 
@@ -270,18 +282,30 @@ async function postRollCall(tournament) {
 }
 
 async function postResults(tournament) {
-  if (secondsNow() < tournament.startAt) return;
+  const now = secondsNow();
+  if (now < tournament.startAt) return;
 
-  const allDone = tournament.entries.every((entry) => entry.done);
-  const gaveUp = secondsNow() > endTime(tournament) + RESULTS_GIVE_UP_HOURS * HOUR;
-  if (!allDone && !gaveUp) return;
+  if (tournament.entries.length && tournament.entries.every((entry) => entry.done)) tournament.doneAt ??= now;
+  const waited = now - overAt(tournament);
+  if (waited < RESULTS_WAIT_HOURS * HOUR) return;
 
-  await post(embeds.results(tournament, state.players));
+  // events that never started have nothing to wait for or show
+  const entries = tournament.entries.filter((entry) => entry.started);
+  // anyone still in when the TO stopped reporting only has a projected placement
+  const allIn = entries.every((entry) => entry.placement && (entry.done || entry.final));
+  if (!allIn && waited < RESULTS_GIVE_UP_HOURS * HOUR) return;
+
+  await post(embeds.results({ ...tournament, entries }, state.players));
   tournament.resultsPosted = true;
 }
 
 export function endTime(tournament) {
   return Math.min(tournament.endAt ?? tournament.startAt, tournament.startAt + MAX_TOURNAMENT_DAYS * DAY);
+}
+
+// a finished bracket counts as over even if the TO set the end date way out
+function overAt(tournament) {
+  return Math.min(endTime(tournament), tournament.doneAt ?? Infinity);
 }
 
 // lots of weeklies leave registration open after the start, but you still have to sign up before it
@@ -296,20 +320,43 @@ export function nextRegReminder(deadline) {
   return next === -1 ? REG_REMINDER_HOURS.length - 1 : next;
 }
 
+// reg admins' tournaments get reminders without anyone setting them
+async function addAdminTournaments() {
+  try {
+    for (const found of await startgg.getAdminTournaments(Object.keys(state.regAdmins))) {
+      // bad end dates make old tournaments show up as upcoming
+      if (state.regReminders[found.id] || state.regSkipped.includes(found.id) || secondsNow() > endTime(found)) continue;
+      state.regReminders[found.id] = { id: found.id, slug: found.slug, name: found.name };
+    }
+  } catch (err) {
+    console.error('finding reg admins\' tournaments failed:', err.message);
+  }
+}
+
 async function postRegReminders() {
+  await addAdminTournaments();
+
   for (const reminder of Object.values(state.regReminders)) {
     try {
       // TOs move the close time, so always go off the latest
       const tournament = await startgg.getRegistration(reminder.slug);
-      const deadline = tournament && regDeadline(tournament);
-      // deleted, or it closed while the bot was down
-      if (!tournament || deadline <= secondsNow()) {
+      // kept until it's over for /bracket
+      if (!tournament || secondsNow() > endTime(tournament) + RUNS_LATE_HOURS * HOUR) {
         delete state.regReminders[reminder.id];
         continue;
       }
-      reminder.deadline = deadline;
-      // set back when there was only the last call
+      const deadline = regDeadline(tournament);
+      Object.assign(reminder, {
+        deadline,
+        startAt: tournament.startAt,
+        endAt: tournament.endAt,
+        events: tournament.events ?? [],
+        images: tournament.images?.filter((image) => image.type === 'profile'),
+      });
+      // set back when there was only the last call, or added for a reg admin
       reminder.next ??= nextRegReminder(deadline);
+      // it closed, maybe while the bot was down
+      if (deadline <= secondsNow()) continue;
 
       // only the latest one if the bot was down through a few
       const due = REG_REMINDER_HOURS.findLastIndex((hours, i) => i >= reminder.next && secondsNow() >= deadline - hours * HOUR);
@@ -331,8 +378,8 @@ async function postRegReminders() {
           });
         }
       }
-      if (lastCall) delete state.regReminders[reminder.id];
-      else reminder.next = due + 1;
+      // past the last call means none are left
+      reminder.next = due + 1;
     } catch (err) {
       console.error(`reg reminder for ${reminder.name} failed:`, err.message);
     }

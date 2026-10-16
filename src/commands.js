@@ -3,7 +3,7 @@ import { ApplicationCommandOptionType as Option, MessageFlags } from 'discord.js
 import * as startgg from './startgg.js';
 import * as embeds from './embeds.js';
 import { state, save } from './store.js';
-import { REG_REMINDER_HOURS, checkRegReminders, checkTournaments, endTime, health, nextRegReminder, regDeadline, secondsNow } from './tracker.js';
+import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, health, nextRegReminder, regDeadline, secondsNow } from './tracker.js';
 import sm4sh from './sm4sh.js';
 import melee from './melee.js';
 import ult from './ult.js';
@@ -16,12 +16,22 @@ import { characterUsage } from './characters.js';
 const HISTORY_PAGES = 15; // 40 sets a page
 // 3000 sets, about a minute the first time for someone who's played that many
 const LIFETIME_PAGES = 75;
-const PAGES_AT_ONCE = 5;
+// also 40 a page, so 400 sets, or 1600 for /characters verbose. the other games are usually further back
+const CHARACTER_PAGES = 10;
+const LIFETIME_CHARACTER_PAGES = 40;
 const HISTORY_CACHE_MINUTES = 10;
+// after that only their newest page gets fetched, and everything again this often to pick up edits to old sets
+const HISTORY_REFRESH_HOURS = 6;
+// per kind of history. whoever was looked up longest ago goes first.
+// a lifetime one is ~5MB for someone with 2500 sets, so only a few of those
+const HISTORY_CACHE_PLAYERS = 25;
+const LIFETIME_CACHE_PLAYERS = 5;
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
 // /characters verbose, so the cards fit in one message
 const CHARACTER_GAMES = 6;
+// /bracket shows a tournament this long before it starts
+const BRACKET_MINUTES_BEFORE = 30;
 
 const jokes = Object.fromEntries([sm4sh, melee, ult, smash64, brawl, pplus].map((joke) => [joke.name, joke]));
 
@@ -81,7 +91,7 @@ export const commands = [
     description: 'Ultimate characters a tracked player has reported',
     options: [
       playerOption('Tracked player'),
-      { type: Option.Boolean, name: 'verbose', description: 'Every game they have characters reported in, not just Ultimate' },
+      { type: Option.Boolean, name: 'verbose', description: 'Every game they have characters reported in, going further back, slower' },
     ],
   },
   {
@@ -114,6 +124,26 @@ export const commands = [
     description: 'Cancel a registration reminder',
     options: [{ type: Option.String, name: 'tournament', description: 'Tournament with a reminder', required: true, autocomplete: true }],
   },
+  {
+    name: 'reg_admin',
+    description: 'TOs whose tournaments get reg reminders automatically',
+    options: [
+      {
+        type: Option.Subcommand,
+        name: 'add',
+        description: 'Set reminders for every tournament a start.gg user is an admin of',
+        options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'remove',
+        description: 'Stop setting reminders for their tournaments',
+        options: [{ type: Option.String, name: 'admin', description: 'Reg admin', required: true, autocomplete: true }],
+      },
+      { type: Option.Subcommand, name: 'list', description: 'List reg admins' },
+    ],
+  },
+  { name: 'bracket', description: 'Bracket links for reg reminder tournaments that are live or start within 30 min' },
   {
     name: 'reg_role',
     description: 'Reg reminder pings for yourself, on or off',
@@ -167,6 +197,14 @@ export async function handleCommand(interaction) {
       return setRegReminder(interaction);
     case 'delete_reg_reminder':
       return deleteRegReminder(interaction);
+    case 'reg_admin add':
+      return regAdminAdd(interaction);
+    case 'reg_admin remove':
+      return regAdminRemove(interaction);
+    case 'reg_admin list':
+      return interaction.reply({ embeds: [embeds.regAdmins(state.regAdmins)] });
+    case 'bracket':
+      return bracket(interaction);
     case 'reg_role':
       return regRole(interaction);
     case 'sm4sh':
@@ -193,6 +231,13 @@ export async function handleAutocomplete(interaction) {
     return interaction.respond(choices.slice(0, 25));
   }
 
+  if (name === 'reg_admin remove') {
+    for (const admin of Object.values(state.regAdmins)) {
+      if (admin.tag.toLowerCase().includes(typed)) choices.push({ name: admin.tag, value: String(admin.userId) });
+    }
+    return interaction.respond(choices.slice(0, 25));
+  }
+
   // no "all" for the ones that need a single player
   if (!['track remove', 'h2h', 'stats', 'characters', 'predict'].includes(name) && 'all'.startsWith(typed)) {
     choices.push({ name: 'all', value: 'all' });
@@ -210,10 +255,14 @@ function readChoice(interaction, name = 'player') {
   const value = interaction.options.getString(name, true).toLowerCase();
   if (value === 'all') return 'all';
 
-  // autocomplete sends the user id, typing it out sends the tag
-  // hasOwn so typing "constructor" doesn't match Object.prototype
-  if (Object.hasOwn(state.players, value)) return state.players[value];
-  return Object.values(state.players).find((player) => player.tag.toLowerCase() === value);
+  return lookup(state.players, value, 'tag');
+}
+
+// autocomplete sends the id, typing it out sends the name.
+// hasOwn so typing "constructor" doesn't match Object.prototype
+function lookup(records, value, name) {
+  if (Object.hasOwn(records, value)) return records[value];
+  return Object.values(records).find((record) => record[name].toLowerCase() === value);
 }
 
 function readPlayer(interaction, name = 'player') {
@@ -237,12 +286,16 @@ function replyNotTracked(interaction) {
   });
 }
 
+// start.gg/user/f64a83c8 or just f64a83c8
+function profileSlug(input) {
+  return input.match(/user\/([\w-]+)/)?.[1] ?? input;
+}
+
 async function trackAdd(interaction) {
   const input = interaction.options.getString('profile', true).trim();
-  const slug = input.match(/user\/([\w-]+)/)?.[1] ?? input;
 
   await interaction.deferReply();
-  const player = await startgg.getPlayer(slug);
+  const player = await startgg.getPlayer(profileSlug(input));
   if (!player) {
     return interaction.editReply(`Couldn't find a start.gg player for \`${input}\`. Use their profile link, like start.gg/user/f64a83c8.`);
   }
@@ -315,38 +368,49 @@ async function recent(interaction) {
 }
 
 // caching the promise means two lookups at once share a fetch
-function cachedHistory(getPage, pages = HISTORY_PAGES) {
+function cachedHistory(getPage, pages = HISTORY_PAGES, keep = HISTORY_CACHE_PLAYERS) {
   const histories = new Map();
   return (playerId) => {
-    // otherwise it keeps every history anyone ever looked up
-    for (const [id, cached] of histories) {
-      if (Date.now() - cached.at > HISTORY_CACHE_MINUTES * 60 * 1000) histories.delete(id);
-    }
+    const now = Date.now();
     const cached = histories.get(playerId);
-    if (cached) return cached.sets;
-
-    const sets = fetchHistory(getPage, playerId, pages);
-    histories.set(playerId, { at: Date.now(), sets });
-    sets.catch(() => histories.delete(playerId));
-    return sets;
+    let entry = cached;
+    if (!cached || now - cached.fullAt > HISTORY_REFRESH_HOURS * 60 * 60 * 1000) {
+      entry = { at: now, fullAt: now, sets: fetchHistory(getPage, playerId, pages) };
+    } else if (now - cached.at > HISTORY_CACHE_MINUTES * 60 * 1000) {
+      // if start.gg errors it keeps what it had
+      entry = { ...cached, at: now, sets: cached.sets.then((sets) => topUp(getPage, playerId, pages, sets).catch(() => sets)) };
+    }
+    if (entry !== cached) entry.sets.catch(() => histories.get(playerId) === entry && histories.delete(playerId));
+    // map order is least recently looked up first
+    histories.delete(playerId);
+    histories.set(playerId, entry);
+    if (histories.size > keep) histories.delete(histories.keys().next().value);
+    return entry.sets;
   };
 }
 
-// a few pages at a time so start.gg's slow responses overlap. the rate limit still spaces them out
+// the first page says how many there are, then the rest get asked for all at once.
+// the rate limit spaces them out, so nothing sits waiting on a slow page
 async function fetchHistory(getPage, playerId, pages) {
-  const sets = [];
-  for (let first = 1; first <= pages; first += PAGES_AT_ONCE) {
-    const numbers = Array.from({ length: Math.min(PAGES_AT_ONCE, pages - first + 1) }, (_, i) => first + i);
-    const batch = await Promise.all(numbers.map((page) => getPage(playerId, page)));
-    sets.push(...batch.flat());
-    if (batch.some((page) => !page.length)) break;
-  }
-  return sets;
+  const first = await getPage(playerId, 1);
+  const rest = [];
+  for (let page = 2; page <= Math.min(pages, first.totalPages); page++) rest.push(getPage(playerId, page));
+  return [first, ...await Promise.all(rest)].flatMap((page) => page.sets);
+}
+
+// their newest page on top of what's cached. none of it being cached means more than a page is new
+async function topUp(getPage, playerId, pages, cached) {
+  const { sets } = await getPage(playerId, 1);
+  const known = new Set(cached.map((set) => set.id));
+  const added = sets.filter((set) => !known.has(set.id));
+  if (added.length && added.length === sets.length) return fetchHistory(getPage, playerId, pages);
+  return [...added, ...cached];
 }
 
 const setHistory = cachedHistory(startgg.getSetHistory);
-const characterHistory = cachedHistory(startgg.getCharacterSets);
-const lifetimeHistory = cachedHistory(startgg.getSetHistory, LIFETIME_PAGES);
+const characterHistory = cachedHistory(startgg.getCharacterSets, CHARACTER_PAGES);
+const lifetimeHistory = cachedHistory(startgg.getSetHistory, LIFETIME_PAGES, LIFETIME_CACHE_PLAYERS);
+const lifetimeCharacterHistory = cachedHistory(startgg.getCharacterSets, LIFETIME_CHARACTER_PAGES, LIFETIME_CACHE_PLAYERS);
 
 async function headToHead(interaction) {
   const a = readPlayer(interaction);
@@ -386,17 +450,22 @@ async function characters(interaction) {
   if (!player) return replyNotTracked(interaction);
 
   await interaction.deferReply();
-  const sets = await characterHistory(player.playerId);
+  const verbose = interaction.options.getBoolean('verbose');
+  const sets = await (verbose ? lifetimeCharacterHistory : characterHistory)(player.playerId);
   const usageIn = (game) => ({ game, usage: characterUsage(sets.filter((set) => set.videogame.id === game.id)) });
 
   let cards = [usageIn({ id: startgg.ULTIMATE, displayName: 'Ultimate' })];
-  if (interaction.options.getBoolean('verbose')) {
+  let note;
+  if (verbose) {
     // a card for each game with characters reported, most games first
-    const games = new Map(sets.map((set) => [set.videogame.id, set.videogame]));
-    cards = [...games.values()].map(usageIn)
-      .filter(({ usage }) => usage.reported)
+    const games = [...new Map(sets.map((set) => [set.videogame.id, set.videogame])).values()].map(usageIn);
+    cards = games.filter(({ usage }) => usage.reported)
       .sort((a, b) => b.usage.games - a.usage.games)
       .slice(0, CHARACTER_GAMES);
+    // so it's clear the rest got looked at too
+    const unreported = games.filter(({ usage }) => !usage.reported).sort((a, b) => b.usage.scanned - a.usage.scanned).map(({ game }) => game.displayName);
+    const shown = unreported.length > 4 ? [...unreported.slice(0, 3), `${unreported.length - 3} other games`] : unreported;
+    if (cards.length && shown.length) note = `No characters reported for ${new Intl.ListFormat('en').format(shown)}`;
     if (!cards.length) cards = [{ usage: characterUsage(sets) }];
   }
 
@@ -405,7 +474,7 @@ async function characters(interaction) {
     ? startgg.getCharacterArt(usage.characters[0].name, game.id).catch(() => null)
     : null)));
   await interaction.editReply({
-    embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, game?.displayName, art[i]?.name)),
+    embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, game?.displayName, art[i]?.name, i === cards.length - 1 ? note : undefined)),
     files: art.filter(Boolean),
   });
 }
@@ -492,16 +561,56 @@ async function setRegReminder(interaction) {
 }
 
 function deleteRegReminder(interaction) {
-  // autocomplete sends the id, typing it out sends the name
   const value = interaction.options.getString('tournament', true).toLowerCase();
-  const reminder = Object.hasOwn(state.regReminders, value)
-    ? state.regReminders[value]
-    : Object.values(state.regReminders).find((each) => each.name.toLowerCase() === value);
+  const reminder = lookup(state.regReminders, value, 'name');
   if (!reminder) return interaction.reply({ content: 'No reminder set for that.', flags: MessageFlags.Ephemeral });
 
   delete state.regReminders[reminder.id];
+  // so a reg admin's doesn't get added back
+  state.regSkipped = [...state.regSkipped, reminder.id].slice(-200);
   save();
   return interaction.reply(`Deleted the reminder for ${reminder.name}.`);
+}
+
+async function regAdminAdd(interaction) {
+  const input = interaction.options.getString('profile', true).trim();
+
+  await interaction.deferReply();
+  const admin = await startgg.getPlayer(profileSlug(input));
+  if (!admin) {
+    return interaction.editReply(`Couldn't find a start.gg user for \`${input}\`. Use their profile link, like start.gg/user/f64a83c8.`);
+  }
+  if (state.regAdmins[admin.userId]) {
+    return interaction.editReply(`${admin.tag} is already a reg admin.`);
+  }
+
+  state.regAdmins[admin.userId] = { userId: admin.userId, slug: admin.slug, tag: admin.tag };
+  save();
+  await interaction.editReply(`Tournaments ${admin.tag} is an admin of on start.gg get reg reminders now. \`/delete_reg_reminder\` skips one.`);
+
+  // don't wait 15 min for theirs to show up
+  checkRegReminders();
+}
+
+function regAdminRemove(interaction) {
+  const admin = lookup(state.regAdmins, interaction.options.getString('admin', true).toLowerCase(), 'tag');
+  if (!admin) return interaction.reply({ content: 'That\'s not a reg admin. See `/reg_admin list`.', flags: MessageFlags.Ephemeral });
+
+  delete state.regAdmins[admin.userId];
+  save();
+  return interaction.reply(`No more automatic reminders for ${admin.tag}'s tournaments. Ones already set stay, \`/delete_reg_reminder\` cancels them.`);
+}
+
+// reg reminder tournaments only, they're the ones the server cares about
+function bracket(interaction) {
+  const now = secondsNow();
+  const live = Object.values(state.regReminders)
+    .filter((reminder) => now >= reminder.startAt - BRACKET_MINUTES_BEFORE * 60 && now <= endTime(reminder) + RUNS_LATE_HOURS * 60 * 60)
+    .sort((a, b) => a.startAt - b.startAt);
+  if (!live.length) {
+    return interaction.reply('No tournaments set as active. Check the other channels if you\'re expecting one.');
+  }
+  return sendEmbeds(interaction, live.flatMap((reminder) => embeds.bracket(reminder)));
 }
 
 // only ever changes the person who ran it. pings go off this list, not the role,

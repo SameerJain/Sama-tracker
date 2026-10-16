@@ -270,10 +270,21 @@ export function results(tournament, players) {
   });
 }
 
+// a link to each event's bracket
+export function bracket(tournament) {
+  const now = Math.floor(Date.now() / 1000);
+  const started = tournament.startAt <= now;
+  const lines = [`${started ? 'Started' : 'Starts'} <t:${tournament.startAt}:R>`, ''];
+  for (const event of tournament.events) lines.push(`[${escapeMarkdown(event.name)}](${startggUrl(`${event.slug}/brackets`)})`);
+  return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? 'Live' : 'Starting soon', tournament), lines);
+}
+
 function placementText(entry) {
   let name = playerLink(entry.player);
   if (entry.dq) name += ' (DQ)';
-  if (!entry.placement) return `${name} (no placement yet)`;
+  if (!entry.placement) return `${name} (not reported)`;
+  // the worst they can finish, so no medal
+  if (!entry.done && !entry.final) return `${ordinal(entry.placement)} ${name} (projected)`;
   return `${medal(entry.placement)}${ordinal(entry.placement)} ${name}`;
 }
 
@@ -579,8 +590,8 @@ export function lifetimeStats(player, events, sets, players) {
   return [overview, results];
 }
 
-// file is the uploaded art of their main. no game means it covers every game
-export function characters(player, usage, game, file) {
+// file is the uploaded art of their main. no game means it covers every game. note goes at the bottom
+export function characters(player, usage, game, file, note) {
   const embed = baseEmbed(colors.brand, game ? `Dark Fundies · ${game}` : undefined)
     .setAuthor({ name: 'Characters' })
     .setTitle(escapeMarkdown(player.tag))
@@ -603,6 +614,7 @@ export function characters(player, usage, game, file) {
   }
   if (usage.characters.length > CHARACTERS_SHOWN) lines.push(`-# and ${usage.characters.length - CHARACTERS_SHOWN} more`);
   lines.push('', `-# Characters were reported in ${usage.reported} of ${from}`);
+  if (note) lines.push(`-# ${note}`);
 
   return embed.setDescription(lines.join('\n'));
 }
@@ -626,6 +638,13 @@ export function trackedList(players) {
     return playerLink(player);
   });
   return withLines(embed, lines);
+}
+
+export function regAdmins(admins) {
+  const all = Object.values(admins).sort((a, b) => a.tag.localeCompare(b.tag));
+  const embed = baseEmbed(colors.brand).setTitle(`Reg admins · ${all.length}`);
+  if (!all.length) return embed.setDescription('Nobody yet. Add a TO with `/reg_admin add`.');
+  return embed.setDescription(`Their tournaments get reg reminders automatically.\n\n${all.map(playerLink).join('\n')}`);
 }
 
 export function added(player) {
@@ -680,6 +699,8 @@ export function help() {
     '`/status` uptime and the last start.gg checks',
     '`/set_reg_reminder` ping Reg Reminders as a tournament\'s registration deadline gets close',
     '`/delete_reg_reminder` cancel one',
+    '`/reg_admin` TOs whose start.gg tournaments get reg reminders automatically',
+    '`/bracket` bracket links for reg reminder tournaments that are live or start within 30 min',
     '`/reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is linked on start.gg',
     '`/sm4sh` a love letter to Smash 4',
     '`/melee` a Melee purist with a take',
@@ -695,7 +716,7 @@ export function help() {
     '• sets on stream or up next in the stream queue',
     '• a roll call an hour before a tournament with 3+ of the crew',
     '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
-    '• where everyone placed once it\'s over',
+    '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting',
   ];
   return baseEmbed(colors.brand).setTitle('Dark Fundies').setDescription(lines.join('\n'));
 }

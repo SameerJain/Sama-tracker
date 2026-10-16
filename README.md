@@ -9,9 +9,9 @@ Follows start.gg players and posts to a Discord channel when one of them:
 - finishes a set. Only their first DQ in an event gets posted, and big wins over higher seeds are marked as major upsets
 - has a set on stream, called or at the front of the stream queue
 - is entered in a tournament starting within the hour, if 3 or more of the crew are
-- finishes a tournament, with where everyone placed
+- finishes a tournament, with where everyone placed. That waits 12 hours after the end since TOs often report top 4 late, or 24 if someone's placement still isn't in. After that it posts anyway, with start.gg's projected placement for anyone left in an unfinished bracket
 
-It also pings a role when registration is about to close for a tournament someone set a reminder for.
+It also pings a role when registration is about to close for a tournament someone set a reminder for, or one a reg admin runs.
 
 ## Setup
 
@@ -47,6 +47,10 @@ Pushing to GitHub redeploys it.
 /status                                        uptime, which machine, last start.gg checks
 /set_reg_reminder tournament:<link>            ping Reg Reminders before registration closes
 /delete_reg_reminder tournament:<name>         cancel a reg reminder
+/reg_admin add profile:<link or ID>            set reg reminders for every tournament they're an admin of
+/reg_admin remove admin:<name>                 stop doing that for them
+/reg_admin list                                every reg admin
+/bracket                                       bracket links for reg reminder tournaments live or starting soon
 /reg_role ping:<on|off>                        reg reminder pings for yourself, on or off
 /sm4sh                                         I LOVE SMASH BROS FOR WII U
 /melee                                         MELEE IS THE ONLY REAL SMASH GAME
@@ -61,14 +65,18 @@ Pushing to GitHub redeploys it.
 
 Reg reminders go out a week, 3 days and a day before registration closes, then a last call 12 hours before. If registration stays open after the tournament starts, the start counts as the deadline. Ones already past when you set it get skipped, except the last call, which goes out right away inside those 12 hours.
 
+Tournaments a reg admin is an admin of on start.gg get reminders set on their own, checked every 15 minutes. Deleting one with `/delete_reg_reminder` keeps it from coming back.
+
+`/bracket` links every event's bracket for reg reminder tournaments from 30 minutes before they start until 6 hours after their end time.
+
 Pings go to whoever turned them on with `/reg_role`, which only ever changes your own setting. If your Discord is linked on start.gg, you don't get pinged for tournaments you're already registered for. The bot also gives you a Reg Reminders role so everyone can see who's in.
 
 `/predict` weighs head-to-head, results against common opponents, seeding at shared brackets and their last 40 sets.
 
 With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game (just stages for P+). Otherwise they just say the line.
 
-`/characters` is Ultimate only unless you add `verbose:True`, which gives a card for each game they have characters reported in, up to 6. Both look at their last 300 singles sets and only see games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg.
+`/characters` is Ultimate only unless you add `verbose:True`, which gives a card for each game they have characters reported in, up to 6. It looks at their last 400 singles sets, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg.
 
 `/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked.
 
-start.gg is rate limited, so `/h2h`, `/predict` and `/characters` take 10 to 30 seconds the first time for a player. `/stats verbose:True` can take a minute for someone with a couple thousand sets. State is saved in `data/state.json`, or on the volume on Railway.
+start.gg allows 80 requests a minute, so `/h2h`, `/predict` and `/characters` take 10 to 30 seconds the first time for a player, then a second or two since only their newest sets get fetched again. The verbose ones can take a minute for someone with a couple thousand sets. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. State is saved in `data/state.json`, or on the volume on Railway.
