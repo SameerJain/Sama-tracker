@@ -1,4 +1,4 @@
-import { EmbedBuilder, escapeMarkdown } from 'discord.js';
+import { EmbedBuilder, embedLength, escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from './startgg.js';
 import { FORM_SETS } from './predict.js';
 
@@ -11,6 +11,10 @@ const colors = {
   stream: 0x9146ff,
   live: 0xe11d48,
   sm4sh: 0x00a2e8,
+  melee: 0x6a5acd,
+  ult: 0xe60012,
+  reg: 0xdc2626,
+  regEarly: 0xf59e0b,
 };
 
 // double elim placements: 1, 2, 3, 4, 5, 7, 9, 13, 17, 25...
@@ -22,9 +26,47 @@ const step = (n) => PLACEMENTS.findLastIndex((place) => place <= n);
 
 const MAJOR_UPSET = 5; // seed 9 beating seed 2
 const RECENT_EVENTS = 4;
+const CHARACTERS_SHOWN = 5;
 
 function baseEmbed(color, footer = 'Dark Fundies') {
   return new EmbedBuilder().setColor(color).setFooter({ text: footer });
+}
+
+// lines grouped so each group fits in one description
+function split(lines, max = 4096) {
+  const groups = [];
+  let size = Infinity;
+  for (const line of lines) {
+    if (size + line.length + 1 > max) {
+      groups.push([]);
+      size = 0;
+    }
+    groups.at(-1).push(line);
+    size += line.length + 1;
+  }
+  return groups;
+}
+
+// a list too long for one embed carries on in more of the same color
+function withLines(embed, lines) {
+  const [first, ...rest] = split(lines).map((group) => group.join('\n'));
+  return [embed.setDescription(first), ...rest.map((text) => baseEmbed(embed.data.color).setDescription(text))];
+}
+
+// a message fits 10 embeds and 6000 chars between them, the rest go in more messages
+export function messages(list) {
+  const batches = [];
+  let size = Infinity;
+  for (const embed of list) {
+    const length = embedLength(embed.data);
+    if (batches.at(-1)?.length === 10 || size + length > 6000) {
+      batches.push([]);
+      size = 0;
+    }
+    batches.at(-1).push(embed);
+    size += length;
+  }
+  return batches;
 }
 
 function tournamentEmbed(color, label, tournament) {
@@ -181,22 +223,43 @@ export function setResult(set, players) {
 }
 
 export function rollCall(tournament, players) {
-  const embed = tournamentEmbed(colors.brand, 'Roll call', tournament)
-    .setDescription(`Starts ${timeText(tournament.startAt)}\n${locationText(tournament)}`);
-
+  const lines = [`Starts ${timeText(tournament.startAt)}`, locationText(tournament)];
   for (const entries of groupByEvent(tournament, players)) {
-    const names = entries.map((entry) => playerLink(entry.player));
-    embed.addFields({ name: eventTitle(entries[0]), value: names.join('\n') });
+    lines.push('', `**${escapeMarkdown(eventTitle(entries[0]))}**`, ...entries.map((entry) => playerLink(entry.player)));
   }
+  return withLines(tournamentEmbed(colors.brand, 'Roll call', tournament), lines);
+}
+
+export function regReminder(tournament, deadline, lastCall) {
+  const register = startggUrl(`${tournament.slug}/register`);
+  const closesFirst = deadline < tournament.startAt;
+
+  const lines = [`## ${closesFirst ? 'Registration closes' : 'Starts'} <t:${deadline}:R>`];
+  if (closesFirst) lines.push(`**Closes:** <t:${deadline}:F>`);
+  lines.push(`**Starts:** <t:${tournament.startAt}:F>`, `**Location:** ${locationText(tournament)}`);
+  if (tournament.numAttendees) lines.push(`**Registered so far:** ${tournament.numAttendees}`);
+  lines.push('', `**[Register on start.gg](${register})**`);
+
+  const embed = baseEmbed(lastCall ? colors.reg : colors.regEarly)
+    .setAuthor({ name: lastCall ? 'Last call to register' : 'Registration reminder' })
+    .setTitle(tournament.name)
+    .setURL(register)
+    .setDescription(lines.join('\n'));
+
+  // a big picture so it stands out, the logo if there's no banner
+  const image = (type) => tournament.images?.find((each) => each.type === type)?.url;
+  const banner = image('banner');
+  const logo = image('profile');
+  if (banner ?? logo) embed.setImage(banner ?? logo);
+  if (banner && logo) embed.setThumbnail(logo);
   return embed;
 }
 
 // one embed per event, best placement first
 export function results(tournament, players) {
-  return groupByEvent(tournament, players).map((entries) => {
+  return groupByEvent(tournament, players).flatMap((entries) => {
     entries.sort((a, b) => (a.placement ?? Infinity) - (b.placement ?? Infinity));
-    return tournamentEmbed(colors.results, `Results · ${eventTitle(entries[0])}`, tournament)
-      .setDescription(entries.map(placementText).join('\n'));
+    return withLines(tournamentEmbed(colors.results, `Results · ${eventTitle(entries[0])}`, tournament), entries.map(placementText));
   });
 }
 
@@ -237,7 +300,11 @@ function upcomingCard(tournament, players, label, color) {
     lines.push(`${playerLink(players[userId])}: ${events.join(', ')}`);
   }
 
-  return tournamentEmbed(color, label, tournament).setDescription(lines.join('\n'));
+  // a card per tournament, so a big one gets cut off instead of carrying on
+  const [shown, ...rest] = split(lines, 4000);
+  const hidden = rest.flat().length;
+  if (hidden) shown.push(`-# and ${hidden} more`);
+  return tournamentEmbed(color, label, tournament).setDescription(shown.join('\n'));
 }
 
 export function headToHead(a, b, sets) {
@@ -357,6 +424,33 @@ export function stats(player, standings, sets) {
   return embed.setDescription(lines.join('\n'));
 }
 
+// file is the uploaded render of their main
+export function characters(player, usage, file) {
+  const embed = baseEmbed(colors.brand, 'Dark Fundies · Ultimate')
+    .setAuthor({ name: 'Characters' })
+    .setTitle(escapeMarkdown(player.tag))
+    .setURL(startggUrl(player.slug));
+  if (file) embed.setThumbnail(`attachment://${file}`);
+
+  const from = `their last ${count(usage.scanned, 'Ultimate singles set')}`;
+  if (!usage.scanned) return embed.setDescription('No Ultimate singles sets on start.gg yet.');
+  if (!usage.reported) return embed.setDescription(`No characters reported in ${from}. Lots of tournaments don't bother.`);
+
+  const lines = [];
+  for (const [i, character] of usage.characters.slice(0, CHARACTERS_SHOWN).entries()) {
+    const share = usage.characters.length > 1 ? ` · ${percent(character.games, usage.games)} of games` : '';
+    const won = `won ${character.wins} of ${character.games} (${percent(character.wins, character.games)})`;
+    const name = i === 0 ? `**${character.name}**` : character.name;
+    // escaped so discord shows "1." as typed instead of making it a list
+    lines.push(`${i + 1}\\. ${name}${share} · ${won}`);
+    if (i === 0 && usage.best) lines.push(`-# Best vs ${usage.best.name} ${usage.best.wins}-${usage.best.games - usage.best.wins}`);
+  }
+  if (usage.characters.length > CHARACTERS_SHOWN) lines.push(`-# and ${usage.characters.length - CHARACTERS_SHOWN} more`);
+  lines.push('', `-# Characters were reported in ${usage.reported} of ${from}`);
+
+  return embed.setDescription(lines.join('\n'));
+}
+
 // 3rd of 20 (seed 2) · Ultimate Singles · Tournament · date
 function placementLine({ placement, seed, dq, event }) {
   let text = `${medal(placement)}**${ordinal(placement)}**`;
@@ -368,14 +462,14 @@ function placementLine({ placement, seed, dq, event }) {
 }
 
 export function trackedList(players) {
-  const all = Object.values(players);
+  const all = Object.values(players).sort((a, b) => a.tag.localeCompare(b.tag));
   const embed = baseEmbed(colors.brand).setTitle(`Tracking ${all.length}`);
-  if (!all.length) return embed.setDescription('Nobody yet. Add someone with `/df track add`.');
+  if (!all.length) return [embed.setDescription('Nobody yet. Add someone with `/df track add`.')];
   const lines = all.map((player) => {
     if (player.streamAlerts === false) return `${playerLink(player)} · stream alerts off`;
     return playerLink(player);
   });
-  return embed.setDescription(lines.join('\n'));
+  return withLines(embed, lines);
 }
 
 export function added(player) {
@@ -385,12 +479,34 @@ export function added(player) {
   return embed;
 }
 
-export function sm4sh(title, text, screenshot, file) {
-  return baseEmbed(colors.sm4sh, `Dark Fundies · ${screenshot.name}`)
+function count(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+export function status(info) {
+  const ago = (seconds) => (seconds ? `<t:${seconds}:R>` : 'not yet');
+  let setCheck = ago(info.setCheck);
+  if (info.setError) setCheck += `, last try failed (${escapeMarkdown(info.setError)})`;
+
+  const lines = [
+    `**Started:** ${ago(info.startedAt)} on ${escapeMarkdown(info.host)}`,
+    `**Last set check:** ${setCheck}`,
+    `**Signups and placements updated:** ${ago(info.tournamentCheck)}`,
+    `**Tracking:** ${count(info.players, 'player')} · ${count(info.tournaments, 'tournament')}`,
+  ];
+  if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
+  if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
+  if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
+
+  return baseEmbed(colors.brand).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
+}
+
+export function joke(name, title, { text, screenshot, image }) {
+  return baseEmbed(colors[name], `Dark Fundies · ${screenshot.name}`)
     .setTitle(title)
     .setURL(screenshot.page)
     .setDescription(text.slice(0, 4096))
-    .setImage(`attachment://${file}`);
+    .setImage(`attachment://${image.name}`);
 }
 
 export function help() {
@@ -402,15 +518,24 @@ export function help() {
     '`/df recent` latest sets',
     '`/df h2h` record between two players',
     '`/df stats` set record, placements and best upset',
+    '`/df characters` Ultimate characters someone has reported and how they do on each',
     '`/df predict` odds of one player beating another',
     '`/df stream` stream alerts on or off',
+    '`/df status` uptime and the last start.gg checks',
+    '`/df set_reg_reminder` ping Reg Reminders as a tournament\'s registration deadline gets close',
+    '`/df delete_reg_reminder` cancel one',
+    '`/df reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is linked on start.gg',
     '`/df sm4sh` a love letter to Smash 4',
+    '`/df melee` a Melee purist with a take',
+    '`/df ult` an Ultimate player who hates Ultimate',
+    '`/df pfp` my profile picture, full size',
     '-# upcoming, recent and stream also take `all` as the player',
     '',
     'Posted here automatically:',
     '• finished sets, and a player\'s first DQ in an event',
     '• sets on stream or up next in the stream queue',
     '• a roll call an hour before a tournament with 3+ of the crew',
+    '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
     '• where everyone placed once it\'s over',
   ];
   return baseEmbed(colors.brand).setTitle('Dark Fundies').setDescription(lines.join('\n'));

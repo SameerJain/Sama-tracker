@@ -1,6 +1,6 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { command, handleAutocomplete, handleCommand } from './commands.js';
-import { checkToken } from './startgg.js';
+import { asCommand, checkToken } from './startgg.js';
 import { startTracking } from './tracker.js';
 
 function quit(message) {
@@ -9,7 +9,7 @@ function quit(message) {
 }
 
 for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN', 'GUILD_ID', 'CHANNEL_ID']) {
-  if (!process.env[name]) quit(`${name} is missing from .env`);
+  if (!process.env[name]) quit(`${name} isn't set, put it in .env or the Railway variables`);
 }
 
 await checkToken().catch((err) => quit(`bad STARTGG_TOKEN (${err.message}), make a new one in start.gg Settings > Developer Settings`));
@@ -59,7 +59,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   busy.add(userId);
 
   try {
-    await handleCommand(interaction);
+    await asCommand(() => handleCommand(interaction));
   } catch (err) {
     console.error(err);
     const message = `Something went wrong: ${err.message}`;

@@ -13,6 +13,12 @@ const RESULTS_GIVE_UP_HOURS = 24;
 const CATCH_UP_HOURS = 3;
 // some TOs set the end date years out by mistake
 const MAX_TOURNAMENT_DAYS = 7;
+// tournaments over a day out barely change, so they get looked at less
+const FAR_OFF_CHECK_HOURS = 6;
+// discord allows 100 mentions a message, and 2000 chars fits about 80
+const MENTIONS_PER_MESSAGE = 80;
+// hours before registration closes. the last one is the last call
+export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -21,20 +27,40 @@ export function secondsNow() {
   return Math.floor(Date.now() / 1000);
 }
 
+// for /df status
+export const health = { startedAt: secondsNow(), downSince: null, skippedBefore: null, setCheck: null, setError: null, tournamentCheck: null };
+
 let channel;
 
 export function startTracking(postChannel) {
   channel = postChannel;
+
+  // lastCheck only moves while it's running, so the oldest one is when it went down.
+  // Infinity with nobody tracked
+  const now = secondsNow();
+  const lastCheck = Math.min(...Object.values(state.players).map((player) => player.lastCheck));
+  if (lastCheck < now - 2 * SET_CHECK_MINUTES * 60) {
+    health.downSince = lastCheck;
+    if (lastCheck < now - CATCH_UP_HOURS * HOUR) health.skippedBefore = now - CATCH_UP_HOURS * HOUR;
+  }
+  // saved from before userIds existed
+  for (const tournament of Object.values(state.tournaments)) {
+    tournament.userIds ??= [...new Set(tournament.entries.map((entry) => entry.userId))];
+  }
+
   checkTournaments();
   checkSets();
   checkProfiles();
+  checkRegReminders();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
+  setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
 }
 
 // one run at a time so nothing posts twice. if a run is already waiting, extra calls
-// get dropped since it'll see the latest players anyway
+// get dropped since it'll see the latest players anyway. background even when a
+// command kicks it off, so it doesn't cut in front of other commands
 function queued(check) {
   let last = Promise.resolve();
   let waiting = false;
@@ -43,9 +69,14 @@ function queued(check) {
     waiting = true;
     last = last.then(() => {
       waiting = false;
-      return check();
+      return startgg.inBackground(check);
     }).catch(console.error);
   };
+}
+
+// fewest messages that fit discord's limits
+async function post(list) {
+  for (const batch of embeds.messages(list)) await channel.send({ embeds: batch });
 }
 
 const checkSets = queued(async () => {
@@ -54,6 +85,7 @@ const checkSets = queued(async () => {
 });
 export const checkTournaments = queued(updateTournaments);
 const checkProfiles = queued(updateProfiles);
+export const checkRegReminders = queued(postRegReminders);
 
 // picks up tag and avatar changes
 async function updateProfiles() {
@@ -83,6 +115,12 @@ async function postNewSets() {
     sets.sort((a, b) => a.completedAt - b.completedAt);
 
     for (const set of sets) {
+      // for /df recent all
+      for (const player of players) {
+        if (!set.sides.some((side) => side.playerIds.includes(player.playerId))) continue;
+        // edits bring back old sets
+        player.lastSetAt = Math.max(player.lastSetAt ?? 0, set.completedAt);
+      }
       if (state.posted.includes(set.id)) continue;
       // editing an old set brings it back
       if (set.completedAt < since - HOUR) continue;
@@ -97,8 +135,11 @@ async function postNewSets() {
     }
     // only on success so a failed check gets covered next time
     for (const player of players) player.lastCheck = checkedAt;
+    health.setCheck = checkedAt;
+    health.setError = null;
   } catch (err) {
     console.error('checking sets failed:', err.message);
+    health.setError = err.message;
   }
 
   state.posted = state.posted.slice(-1000);
@@ -165,20 +206,23 @@ function alertsOn(player) {
 }
 
 async function updateTournaments() {
-  const userIds = Object.values(state.players).map((player) => player.userId);
+  const tracked = Object.values(state.players).map((player) => player.userId);
 
-  for (const userId of userIds) {
-    try {
-      for (const tournament of await startgg.getUpcomingTournaments(userId)) {
+  try {
+    for (const [userId, tournaments] of await startgg.getUpcomingTournaments(tracked)) {
+      for (const found of tournaments) {
         // bad end dates make old tournaments show up as upcoming
-        if (secondsNow() > endTime(tournament)) continue;
-        if (!state.tournaments[tournament.id]) {
-          state.tournaments[tournament.id] = { id: tournament.id, entries: [] };
+        if (secondsNow() > endTime(found)) continue;
+        const tournament = state.tournaments[found.id] ??= { ...found, entries: [], userIds: [] };
+        // someone new signed up, so it gets looked at now even if it's far off
+        if (!tournament.userIds.includes(userId)) {
+          tournament.userIds.push(userId);
+          tournament.checkedAt = 0;
         }
       }
-    } catch (err) {
-      console.error(`finding tournaments for ${state.players[userId]?.tag} failed:`, err.message);
     }
+  } catch (err) {
+    console.error('finding tournaments failed:', err.message);
   }
 
   for (const tournament of Object.values(state.tournaments)) {
@@ -187,15 +231,19 @@ async function updateTournaments() {
       if (secondsNow() > endTime(tournament) + 7 * DAY) delete state.tournaments[tournament.id];
       continue;
     }
+    const farOff = tournament.startAt - secondsNow() > DAY;
+    if (farOff && secondsNow() - (tournament.checkedAt ?? 0) < FAR_OFF_CHECK_HOURS * HOUR) continue;
 
     try {
+      // only the people who signed up. everyone at every tournament gets slow with a big crew
+      const userIds = tournament.userIds.filter((id) => state.players[id]);
       const latest = await startgg.getTournament(tournament.id, userIds);
       // deleted or unpublished
       if (!latest) {
         delete state.tournaments[tournament.id];
         continue;
       }
-      Object.assign(tournament, latest);
+      Object.assign(tournament, latest, { checkedAt: secondsNow() });
       await postRollCall(tournament);
       await postResults(tournament);
     } catch (err) {
@@ -203,6 +251,7 @@ async function updateTournaments() {
     }
   }
 
+  health.tournamentCheck = secondsNow();
   save();
 }
 
@@ -216,7 +265,7 @@ async function postRollCall(tournament) {
   const entered = new Set(tournament.entries.map((entry) => entry.userId));
   if (entered.size < ROLL_CALL_MIN_PLAYERS) return;
 
-  await channel.send({ embeds: [embeds.rollCall(tournament, state.players)] });
+  await post(embeds.rollCall(tournament, state.players));
   tournament.rollCallPosted = true;
 }
 
@@ -227,13 +276,66 @@ async function postResults(tournament) {
   const gaveUp = secondsNow() > endTime(tournament) + RESULTS_GIVE_UP_HOURS * HOUR;
   if (!allDone && !gaveUp) return;
 
-  // separate messages, discord's 6000 char limit is per message
-  for (const embed of embeds.results(tournament, state.players)) {
-    await channel.send({ embeds: [embed] });
-  }
+  await post(embeds.results(tournament, state.players));
   tournament.resultsPosted = true;
 }
 
 export function endTime(tournament) {
   return Math.min(tournament.endAt ?? tournament.startAt, tournament.startAt + MAX_TOURNAMENT_DAYS * DAY);
+}
+
+// lots of weeklies leave registration open after the start, but you still have to sign up before it
+export function regDeadline(tournament) {
+  return Math.min(tournament.registrationClosesAt ?? tournament.startAt, tournament.startAt);
+}
+
+// index of the first reminder still to come. ones already past get skipped,
+// except the last call, so setting it late sends that right away
+export function nextRegReminder(deadline) {
+  const next = REG_REMINDER_HOURS.findIndex((hours) => secondsNow() < deadline - hours * HOUR);
+  return next === -1 ? REG_REMINDER_HOURS.length - 1 : next;
+}
+
+async function postRegReminders() {
+  for (const reminder of Object.values(state.regReminders)) {
+    try {
+      // TOs move the close time, so always go off the latest
+      const tournament = await startgg.getRegistration(reminder.slug);
+      const deadline = tournament && regDeadline(tournament);
+      // deleted, or it closed while the bot was down
+      if (!tournament || deadline <= secondsNow()) {
+        delete state.regReminders[reminder.id];
+        continue;
+      }
+      reminder.deadline = deadline;
+      // set back when there was only the last call
+      reminder.next ??= nextRegReminder(deadline);
+
+      // only the latest one if the bot was down through a few
+      const due = REG_REMINDER_HOURS.findLastIndex((hours, i) => i >= reminder.next && secondsNow() >= deadline - hours * HOUR);
+      if (due === -1) continue;
+      const lastCall = due === REG_REMINDER_HOURS.length - 1;
+
+      // not open means it filled up, or for the early ones that it hasn't opened yet
+      if (tournament.isRegistrationOpen) {
+        // people one by one, a role ping would hit the ones already registered
+        const registered = await startgg.getRegisteredDiscordIds(tournament.id);
+        const ping = state.regPings.filter((id) => !registered.has(id));
+        // the embed goes with the first batch of pings, or alone if there's nobody to ping
+        for (let i = 0; i === 0 || i < ping.length; i += MENTIONS_PER_MESSAGE) {
+          const users = ping.slice(i, i + MENTIONS_PER_MESSAGE);
+          await channel.send({
+            content: users.length ? `${users.map((id) => `<@${id}>`).join(' ')} ${lastCall ? 'last call' : 'registration reminder'}` : undefined,
+            embeds: i === 0 ? [embeds.regReminder(tournament, deadline, lastCall)] : [],
+            allowedMentions: { users },
+          });
+        }
+      }
+      if (lastCall) delete state.regReminders[reminder.id];
+      else reminder.next = due + 1;
+    } catch (err) {
+      console.error(`reg reminder for ${reminder.name} failed:`, err.message);
+    }
+  }
+  save();
 }

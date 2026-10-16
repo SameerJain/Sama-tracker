@@ -1,10 +1,10 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 const API_URL = 'https://api.start.gg/gql/alpha';
 
 export function startggUrl(slug) {
   return `https://www.start.gg/${slug}`;
 }
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function chunk(list, size) {
   const groups = [];
@@ -12,13 +12,40 @@ function chunk(list, size) {
   return groups;
 }
 
-// start.gg allows 80 requests a minute, so space them 800ms apart
+// start.gg allows 80 requests a minute, so one goes out every 800ms.
+// requests for a command go ahead of the background checks
+const fromCommand = new AsyncLocalStorage();
+const waiting = { command: [], background: [] };
 let nextSlot = 0;
+let timer;
+
+export const asCommand = (fn) => fromCommand.run(true, fn);
+export const inBackground = (fn) => fromCommand.run(false, fn);
+export const queueLength = () => waiting.command.length + waiting.background.length;
+
+function takeTurn() {
+  return new Promise((resolve) => {
+    waiting[fromCommand.getStore() ? 'command' : 'background'].push(resolve);
+    sendNext();
+  });
+}
+
+function sendNext() {
+  if (timer) return;
+  timer = setTimeout(() => {
+    timer = null;
+    // a 429 pushed everything back since this was scheduled
+    if (Date.now() < nextSlot) return sendNext();
+    const next = waiting.command.shift() ?? waiting.background.shift();
+    if (!next) return;
+    nextSlot = Date.now() + 800;
+    next();
+    sendNext();
+  }, Math.max(0, nextSlot - Date.now()));
+}
 
 async function query(text, variables, retries = 2) {
-  const slot = Math.max(Date.now(), nextSlot);
-  nextSlot = slot + 800;
-  await sleep(slot - Date.now());
+  await takeTurn();
 
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -31,15 +58,33 @@ async function query(text, variables, retries = 2) {
   }).catch((err) => {
     throw new Error(`start.gg didn't respond (${err.message})`);
   });
-  // still got limited, probably another copy running on the same token
+  // still got limited, probably another copy running on the same token. everything waits
   if (res.status === 429 && retries > 0) {
-    await sleep(15_000);
+    nextSlot = Date.now() + 15_000;
     return query(text, variables, retries - 1);
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`start.gg: ${body.message ?? `HTTP ${res.status}`}`);
   if (body.errors) throw new Error(`start.gg: ${body.errors[0].message}`);
   return body.data;
+}
+
+// a bunch of lookups per request, aliased by id. start.gg's 1000 object limit counts what comes back
+// and most checks come back empty, so groups start big and get split in half when they go over
+async function lookupMany(ids, toQuery, variables) {
+  const results = await Promise.all(chunk(ids, 20).map((group) => lookupGroup(group, toQuery, variables)));
+  return Object.assign({}, ...results);
+}
+
+async function lookupGroup(group, toQuery, variables) {
+  try {
+    return await query(toQuery(group), variables);
+  } catch (err) {
+    if (group.length === 1 || !err.message.includes('complexity')) throw err;
+    const half = Math.ceil(group.length / 2);
+    const [a, b] = await Promise.all([group.slice(0, half), group.slice(half)].map((each) => lookupGroup(each, toQuery, variables)));
+    return { ...a, ...b };
+  }
 }
 
 export async function checkToken() {
@@ -129,20 +174,15 @@ export function fromSide(set, playerId) {
 
 // set states: 1 waiting, 2 in progress, 3 done, 6 called
 export async function getSets(playerIds, { since, perPage = 10, states = [3] } = {}) {
-  // start.gg rejects queries that could return over 1000 objects,
-  // roughly 3 per player + 35 per set, more for long sets
-  const size = Math.max(1, Math.floor(1000 / (3 + 35 * perPage)));
-
-  // a few players per request, aliased as p<id>
-  const results = await Promise.all(chunk(playerIds, size).map((group) => query(`
+  const data = await lookupMany(playerIds, (group) => `
     query ($perPage: Int!, $filters: SetFilters) {
       ${group.map((id) => `p${id}: player(id: ${id}) { sets(perPage: $perPage, page: 1, filters: $filters) { nodes { ${SET_FIELDS} } } }`).join('\n')}
     }
-  `, { perPage, filters: { state: states, updatedAfter: since } })));
+  `, { perPage, filters: { state: states, updatedAfter: since } });
 
   // two tracked players can be in the same set
   const setsById = new Map();
-  for (const player of results.flatMap(Object.values)) {
+  for (const player of Object.values(data)) {
     for (const set of (player?.sets?.nodes ?? []).map(toSet).filter(Boolean)) {
       setsById.set(set.id, set);
     }
@@ -163,7 +203,7 @@ export async function getSetHistory(playerId, page) {
             winnerId
             event { slug videogame { displayName } tournament { name } }
             slots {
-              entrant { id initialSeedNum participants { player { id } } }
+              entrant { id name initialSeedNum participants { player { id } } }
               standing { stats { score { value } } }
             }
           }
@@ -173,6 +213,40 @@ export async function getSetHistory(playerId, page) {
   `, { id: playerId, page });
 
   return (data.player?.sets?.nodes ?? []).map(toSet).filter(Boolean);
+}
+
+// every finished singles event they entered, newest first. an event is ~7 objects, so 120 a page
+export async function getEventHistory(userId) {
+  const events = [];
+  for (let page = 1; ; page++) {
+    const data = await query(`
+      query ($id: ID!, $page: Int!) {
+        user(id: $id) {
+          events(query: { page: $page, perPage: 120, filter: { eventType: 1 } }) {
+            pageInfo { totalPages }
+            nodes {
+              name
+              slug
+              startAt
+              numEntrants
+              state
+              videogame { displayName }
+              tournament { name }
+              userEntrant(userId: $id) { initialSeedNum isDisqualified standing { placement } }
+            }
+          }
+        }
+      }
+    `, { id: userId, page });
+
+    const connection = data.user?.events;
+    for (const { userEntrant: entrant, state, ...event } of connection?.nodes ?? []) {
+      const placement = entrant?.standing?.placement;
+      if (state !== 'COMPLETED' || !placement) continue;
+      events.push({ placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event });
+    }
+    if (!connection || page >= connection.pageInfo.totalPages) return events.sort((a, b) => b.event.startAt - a.event.startAt);
+  }
 }
 
 // 30 sets keeps this under the object limit
@@ -210,6 +284,63 @@ export async function getStats(playerId) {
     .map(({ placement, entrant }) => ({ placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event: entrant.event }));
   const sets = (data.player?.sets?.nodes ?? []).map(toSet).filter(Boolean);
   return { standings, sets };
+}
+
+// for /df characters. every game they reported a character for, newest set first.
+// the limit counts what comes back, and a bo5 with characters is ~46 objects, so only 20 fit
+export async function getCharacterSets(playerId, page) {
+  const data = await query(`
+    query ($id: ID!, $page: Int!) {
+      player(id: $id) {
+        sets(perPage: 20, page: $page, filters: { state: [3], entrantSize: [1] }) {
+          nodes {
+            completedAt
+            event { videogame { id displayName } }
+            slots { entrant { id participants { player { id } } } }
+            games { winnerId selections { entrant { id } character { name } } }
+          }
+        }
+      }
+    }
+  `, { id: playerId, page });
+
+  return (data.player?.sets?.nodes ?? []).map((node) => {
+    const mine = node.slots.find((slot) => slot.entrant?.participants.some((participant) => participant.player?.id === playerId))?.entrant.id;
+    const games = [];
+    for (const game of node.games ?? []) {
+      const picks = game.selections ?? [];
+      const character = picks.find((pick) => pick.entrant?.id === mine)?.character?.name;
+      const against = picks.find((pick) => pick.entrant?.id !== mine)?.character?.name;
+      if (character && game.winnerId) games.push({ character, against, won: game.winnerId === mine });
+    }
+    return { completedAt: node.completedAt, videogame: node.event.videogame, games };
+  });
+}
+
+export const ULTIMATE = 1386;
+
+// the roster doesn't change, so it only gets fetched once
+let roster;
+
+function ultimateRoster() {
+  if (!roster) {
+    roster = query(`{ videogame(id: ${ULTIMATE}) { characters { name images(type: "icon") { url } } } }`)
+      .then((data) => data.videogame?.characters ?? []);
+    roster.catch(() => { roster = null; });
+  }
+  return roster;
+}
+
+// start.gg's icon for an ultimate character is its render. discord can't always
+// load images.start.gg, so this downloads it to upload with the message
+export async function getCharacterArt(name) {
+  const url = (await ultimateRoster()).find((character) => character.name === name)?.images?.[0]?.url;
+  if (!url) return null;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`start.gg image returned ${res.status}`);
+  const extension = new URL(url).pathname.split('.').pop();
+  return { attachment: Buffer.from(await res.arrayBuffer()), name: `character.${extension}` };
 }
 
 export async function getStreamQueues(tournamentId) {
@@ -263,19 +394,13 @@ const TOURNAMENT_FIELDS = `
   images(type: "profile") { url }
 `;
 
-// also returns ones they only admin, those just end up with no entries
-export async function getUpcomingTournaments(userId) {
-  const data = await query(`
-    query ($id: ID!) {
-      user(id: $id) {
-        tournaments(query: { perPage: 20, filter: { upcoming: true, past: false } }) {
-          nodes { ${TOURNAMENT_FIELDS} }
-        }
-      }
-    }
-  `, { id: userId });
+// [userId, tournaments] for each of them. also returns ones they only admin, those just end up with no entries
+export async function getUpcomingTournaments(userIds) {
+  const data = await lookupMany(userIds, (group) => `{
+    ${group.map((id) => `u${id}: user(id: ${id}) { tournaments(query: { perPage: 20, filter: { upcoming: true, past: false } }) { nodes { ${TOURNAMENT_FIELDS} } } }`).join('\n')}
+  }`);
 
-  return data.user?.tournaments?.nodes ?? [];
+  return userIds.map((userId) => [userId, data[`u${userId}`]?.tournaments?.nodes ?? []]);
 }
 
 // every player in every event at a major goes over the object limit
@@ -338,4 +463,51 @@ async function lookupEntries(tournamentId, userIds) {
   `, { id: tournamentId });
 
   return data.tournament;
+}
+
+// slug is genesis-x, tournament/genesis-x or a short link name
+export async function getRegistration(slug) {
+  const data = await query(`
+    query ($slug: String) {
+      tournament(slug: $slug) {
+        id
+        name
+        slug
+        startAt
+        registrationClosesAt
+        isRegistrationOpen
+        numAttendees
+        city
+        addrState
+        isOnline
+        images { type url }
+      }
+    }
+  `, { slug });
+
+  return data.tournament;
+}
+
+// discord ids of everyone registered who linked discord on start.gg.
+// a participant is ~3 objects, so 200 a page stays under the limit
+export async function getRegisteredDiscordIds(tournamentId) {
+  const ids = new Set();
+  for (let page = 1; ; page++) {
+    const data = await query(`
+      query ($id: ID!, $page: Int!) {
+        tournament(id: $id) {
+          participants(query: { page: $page, perPage: 200 }) {
+            pageInfo { totalPages }
+            nodes { user { authorizations(types: [DISCORD]) { externalId } } }
+          }
+        }
+      }
+    `, { id: tournamentId, page });
+
+    const participants = data.tournament?.participants;
+    for (const node of participants?.nodes ?? []) {
+      for (const link of node.user?.authorizations ?? []) ids.add(link.externalId);
+    }
+    if (!participants || page >= participants.pageInfo.totalPages) return ids;
+  }
 }

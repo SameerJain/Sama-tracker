@@ -1,13 +1,26 @@
-import { ApplicationCommandOptionType as Option, MessageFlags, embedLength } from 'discord.js';
+import { hostname } from 'node:os';
+import { ApplicationCommandOptionType as Option, MessageFlags } from 'discord.js';
 import * as startgg from './startgg.js';
 import * as embeds from './embeds.js';
 import { state, save } from './store.js';
-import { checkTournaments, endTime, secondsNow } from './tracker.js';
-import * as smash4 from './sm4sh.js';
+import { REG_REMINDER_HOURS, checkRegReminders, checkTournaments, endTime, health, nextRegReminder, regDeadline, secondsNow } from './tracker.js';
+import sm4sh from './sm4sh.js';
+import melee from './melee.js';
+import ult from './ult.js';
 import { predict as predictOdds } from './predict.js';
+import { characterUsage } from './characters.js';
 
 const HISTORY_PAGES = 15; // 40 sets a page
+// 3000 sets, about a minute the first time for someone who's played that many
+const LIFETIME_PAGES = 75;
 const HISTORY_CACHE_MINUTES = 10;
+// /df recent all only asks start.gg about whoever played most recently
+const RECENT_ALL_PLAYERS = 40;
+
+const jokes = { sm4sh, melee, ult };
+
+// shows who has reg pings on
+const REG_ROLE = 'Reg Reminders';
 
 function playerOption(description, name = 'player') {
   return { type: Option.String, name, description, required: true, autocomplete: true };
@@ -60,6 +73,15 @@ export const command = {
       type: Option.Subcommand,
       name: 'stats',
       description: 'Recent placements and set record',
+      options: [
+        playerOption('Tracked player'),
+        { type: Option.Boolean, name: 'verbose', description: 'Full lifetime report, slower' },
+      ],
+    },
+    {
+      type: Option.Subcommand,
+      name: 'characters',
+      description: 'Ultimate characters a tracked player has reported',
       options: [playerOption('Tracked player')],
     },
     {
@@ -83,7 +105,33 @@ export const command = {
         },
       ],
     },
-    { type: Option.Subcommand, name: 'sm4sh', description: smash4.LINE },
+    { type: Option.Subcommand, name: 'status', description: 'Uptime and the last start.gg checks' },
+    {
+      type: Option.Subcommand,
+      name: 'set_reg_reminder',
+      description: 'Ping people with reg pings on as a tournament\'s registration deadline gets close',
+      options: [{ type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true }],
+    },
+    {
+      type: Option.Subcommand,
+      name: 'delete_reg_reminder',
+      description: 'Cancel a registration reminder',
+      options: [{ type: Option.String, name: 'tournament', description: 'Tournament with a reminder', required: true, autocomplete: true }],
+    },
+    {
+      type: Option.Subcommand,
+      name: 'reg_role',
+      description: 'Reg reminder pings for yourself, on or off',
+      options: [{
+        type: Option.String,
+        name: 'ping',
+        description: 'on or off',
+        required: true,
+        choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
+      }],
+    },
+    ...Object.values(jokes).map((joke) => ({ type: Option.Subcommand, name: joke.name, description: joke.line })),
+    { type: Option.Subcommand, name: 'pfp', description: 'My profile picture, full size' },
   ],
 };
 
@@ -100,7 +148,7 @@ export async function handleCommand(interaction) {
     case 'track remove':
       return trackRemove(interaction);
     case 'track list':
-      return interaction.reply({ embeds: [embeds.trackedList(state.players)] });
+      return sendEmbeds(interaction, embeds.trackedList(state.players));
     case 'upcoming':
       return upcoming(interaction);
     case 'recent':
@@ -109,12 +157,26 @@ export async function handleCommand(interaction) {
       return headToHead(interaction);
     case 'stats':
       return stats(interaction);
+    case 'characters':
+      return characters(interaction);
     case 'predict':
       return predict(interaction);
     case 'stream':
       return streamAlerts(interaction);
+    case 'status':
+      return status(interaction);
+    case 'set_reg_reminder':
+      return setRegReminder(interaction);
+    case 'delete_reg_reminder':
+      return deleteRegReminder(interaction);
+    case 'reg_role':
+      return regRole(interaction);
     case 'sm4sh':
-      return sm4sh(interaction);
+    case 'melee':
+    case 'ult':
+      return tell(interaction, jokes[name]);
+    case 'pfp':
+      return pfp(interaction);
   }
 }
 
@@ -122,15 +184,22 @@ export async function handleAutocomplete(interaction) {
   const typed = interaction.options.getFocused().toLowerCase();
   const choices = [];
 
+  if (interaction.options.getSubcommand() === 'delete_reg_reminder') {
+    for (const reminder of Object.values(state.regReminders)) {
+      if (reminder.name.toLowerCase().includes(typed)) choices.push({ name: reminder.name.slice(0, 100), value: String(reminder.id) });
+    }
+    return interaction.respond(choices.slice(0, 25));
+  }
+
   // no "all" for the ones that need a single player
-  if (!['remove', 'h2h', 'stats', 'predict'].includes(interaction.options.getSubcommand()) && 'all'.startsWith(typed)) {
+  if (!['remove', 'h2h', 'stats', 'characters', 'predict'].includes(interaction.options.getSubcommand()) && 'all'.startsWith(typed)) {
     choices.push({ name: 'all', value: 'all' });
   }
-  for (const player of Object.values(state.players)) {
-    if (player.tag.toLowerCase().includes(typed)) {
-      choices.push({ name: player.tag, value: String(player.userId) });
-    }
-  }
+  // only 25 fit, so tags that start with what's typed go first
+  const matches = Object.values(state.players).filter((player) => player.tag.toLowerCase().includes(typed));
+  const starts = (player) => player.tag.toLowerCase().startsWith(typed);
+  matches.sort((a, b) => starts(b) - starts(a));
+  for (const player of matches) choices.push({ name: player.tag, value: String(player.userId) });
 
   await interaction.respond(choices.slice(0, 25));
 }
@@ -150,22 +219,9 @@ function readPlayer(interaction, name = 'player') {
   return choice === 'all' ? undefined : choice;
 }
 
-// discord allows 10 embeds and 6000 chars per message, the rest go in follow-ups
+// whatever doesn't fit in the reply goes in follow-ups
 async function sendEmbeds(interaction, list) {
-  const messages = [[]];
-  let size = 0;
-  for (const embed of list) {
-    const length = embedLength(embed.data);
-    const current = messages.at(-1);
-    if (current.length === 10 || (current.length && size + length > 6000)) {
-      messages.push([]);
-      size = 0;
-    }
-    messages.at(-1).push(embed);
-    size += length;
-  }
-
-  for (const [i, batch] of messages.entries()) {
+  for (const [i, batch] of embeds.messages(list).entries()) {
     if (i > 0) await interaction.followUp({ embeds: batch });
     else if (interaction.deferred) await interaction.editReply({ embeds: batch });
     else await interaction.reply({ embeds: batch });
@@ -235,7 +291,10 @@ async function recent(interaction) {
   if (!choice) return replyNotTracked(interaction);
 
   await interaction.deferReply();
-  const players = choice === 'all' ? Object.values(state.players) : [choice];
+  // the latest 20 sets come from whoever played last, no need to ask about everyone
+  const players = choice === 'all'
+    ? Object.values(state.players).sort((a, b) => (b.lastSetAt ?? 0) - (a.lastSetAt ?? 0)).slice(0, RECENT_ALL_PLAYERS)
+    : [choice];
   const perPlayer = choice === 'all' ? 3 : 5;
 
   const sets = await startgg.getSets(players.map((player) => player.playerId), { perPage: perPlayer });
@@ -254,27 +313,36 @@ async function recent(interaction) {
 }
 
 // caching the promise means two lookups at once share a fetch
-const histories = new Map();
+function cachedHistory(getPage, pages = HISTORY_PAGES) {
+  const histories = new Map();
+  return (playerId) => {
+    // otherwise it keeps every history anyone ever looked up
+    for (const [id, cached] of histories) {
+      if (Date.now() - cached.at > HISTORY_CACHE_MINUTES * 60 * 1000) histories.delete(id);
+    }
+    const cached = histories.get(playerId);
+    if (cached) return cached.sets;
 
-function setHistory(playerId) {
-  const cached = histories.get(playerId);
-  if (cached && Date.now() - cached.at < HISTORY_CACHE_MINUTES * 60 * 1000) return cached.sets;
-
-  const sets = fetchHistory(playerId);
-  histories.set(playerId, { at: Date.now(), sets });
-  sets.catch(() => histories.delete(playerId));
-  return sets;
+    const sets = fetchHistory(getPage, playerId, pages);
+    histories.set(playerId, { at: Date.now(), sets });
+    sets.catch(() => histories.delete(playerId));
+    return sets;
+  };
 }
 
-async function fetchHistory(playerId) {
+async function fetchHistory(getPage, playerId, pages) {
   const sets = [];
-  for (let page = 1; page <= HISTORY_PAGES; page++) {
-    const batch = await startgg.getSetHistory(playerId, page);
+  for (let page = 1; page <= pages; page++) {
+    const batch = await getPage(playerId, page);
     if (!batch.length) break;
     sets.push(...batch);
   }
   return sets;
 }
+
+const setHistory = cachedHistory(startgg.getSetHistory);
+const characterHistory = cachedHistory(startgg.getCharacterSets);
+const lifetimeHistory = cachedHistory(startgg.getSetHistory, LIFETIME_PAGES);
 
 async function headToHead(interaction) {
   const a = readPlayer(interaction);
@@ -301,8 +369,25 @@ async function stats(interaction) {
   if (!player) return replyNotTracked(interaction);
 
   await interaction.deferReply();
+  if (interaction.options.getBoolean('verbose')) {
+    const [events, sets] = await Promise.all([startgg.getEventHistory(player.userId), lifetimeHistory(player.playerId)]);
+    return sendEmbeds(interaction, embeds.lifetimeStats(player, events, sets, state.players));
+  }
   const { standings, sets } = await startgg.getStats(player.playerId);
   await interaction.editReply({ embeds: [embeds.stats(player, standings, sets)] });
+}
+
+async function characters(interaction) {
+  const player = readPlayer(interaction);
+  if (!player) return replyNotTracked(interaction);
+
+  await interaction.deferReply();
+  // ultimate only for now
+  const sets = (await characterHistory(player.playerId)).filter((set) => set.videogame.id === startgg.ULTIMATE);
+  const usage = characterUsage(sets);
+  // no picture beats no reply
+  const art = usage.characters.length ? await startgg.getCharacterArt(usage.characters[0].name).catch(() => null) : null;
+  await interaction.editReply({ embeds: [embeds.characters(player, usage, art?.name)], files: art ? [art] : [] });
 }
 
 async function predict(interaction) {
@@ -332,16 +417,119 @@ function streamAlerts(interaction) {
   return interaction.reply(`Stream alerts ${on ? 'on' : 'off'} for ${who}.`);
 }
 
-async function sm4sh(interaction) {
-  if (!smash4.enabled) return interaction.reply(smash4.LINE);
+function status(interaction) {
+  const tournaments = Object.values(state.tournaments).filter((tournament) => !tournament.resultsPosted && tournament.entries.length);
+  const info = {
+    ...health,
+    // the hostname there is a random container id
+    host: process.env.RAILWAY_ENVIRONMENT_NAME ? 'Railway' : hostname(),
+    avatar: interaction.client.user.displayAvatarURL(),
+    players: Object.keys(state.players).length,
+    tournaments: tournaments.length,
+    queued: startgg.queueLength(),
+  };
+  return interaction.reply({ embeds: [embeds.status(info)], flags: MessageFlags.Ephemeral });
+}
+
+// start.gg/tournament/genesis-x/details, a short link like start.gg/genesis, or just the slug
+function tournamentSlug(input) {
+  const path = input.replace(/^(https?:\/\/)?(www\.)?(start|smash)\.gg\//, '');
+  return path.match(/tournament\/([\w-]+)/)?.[1] ?? path.split(/[/?#]/)[0];
+}
+
+async function setRegReminder(interaction) {
+  const input = interaction.options.getString('tournament', true).trim();
+
+  await interaction.deferReply();
+  const tournament = await startgg.getRegistration(tournamentSlug(input));
+  if (!tournament) {
+    return interaction.editReply(`Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`);
+  }
+
+  if (state.regReminders[tournament.id]) {
+    return interaction.editReply(`${tournament.name} already has reminders set. \`/df delete_reg_reminder\` cancels them.`);
+  }
+
+  const deadline = regDeadline(tournament);
+  const next = nextRegReminder(deadline);
+  const firstAt = deadline - REG_REMINDER_HOURS[next] * 60 * 60;
+  // further out it might just not be open yet
+  if (deadline <= secondsNow() || (firstAt <= secondsNow() && !tournament.isRegistrationOpen)) {
+    return interaction.editReply(`Registration for ${tournament.name} is closed.`);
+  }
+
+  state.regReminders[tournament.id] = { id: tournament.id, slug: tournament.slug, name: tournament.name, deadline, next };
+  save();
+  // inside the last call window it goes out now
+  checkRegReminders();
+
+  if (firstAt <= secondsNow()) {
+    return interaction.editReply(`Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.`);
+  }
+  const duration = (hours) => (hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`);
+  const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(duration));
+  return interaction.editReply(`Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/df reg_role\` to turn yours on.`);
+}
+
+function deleteRegReminder(interaction) {
+  // autocomplete sends the id, typing it out sends the name
+  const value = interaction.options.getString('tournament', true).toLowerCase();
+  const reminder = Object.hasOwn(state.regReminders, value)
+    ? state.regReminders[value]
+    : Object.values(state.regReminders).find((each) => each.name.toLowerCase() === value);
+  if (!reminder) return interaction.reply({ content: 'No reminder set for that.', flags: MessageFlags.Ephemeral });
+
+  delete state.regReminders[reminder.id];
+  save();
+  return interaction.reply(`Deleted the reminder for ${reminder.name}.`);
+}
+
+// only ever changes the person who ran it. pings go off this list, not the role,
+// so people already registered can be left out
+async function regRole(interaction) {
+  const on = interaction.options.getString('ping', true) === 'on';
+  const { guild, member, user } = interaction;
+
+  state.regPings = state.regPings.filter((id) => id !== user.id);
+  if (on) state.regPings.push(user.id);
+  save();
+
+  let content = on
+    ? 'You\'ll get pinged for reg reminders. If your Discord is linked on start.gg, not for ones you\'re already registered for.'
+    : 'No more reg reminder pings.';
+  try {
+    let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
+    if (on) {
+      role ??= await guild.roles.create({ name: REG_ROLE, reason: 'shows who has /df reg_role on' });
+      await member.roles.add(role);
+    } else if (role) {
+      await member.roles.remove(role);
+    }
+  } catch (err) {
+    // missing permissions. the pings still work without the role
+    if (err.code !== 50013) throw err;
+    content += ` I couldn't change your ${REG_ROLE} role though, that needs Manage Roles and my role above it.`;
+  }
+  return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+}
+
+// just the picture, as big as discord has it
+async function pfp(interaction) {
+  const url = interaction.client.user.displayAvatarURL({ extension: 'png', size: 4096 });
+  await interaction.deferReply();
+  await interaction.editReply({ files: [{ attachment: url, name: `pfp.${new URL(url).pathname.split('.').pop()}` }] });
+}
+
+async function tell(interaction, joke) {
+  if (!joke.enabled) return interaction.reply(joke.line);
 
   await interaction.deferReply();
   try {
-    const { text, screenshot, image } = await smash4.takePost();
-    await interaction.editReply({ embeds: [embeds.sm4sh(smash4.LINE, text, screenshot, image.name)], files: [image] });
+    const post = await joke.takePost();
+    await interaction.editReply({ embeds: [embeds.joke(joke.name, joke.line, post)], files: [post.image] });
   } catch (err) {
     // claude or smashwiki is down, just say it
-    console.error('sm4sh failed:', err.message);
-    await interaction.editReply(smash4.LINE);
+    console.error(`${joke.name} failed:`, err.message);
+    await interaction.editReply(joke.line);
   }
 }

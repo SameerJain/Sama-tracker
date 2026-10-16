@@ -1,9 +1,12 @@
 import fs from 'node:fs';
 
-const FILE = 'data/state.json';
+// railway sets this when a volume is attached, anything else is wiped on redeploy
+const DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH ?? 'data';
+const FILE = `${DIR}/state.json`;
 
-// players are keyed by start.gg user id. posted/streamed/dqs are ids already announced
-const empty = { players: {}, tournaments: {}, posted: [], streamed: [], dqs: [] };
+// players are keyed by start.gg user id, regReminders by tournament id. posted/streamed/dqs are ids already announced.
+// regPings are discord ids that turned reg pings on
+const empty = { players: {}, tournaments: {}, posted: [], streamed: [], dqs: [], regReminders: {}, regPings: [] };
 
 function load() {
   if (!fs.existsSync(FILE)) return empty;
@@ -20,7 +23,7 @@ export const state = load();
 
 // write + rename so a crash can't leave it half written
 export function save() {
-  fs.mkdirSync('data', { recursive: true });
+  fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(`${FILE}.tmp`, JSON.stringify(state, null, 2));
   fs.renameSync(`${FILE}.tmp`, FILE);
 }

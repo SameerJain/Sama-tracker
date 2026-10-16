@@ -1,14 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk';
-
-export const LINE = 'I LOVE SMASH BROS FOR WII U';
+import { makeJoke } from './joke.js';
 
 const PROMPT = `You are a competitive Super Smash Bros. for Wii U player and the game's biggest fan, posting in a Discord server of Smash players.
 Write a post about how much you love the game, in the style given in the message. Talk about it the way a competitive player would: the gameplay, the meta, the tournaments, the community. Let that show instead of announcing it.
 Be funny and over the top: absurd exaggeration, unhinged devotion, petty jabs at the other Smash games. Specific jokes beat generic hype.
 Build it around one or two of the talking points in the message, not all of them. Never name real players, commentators or anyone else from the scene.
-This crowd notices mistakes, so for Smash 4 specifics stick to the talking points. Ice Climbers, Snake, Wolf and Pokemon Trainer aren't in Smash 4, and Smash Run is only on 3DS.
-Format it the way the style calls for, not as a bullet list by default. No headings, the post already has a title. Jokes land harder short: at most 5 sentences (8 short lines for poems and lists) and 30 to 80 words, unless the style says otherwise.
-Reply with only the post, no notes about how you're writing it.`;
+This crowd notices mistakes, so for Smash 4 specifics stick to the talking points. Ice Climbers, Snake, Wolf and Pokemon Trainer aren't in Smash 4, and Smash Run is only on 3DS.`;
 
 const STYLES = [
   'an all-caps hype rant in one paragraph',
@@ -50,119 +46,11 @@ const TALKING_POINTS = [
   'big events like Genesis, CEO, EVO, The Big House, 2GG and Umebura in Japan',
 ];
 
-// short timeout so it falls back to the line fast if claude is down
-const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 20_000, maxRetries: 1 }) : null;
-
-export const enabled = Boolean(client);
-
-// all ~1800 wii u screenshots on smashwiki, fetched once
-let screenshots;
-
-function allScreenshots() {
-  if (!screenshots) {
-    screenshots = fetchScreenshots();
-    screenshots.catch(() => { screenshots = null; });
-  }
-  return screenshots;
-}
-
-async function wiki(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'dark-fundies-bot' }, signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) throw new Error(`SmashWiki returned ${res.status}`);
-  return res;
-}
-
-async function fetchScreenshots() {
-  const files = [];
-  let next = {};
-  while (next) {
-    const params = new URLSearchParams({
-      action: 'query',
-      format: 'json',
-      formatversion: '2',
-      generator: 'categorymembers',
-      gcmtitle: 'Category:Screenshots (SSB4-Wii U)',
-      gcmtype: 'file',
-      gcmlimit: '500',
-      prop: 'imageinfo',
-      iiprop: 'url',
-      ...next,
-    });
-    const data = await (await wiki(`https://www.ssbwiki.com/api.php?${params}`)).json();
-
-    for (const page of data.query.pages) {
-      const info = page.imageinfo?.[0];
-      if (!info) continue;
-      // "File:Animal_Crossing_Stage_SSB4.jpg" -> "Animal Crossing Stage SSB4"
-      const name = page.title.replace(/^File:/, '').replace(/\.\w+$/, '').replaceAll('_', ' ');
-      files.push({ name, url: info.url, page: info.descriptionurl });
-    }
-    next = data.continue;
-  }
-  return files;
-}
-
-// discord can't always load smashwiki images, so upload the file
-async function download(screenshot) {
-  const res = await wiki(screenshot.url);
-  const extension = screenshot.url.split('.').pop().toLowerCase();
-  return { attachment: Buffer.from(await res.arrayBuffer()), name: `sm4sh.${extension}` };
-}
-
-// removes what it picks
-function pickFrom(list) {
-  return list.splice(Math.floor(Math.random() * list.length), 1)[0];
-}
-
-// no repeats until every screenshot has been shown
-let unseen = [];
-
-function pickScreenshot(files) {
-  if (!unseen.length) unseen = [...files];
-  return pickFrom(unseen);
-}
-
-async function loveLetter() {
-  const points = [...TALKING_POINTS];
-  const response = await client.messages.create({
-    model: 'claude-haiku-5-5',
-    max_tokens: 16000,
-    // low effort ignores the word limit
-    output_config: { effort: 'medium' },
-    system: PROMPT,
-    messages: [{
-      role: 'user',
-      content: [
-        `Style: ${pickFrom([...STYLES])}`,
-        `Talking points: ${[pickFrom(points), pickFrom(points), pickFrom(points)].join('; ')}`,
-      ].join('\n'),
-    }],
-  });
-
-  const text = response.content.filter((block) => block.type === 'text').map((block) => block.text).join('');
-  if (response.stop_reason === 'refusal' || !text) throw new Error(`Claude sent nothing back (${response.stop_reason})`);
-  return text;
-}
-
-async function makePost() {
-  const screenshot = pickScreenshot(await allScreenshots());
-  const [text, image] = await Promise.all([loveLetter(), download(screenshot)]);
-  return { text, screenshot, image };
-}
-
-// made ahead of time so /df sm4sh replies right away
-let nextPost;
-
-function prepare() {
-  nextPost = makePost();
-  nextPost.catch(() => {}); // handled in takePost
-}
-
-export function takePost() {
-  const ready = nextPost;
-  prepare();
-  // if the prefetched one failed, try again now
-  return ready.catch(makePost);
-}
-
-if (enabled) prepare();
+export default makeJoke({
+  name: 'sm4sh',
+  line: 'I LOVE SMASH BROS FOR WII U',
+  category: 'Screenshots (SSB4-Wii U)',
+  prompt: PROMPT,
+  styles: STYLES,
+  points: TALKING_POINTS,
+});
