@@ -35,7 +35,7 @@ const UPSETS_SHOWN = 3;
 const OPPONENTS_SHOWN = 8;
 const GAMES_SHOWN = 6;
 
-function baseEmbed(color, footer = 'Dark Fundies') {
+function baseEmbed(color, footer = 'Sama-tracker') {
   return new EmbedBuilder().setColor(color).setFooter({ text: footer });
 }
 
@@ -168,7 +168,7 @@ function setEmbed(set, color, player) {
   const game = set.event.videogame?.displayName;
   const tournament = set.event.tournament;
 
-  const embed = baseEmbed(color, game ? `Dark Fundies · ${game}` : undefined)
+  const embed = baseEmbed(color, game ? `Sama-tracker · ${game}` : undefined)
     .setDescription(`**${set.round}** · ${escapeMarkdown(set.event.name)}\n[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})`);
 
   if (player) embed.setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) });
@@ -364,7 +364,7 @@ export function headToHead(a, b, sets) {
 
 export function prediction(a, b, odds) {
   const chanceA = Math.min(99, Math.max(1, Math.round(odds.chance * 100)));
-  const embed = baseEmbed(colors.clash, `Dark Fundies · ${odds.game}`)
+  const embed = baseEmbed(colors.clash, `Sama-tracker · ${odds.game}`)
     .setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) })
     .setTitle(`${escapeMarkdown(a.tag)} ${chanceA}% · ${100 - chanceA}% ${escapeMarkdown(b.tag)}`);
   if (b.image) embed.setThumbnail(b.image);
@@ -592,7 +592,7 @@ export function lifetimeStats(player, events, sets, players) {
 
 // file is the uploaded art of their main. no game means it covers every game. note goes at the bottom
 export function characters(player, usage, game, file, note) {
-  const embed = baseEmbed(colors.brand, game ? `Dark Fundies · ${game}` : undefined)
+  const embed = baseEmbed(colors.brand, game ? `Sama-tracker · ${game}` : undefined)
     .setAuthor({ name: 'Characters' })
     .setTitle(escapeMarkdown(player.tag))
     .setURL(startggUrl(player.slug));
@@ -677,7 +677,7 @@ export function status(info) {
 }
 
 export function joke(name, title, { text, screenshot, image }) {
-  return baseEmbed(colors[name], `Dark Fundies · ${screenshot.name}`)
+  return baseEmbed(colors[name], `Sama-tracker · ${screenshot.name}`)
     .setTitle(title)
     .setURL(screenshot.page)
     .setDescription(text.slice(0, 4096))
@@ -686,37 +686,47 @@ export function joke(name, title, { text, screenshot, image }) {
 
 export function help() {
   const lines = [
+    '**General**',
+    '`/help` show the commands',
+    '`/status` uptime and the last start.gg checks',
+    '`/pfp` my profile picture, full size',
+    '',
+    '**Player tracking**',
     '`/track add` track someone by start.gg link or ID',
     '`/track remove` stop tracking someone',
     '`/track list` everyone tracked',
     '`/upcoming` live and upcoming tournaments',
     '`/recent` latest sets',
+    '`/stream` stream alerts on or off',
+    '-# upcoming, recent and stream also take `all` as the player',
+    '',
+    '**Player stats**',
     '`/h2h` record between two players',
     '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
     '`/characters` Ultimate characters someone has reported and how they do on each, `verbose:True` for every game',
     '`/predict` odds of one player beating another',
-    '`/stream` stream alerts on or off',
-    '`/status` uptime and the last start.gg checks',
+    '',
+    '**Registration reminders**',
     '`/set_reg_reminder` ping Reg Reminders as a tournament\'s registration deadline gets close',
     '`/delete_reg_reminder` cancel one',
     '`/reg_admin` TOs whose start.gg tournaments get reg reminders automatically',
     '`/bracket` bracket links for reg reminder tournaments that are live or start within 30 min',
     '`/reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is linked on start.gg',
+    '',
+    '**Fun**',
     '`/sm4sh` a love letter to Smash 4',
     '`/melee` a Melee purist with a take',
     '`/ult` an Ultimate player who hates Ultimate',
     '`/64` a 64 old head who says 64 did it first',
     '`/brawl` the last person still defending Brawl',
     '`/pplus` a Project+ player who wants you on netplay',
-    '`/pfp` my profile picture, full size',
-    '-# upcoming, recent and stream also take `all` as the player',
     '',
-    'Posted here automatically:',
+    '**Posted here automatically**',
     '• finished sets, and a player\'s first DQ in an event',
     '• sets on stream or up next in the stream queue',
     '• a roll call an hour before a tournament with 3+ of the crew',
     '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
     '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting',
   ];
-  return baseEmbed(colors.brand).setTitle('Dark Fundies').setDescription(lines.join('\n'));
+  return baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'));
 }

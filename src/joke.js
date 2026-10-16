@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 20_000, maxRetries: 1 }) : null;
 
 async function wiki(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'dark-fundies-bot' }, signal: AbortSignal.timeout(30_000) });
+  const res = await fetch(url, { headers: { 'User-Agent': 'Sama-tracker' }, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`SmashWiki returned ${res.status}`);
   return res;
 }

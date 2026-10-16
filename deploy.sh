@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# push, pull on the vm, restart. needs a "dfbot" host in ~/.ssh/config
+# push to GitHub; the connected Railway service deploys automatically
 set -e
 
 if [ -n "$(git status --porcelain)" ]; then
@@ -7,4 +7,3 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 git push
-ssh dfbot 'cd dark-fundies-bot && git pull --ff-only && npm ci --omit=dev && sudo systemctl restart dfbot && sleep 5 && journalctl -u dfbot -n 5 --no-pager'

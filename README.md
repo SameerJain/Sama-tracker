@@ -1,4 +1,4 @@
-# Dark Fundies Bot
+# Sama-tracker
 
 <img src="screenshots/predict.png" alt="/predict" width="56%"> <img src="screenshots/h2h.png" alt="/h2h" width="42%">
 
@@ -30,21 +30,45 @@ Only run one copy at a time or everything gets posted twice.
 
 Pushing to GitHub redeploys it.
 
+### Discord name and roles
+
+The app and bot username are `Sama-tracker` in the Discord Developer Portal. You can also rename the bot's server role to `Sama-tracker`. Keep its permissions and position, above `Reg Reminders`, so it can assign that role.
+
+Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message footers come from `src/embeds.js`; new messages use the updated name after deployment. Existing messages keep their original footers.
+
 ## Commands
+
+### General
 
 ```
 /help                                          show the commands
+/status                                        uptime, which machine, last start.gg checks
+/pfp                                           the bot's profile picture, full size
+```
+
+### Player tracking
+
+```
 /track add profile:<link or ID>                track a start.gg player
 /track remove player:<name>                    stop tracking someone
 /track list                                    everyone being tracked
 /upcoming player:<name or all>                 their tournaments, live ones first
 /recent player:<name or all>                   latest sets, 5 for one player or 3 each for all
+/stream player:<name or all> alerts:<on|off>   on-stream alerts on or off
+```
+
+### Player stats
+
+```
 /h2h player:<name> opponent:<name>             singles record against each other, DQs left out
 /stats player:<name> [verbose:True]            recent set record, best finish, biggest upset, or a lifetime report
 /characters player:<name> [verbose:True]       Ultimate characters from reported games, with records, or every game
 /predict player:<name> opponent:<name>         odds of one beating the other
-/stream player:<name or all> alerts:<on|off>   on-stream alerts on or off
-/status                                        uptime, which machine, last start.gg checks
+```
+
+### Registration reminders
+
+```
 /set_reg_reminder tournament:<link>            ping Reg Reminders before registration closes
 /delete_reg_reminder tournament:<name>         cancel a reg reminder
 /reg_admin add profile:<link or ID>            set reg reminders for every tournament they're an admin of
@@ -52,14 +76,20 @@ Pushing to GitHub redeploys it.
 /reg_admin list                                every reg admin
 /bracket                                       bracket links for reg reminder tournaments live or starting soon
 /reg_role ping:<on|off>                        reg reminder pings for yourself, on or off
+```
+
+### Fun
+
+```
 /sm4sh                                         I LOVE SMASH BROS FOR WII U
 /melee                                         MELEE IS THE ONLY REAL SMASH GAME
 /ult                                           I HATE SMASH BROS ULTIMATE
 /64                                            SMASH 64 DID IT FIRST
 /brawl                                         BRAWL WAS GOOD ACTUALLY
 /pplus                                         HAVE YOU HEARD ABOUT PROJECT+
-/pfp                                           the bot's profile picture, full size
 ```
+
+### Command notes
 
 `profile` takes a link like `start.gg/user/f64a83c8` or just the ID at the end. `player` autocompletes from the tracked list.
 
