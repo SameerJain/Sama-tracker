@@ -7,6 +7,9 @@ import { REG_REMINDER_HOURS, checkRegReminders, checkTournaments, endTime, healt
 import sm4sh from './sm4sh.js';
 import melee from './melee.js';
 import ult from './ult.js';
+import smash64 from './smash64.js';
+import brawl from './brawl.js';
+import pplus from './pplus.js';
 import { predict as predictOdds } from './predict.js';
 import { characterUsage } from './characters.js';
 
@@ -18,7 +21,7 @@ const HISTORY_CACHE_MINUTES = 10;
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
 
-const jokes = { sm4sh, melee, ult };
+const jokes = Object.fromEntries([sm4sh, melee, ult, smash64, brawl, pplus].map((joke) => [joke.name, joke]));
 
 // shows who has reg pings on
 const REG_ROLE = 'Reg Reminders';
@@ -164,6 +167,9 @@ export async function handleCommand(interaction) {
     case 'sm4sh':
     case 'melee':
     case 'ult':
+    case '64':
+    case 'brawl':
+    case 'pplus':
       return tell(interaction, jokes[name]);
     case 'pfp':
       return pfp(interaction);

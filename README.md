@@ -51,6 +51,9 @@ Pushing to GitHub redeploys it.
 /sm4sh                                         I LOVE SMASH BROS FOR WII U
 /melee                                         MELEE IS THE ONLY REAL SMASH GAME
 /ult                                           I HATE SMASH BROS ULTIMATE
+/64                                            SMASH 64 DID IT FIRST
+/brawl                                         BRAWL WAS GOOD ACTUALLY
+/pplus                                         HAVE YOU HEARD ABOUT PROJECT+
 /pfp                                           the bot's profile picture, full size
 ```
 
@@ -62,7 +65,7 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 
 `/predict` weighs head-to-head, results against common opponents, seeding at shared brackets and their last 40 sets.
 
-With `ANTHROPIC_API_KEY` set, `/sm4sh`, `/melee` and `/ult` get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist or a burnt-out Ultimate player, with a random SmashWiki screenshot from that game. Otherwise they just say the line.
+With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game (just stages for P+). Otherwise they just say the line.
 
 `/characters` is Ultimate only and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's render.
 
