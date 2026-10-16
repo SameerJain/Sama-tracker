@@ -579,16 +579,17 @@ export function lifetimeStats(player, events, sets, players) {
   return [overview, results];
 }
 
-// file is the uploaded render of their main
-export function characters(player, usage, file) {
-  const embed = baseEmbed(colors.brand, 'Dark Fundies · Ultimate')
+// file is the uploaded art of their main. no game means it covers every game
+export function characters(player, usage, game, file) {
+  const embed = baseEmbed(colors.brand, game ? `Dark Fundies · ${game}` : undefined)
     .setAuthor({ name: 'Characters' })
     .setTitle(escapeMarkdown(player.tag))
     .setURL(startggUrl(player.slug));
   if (file) embed.setThumbnail(`attachment://${file}`);
 
-  const from = `their last ${count(usage.scanned, 'Ultimate singles set')}`;
-  if (!usage.scanned) return embed.setDescription('No Ultimate singles sets on start.gg yet.');
+  const sets = game ? `${game} singles set` : 'singles set';
+  const from = `their last ${count(usage.scanned, sets)}`;
+  if (!usage.scanned) return embed.setDescription(`No ${sets}s on start.gg yet.`);
   if (!usage.reported) return embed.setDescription(`No characters reported in ${from}. Lots of tournaments don't bother.`);
 
   const lines = [];
@@ -673,7 +674,7 @@ export function help() {
     '`/recent` latest sets',
     '`/h2h` record between two players',
     '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
-    '`/characters` Ultimate characters someone has reported and how they do on each',
+    '`/characters` Ultimate characters someone has reported and how they do on each, `verbose:True` for every game',
     '`/predict` odds of one player beating another',
     '`/stream` stream alerts on or off',
     '`/status` uptime and the last start.gg checks',

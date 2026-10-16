@@ -20,6 +20,8 @@ const PAGES_AT_ONCE = 5;
 const HISTORY_CACHE_MINUTES = 10;
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
+// /characters verbose, so the cards fit in one message
+const CHARACTER_GAMES = 6;
 
 const jokes = Object.fromEntries([sm4sh, melee, ult, smash64, brawl, pplus].map((joke) => [joke.name, joke]));
 
@@ -77,7 +79,10 @@ export const commands = [
   {
     name: 'characters',
     description: 'Ultimate characters a tracked player has reported',
-    options: [playerOption('Tracked player')],
+    options: [
+      playerOption('Tracked player'),
+      { type: Option.Boolean, name: 'verbose', description: 'Every game they have characters reported in, not just Ultimate' },
+    ],
   },
   {
     name: 'predict',
@@ -381,12 +386,28 @@ async function characters(interaction) {
   if (!player) return replyNotTracked(interaction);
 
   await interaction.deferReply();
-  // ultimate only for now
-  const sets = (await characterHistory(player.playerId)).filter((set) => set.videogame.id === startgg.ULTIMATE);
-  const usage = characterUsage(sets);
+  const sets = await characterHistory(player.playerId);
+  const usageIn = (game) => ({ game, usage: characterUsage(sets.filter((set) => set.videogame.id === game.id)) });
+
+  let cards = [usageIn({ id: startgg.ULTIMATE, displayName: 'Ultimate' })];
+  if (interaction.options.getBoolean('verbose')) {
+    // a card for each game with characters reported, most games first
+    const games = new Map(sets.map((set) => [set.videogame.id, set.videogame]));
+    cards = [...games.values()].map(usageIn)
+      .filter(({ usage }) => usage.reported)
+      .sort((a, b) => b.usage.games - a.usage.games)
+      .slice(0, CHARACTER_GAMES);
+    if (!cards.length) cards = [{ usage: characterUsage(sets) }];
+  }
+
   // no picture beats no reply
-  const art = usage.characters.length ? await startgg.getCharacterArt(usage.characters[0].name).catch(() => null) : null;
-  await interaction.editReply({ embeds: [embeds.characters(player, usage, art?.name)], files: art ? [art] : [] });
+  const art = await Promise.all(cards.map(({ game, usage }) => (game && usage.characters.length
+    ? startgg.getCharacterArt(usage.characters[0].name, game.id).catch(() => null)
+    : null)));
+  await interaction.editReply({
+    embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, game?.displayName, art[i]?.name)),
+    files: art.filter(Boolean),
+  });
 }
 
 async function predict(interaction) {

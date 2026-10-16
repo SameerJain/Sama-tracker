@@ -41,7 +41,7 @@ Pushing to GitHub redeploys it.
 /recent player:<name or all>                   latest sets, 5 for one player or 3 each for all
 /h2h player:<name> opponent:<name>             singles record against each other, DQs left out
 /stats player:<name> [verbose:True]            recent set record, best finish, biggest upset, or a lifetime report
-/characters player:<name>                      Ultimate characters from reported games, with records
+/characters player:<name> [verbose:True]       Ultimate characters from reported games, with records, or every game
 /predict player:<name> opponent:<name>         odds of one beating the other
 /stream player:<name or all> alerts:<on|off>   on-stream alerts on or off
 /status                                        uptime, which machine, last start.gg checks
@@ -67,7 +67,7 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 
 With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game (just stages for P+). Otherwise they just say the line.
 
-`/characters` is Ultimate only and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's render.
+`/characters` is Ultimate only unless you add `verbose:True`, which gives a card for each game they have characters reported in, up to 6. Both look at their last 300 singles sets and only see games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg.
 
 `/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked.
 

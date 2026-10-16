@@ -319,28 +319,30 @@ export async function getCharacterSets(playerId, page) {
 
 export const ULTIMATE = 1386;
 
-// the roster doesn't change, so it only gets fetched once
-let roster;
+// rosters don't change, so each game's only gets fetched once
+const rosters = new Map();
 
-function ultimateRoster() {
-  if (!roster) {
-    roster = query(`{ videogame(id: ${ULTIMATE}) { characters { name images(type: "icon") { url } } } }`)
+function roster(videogameId) {
+  if (!rosters.has(videogameId)) {
+    const characters = query('query ($id: ID!) { videogame(id: $id) { characters { name images(type: "icon") { url } } } }', { id: videogameId })
       .then((data) => data.videogame?.characters ?? []);
-    roster.catch(() => { roster = null; });
+    characters.catch(() => rosters.delete(videogameId));
+    rosters.set(videogameId, characters);
   }
-  return roster;
+  return rosters.get(videogameId);
 }
 
-// start.gg's icon for an ultimate character is its render. discord can't always
-// load images.start.gg, so this downloads it to upload with the message
-export async function getCharacterArt(name) {
-  const url = (await ultimateRoster()).find((character) => character.name === name)?.images?.[0]?.url;
+// start.gg's icon for an ultimate character is its render, older games get a smaller portrait.
+// discord can't always load images.start.gg, so this downloads it to upload with the message
+export async function getCharacterArt(name, videogameId) {
+  const url = (await roster(videogameId)).find((character) => character.name === name)?.images?.[0]?.url;
   if (!url) return null;
 
   const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`start.gg image returned ${res.status}`);
   const extension = new URL(url).pathname.split('.').pop();
-  return { attachment: Buffer.from(await res.arrayBuffer()), name: `character.${extension}` };
+  // one per game, a verbose reply has several
+  return { attachment: Buffer.from(await res.arrayBuffer()), name: `character-${videogameId}.${extension}` };
 }
 
 export async function getStreamQueues(tournamentId) {
