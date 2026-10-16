@@ -1,6 +1,7 @@
 import { EmbedBuilder, embedLength, escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from './startgg.js';
 import { FORM_SETS } from './predict.js';
+import { characterUsage } from './characters.js';
 
 const colors = {
   brand: 0x5b21b6,
@@ -262,6 +263,45 @@ export function regReminder(tournament, deadline, lastCall) {
   return embed;
 }
 
+const WARNINGS = [
+  'This is your official warning',
+  'The registration police have been notified',
+  'No reg, no bracket',
+  'The bracket isn\'t waiting for you',
+];
+
+// /reg_warn, for someone whose discord isn't on any registration for it
+export function regWarning(tournament, deadline) {
+  const register = startggUrl(`${tournament.slug}/register`);
+  const lines = [
+    `Not registered yet, and registration closes <t:${deadline}:R>.`,
+    '',
+    `**[Register on start.gg](${register})**`,
+    '-# Already did? Connect Discord on start.gg so it shows up',
+  ];
+  const embed = baseEmbed(colors.reg)
+    .setAuthor({ name: WARNINGS[Math.floor(Math.random() * WARNINGS.length)] })
+    .setTitle(tournament.name)
+    .setURL(register)
+    .setDescription(lines.join('\n'));
+  const logo = tournament.images?.find((image) => image.type === 'profile')?.url;
+  if (logo) embed.setThumbnail(logo);
+  return embed;
+}
+
+// /registered. members are the participants who are in this server, entries say what they're in
+export function registered(tournament, members, total, linked) {
+  const events = Map.groupBy(tournament.entries ?? [], (entry) => entry.userId);
+  const lines = [`**Time:** ${timeText(tournament.startAt)}`, `**Location:** ${locationText(tournament)}`, ''];
+  for (const member of members.toSorted((a, b) => (a.tag ?? '').localeCompare(b.tag ?? ''))) {
+    const entered = events.get(member.userId)?.map((entry) => entry.event);
+    lines.push(`<@${member.discordId}> · ${escapeMarkdown(member.tag ?? '')}${entered ? `: ${entered.join(', ')}` : ''}`);
+  }
+  if (!members.length) lines.push('Nobody from this server yet.');
+  lines.push(`-# Goes by the Discord connected on start.gg, which ${linked} of the ${total} registered have`);
+  return withLines(tournamentEmbed(colors.brand, `Registered from this server · ${members.length}`, tournament), lines);
+}
+
 // one embed per event, best placement first
 export function results(tournament, players) {
   return groupByEvent(tournament, players).flatMap((entries) => {
@@ -291,7 +331,8 @@ function placementText(entry) {
 // a card per tournament so each one gets its own image
 export function upcoming(tournaments, players, who) {
   if (!tournaments.length) {
-    return [baseEmbed(colors.brand).setTitle(`Upcoming · ${who}`).setDescription('Nobody is registered for anything yet.')];
+    const nobody = who === 'everyone' ? 'Nobody is' : `${escapeMarkdown(who)} isn't`;
+    return [baseEmbed(colors.brand).setTitle(`Upcoming · ${escapeMarkdown(who)}`).setDescription(`${nobody} registered for anything yet.`)];
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -325,7 +366,8 @@ function upcomingCard(tournament, players, label, color) {
   return tournamentEmbed(color, label, tournament).setDescription(shown.join('\n'));
 }
 
-export function headToHead(a, b, sets) {
+// sets is newest first. verbose lists every set and adds splits, streaks and when they first played
+export function headToHead(a, b, sets, verbose) {
   const results = sets.map((set) => fromSide(set, a.playerId));
   const wins = results.filter((result) => result.won).length;
   const losses = results.length - wins;
@@ -334,9 +376,9 @@ export function headToHead(a, b, sets) {
   if (b.image) embed.setThumbnail(b.image);
 
   if (!results.length) {
-    return embed
+    return [embed
       .setTitle(`${escapeMarkdown(a.tag)} vs ${escapeMarkdown(b.tag)}`)
-      .setDescription('They haven\'t played each other in singles on start.gg yet.');
+      .setDescription('They haven\'t played each other in singles on start.gg yet.')];
   }
 
   embed.setTitle(`${escapeMarkdown(a.tag)} ${wins}-${losses} ${escapeMarkdown(b.tag)}`);
@@ -354,15 +396,50 @@ export function headToHead(a, b, sets) {
     const leader = wins > losses ? a : b;
     lines.push(`**${escapeMarkdown(leader.tag)} leads ${Math.max(wins, losses)}-${Math.min(wins, losses)}**`);
   }
+  if (verbose) lines.push(...rivalry(a, b, results));
   if (lines.length) lines.push('');
 
-  for (const { set, me, them, won } of results.slice(0, 10)) {
+  const shown = verbose ? results : results.slice(0, 10);
+  for (const { set, me, them, won } of shown) {
     lines.push(`${won ? 'W' : 'L'} ${scoreText(me, them)} · ${set.round} · ${setLink(set)} · <t:${set.completedAt}:d>`);
   }
-  return embed.setDescription(lines.join('\n'));
+  if (shown.length < results.length) lines.push(`-# ${count(results.length - shown.length, 'older set')} not shown, \`verbose:True\` lists them all`);
+  return withLines(embed, lines);
 }
 
-export function prediction(a, b, odds) {
+// /h2h verbose, from a's side like the title
+function rivalry(a, b, results) {
+  const tagA = escapeMarkdown(a.tag);
+  const tagB = escapeMarkdown(b.tag);
+  const record = (list) => winLoss(list.filter(({ won }) => won).length, list.filter(({ won }) => !won).length);
+  const lines = [];
+
+  const byGame = Map.groupBy(results, ({ set }) => set.event.videogame?.displayName ?? 'Other');
+  if (byGame.size > 1) lines.push(`**By game:** ${[...byGame].map(([game, list]) => `${escapeMarkdown(game)} ${record(list)}`).join(' · ')}`);
+
+  // who the bracket expected to win
+  const seeded = results.filter(({ me, them }) => me.seed && them.seed && me.seed !== them.seed);
+  const above = seeded.filter(({ me, them }) => me.seed < them.seed);
+  if (above.length) lines.push(`**Seeded above ${tagB}:** ${tagA} ${record(above)}`);
+  const below = seeded.filter(({ me, them }) => me.seed > them.seed);
+  if (below.length) lines.push(`**Seeded below ${tagB}:** ${tagA} ${record(below)}`);
+
+  const grands = results.filter(({ set }) => /grand final/i.test(set.round ?? ''));
+  if (grands.length) lines.push(`**Grand finals:** ${tagA} ${record(grands)}`);
+
+  const streak = results.findIndex((result) => result.won !== results[0].won);
+  const run = streak === -1 ? results.length : streak;
+  if (run > 1) lines.push(`**Streak:** ${escapeMarkdown((results[0].won ? a : b).tag)} has won the last ${run}`);
+
+  const first = results.at(-1);
+  lines.push(`**First played:** <t:${first.set.completedAt}:D> at ${setLink(first.set)}`);
+  return lines;
+}
+
+const FACTORS = { h2h: 'Head-to-head', common: 'Common opponents', seeding: 'Seeding', form: 'Form' };
+
+// verbose shows how much each part counted and what it says on its own, plus what's behind them
+export function prediction(a, b, odds, verbose) {
   const chanceA = Math.min(99, Math.max(1, Math.round(odds.chance * 100)));
   const embed = baseEmbed(colors.clash, `Sama-tracker · ${odds.game}`)
     .setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) })
@@ -386,10 +463,25 @@ export function prediction(a, b, odds) {
     const higher = seeding.higher >= seeding.total - seeding.higher ? [tagA, seeding.higher] : [tagB, seeding.total - seeding.higher];
     lines.push(`**Seeding:** ${higher[0]} seeded higher in ${higher[1]} of ${seeding.total} shared brackets`);
   }
-  const record = ({ wins, total }) => `${wins}-${total - wins}${total ? ` (${percent(wins, total)})` : ''}`;
+  const record = ({ wins, total }) => winLoss(wins, total - wins);
   lines.push(`**Form:** ${tagA} ${record(form.a)} · ${tagB} ${record(form.b)}, last ${FORM_SETS} sets each`);
+  if (!verbose) return [embed.setDescription(lines.join('\n'))];
 
-  return embed.setDescription(lines.join('\n'));
+  section(lines, 'How it adds up', odds.factors.map(({ key, n, share, chance }) => {
+    if (!n) return `${FACTORS[key]}: nothing to go on, so it doesn't count`;
+    const lean = Math.round(chance * 100);
+    let says = 'even';
+    if (lean > 50) says = `${tagA} ${lean}%`;
+    if (lean < 50) says = `${tagB} ${100 - lean}%`;
+    return `${FACTORS[key]}: counts for ${percent(share, 1)} · on its own, ${says}`;
+  }));
+  const played = ({ a: x, b: y }) => x.total + y.total;
+  section(lines, 'Common opponents', common.opponents.toSorted((x, y) => played(y) - played(x)).slice(0, OPPONENTS_SHOWN)
+    .map(({ name, a: x, b: y }) => `${escapeMarkdown(name)}: ${tagA} ${x.wins}-${x.total - x.wins} · ${tagB} ${y.wins}-${y.total - y.wins}`));
+  section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
+    .map(({ set, a: x, b: y }) => `[${escapeMarkdown(set.event.tournament.name)}](${startggUrl(set.event.slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
+  lines.push('-# Each part is weighted by how much it matters and how many sets it goes off, then they\'re averaged as log odds');
+  return withLines(embed, lines);
 }
 
 export function stats(player, standings, sets) {
@@ -438,6 +530,137 @@ export function stats(player, standings, sets) {
   return embed.setDescription(lines.join('\n'));
 }
 
+export function run(player, tournament, entry, sets) {
+  const embed = tournamentEmbed(colors.live, `${player.tag}'s run`, tournament);
+  const finished = entry.done || entry.final || entry.dq;
+  const lines = [`**${escapeMarkdown(eventTitle(entry))}**`];
+  if (entry.dq) lines.push('Disqualified');
+  else if (finished) lines.push(`Finished${entry.placement ? ` · ${ordinal(entry.placement)} place` : ' · placement pending'}`);
+  else lines.push('Still in the bracket');
+  const played = sets.filter((set) => set.state === 3 && set.winnerId)
+    .sort((a, b) => a.completedAt - b.completedAt).map((set) => fromSide(set, player.playerId)).filter(Boolean);
+  lines.push('');
+  for (const { set, me, them, won } of played) {
+    lines.push(`${won ? 'W' : 'L'} ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}** · [${escapeMarkdown(set.round)}](${setUrl(set)})`);
+  }
+  if (!played.length) lines.push('No completed sets reported yet.');
+  if (!finished) {
+    const pending = sets.filter((set) => [1, 2, 6].includes(set.state));
+    const next = pending.find((set) => set.state === 2 || set.state === 6) ?? pending[0];
+    const result = next && fromSide(next, player.playerId);
+    lines.push('', result
+      ? `**Next:** ${escapeMarkdown(result.them.name)} · [${escapeMarkdown(next.round)}](${setUrl(next)})${next.state === 2 ? ' · in progress' : next.state === 6 ? ' · called' : ''}`
+      : 'Next opponent has not been assigned yet.');
+  }
+  return withLines(embed, lines);
+}
+
+// a card per game, the last 30 days over the 30 before
+export function progress(player, current, previous, { since, middle, until }) {
+  const title = `${escapeMarkdown(player.tag)}'s progress`;
+  const games = [...new Set([...current.games, ...previous.games].map(({ game }) => game))];
+  if (!games.length) return [baseEmbed(colors.brand).setTitle(title).setDescription('No singles results in the last 60 days.')];
+
+  return games.flatMap((game) => {
+    const recent = current.games.find((entry) => entry.game === game);
+    const before = previous.games.find((entry) => entry.game === game);
+    const lines = [
+      `**Last 30 days** · <t:${middle}:d> to <t:${until}:d>`, ...periodLines(recent),
+      '',
+      `**Previous 30 days** · <t:${since}:d> to <t:${middle}:d>`, ...periodLines(before),
+    ];
+    const rate = (data) => (data?.wins + data?.losses ? data.wins / (data.wins + data.losses) : null);
+    if (rate(recent) !== null && rate(before) !== null) {
+      const points = 100 * (rate(recent) - rate(before));
+      lines.push('', `Win rate ${points >= 0 ? 'up' : 'down'} ${Math.abs(points).toFixed(1)} points`);
+    }
+    lines.push('-# Singles only, DQs left out. Events count toward the 30 days they started in, and vs seed goes by placement tier');
+    return withLines(baseEmbed(colors.brand, `Sama-tracker · ${game}`).setTitle(title).setURL(startggUrl(player.slug)), lines);
+  });
+}
+
+// one game in one period of /progress
+function periodLines(data) {
+  if (!data) return ['No sets or finished events.'];
+  const lines = [`Sets: ${winLoss(data.wins, data.losses)}`];
+
+  const sized = data.events.filter(({ event }) => event.numEntrants > 0);
+  if (sized.length) {
+    const average = sized.reduce((total, entry) => total + finish(entry), 0) / sized.length;
+    lines.push(`Placements: ${count(data.events.length, 'event')} · average top ${Math.ceil(average * 100)}%`);
+    lines.push(`Best: ${placementLine(sized.toSorted(byFinish)[0])}`);
+  } else if (data.events.length) {
+    lines.push(`Placements: ${count(data.events.length, 'event')}, no bracket sizes reported`);
+  } else {
+    lines.push('Placements: no finished events');
+  }
+
+  const seeded = data.events.filter(({ seed }) => seed > 0);
+  if (!seeded.length) return [...lines, 'Vs seed: no seeded finishes reported'];
+  const better = seeded.filter(({ placement, seed }) => step(placement) < step(seed)).length;
+  const worse = seeded.filter(({ placement, seed }) => step(placement) > step(seed)).length;
+  return [...lines, `Vs seed: ${better} better · ${seeded.length - better - worse} on seed · ${worse} worse`];
+}
+
+export function scout(player, opponent, mine, theirs, characterSets) {
+  const played = theirs.map((set) => fromSide(set, opponent.playerId)).filter((result) => result && !result.dq);
+  const meetings = [...new Map([...mine, ...theirs].map((set) => [set.id, set])).values()]
+    .map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq && result.them.playerIds.includes(opponent.playerId));
+  const lines = ['**Recent form**'];
+  const games = [...new Set(played.map(({ set }) => set.event.videogame?.displayName ?? 'Other'))];
+  for (const game of games.slice(0, GAMES_SHOWN)) {
+    const recent = played.filter(({ set }) => (set.event.videogame?.displayName ?? 'Other') === game).slice(0, 20);
+    const wins = recent.filter(({ won }) => won).length;
+    lines.push(`${escapeMarkdown(game)}: ${winLoss(wins, recent.length - wins)} · last ${recent.length} sets`);
+  }
+  if (!played.length) lines.push('No recent singles sets.');
+  section(lines, 'Latest sets', played.slice(0, 5).map(({ set, me, them, won }) =>
+    `${won ? 'W' : 'L'} ${scoreText(me, them)} vs ${escapeMarkdown(them.name)} · ${setLink(set)} · <t:${set.completedAt}:d>`));
+  lines.push('', '**Reported characters**');
+  const characterGames = [...new Map(characterSets.map((set) => [set.videogame.id, set.videogame])).values()];
+  let reported = false;
+  for (const game of characterGames.slice(0, GAMES_SHOWN)) {
+    const usage = characterUsage(characterSets.filter((set) => set.videogame.id === game.id));
+    if (!usage.reported) continue;
+    reported = true;
+    lines.push(`${escapeMarkdown(game.displayName)}: ${usage.characters.slice(0, 3).map((c) => `${escapeMarkdown(c.name)} (${count(c.games, 'game')})`).join(', ')}`);
+  }
+  if (!reported) lines.push('No characters reported in their recent sets.');
+  lines.push('', `**Your head-to-head** · ${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`);
+  const sharedGames = [...new Set(meetings.map(({ set }) => set.event.videogame?.displayName ?? 'Other'))];
+  for (const game of sharedGames.slice(0, GAMES_SHOWN)) {
+    const sets = meetings.filter(({ set }) => (set.event.videogame?.displayName ?? 'Other') === game);
+    const wins = sets.filter(({ won }) => won).length;
+    lines.push(`${escapeMarkdown(game)}: ${winLoss(wins, sets.length - wins)}`);
+  }
+  if (!meetings.length) lines.push('You haven\'t played each other in singles, as far back as this checks.');
+  lines.push('-# From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them');
+  return withLines(baseEmbed(colors.brand).setTitle(`Scouting ${opponent.tag}`).setURL(startggUrl(opponent.slug)), lines);
+}
+
+// upcoming is [{ tournament, players }] for the active players' entries before the next recap
+export function weeklyRecap(crew, upcoming, { since, until }) {
+  const lines = [`<t:${since}:d> to <t:${until}:d> · ${count(crew.length, 'active player')}`];
+  const wins = crew.flatMap(({ player, summary }) => summary.played.filter((result) => result.won).map((result) => ({ ...result, player })));
+  const upset = wins.filter(({ me, them }) => upsetFactor(me, them) > 0)
+    .sort((a, b) => upsetFactor(b.me, b.them) - upsetFactor(a.me, a.them))[0];
+  if (upset) lines.push('', `**Biggest upset:** ${playerLink(upset.player)} ${upsetLine(upset)}`);
+  const finishes = crew.flatMap(({ player, summary }) => summary.finishes.map((entry) => ({ ...entry, player })))
+    .filter(({ event }) => event.numEntrants).sort(byFinish);
+  if (finishes.length) lines.push(`**Best finish:** ${playerLink(finishes[0].player)} · ${placementLine(finishes[0])}`);
+  for (const { player, summary } of crew) {
+    lines.push('', `**${escapeMarkdown(player.tag)}**`);
+    for (const game of summary.games) lines.push(`${escapeMarkdown(game.game)}: ${winLoss(game.wins, game.losses)}`);
+    lines.push(...summary.finishes.map(placementLine));
+    if (!summary.finishes.length) lines.push('No final placements reported for this week\'s events yet.');
+  }
+  const next = upcoming.map(({ tournament, players }) => `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)}) · `
+    + `<t:${tournament.startAt}:f> · ${players.map((player) => escapeMarkdown(player.tag)).join(', ')}`);
+  section(lines, 'Upcoming this week', next.length ? next : ['Nobody who played this week is signed up for anything yet.']);
+  lines.push('-# Singles only, and only people who played a set that wasn\'t a DQ');
+  return withLines(baseEmbed(colors.results).setTitle('Weekly crew recap'), lines);
+}
+
 // beat Foo (seed 2) 3-1 as seed 9 at Tournament
 function upsetLine({ set, me, them, won }) {
   const score = scoreText(me, them) === 'vs' ? '' : ` ${scoreText(me, them)}`;
@@ -450,7 +673,7 @@ function upsetSize(result) {
 }
 
 function winLoss(wins, losses) {
-  return `${wins}-${losses} (${percent(wins, wins + losses)})`;
+  return `${wins}-${losses}${wins + losses ? ` (${percent(wins, wins + losses)})` : ''}`;
 }
 
 // relative to bracket size, so 4th of 84 beats 3rd of 20
@@ -637,6 +860,7 @@ export function trackedList(players) {
     if (player.streamAlerts === false) return `${playerLink(player)} · stream alerts off`;
     return playerLink(player);
   });
+  lines.push('', '-# Only these players can be picked in commands. Anyone else can `/link` their start.gg to look themselves up');
   return withLines(embed, lines);
 }
 
@@ -645,6 +869,27 @@ export function regAdmins(admins) {
   const embed = baseEmbed(colors.brand).setTitle(`Reg admins · ${all.length}`);
   if (!all.length) return embed.setDescription('Nobody yet. Add a TO with `/reg_admin add`.');
   return embed.setDescription(`Their tournaments get reg reminders automatically.\n\n${all.map(playerLink).join('\n')}`);
+}
+
+const SITES = {
+  'x.com': 'X', 'twitter.com': 'X', 'twitch.tv': 'Twitch', 'youtube.com': 'YouTube', 'youtu.be': 'YouTube',
+  'instagram.com': 'Instagram', 'tiktok.com': 'TikTok', 'bsky.app': 'Bluesky', 'kick.com': 'Kick',
+  'facebook.com': 'Facebook', 'threads.net': 'Threads', 'discord.gg': 'Discord', 'discord.com': 'Discord',
+};
+
+// other sites show the whole link
+function socialLink(url) {
+  const site = SITES[new URL(url).hostname.replace(/^(www|m|mobile)\./, '')];
+  return site ? `[${site}](${url})` : url;
+}
+
+export function socials(links) {
+  const embed = baseEmbed(colors.brand).setTitle('Socials');
+  if (!links.length) return [embed.setDescription('Nothing yet. Add a link with `/socials_edit add`.')];
+  // a line per name, in the order they were added
+  const lines = [...Map.groupBy(links, (link) => link.name)]
+    .map(([name, group]) => `**${escapeMarkdown(name)}** · ${group.map((link) => socialLink(link.url)).join(' · ')}`);
+  return withLines(embed, lines);
 }
 
 export function added(player) {
@@ -689,7 +934,9 @@ export function help() {
     '**General**',
     '`/help` show the commands',
     '`/status` uptime and the last start.gg checks',
-    '`/pfp` my profile picture, full size',
+    '`/socials` streams and social links saved for this server',
+    '`/socials_edit` add or remove those links. Manage Server permission by default',
+    '`/messages` automatic post switches and recap day/time/timezone. Manage Server permission required',
     '',
     '**Player tracking**',
     '`/track add` track someone by start.gg link or ID',
@@ -697,21 +944,31 @@ export function help() {
     '`/track list` everyone tracked',
     '`/upcoming` live and upcoming tournaments',
     '`/recent` latest sets',
+    '`/run` current tournament run, results and next opponent',
     '`/stream` stream alerts on or off',
-    '-# upcoming, recent and stream also take `all` as the player',
+    '-# Only tracked players can be picked as the player. upcoming, recent and stream also take `all`',
+    '',
+    '**Looking yourself up**',
+    '`/link` link your start.gg, then leave the player out of a command to get yourself. It doesn\'t track you',
+    '`/unlink` undo that',
+    '-# Tracked players with Discord connected on start.gg don\'t need to link',
     '',
     '**Player stats**',
-    '`/h2h` record between two players',
+    '`/h2h` record against someone. `verbose:True` for every set, splits and streaks',
     '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
     '`/characters` Ultimate characters someone has reported and how they do on each, `verbose:True` for every game',
-    '`/predict` odds of one player beating another',
+    '`/predict` odds of beating someone. `verbose:True` shows how each part counts',
+    '`/scout profile:<link or ID>` scout any opponent. Only for tracked players with Discord connected on start.gg',
+    '`/progress` last 30 days vs the previous 30, by game',
     '',
-    '**Registration reminders**',
-    '`/set_reg_reminder` ping Reg Reminders as a tournament\'s registration deadline gets close',
+    '**Registration**',
+    '`/set_reg_reminder` ping everyone with reg pings on as a tournament\'s registration deadline gets close',
     '`/delete_reg_reminder` cancel one',
     '`/reg_admin` TOs whose start.gg tournaments get reg reminders automatically',
+    '`/reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is connected on start.gg',
     '`/bracket` bracket links for reg reminder tournaments that are live or start within 30 min',
-    '`/reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is linked on start.gg',
+    '`/registered` who in this server is registered for a tournament',
+    '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so',
     '',
     '**Fun**',
     '`/sm4sh` a love letter to Smash 4',
@@ -720,6 +977,7 @@ export function help() {
     '`/64` a 64 old head who says 64 did it first',
     '`/brawl` the last person still defending Brawl',
     '`/pplus` a Project+ player who wants you on netplay',
+    '`/pfp` my profile picture, full size',
     '',
     '**Posted here automatically**',
     '• finished sets, and a player\'s first DQ in an event',
@@ -727,6 +985,7 @@ export function help() {
     '• a roll call an hour before a tournament with 3+ of the crew',
     '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
     '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting',
+    '• weekly crew recap, only players with a non-DQ singles set that week. Sunday 9 pm New York by default, `/messages` changes it',
   ];
   return baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'));
 }

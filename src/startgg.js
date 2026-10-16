@@ -77,6 +77,15 @@ async function query(text, variables, retries = 2) {
   return body.data;
 }
 
+// getPage(n) resolves to { totalPages, ... }. page 1 says how many there are, then the rest get asked
+// for at once. the rate limit spaces them out, so nothing waits on the response before it
+async function allPages(getPage) {
+  const first = await getPage(1);
+  const rest = [];
+  for (let page = 2; page <= first.totalPages; page++) rest.push(getPage(page));
+  return [first, ...await Promise.all(rest)];
+}
+
 // a bunch of lookups per request, aliased by id. start.gg's 1000 object limit counts what comes back
 // and most checks come back empty, so groups start big and get split in half when they go over
 async function lookupMany(ids, toQuery, variables) {
@@ -109,6 +118,7 @@ export async function getPlayer(id) {
         slug
         images(type: "profile") { url }
         player { id gamerTag }
+        authorizations(types: [DISCORD]) { externalId }
       }
     }
   `, { slug });
@@ -122,18 +132,19 @@ export async function getPlayer(id) {
     playerId: user.player.id,
     tag: user.player.gamerTag,
     image: user.images?.[0]?.url,
+    discordId: user.authorizations?.[0]?.externalId,
   };
 }
 
-// [userId, { tag, image }] for each of them, null if they're gone from start.gg
+// [userId, { tag, image, discordId }] for each of them, null if they're gone from start.gg
 export async function getProfiles(userIds) {
   const data = await lookupMany(userIds, (group) => `{
-    ${group.map((id) => `u${id}: user(id: ${id}) { images(type: "profile") { url } player { gamerTag } }`).join('\n')}
+    ${group.map((id) => `u${id}: user(id: ${id}) { images(type: "profile") { url } player { gamerTag } authorizations(types: [DISCORD]) { externalId } }`).join('\n')}
   }`);
 
   return userIds.map((userId) => {
     const user = data[`u${userId}`];
-    return [userId, user?.player ? { tag: user.player.gamerTag, image: user.images?.[0]?.url } : null];
+    return [userId, user?.player ? { tag: user.player.gamerTag, image: user.images?.[0]?.url, discordId: user.authorizations?.[0]?.externalId } : null];
   });
 }
 
@@ -141,6 +152,7 @@ const SET_FIELDS = `
   id
   state
   completedAt
+  updatedAt
   fullRoundText
   winnerId
   stream { streamName streamSource }
@@ -176,6 +188,7 @@ function toSet(node) {
     id: String(node.id),
     state: node.state,
     completedAt: node.completedAt,
+    updatedAt: node.updatedAt,
     round: node.fullRoundText,
     winnerId: node.winnerId,
     stream: node.stream,
@@ -212,11 +225,11 @@ export async function getSets(playerIds, { since, perPage = 10, states = [3] } =
 
 // for h2h/predict. no games or characters, so a set is ~22 objects and 40 fit under the limit.
 // pages can come back short or empty in the middle, so totalPages is the only way to know it's the end
-export async function getSetHistory(playerId, page) {
+export async function getSetHistory(playerId, page, filters = {}) {
   const data = await query(`
-    query ($id: ID!, $page: Int!) {
+    query ($id: ID!, $page: Int!, $filters: SetFilters) {
       player(id: $id) {
-        sets(perPage: 40, page: $page, filters: { state: [3], entrantSize: [1] }) {
+        sets(perPage: 40, page: $page, filters: $filters) {
           pageInfo { totalPages }
           nodes {
             id
@@ -232,44 +245,78 @@ export async function getSetHistory(playerId, page) {
         }
       }
     }
-  `, { id: playerId, page });
+  `, { id: playerId, page, filters: { state: [3], entrantSize: [1], ...filters } });
 
   const connection = data.player?.sets;
   return { totalPages: connection?.pageInfo?.totalPages ?? 0, sets: (connection?.nodes ?? []).map(toSet).filter(Boolean) };
 }
 
-// every finished singles event they entered, newest first. an event is ~7 objects, so 120 a page
-export async function getEventHistory(userId) {
-  const events = [];
-  for (let page = 1; ; page++) {
-    const data = await query(`
-      query ($id: ID!, $page: Int!) {
-        user(id: $id) {
-          events(query: { page: $page, perPage: 120, filter: { eventType: 1 } }) {
-            pageInfo { totalPages }
-            nodes {
-              name
-              slug
-              startAt
-              numEntrants
-              state
-              videogame { displayName }
-              tournament { name }
-              userEntrant(userId: $id) { initialSeedNum isDisqualified standing { placement } }
+// sets completed in [since, until), newest first. updatedAfter also brings back old sets that got
+// edited, so every page gets read before going by completion time
+export async function getPeriodHistory(playerId, since, until) {
+  const pages = await allPages((page) => getSetHistory(playerId, page, { updatedAfter: since - 1 }));
+  const sets = new Map();
+  for (const set of pages.flatMap((page) => page.sets)) {
+    if (set.completedAt >= since && set.completedAt < until) sets.set(set.id, set);
+  }
+  return [...sets.values()].sort((a, b) => b.completedAt - a.completedAt);
+}
+
+// { totalPages, nodes } out of a paginated start.gg connection, which is null if what it's on is gone
+function connectionPage(connection) {
+  return { totalPages: connection?.pageInfo?.totalPages ?? 0, nodes: connection?.nodes ?? [] };
+}
+
+export async function getRunSets(eventId, playerId) {
+  const pages = await allPages(async (page) => connectionPage((await query(`
+    query ($id: ID!, $player: ID!, $page: Int!) {
+      event(id: $id) {
+        sets(page: $page, perPage: 30, sortType: STANDARD, filters: { playerIds: [$player], showByes: false }) {
+          pageInfo { totalPages }
+          nodes {
+            id state completedAt fullRoundText winnerId
+            event { slug }
+            slots {
+              entrant { id name initialSeedNum participants { player { id } } }
+              standing { stats { score { value } } }
             }
           }
         }
       }
-    `, { id: userId, page });
-
-    const connection = data.user?.events;
-    for (const { userEntrant: entrant, state, ...event } of connection?.nodes ?? []) {
-      const placement = entrant?.standing?.placement;
-      if (state !== 'COMPLETED' || !placement) continue;
-      events.push({ placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event });
     }
-    if (!connection || page >= connection.pageInfo.totalPages) return events.sort((a, b) => b.event.startAt - a.event.startAt);
+  `, { id: eventId, player: playerId, page })).event?.sets));
+  return pages.flatMap((page) => page.nodes).map(toSet).filter(Boolean);
+}
+
+// every finished singles event they entered, newest first. an event is ~7 objects, so 120 a page
+export async function getEventHistory(userId) {
+  const pages = await allPages(async (page) => connectionPage((await query(`
+    query ($id: ID!, $page: Int!) {
+      user(id: $id) {
+        events(query: { page: $page, perPage: 120, filter: { eventType: 1 } }) {
+          pageInfo { totalPages }
+          nodes {
+            name
+            slug
+            startAt
+            numEntrants
+            state
+            videogame { displayName }
+            tournament { name }
+            userEntrant(userId: $id) { initialSeedNum isDisqualified standing { placement } }
+          }
+        }
+      }
+    }
+  `, { id: userId, page })).user?.events));
+
+  const events = [];
+  for (const { userEntrant: entrant, state, ...event } of pages.flatMap((page) => page.nodes)) {
+    const placement = entrant?.standing?.placement;
+    if (state !== 'COMPLETED' || !placement) continue;
+    events.push({ placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event });
   }
+  return events.sort((a, b) => b.event.startAt - a.event.startAt);
 }
 
 // 30 sets keeps this under the object limit
@@ -539,26 +586,21 @@ export async function getRegistration(slug) {
   return data.tournament;
 }
 
-// discord ids of everyone registered who linked discord on start.gg.
+// everyone registered, with the discord they connected on start.gg if they did.
 // a participant is ~3 objects, so 200 a page stays under the limit
-export async function getRegisteredDiscordIds(tournamentId) {
-  const ids = new Set();
-  for (let page = 1; ; page++) {
-    const data = await query(`
-      query ($id: ID!, $page: Int!) {
-        tournament(id: $id) {
-          participants(query: { page: $page, perPage: 200 }) {
-            pageInfo { totalPages }
-            nodes { user { authorizations(types: [DISCORD]) { externalId } } }
-          }
+export async function getParticipants(tournamentId) {
+  const pages = await allPages(async (page) => connectionPage((await query(`
+    query ($id: ID!, $page: Int!) {
+      tournament(id: $id) {
+        participants(query: { page: $page, perPage: 200 }) {
+          pageInfo { totalPages }
+          nodes { gamerTag user { id authorizations(types: [DISCORD]) { externalId } } }
         }
       }
-    `, { id: tournamentId, page });
-
-    const participants = data.tournament?.participants;
-    for (const node of participants?.nodes ?? []) {
-      for (const link of node.user?.authorizations ?? []) ids.add(link.externalId);
     }
-    if (!participants || page >= participants.pageInfo.totalPages) return ids;
-  }
+  `, { id: tournamentId, page })).tournament?.participants));
+
+  // TOs can add people who don't have an account
+  return pages.flatMap((page) => page.nodes)
+    .map((node) => ({ tag: node.gamerTag, userId: node.user?.id, discordId: node.user?.authorizations?.[0]?.externalId }));
 }

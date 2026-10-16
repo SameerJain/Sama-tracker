@@ -5,8 +5,12 @@ const DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH ?? 'data';
 const FILE = `${DIR}/state.json`;
 
 // players and regAdmins are keyed by start.gg user id, regReminders by tournament id. posted/streamed/dqs are ids already announced.
-// regPings are discord ids that turned reg pings on. regSkipped are tournament ids whose reminder got deleted, so admins' don't come back
-const empty = { players: {}, tournaments: {}, posted: [], streamed: [], dqs: [], regReminders: {}, regPings: [], regAdmins: {}, regSkipped: [] };
+// regPings are discord ids that turned reg pings on. regSkipped are tournament ids whose reminder got deleted, so admins' don't come back.
+// links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added
+const empty = {
+  players: {}, tournaments: {}, posted: [], streamed: [], dqs: [], regReminders: {}, regPings: [], regAdmins: {}, regSkipped: [],
+  links: {}, socials: [],
+};
 
 function load() {
   if (!fs.existsSync(FILE)) return empty;

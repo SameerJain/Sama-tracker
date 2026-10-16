@@ -8,6 +8,7 @@ const WEIGHTS = { h2h: 3, common: 2, seeding: 1.5, form: 1 };
 const rate = (wins, total) => (wins + 1) / (total + 2);
 // log odds, these average properly where raw rates don't
 const logit = (p) => Math.log(p / (1 - p));
+const fromLogit = (x) => 1 / (1 + Math.exp(-x));
 
 function sharedGame(historyA, historyB) {
   const count = (sets) => {
@@ -39,10 +40,11 @@ function results(history, player, game) {
 
 function recordsByOpponent(list, skip) {
   const records = new Map();
-  for (const { opponent, won } of list) {
+  for (const { opponent, them, won } of list) {
     // no id when the opponent doesn't have a start.gg account
     if (!opponent || skip.includes(opponent)) continue;
-    const record = records.get(opponent) ?? { wins: 0, total: 0 };
+    // newest first, so it's the name they entered with last
+    const record = records.get(opponent) ?? { name: them.name, wins: 0, total: 0 };
     record.total++;
     if (won) record.wins++;
     records.set(opponent, record);
@@ -51,7 +53,7 @@ function recordsByOpponent(list, skip) {
 }
 
 function seedsByEvent(list) {
-  return new Map(list.filter(({ me }) => me.seed).map(({ set, me }) => [set.event.slug, me.seed]));
+  return new Map(list.filter(({ me }) => me.seed).map(({ set, me }) => [set.event.slug, { seed: me.seed, set }]));
 }
 
 export function predict(a, b, historyA, historyB) {
@@ -69,7 +71,7 @@ export function predict(a, b, historyA, historyB) {
   // ties against a common opponent count as half
   const skip = [a.playerId, b.playerId];
   const vsB = recordsByOpponent(listB, skip);
-  const common = { better: 0, worse: 0, total: 0 };
+  const common = { better: 0, worse: 0, total: 0, opponents: [] };
   for (const [opponent, x] of recordsByOpponent(listA, skip)) {
     const y = vsB.get(opponent);
     if (!y) continue;
@@ -77,14 +79,17 @@ export function predict(a, b, historyA, historyB) {
     const diff = x.wins / x.total - y.wins / y.total;
     if (diff > 0) common.better++;
     if (diff < 0) common.worse++;
+    common.opponents.push({ name: x.name, a: x, b: y });
   }
 
   const seedsB = seedsByEvent(listB);
-  const seeding = { higher: 0, total: 0 };
-  for (const [event, seed] of seedsByEvent(listA)) {
-    if (!seedsB.has(event)) continue;
+  const seeding = { higher: 0, total: 0, brackets: [] };
+  for (const [event, mine] of seedsByEvent(listA)) {
+    const theirs = seedsB.get(event);
+    if (!theirs) continue;
     seeding.total++;
-    if (seed < seedsB.get(event)) seeding.higher++;
+    if (mine.seed < theirs.seed) seeding.higher++;
+    seeding.brackets.push({ set: mine.set, a: mine.seed, b: theirs.seed });
   }
 
   const recentA = listA.slice(0, FORM_SETS);
@@ -94,22 +99,23 @@ export function predict(a, b, historyA, historyB) {
     b: { wins: recentB.filter(({ won }) => won).length, total: recentB.length },
   };
 
-  // [weight, sample size, lean towards a]
+  // [key, sample size, lean towards a]
   const signals = [
-    [WEIGHTS.h2h, h2h.total, logit(rate(h2h.wins, h2h.total))],
-    [WEIGHTS.common, common.total, logit(rate(common.better + (common.total - common.better - common.worse) / 2, common.total))],
-    [WEIGHTS.seeding, seeding.total, logit(rate(seeding.higher, seeding.total))],
-    [WEIGHTS.form, Math.min(form.a.total, form.b.total), logit(rate(form.a.wins, form.a.total)) - logit(rate(form.b.wins, form.b.total))],
+    ['h2h', h2h.total, logit(rate(h2h.wins, h2h.total))],
+    ['common', common.total, logit(rate(common.better + (common.total - common.better - common.worse) / 2, common.total))],
+    ['seeding', seeding.total, logit(rate(seeding.higher, seeding.total))],
+    ['form', Math.min(form.a.total, form.b.total), logit(rate(form.a.wins, form.a.total)) - logit(rate(form.b.wins, form.b.total))],
   ];
-  let sum = 0;
-  let totalWeight = 0;
-  for (const [weight, n, lean] of signals) {
-    // 3 sets gets half the weight, 30 gets ~90%
-    const w = weight * (n / (n + 3));
-    sum += w * lean;
-    totalWeight += w;
+  // 3 sets gets half the weight, 30 gets ~90%
+  const factors = signals.map(([key, n, lean]) => ({ key, n, lean, weight: WEIGHTS[key] * (n / (n + 3)) }));
+  const totalWeight = factors.reduce((sum, { weight }) => sum + weight, 0);
+  const lean = factors.reduce((sum, factor) => sum + factor.weight * factor.lean, 0);
+  for (const factor of factors) {
+    // for /predict verbose: how much it counted, and the odds it gives on its own
+    factor.share = totalWeight ? factor.weight / totalWeight : 0;
+    factor.chance = fromLogit(factor.lean);
   }
-  const chance = totalWeight ? 1 / (1 + Math.exp(-sum / totalWeight)) : 0.5;
+  const chance = totalWeight ? fromLogit(lean / totalWeight) : 0.5;
 
-  return { game, chance, h2h, common, seeding, form };
+  return { game, chance, h2h, common, seeding, form, factors };
 }

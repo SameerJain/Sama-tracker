@@ -1,5 +1,5 @@
 import { hostname } from 'node:os';
-import { ApplicationCommandOptionType as Option, MessageFlags } from 'discord.js';
+import { ApplicationCommandOptionType as Option, MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import * as startgg from './startgg.js';
 import * as embeds from './embeds.js';
 import { state, save } from './store.js';
@@ -12,6 +12,8 @@ import brawl from './brawl.js';
 import pplus from './pplus.js';
 import { predict as predictOdds } from './predict.js';
 import { characterUsage } from './characters.js';
+import { periodSummary } from './reports.js';
+import { MESSAGE_TYPES, WEEKDAYS, messageSettings } from './message-settings.js';
 
 const HISTORY_PAGES = 15; // 40 sets a page
 // 3000 sets, about a minute the first time for someone who's played that many
@@ -32,18 +34,64 @@ const RECENT_ALL_PLAYERS = 40;
 const CHARACTER_GAMES = 6;
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
+// remove autocompletes with the link as the value, which discord caps at 100
+const SOCIAL_URL_LENGTH = 100;
+// discord takes this many ids a request when checking who's in the server
+const MEMBERS_PER_FETCH = 100;
 
 const jokes = Object.fromEntries([sm4sh, melee, ult, smash64, brawl, pplus].map((joke) => [joke.name, joke]));
 
 // shows who has reg pings on
 const REG_ROLE = 'Reg Reminders';
 
-function playerOption(description, name = 'player') {
-  return { type: Option.String, name, description, required: true, autocomplete: true };
+// an optional one that's left out means whoever ran the command
+function playerOption(description, name = 'player', required = true) {
+  return { type: Option.String, name, description, required, autocomplete: true };
+}
+
+const YOU = 'Tracked player, leave out for yourself';
+const YOU_OR_ALL = 'Tracked player or all, leave out for yourself';
+
+function verboseOption(description) {
+  return { type: Option.Boolean, name: 'verbose', description };
 }
 
 export const commands = [
   { name: 'help', description: 'Show commands' },
+  {
+    name: 'messages', description: 'Show or change automatic posts and the weekly recap schedule',
+    default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
+    options: [
+      ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
+      { type: Option.Integer, name: 'recap_day', description: 'Day of the weekly recap', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
+      { type: Option.String, name: 'recap_time', description: 'Weekly recap time in 24-hour HH:MM, like 21:00' },
+      { type: Option.String, name: 'timezone', description: 'Recap timezone, like America/New_York or Europe/London' },
+    ],
+  },
+  // two commands since one with subcommands can't be run on its own, and permissions are per command
+  { name: 'socials', description: 'Streams and social links saved for this server' },
+  {
+    name: 'socials_edit',
+    description: 'Add or remove links shown by /socials',
+    default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
+    options: [
+      {
+        type: Option.Subcommand,
+        name: 'add',
+        description: 'Add a link to /socials',
+        options: [
+          { type: Option.String, name: 'name', description: 'Whose link it is, like 716 Esports. Links with the same name share a line', required: true, max_length: 50 },
+          { type: Option.String, name: 'link', description: 'Profile, channel or page link', required: true },
+        ],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'remove',
+        description: 'Remove a link from /socials',
+        options: [{ type: Option.String, name: 'link', description: 'Link to remove', required: true, autocomplete: true }],
+      },
+    ],
+  },
   {
     name: 'track',
     description: 'Manage tracked players',
@@ -64,40 +112,39 @@ export const commands = [
     ],
   },
   {
-    name: 'upcoming',
-    description: 'Upcoming tournaments',
-    options: [playerOption('Tracked player, or all')],
+    name: 'link',
+    description: 'Link your start.gg so leaving the player out of a command looks you up',
+    options: [{ type: Option.String, name: 'profile', description: 'Your start.gg profile link or ID', required: true }],
   },
+  { name: 'unlink', description: 'Unlink the start.gg you linked with /link' },
+  { name: 'upcoming', description: 'Upcoming tournaments', options: [playerOption(YOU_OR_ALL, 'player', false)] },
+  { name: 'recent', description: 'Latest reported sets', options: [playerOption(YOU_OR_ALL, 'player', false)] },
+  { name: 'run', description: 'Current tournament run and next opponent', options: [playerOption(YOU, 'player', false)] },
+  { name: 'progress', description: 'Last 30 days compared with the previous 30, by game', options: [playerOption(YOU, 'player', false)] },
   {
-    name: 'recent',
-    description: 'Latest reported sets',
-    options: [playerOption('Tracked player, or all')],
+    name: 'scout', description: 'Scout any start.gg opponent, for tracked players with Discord connected on start.gg',
+    options: [{ type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true }],
   },
+  // discord wants required options before optional ones, so the opponent goes first
   {
     name: 'h2h',
-    description: 'Head-to-head record between two tracked players',
-    options: [playerOption('Tracked player'), playerOption('Tracked player', 'opponent')],
+    description: 'Head-to-head record against another player',
+    options: [playerOption('Tracked player to compare with', 'opponent'), playerOption(YOU, 'player', false), verboseOption('Every set they\'ve played, plus splits and streaks. Slower')],
   },
   {
     name: 'stats',
     description: 'Recent placements and set record',
-    options: [
-      playerOption('Tracked player'),
-      { type: Option.Boolean, name: 'verbose', description: 'Full lifetime report, slower' },
-    ],
+    options: [playerOption(YOU, 'player', false), verboseOption('Full lifetime report, slower')],
   },
   {
     name: 'characters',
-    description: 'Ultimate characters a tracked player has reported',
-    options: [
-      playerOption('Tracked player'),
-      { type: Option.Boolean, name: 'verbose', description: 'Every game they have characters reported in, going further back, slower' },
-    ],
+    description: 'Ultimate characters a player has reported',
+    options: [playerOption(YOU, 'player', false), verboseOption('Every game they have characters reported in, going further back, slower')],
   },
   {
     name: 'predict',
-    description: 'Odds of one tracked player beating another',
-    options: [playerOption('Tracked player'), playerOption('Tracked player', 'opponent')],
+    description: 'Odds of beating another player',
+    options: [playerOption('Tracked player to go up against', 'opponent'), playerOption(YOU, 'player', false), verboseOption('Show how each part of the prediction counts')],
   },
   {
     name: 'stream',
@@ -155,6 +202,19 @@ export const commands = [
       choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
     }],
   },
+  {
+    name: 'registered',
+    description: 'Who in this server is registered for a tournament, going by the Discord on their start.gg',
+    options: [{ type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true }],
+  },
+  {
+    name: 'reg_warn',
+    description: 'Warn someone who isn\'t registered for a tournament yet. No ping if they are',
+    options: [
+      { type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true },
+      { type: Option.User, name: 'user', description: 'Who to check', required: true },
+    ],
+  },
   ...Object.values(jokes).map((joke) => ({ name: joke.name, description: joke.line })),
   { name: 'pfp', description: 'My profile picture, full size' },
 ];
@@ -171,16 +231,34 @@ export async function handleCommand(interaction) {
   switch (name) {
     case 'help':
       return interaction.reply({ embeds: [embeds.help()] });
+    case 'messages':
+      return configureMessages(interaction);
+    case 'socials':
+      return sendEmbeds(interaction, embeds.socials(state.socials));
+    case 'socials_edit add':
+      return socialsAdd(interaction);
+    case 'socials_edit remove':
+      return socialsRemove(interaction);
     case 'track add':
       return trackAdd(interaction);
     case 'track remove':
       return trackRemove(interaction);
     case 'track list':
       return sendEmbeds(interaction, embeds.trackedList(state.players));
+    case 'link':
+      return link(interaction);
+    case 'unlink':
+      return unlink(interaction);
     case 'upcoming':
       return upcoming(interaction);
     case 'recent':
       return recent(interaction);
+    case 'run':
+      return run(interaction);
+    case 'progress':
+      return progress(interaction);
+    case 'scout':
+      return scout(interaction);
     case 'h2h':
       return headToHead(interaction);
     case 'stats':
@@ -207,6 +285,10 @@ export async function handleCommand(interaction) {
       return bracket(interaction);
     case 'reg_role':
       return regRole(interaction);
+    case 'registered':
+      return registered(interaction);
+    case 'reg_warn':
+      return regWarn(interaction);
     case 'sm4sh':
     case 'melee':
     case 'ult':
@@ -220,7 +302,8 @@ export async function handleCommand(interaction) {
 }
 
 export async function handleAutocomplete(interaction) {
-  const typed = interaction.options.getFocused().toLowerCase();
+  const focused = interaction.options.getFocused();
+  const typed = focused.toLowerCase();
   const name = commandName(interaction);
   const choices = [];
 
@@ -238,8 +321,16 @@ export async function handleAutocomplete(interaction) {
     return interaction.respond(choices.slice(0, 25));
   }
 
+  if (name === 'socials_edit remove') {
+    for (const social of state.socials) {
+      const label = `${social.name} · ${social.url.replace(/^https?:\/\//, '')}`;
+      if (label.toLowerCase().includes(typed)) choices.push({ name: label.slice(0, 100), value: social.url });
+    }
+    return interaction.respond(choices.slice(0, 25));
+  }
+
   // no "all" for the ones that need a single player
-  if (!['track remove', 'h2h', 'stats', 'characters', 'predict'].includes(name) && 'all'.startsWith(typed)) {
+  if (!['track remove', 'h2h', 'stats', 'characters', 'predict', 'run', 'progress'].includes(name) && 'all'.startsWith(typed)) {
     choices.push({ name: 'all', value: 'all' });
   }
   // only 25 fit, so tags that start with what's typed go first
@@ -248,14 +339,30 @@ export async function handleAutocomplete(interaction) {
   matches.sort((a, b) => starts(b) - starts(a));
   for (const player of matches) choices.push({ name: player.tag, value: String(player.userId) });
 
+  // an empty list looks broken, so say why. picking it gets the not tracked reply
+  if (!choices.length) {
+    const why = Object.keys(state.players).length ? `Nobody tracked matches "${focused}", /track add them first` : 'Nobody is tracked yet, /track add someone first';
+    choices.push({ name: why.slice(0, 100), value: focused.slice(0, 100) || 'nobody' });
+  }
+
   await interaction.respond(choices.slice(0, 25));
 }
 
+// a tracked player picked from the list, 'all', or whoever ran it if it's left out.
+// undefined when it's none of those
 function readChoice(interaction, name = 'player') {
-  const value = interaction.options.getString(name, true).toLowerCase();
+  const value = interaction.options.getString(name)?.toLowerCase();
+  if (value === undefined) return linkedPlayer(interaction.user.id);
   if (value === 'all') return 'all';
 
   return lookup(state.players, value, 'tag');
+}
+
+// from /link, or the tracked player whose start.gg has this discord connected
+function linkedPlayer(discordId) {
+  const linked = state.links[discordId];
+  if (linked) return state.players[linked.userId] ?? linked;
+  return Object.values(state.players).find((player) => player.discordId === discordId);
 }
 
 // autocomplete sends the id, typing it out sends the name.
@@ -270,20 +377,109 @@ function readPlayer(interaction, name = 'player') {
   return choice === 'all' ? undefined : choice;
 }
 
-// whatever doesn't fit in the reply goes in follow-ups
+// whatever doesn't fit in the reply goes in follow-ups, which are only ephemeral when asked
 async function sendEmbeds(interaction, list) {
   for (const [i, batch] of embeds.messages(list).entries()) {
-    if (i > 0) await interaction.followUp({ embeds: batch });
+    if (i > 0) await interaction.followUp({ embeds: batch, ...(interaction.ephemeral && { flags: MessageFlags.Ephemeral }) });
     else if (interaction.deferred) await interaction.editReply({ embeds: batch });
     else await interaction.reply({ embeds: batch });
   }
 }
 
-function replyNotTracked(interaction) {
-  return interaction.reply({
-    content: 'That player isn\'t tracked. See `/track list`.',
-    flags: MessageFlags.Ephemeral,
-  });
+// left out with no start.gg linked, or someone picked who isn't tracked
+function replyNoPlayer(interaction, name = 'player') {
+  const content = interaction.options.getString(name) === null
+    ? 'Pick a player, or `/link` your start.gg so leaving it out looks you up.'
+    : 'Only tracked players can be picked. `/track add` them first, `/track list` shows who\'s tracked.';
+  return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+}
+
+function configureMessages(interaction) {
+  const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return reply('You need Manage Server permission to control automatic messages.');
+  const previous = messageSettings();
+  const changes = {};
+  for (const type of Object.keys(MESSAGE_TYPES)) {
+    const value = interaction.options.getBoolean(type);
+    if (value !== null) changes[type] = value;
+  }
+  const day = interaction.options.getInteger('recap_day');
+  if (day !== null) changes.recapDay = day;
+  const time = interaction.options.getString('recap_time')?.trim();
+  if (time !== undefined) {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return reply('Use a 24-hour time in HH:MM format, like 09:00 or 21:30.');
+    changes.recapTime = time;
+  }
+  const timezone = interaction.options.getString('timezone')?.trim();
+  if (timezone !== undefined) {
+    try {
+      changes.timezone = new Intl.DateTimeFormat('en-US', { timeZone: timezone }).resolvedOptions().timeZone;
+    } catch {
+      return reply('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
+    }
+  }
+
+  if (Object.keys(changes).length) {
+    const now = secondsNow();
+    // anything that came due while one was off stays skipped once it's back on
+    const reenabled = Object.keys(MESSAGE_TYPES).filter((type) => changes[type] && !previous[type]);
+    if (reenabled.length) changes.enabledAt = { ...previous.enabledAt, ...Object.fromEntries(reenabled.map((type) => [type, now])) };
+    // a new schedule starts with the next recap
+    if (['recapDay', 'recapTime', 'timezone'].some((key) => Object.hasOwn(changes, key) && changes[key] !== previous[key])) {
+      changes.recapChangedAt = now;
+    }
+    state.messages = { ...state.messages, ...changes };
+    save();
+  }
+  const settings = messageSettings();
+  const lines = Object.entries(MESSAGE_TYPES).map(([key, label]) => `${label}: ${settings[key] ? 'on' : 'off'}`);
+  lines.push('', `Recap schedule: ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} (${settings.timezone})`,
+    'Whatever comes due while something is off gets skipped, not sent later. Schedule changes start with the next recap.');
+  return reply(lines.join('\n'));
+}
+
+// twitch.tv/name works without the https. null for anything that isn't a web link
+function socialUrl(input) {
+  const text = input.trim();
+  let url;
+  try {
+    url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+  } catch {
+    return null;
+  }
+  // "hello" parses as https://hello/, and twitch.tv@evil.example goes to evil.example
+  if (!url.hostname.includes('.') || url.username || url.password) return null;
+  // a ) would end the [Twitch](link) early
+  return url.href.replaceAll('(', '%28').replaceAll(')', '%29');
+}
+
+// ephemeral so edits don't clutter the channel and a name can't ping anyone
+function socialsAdd(interaction) {
+  const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  const typed = interaction.options.getString('name', true).trim();
+  const url = socialUrl(interaction.options.getString('link', true));
+  if (!url) return reply('That isn\'t a web link. Paste the profile, channel or page link.');
+  if (url.length > SOCIAL_URL_LENGTH) return reply(`Links can be up to ${SOCIAL_URL_LENGTH} characters.`);
+
+  const listed = state.socials.find((social) => social.url === url);
+  if (listed) return reply(`That link is already in \`/socials\` under ${listed.name}.`);
+
+  // "716 esports" goes on the same line as "716 Esports", spelled like the first one
+  const name = state.socials.find((social) => social.name.toLowerCase() === typed.toLowerCase())?.name ?? typed;
+  state.socials.push({ name, url });
+  save();
+  return reply(`Added ${url} under ${name}.`);
+}
+
+function socialsRemove(interaction) {
+  // autocomplete sends the saved link, typing it out might leave off the https
+  const url = socialUrl(interaction.options.getString('link', true));
+  const social = state.socials.find((each) => each.url === url);
+  if (!social) return interaction.reply({ content: 'That link isn\'t in `/socials`. Pick one from the list.', flags: MessageFlags.Ephemeral });
+
+  state.socials = state.socials.filter((each) => each !== social);
+  save();
+  return interaction.reply({ content: `Removed ${social.url} from ${social.name}.`, flags: MessageFlags.Ephemeral });
 }
 
 // start.gg/user/f64a83c8 or just f64a83c8
@@ -313,16 +509,50 @@ async function trackAdd(interaction) {
 
 async function trackRemove(interaction) {
   const player = readPlayer(interaction);
-  if (!player) return replyNotTracked(interaction);
+  if (!player) return replyNoPlayer(interaction);
 
   delete state.players[player.userId];
   save();
   await interaction.reply(`Stopped tracking ${player.tag}.`);
 }
 
-function upcoming(interaction) {
+// only lets commands default to them, they don't get tracked.
+// their start.gg has to have this discord connected so nobody can link as someone else
+async function link(interaction) {
+  const input = interaction.options.getString('profile', true).trim();
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const player = await startgg.getPlayer(profileSlug(input));
+  if (!player) {
+    return interaction.editReply(`Couldn't find a start.gg player for \`${input}\`. Use your profile link, like start.gg/user/f64a83c8.`);
+  }
+  if (player.discordId !== interaction.user.id) {
+    return interaction.editReply(player.discordId
+      ? `${player.tag}'s start.gg has a different Discord account connected.`
+      : 'Connect your Discord on your start.gg profile first, then try again.');
+  }
+
+  state.links[interaction.user.id] = player;
+  save();
+  return interaction.editReply(`Linked to ${player.tag}. Leave the player out of commands like \`/stats\` or \`/h2h\` to look yourself up. You aren't tracked, so you won't be in \`/track list\` or get posted about.`);
+}
+
+function unlink(interaction) {
+  const linked = state.links[interaction.user.id];
+  delete state.links[interaction.user.id];
+  if (linked) save();
+  let content = linked ? `Unlinked from ${linked.tag}.` : 'You weren\'t linked.';
+  // tracked with discord connected still counts
+  const still = linkedPlayer(interaction.user.id);
+  if (still) content += ` Commands still find you as ${still.tag}, since you're tracked with this Discord on your start.gg.`;
+  return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+}
+
+async function upcoming(interaction) {
   const choice = readChoice(interaction);
-  if (!choice) return replyNotTracked(interaction);
+  if (!choice) return replyNoPlayer(interaction);
+  // only tracked players' tournaments are saved
+  if (choice !== 'all' && !state.players[choice.userId]) return upcomingFor(interaction, choice);
 
   const now = secondsNow();
   const tournaments = [];
@@ -341,18 +571,32 @@ function upcoming(interaction) {
   return sendEmbeds(interaction, embeds.upcoming(tournaments, state.players, who));
 }
 
+// someone from /link, straight from start.gg
+async function upcomingFor(interaction, player) {
+  await interaction.deferReply();
+  const [[, found]] = await startgg.getUpcomingTournaments([player.userId]);
+  const tournaments = [];
+  for (const { id } of found) {
+    const tournament = await startgg.getTournament(id, [player.userId]);
+    // no entries means they only admin it
+    if (tournament?.entries.length && secondsNow() <= endTime(tournament)) tournaments.push(tournament);
+  }
+  tournaments.sort((a, b) => a.startAt - b.startAt);
+  return sendEmbeds(interaction, embeds.upcoming(tournaments, { [player.userId]: player }, player.tag));
+}
+
 async function recent(interaction) {
   const choice = readChoice(interaction);
-  if (!choice) return replyNotTracked(interaction);
+  if (!choice) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
   // the latest 20 sets come from whoever played last, no need to ask about everyone
-  const players = choice === 'all'
+  const asking = choice === 'all'
     ? Object.values(state.players).sort((a, b) => (b.lastSetAt ?? 0) - (a.lastSetAt ?? 0)).slice(0, RECENT_ALL_PLAYERS)
     : [choice];
   const perPlayer = choice === 'all' ? 3 : 5;
 
-  const sets = await startgg.getSets(players.map((player) => player.playerId), { perPage: perPlayer });
+  const sets = await startgg.getSets(asking.map((player) => player.playerId), { perPage: perPlayer });
 
   // 20 max so it's two messages at most
   const latest = sets
@@ -360,11 +604,86 @@ async function recent(interaction) {
     .slice(0, 20);
   if (!latest.length) return interaction.editReply('No sets found.');
 
-  const cards = latest.map((set) => embeds.setResult(set, state.players));
+  // someone from /link isn't tracked, the cards still need to know which side is theirs
+  const players = choice === 'all' ? state.players : { ...state.players, [choice.userId]: choice };
+  const cards = latest.map((set) => embeds.setResult(set, players));
   // sort is stable, so each player's sets stay newest first
   if (choice === 'all') cards.sort((a, b) => (a.data.author?.name ?? '').localeCompare(b.data.author?.name ?? ''));
 
   await sendEmbeds(interaction, cards);
+}
+
+async function run(interaction) {
+  const player = readPlayer(interaction);
+  if (!player) return replyNoPlayer(interaction);
+
+  await interaction.deferReply();
+  const now = secondsNow();
+  // the saved ones too, in case start.gg's upcoming list drops one that's running late
+  const [[, upcoming]] = await startgg.getUpcomingTournaments([player.userId]);
+  const tournaments = new Map(Object.values(state.tournaments)
+    .filter((tournament) => tournament.userIds?.includes(player.userId))
+    .map((tournament) => [tournament.id, tournament]));
+  for (const tournament of upcoming) tournaments.set(tournament.id, tournament);
+  const current = [...tournaments.values()]
+    .filter((tournament) => tournament.startAt <= now && now <= endTime(tournament) + RUNS_LATE_HOURS * 60 * 60)
+    .sort((a, b) => b.startAt - a.startAt);
+
+  const cards = [];
+  for (const found of current) {
+    const tournament = await startgg.getTournament(found.id, [player.userId]);
+    for (const entry of tournament?.entries ?? []) {
+      if (!entry.started) continue;
+      const sets = await startgg.getRunSets(entry.eventId, player.playerId);
+      cards.push(...embeds.run(player, tournament, entry, sets));
+    }
+  }
+  if (!cards.length) return interaction.editReply(`${player.tag} has no current tournament run on start.gg.`);
+  return sendEmbeds(interaction, cards);
+}
+
+async function progress(interaction) {
+  const player = readPlayer(interaction);
+  if (!player) return replyNoPlayer(interaction);
+
+  await interaction.deferReply();
+  const until = secondsNow();
+  const middle = until - 30 * 24 * 60 * 60;
+  const since = middle - 30 * 24 * 60 * 60;
+  const [sets, events] = await Promise.all([
+    startgg.getPeriodHistory(player.playerId, since, until),
+    startgg.getEventHistory(player.userId),
+  ]);
+  const current = periodSummary(player, sets, events, middle, until);
+  const previous = periodSummary(player, sets, events, since, middle);
+  return sendEmbeds(interaction, embeds.progress(player, current, previous, { since, middle, until }));
+}
+
+async function scout(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const player = await trackedCaller(interaction.user.id);
+  if (!player) return interaction.editReply('Only tracked players can use /scout. Connect your Discord on your tracked start.gg profile first.');
+
+  const input = interaction.options.getString('profile', true).trim();
+  const opponent = await startgg.getPlayer(profileSlug(input));
+  if (!opponent) return interaction.editReply('Couldn\'t find that start.gg player. Use their profile link or ID.');
+  if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
+
+  const [mine, theirs, characters] = await Promise.all([
+    setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
+  ]);
+  return sendEmbeds(interaction, embeds.scout(player, opponent, mine, theirs, characters));
+}
+
+// the tracked player with this discord connected on start.gg. checked live, so disconnecting it there
+// takes /scout away right away. whoever it was last time goes first, so it's usually one lookup
+async function trackedCaller(discordId) {
+  const saved = Object.values(state.players).filter((player) => player.discordId === discordId).map((player) => String(player.userId));
+  for (const userIds of [saved, Object.keys(state.players)]) {
+    if (!userIds.length) continue;
+    const match = (await startgg.getProfiles(userIds)).find(([, profile]) => profile?.discordId === discordId);
+    if (match) return state.players[match[0]];
+  }
 }
 
 // caching the promise means two lookups at once share a fetch
@@ -413,15 +732,18 @@ const lifetimeHistory = cachedHistory(startgg.getSetHistory, LIFETIME_PAGES, LIF
 const lifetimeCharacterHistory = cachedHistory(startgg.getCharacterSets, LIFETIME_CHARACTER_PAGES, LIFETIME_CACHE_PLAYERS);
 
 async function headToHead(interaction) {
-  const a = readPlayer(interaction);
   const b = readPlayer(interaction, 'opponent');
-  if (!a || !b) return replyNotTracked(interaction);
-  if (a === b) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
+  if (!b) return replyNoPlayer(interaction, 'opponent');
+  const a = readPlayer(interaction);
+  if (!a) return replyNoPlayer(interaction);
+  if (a.userId === b.userId) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
 
   await interaction.deferReply();
+  const verbose = interaction.options.getBoolean('verbose') ?? false;
+  const history = verbose ? lifetimeHistory : setHistory;
   // start.gg can't search sets between two players, so go through both histories
   // (either one can get cut off before older sets) and dedupe by set id
-  const [historyA, historyB] = await Promise.all([setHistory(a.playerId), setHistory(b.playerId)]);
+  const [historyA, historyB] = await Promise.all([history(a.playerId), history(b.playerId)]);
   const played = new Map();
   for (const set of [...historyA, ...historyB]) {
     const result = startgg.fromSide(set, a.playerId);
@@ -429,12 +751,12 @@ async function headToHead(interaction) {
   }
   const sets = [...played.values()].sort((x, y) => y.completedAt - x.completedAt);
 
-  await interaction.editReply({ embeds: [embeds.headToHead(a, b, sets)] });
+  await sendEmbeds(interaction, embeds.headToHead(a, b, sets, verbose));
 }
 
 async function stats(interaction) {
   const player = readPlayer(interaction);
-  if (!player) return replyNotTracked(interaction);
+  if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
   if (interaction.options.getBoolean('verbose')) {
@@ -447,7 +769,7 @@ async function stats(interaction) {
 
 async function characters(interaction) {
   const player = readPlayer(interaction);
-  if (!player) return replyNotTracked(interaction);
+  if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
   const verbose = interaction.options.getBoolean('verbose');
@@ -479,23 +801,25 @@ async function characters(interaction) {
   });
 }
 
+// verbose explains the same odds instead of changing them
 async function predict(interaction) {
-  const a = readPlayer(interaction);
   const b = readPlayer(interaction, 'opponent');
-  if (!a || !b) return replyNotTracked(interaction);
-  if (a === b) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
+  if (!b) return replyNoPlayer(interaction, 'opponent');
+  const a = readPlayer(interaction);
+  if (!a) return replyNoPlayer(interaction);
+  if (a.userId === b.userId) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
 
   await interaction.deferReply();
   const [historyA, historyB] = await Promise.all([setHistory(a.playerId), setHistory(b.playerId)]);
   const odds = predictOdds(a, b, historyA, historyB);
   if (!odds) return interaction.editReply(`${a.tag} and ${b.tag} haven't played singles in the same game on start.gg.`);
 
-  await interaction.editReply({ embeds: [embeds.prediction(a, b, odds)] });
+  await sendEmbeds(interaction, embeds.prediction(a, b, odds, interaction.options.getBoolean('verbose') ?? false));
 }
 
 function streamAlerts(interaction) {
   const choice = readChoice(interaction);
-  if (!choice) return replyNotTracked(interaction);
+  if (!choice) return replyNoPlayer(interaction);
 
   const on = interaction.options.getString('alerts', true) === 'on';
   const players = choice === 'all' ? Object.values(state.players) : [choice];
@@ -526,14 +850,16 @@ function tournamentSlug(input) {
   return path.match(/tournament\/([\w-]+)/)?.[1] ?? path.split(/[/?#]/)[0];
 }
 
+function tournamentNotFound(input) {
+  return `Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`;
+}
+
 async function setRegReminder(interaction) {
   const input = interaction.options.getString('tournament', true).trim();
 
   await interaction.deferReply();
   const tournament = await startgg.getRegistration(tournamentSlug(input));
-  if (!tournament) {
-    return interaction.editReply(`Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`);
-  }
+  if (!tournament) return interaction.editReply(tournamentNotFound(input));
 
   if (state.regReminders[tournament.id]) {
     return interaction.editReply(`${tournament.name} already has reminders set. \`/delete_reg_reminder\` cancels them.`);
@@ -624,7 +950,7 @@ async function regRole(interaction) {
   save();
 
   let content = on
-    ? 'You\'ll get pinged for reg reminders. If your Discord is linked on start.gg, not for ones you\'re already registered for.'
+    ? 'You\'ll get pinged for reg reminders. If your Discord is connected on start.gg, not for ones you\'re already registered for.'
     : 'No more reg reminder pings.';
   try {
     let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
@@ -640,6 +966,67 @@ async function regRole(interaction) {
     content += ` I couldn't change your ${REG_ROLE} role though, that needs Manage Roles and my role above it.`;
   }
   return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+}
+
+// which of these discord ids are in the server. asking by id doesn't need the server members intent.
+// discord can say to slow down, then it gets one more try after waiting
+async function inServer(guild, ids) {
+  const found = new Set();
+  for (let i = 0; i < ids.length; i += MEMBERS_PER_FETCH) {
+    const user = ids.slice(i, i + MEMBERS_PER_FETCH);
+    const members = await guild.members.fetch({ user }).catch(async (err) => {
+      if (!err.data?.retry_after) throw err;
+      await new Promise((resolve) => setTimeout(resolve, err.data.retry_after * 1000));
+      return guild.members.fetch({ user });
+    });
+    for (const id of members.keys()) found.add(id);
+  }
+  return found;
+}
+
+// like /upcoming for one tournament, but anyone in the server instead of the tracked list
+async function registered(interaction) {
+  const input = interaction.options.getString('tournament', true).trim();
+
+  await interaction.deferReply();
+  const found = await startgg.getRegistration(tournamentSlug(input));
+  if (!found) return interaction.editReply(tournamentNotFound(input));
+
+  const participants = await startgg.getParticipants(found.id);
+  const linked = participants.filter((participant) => participant.discordId);
+  const members = await inServer(interaction.guild, [...new Set(linked.map((participant) => participant.discordId))]);
+  const here = linked.filter((participant) => members.has(participant.discordId));
+  // for the events each of them is in
+  const tournament = await startgg.getTournament(found.id, here.map((participant) => participant.userId));
+  return sendEmbeds(interaction, embeds.registered(tournament ?? found, here, participants.length, linked.length));
+}
+
+// goes by the discord connected on start.gg, and only pings when they're not registered
+async function regWarn(interaction) {
+  const input = interaction.options.getString('tournament', true).trim();
+  const user = interaction.options.getUser('user', true);
+  if (user.bot) return interaction.reply({ content: 'Bots don\'t need to register.', flags: MessageFlags.Ephemeral });
+
+  await interaction.deferReply();
+  const tournament = await startgg.getRegistration(tournamentSlug(input));
+  if (!tournament) return interaction.editReply(tournamentNotFound(input));
+
+  const participants = await startgg.getParticipants(tournament.id);
+  if (participants.some((participant) => participant.discordId === user.id)) {
+    const name = interaction.options.getMember('user')?.displayName ?? user.displayName;
+    return interaction.editReply(`Already registered.\n-# ${escapeMarkdown(name)} · ${escapeMarkdown(tournament.name)}`);
+  }
+  const deadline = regDeadline(tournament);
+  if (deadline <= secondsNow()) return interaction.editReply(`Registration for ${tournament.name} already closed.`);
+  if (!tournament.isRegistrationOpen) return interaction.editReply(`Registration for ${tournament.name} isn't open right now.`);
+
+  // editing the reply wouldn't ping them, so the warning goes out as a new message
+  await interaction.deleteReply();
+  return interaction.followUp({
+    content: `<@${user.id}>`,
+    embeds: [embeds.regWarning(tournament, deadline)],
+    allowedMentions: { users: [user.id] },
+  });
 }
 
 // just the picture, as big as discord has it

@@ -1,6 +1,8 @@
 import * as startgg from './startgg.js';
 import * as embeds from './embeds.js';
 import { state, save } from './store.js';
+import { periodSummary, weeklyPeriod } from './reports.js';
+import { messageEnabled, messageSettings } from './message-settings.js';
 
 const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
@@ -56,10 +58,12 @@ export function startTracking(postChannel) {
   checkSets();
   checkProfiles();
   checkRegReminders();
+  checkWeeklyRecap();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
+  setInterval(checkWeeklyRecap, 60 * 1000);
 }
 
 // one run at a time so nothing posts twice. if a run is already waiting, extra calls
@@ -78,9 +82,11 @@ function queued(check) {
   };
 }
 
-// fewest messages that fit discord's limits
-async function post(list) {
-  for (const batch of embeds.messages(list)) await channel.send({ embeds: batch });
+// fewest messages that fit discord's limits. the switch gets checked before each one in case it's turned off partway
+async function post(list, type, dueAt, postChannel = channel) {
+  for (const batch of embeds.messages(list)) {
+    if (messageEnabled(type, dueAt)) await postChannel.send({ embeds: batch });
+  }
 }
 
 const checkSets = queued(async () => {
@@ -90,16 +96,65 @@ const checkSets = queued(async () => {
 export const checkTournaments = queued(updateTournaments);
 const checkProfiles = queued(updateProfiles);
 export const checkRegReminders = queued(postRegReminders);
+const checkWeeklyRecap = queued(postWeeklyRecap);
 
-// picks up tag and avatar changes, 20 people a request
-async function updateProfiles() {
-  try {
-    for (const [userId, latest] of await startgg.getProfiles(Object.keys(state.players))) {
+export async function postWeeklyRecap(postChannel = channel, now = secondsNow()) {
+  const period = weeklyPeriod(now, messageSettings());
+  // turning it back on or changing the schedule waits for the next recap instead of sending an overdue one
+  const canPost = () => messageEnabled('recap', period.until) && period.until > (messageSettings().recapChangedAt ?? 0);
+  if (!period || !canPost() || (state.weeklyRecap?.until === period.until && state.weeklyRecap.done)) return;
+  // built once and saved, so a restart partway through sends the rest instead of starting over
+  if (state.weeklyRecap?.until !== period.until) {
+    const crew = [];
+    for (const player of Object.values(state.players)) {
+      const sets = await startgg.getPeriodHistory(player.playerId, period.since, period.until);
+      const summary = periodSummary(player, sets, [], period.since, period.until);
+      // only people with a set that wasn't a DQ
+      if (!summary.played.length) continue;
+      // placements from events they played in this week, including ones that started the week before
+      const events = await startgg.getEventHistory(player.userId);
+      const playedEvents = new Set(summary.played.map(({ set }) => set.event.slug));
+      summary.finishes = events.filter(({ event, dq }) => !dq && playedEvents.has(event.slug));
       // removed while this was running
-      const player = state.players[userId];
-      if (!latest || !player) continue;
-      player.tag = latest.tag;
-      player.image = latest.image;
+      if (state.players[player.userId]) crew.push({ player, summary });
+    }
+    crew.sort((a, b) => a.player.tag.localeCompare(b.player.tag));
+    if (!canPost()) return;
+
+    const active = new Set(crew.map(({ player }) => player.userId));
+    const upcoming = [];
+    for (const tournament of Object.values(state.tournaments)) {
+      if (tournament.startAt < now || tournament.startAt >= period.next) continue;
+      const going = [...new Set(tournament.entries.map((entry) => entry.userId))].filter((id) => active.has(id));
+      if (going.length) upcoming.push({ tournament, players: going.map((id) => state.players[id]) });
+    }
+    upcoming.sort((a, b) => a.tournament.startAt - b.tournament.startAt);
+    const batches = crew.length ? embeds.messages(embeds.weeklyRecap(crew, upcoming, period)) : [];
+    state.weeklyRecap = { until: period.until, sent: 0, done: false, batches: batches.map((batch) => batch.map((embed) => embed.toJSON())) };
+    save();
+  }
+  for (let i = state.weeklyRecap.sent; i < state.weeklyRecap.batches.length; i++) {
+    if (!canPost()) return;
+    await postChannel.send({ embeds: state.weeklyRecap.batches[i] });
+    state.weeklyRecap.sent = i + 1;
+    save();
+  }
+  state.weeklyRecap.done = true;
+  delete state.weeklyRecap.batches;
+  save();
+}
+
+// picks up tag, avatar and connected discord changes for tracked and /link people, 20 a request
+async function updateProfiles() {
+  const records = [...Object.values(state.players), ...Object.values(state.links)];
+  try {
+    const latest = new Map(await startgg.getProfiles([...new Set(records.map((record) => String(record.userId)))]));
+    for (const record of records) {
+      const profile = latest.get(String(record.userId));
+      if (!profile) continue;
+      record.tag = profile.tag;
+      record.image = profile.image;
+      record.discordId = profile.discordId;
     }
   } catch (err) {
     console.error('refreshing profiles failed:', err.message);
@@ -107,7 +162,7 @@ async function updateProfiles() {
   save();
 }
 
-async function postNewSets() {
+export async function postNewSets(postChannel = channel) {
   const players = Object.values(state.players);
   const playerIds = players.map((player) => player.playerId);
   const checkedAt = secondsNow();
@@ -134,7 +189,7 @@ async function postNewSets() {
       const dqed = set.sides.find((side) => side.score === -1);
       if (dqed && (!dqed.playerIds.some((id) => playerIds.includes(id)) || state.dqs.includes(dqed.id))) continue;
 
-      await channel.send({ embeds: [embeds.setResult(set, state.players)] });
+      if (messageEnabled('sets', set.completedAt)) await postChannel.send({ embeds: [embeds.setResult(set, state.players)] });
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
     }
@@ -152,12 +207,12 @@ async function postNewSets() {
   save();
 }
 
-async function postStreamAlerts() {
+export async function postStreamAlerts(postChannel = channel) {
   try {
     const playerIds = Object.values(state.players).filter(alertsOn).map((player) => player.playerId);
     for (const set of await startgg.getStreamedSets(playerIds)) {
       if (state.streamed.includes(set.id)) continue;
-      await channel.send({ embeds: [embeds.onStream(set, state.players)] });
+      if (messageEnabled('streams', wentLiveAt(set))) await postChannel.send({ embeds: [embeds.onStream(set, state.players)] });
       state.streamed.push(set.id);
     }
   } catch (err) {
@@ -170,7 +225,7 @@ async function postStreamAlerts() {
       for (const queue of await startgg.getStreamQueues(tournament.id)) {
         for (const set of setsToAnnounce(queue.sets)) {
           if (state.streamed.includes(set.id) || !hasPlayerWithAlerts(set)) continue;
-          await channel.send({ embeds: [embeds.onStream(set, state.players)] });
+          if (messageEnabled('streams', wentLiveAt(set))) await postChannel.send({ embeds: [embeds.onStream(set, state.players)] });
           state.streamed.push(set.id);
         }
       }
@@ -181,6 +236,12 @@ async function postStreamAlerts() {
 
   state.streamed = state.streamed.slice(-200);
   save();
+}
+
+// a called or started set was last updated around when it went live. one only waiting
+// at the front of a queue was last touched when it got queued, so it has no time to go by
+function wentLiveAt(set) {
+  return set.state === 1 ? undefined : set.updatedAt;
 }
 
 // queueSets is in queue order, front first
@@ -267,21 +328,21 @@ async function updateTournaments() {
   save();
 }
 
-async function postRollCall(tournament) {
+export async function postRollCall(tournament, postChannel = channel) {
   if (tournament.rollCallPosted) return;
 
-  const secondsUntilStart = tournament.startAt - secondsNow();
-  if (secondsUntilStart <= 0 || secondsUntilStart > ROLL_CALL_HOURS_BEFORE * HOUR) return;
+  const dueAt = tournament.startAt - ROLL_CALL_HOURS_BEFORE * HOUR;
+  if (secondsNow() >= tournament.startAt || secondsNow() < dueAt) return;
 
   // people, not entries. a late sign-up can still trigger it
   const entered = new Set(tournament.entries.map((entry) => entry.userId));
   if (entered.size < ROLL_CALL_MIN_PLAYERS) return;
 
-  await post(embeds.rollCall(tournament, state.players));
+  if (messageEnabled('rollcall', dueAt)) await post(embeds.rollCall(tournament, state.players), 'rollcall', dueAt, postChannel);
   tournament.rollCallPosted = true;
 }
 
-async function postResults(tournament) {
+export async function postResults(tournament, postChannel = channel) {
   const now = secondsNow();
   if (now < tournament.startAt) return;
 
@@ -295,7 +356,8 @@ async function postResults(tournament) {
   const allIn = entries.every((entry) => entry.placement && (entry.done || entry.final));
   if (!allIn && waited < RESULTS_GIVE_UP_HOURS * HOUR) return;
 
-  await post(embeds.results({ ...tournament, entries }, state.players));
+  const dueAt = overAt(tournament) + (allIn ? RESULTS_WAIT_HOURS : RESULTS_GIVE_UP_HOURS) * HOUR;
+  if (messageEnabled('results', dueAt)) await post(embeds.results({ ...tournament, entries }, state.players), 'results', dueAt, postChannel);
   tournament.resultsPosted = true;
 }
 
@@ -333,7 +395,7 @@ async function addAdminTournaments() {
   }
 }
 
-async function postRegReminders() {
+export async function postRegReminders(postChannel = channel) {
   await addAdminTournaments();
 
   for (const reminder of Object.values(state.regReminders)) {
@@ -364,14 +426,16 @@ async function postRegReminders() {
       const lastCall = due === REG_REMINDER_HOURS.length - 1;
 
       // not open means it filled up, or for the early ones that it hasn't opened yet
-      if (tournament.isRegistrationOpen) {
+      const dueAt = deadline - REG_REMINDER_HOURS[due] * HOUR;
+      if (tournament.isRegistrationOpen && messageEnabled('registration', dueAt)) {
         // people one by one, a role ping would hit the ones already registered
-        const registered = await startgg.getRegisteredDiscordIds(tournament.id);
+        const registered = new Set((await startgg.getParticipants(tournament.id)).map((participant) => participant.discordId));
         const ping = state.regPings.filter((id) => !registered.has(id));
         // the embed goes with the first batch of pings, or alone if there's nobody to ping
         for (let i = 0; i === 0 || i < ping.length; i += MENTIONS_PER_MESSAGE) {
+          if (!messageEnabled('registration')) break;
           const users = ping.slice(i, i + MENTIONS_PER_MESSAGE);
-          await channel.send({
+          await postChannel.send({
             content: users.length ? `${users.map((id) => `<@${id}>`).join(' ')} ${lastCall ? 'last call' : 'registration reminder'}` : undefined,
             embeds: i === 0 ? [embeds.regReminder(tournament, deadline, lastCall)] : [],
             allowedMentions: { users },
