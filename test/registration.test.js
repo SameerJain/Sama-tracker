@@ -25,12 +25,15 @@ const participants = [
   { gamerTag: 'Added by the TO', user: null },
 ];
 
-function mockStartgg(closesAt) {
+// hidden is a TO hiding who's registered: no participants and no count
+function mockStartgg(closesAt, { hidden = false } = {}) {
   globalThis.fetch = async (_url, options) => {
     const { query } = JSON.parse(options.body);
     let data;
-    if (query.includes('registrationClosesAt')) data = { tournament: tournament(closesAt) };
-    else if (query.includes('participants(')) data = { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: participants } } };
+    if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(closesAt), numAttendees: hidden ? null : participants.length } };
+    else if (query.includes('participants(')) {
+      data = { tournament: { participants: hidden ? { pageInfo: { totalPages: 0 }, nodes: [] } : { pageInfo: { totalPages: 1 }, nodes: participants } } };
+    }
     else if (query.includes('userEntrant')) {
       data = { tournament: { ...tournament(closesAt), events: [
         { id: 50, name: 'Ultimate Singles', slug: 'tournament/local/event/singles', state: 'CREATED', numEntrants: 40, u1: { id: 9, standing: null } },
@@ -50,7 +53,7 @@ function interaction(commandName, values, user, send = async () => ({})) {
     guild: { members: { fetch: async ({ user: ids }) => new Map(ids.filter(id => id === 'in-server').map(id => [id, { displayName: 'Herb' }])) } },
     channel: { send: async r => { calls.push(['send', r]); return send(r); } },
     options: {
-      getSubcommand: () => null, getString: name => values[name] ?? null,
+      getSubcommand: () => null, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null,
       getUser: () => user, getMember: () => user && { displayName: user.displayName },
     },
     reply: async r => calls.push(['reply', r]),
@@ -86,13 +89,71 @@ test('registered lists only server members by name, with their events, and menti
   await handleCommand(run);
   const [, reply] = run.calls.at(-1);
   const text = reply.embeds.map(e => e.data.description).join('\n');
-  assert.match(text, /^Here \(Herb\): Ultimate Singles$/m);
+  assert.match(text, /^\*\*Here\*\* \(Herb\)\n- Ultimate Singles$/m);
   assert.doesNotMatch(JSON.stringify(reply), /<@/);
   assert.doesNotMatch(text, /Elsewhere|No Discord|Added by the TO/);
-  assert.match(text, /2 of the 4 registered/);
+  assert.doesNotMatch(text, /of the \d+ registered/);
   assert.match(reply.embeds[0].data.author.name, /Registered from this server · 1/);
   // everyone with discord connected, in the server or not, for /profile
   assert.deepEqual(state.accounts, { 'in-server': 1, 'not-in-server': 2 });
+});
+
+test('registered puts a gap between people, names in bold and their events under them', async () => {
+  const { registered } = await import('../src/embeds.js');
+  const entries = [
+    { userId: 1, event: 'Ultimate Singles' }, { userId: 1, event: 'Doubles *pot bonus*' },
+    { userId: 2, event: 'Melee Singles' },
+  ];
+  const members = [{ tag: 'Zed', userId: 2, name: 'zed' }, { tag: 'Amy', userId: 1, name: 'Amelia' }, { tag: 'Spectator', userId: 3 }];
+  const [card] = registered({ ...tournament(), entries }, members);
+  assert.equal(card.data.description.split('\n').slice(2).join('\n'), [
+    '',
+    '**Amy** (Amelia)', '- Ultimate Singles', '- Doubles \\*pot bonus\\*',
+    '',
+    '**Spectator**',
+    '',
+    '**Zed**', '- Melee Singles',
+  ].join('\n'));
+  assert.match(registered(tournament(), [])[0].data.description, /\n\nNobody from this server yet\.$/);
+});
+
+test('registered by_event lists the event with the most people first, then anyone in no event', async () => {
+  const { registered } = await import('../src/embeds.js');
+  const entries = [
+    { userId: 1, event: 'Melee *Singles*', eventSlug: 'melee', entrants: 12 },
+    { userId: 1, event: 'Ultimate Singles', eventSlug: 'ult', entrants: 40 },
+    { userId: 2, event: 'Ultimate Singles', eventSlug: 'ult', entrants: 40 },
+    { userId: 2, event: 'Raffle', eventSlug: 'raffle' },
+  ];
+  const members = [{ tag: 'Zed', userId: 2 }, { tag: 'Amy', userId: 1, name: 'Amelia' }, { tag: 'Spectator', userId: 3 }];
+  const [card] = registered({ ...tournament(), entries }, members, { byEvent: true });
+  assert.equal(card.data.description.split('\n').slice(2).join('\n'), [
+    '',
+    '**Ultimate Singles** · 2 of 40 entrants', '- Amy (Amelia)', '- Zed',
+    '',
+    '**Melee \\*Singles\\*** · 1 of 12 entrants', '- Amy (Amelia)',
+    '',
+    '**Raffle** · 1', '- Zed',
+    '',
+    '**Not in an event**', '- Spectator',
+  ].join('\n'));
+  assert.equal(card.data.author.name, 'Registered from this server · 3');
+});
+
+test('registered by_event goes through the command too', async () => {
+  mockStartgg();
+  const run = interaction('registered', { tournament: 'start.gg/tournament/local', by_event: true });
+  await handleCommand(run);
+  const [, reply] = run.calls.at(-1);
+  assert.match(reply.embeds[0].data.description, /\*\*Ultimate Singles\*\* · 1 of 40 entrants\n- Here \(Herb\)$/);
+});
+
+test('registered says when start.gg hides who is registered, instead of an empty list', async () => {
+  mockStartgg(undefined, { hidden: true });
+  const run = interaction('registered', { tournament: 'start.gg/tournament/local' });
+  await handleCommand(run);
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'edit']);
+  assert.match(run.calls[1][1], /hides who's registered for Local/);
 });
 
 test('reg_warn says already registered without a mention or a ping', async () => {
@@ -115,7 +176,19 @@ test('reg_warn pings someone who is not registered in a channel message, not a f
   assert.equal(warning.content, '<@slacker>');
   assert.deepEqual(warning.allowedMentions, { users: ['slacker'] });
   assert.equal(warning.embeds[0].data.title, 'Local');
+  assert.match(warning.embeds[0].data.description, /^\*\*NOT REGISTERED YET!!!!\*\* Registration closes <t:\d+:R>\./);
   assert.match(warning.embeds[0].data.description, /start\.gg\/tournament\/local\/register/);
+  assert.doesNotMatch(warning.embeds[0].data.description, /Connect Discord/);
+});
+
+test('reg_warn sends nothing when start.gg hides who is registered', async () => {
+  mockStartgg(undefined, { hidden: true });
+  const run = interaction('reg_warn', { tournament: 'local' }, { id: 'in-server', displayName: 'Here' });
+  await handleCommand(run);
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'edit']);
+  const [, content] = run.calls[1];
+  assert.match(content, /hides who's registered for Local.*No warning sent/);
+  assert.doesNotMatch(content, /<@/);
 });
 
 test('reg_warn falls back to a follow-up when it cannot post in the channel', async () => {

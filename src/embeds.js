@@ -285,10 +285,9 @@ const WARNINGS = [
 export function regWarning(tournament, deadline) {
   const register = startggUrl(`${tournament.slug}/register`);
   const lines = [
-    `Not registered yet, and registration closes <t:${deadline}:R>.`,
+    `**NOT REGISTERED YET!!!!** Registration closes <t:${deadline}:R>.`,
     '',
     `**[Register on start.gg](${register})**`,
-    '-# Already did? Connect Discord on start.gg so it shows up',
   ];
   const embed = baseEmbed(colors.reg)
     .setAuthor({ name: WARNINGS[Math.floor(Math.random() * WARNINGS.length)] })
@@ -300,25 +299,50 @@ export function regWarning(tournament, deadline) {
   return embed;
 }
 
-// start.gg tag, then their name in the server when it's different
-function memberName({ tag, name }) {
-  if (!tag) return escapeMarkdown(name ?? 'Unknown');
-  if (!name || name.toLowerCase() === tag.toLowerCase()) return escapeMarkdown(tag);
-  return `${escapeMarkdown(tag)} (${escapeMarkdown(name)})`;
+// start.gg tag, then their name in the server when it's different. the tag goes in bold when it heads a group
+function memberName({ tag, name }, bold = false) {
+  const shown = escapeMarkdown(tag ?? name ?? 'Unknown');
+  const main = bold ? `**${shown}**` : shown;
+  if (!tag || !name || name.toLowerCase() === tag.toLowerCase()) return main;
+  return `${main} (${escapeMarkdown(name)})`;
 }
 
 // /registered. members are the participants who are in this server, entries say what they're in.
 // names, not mentions, so nobody looks called out
-export function registered(tournament, members, total, linked) {
-  const events = Map.groupBy(tournament.entries ?? [], (entry) => entry.userId);
-  const lines = [`**Time:** ${timeText(tournament.startAt)}`, `**Location:** ${locationText(tournament)}`, ''];
-  for (const member of members.toSorted((a, b) => (a.tag ?? '').localeCompare(b.tag ?? ''))) {
-    const entered = events.get(member.userId)?.map((entry) => entry.event);
-    lines.push(`${memberName(member)}${entered ? `: ${entered.join(', ')}` : ''}`);
+export function registered(tournament, members, { byEvent = false } = {}) {
+  const lines = [`**Time:** ${timeText(tournament.startAt)}`, `**Location:** ${locationText(tournament)}`];
+  const entries = tournament.entries ?? [];
+  const sorted = members.toSorted((a, b) => (a.tag ?? '').localeCompare(b.tag ?? ''));
+  if (!members.length) lines.push('', 'Nobody from this server yet.');
+  else if (byEvent) lines.push(...registeredByEvent(entries, sorted));
+  else {
+    const events = Map.groupBy(entries, (entry) => entry.userId);
+    for (const member of sorted) {
+      const entered = events.get(member.userId)?.map((entry) => `- ${escapeMarkdown(entry.event)}`) ?? [];
+      // one string per person so a card that runs long never splits someone from their events
+      lines.push('', [memberName(member, true), ...entered].join('\n'));
+    }
   }
-  if (!members.length) lines.push('Nobody from this server yet.');
-  lines.push(`-# Goes by the Discord connected on start.gg, which ${linked} of the ${total} registered have`);
   return withLines(tournamentEmbed(colors.brand, `Registered from this server · ${members.length}`, tournament), lines);
+}
+
+// the events with the most people from the server first. a person per line, since one event can be
+// most of the server and too long for a single description
+function registeredByEvent(entries, members) {
+  const lines = [];
+  const groups = [...Map.groupBy(entries, (entry) => entry.eventSlug).values()].sort((a, b) => b.length - a.length);
+  for (const group of groups) {
+    const userIds = new Set(group.map((entry) => entry.userId));
+    const people = members.filter((member) => userIds.has(member.userId));
+    const { event, entrants } = group[0];
+    lines.push('', `**${escapeMarkdown(event)}** · ${entrants ? `${people.length} of ${entrants} entrants` : people.length}`);
+    lines.push(...people.map((member) => `- ${memberName(member)}`));
+  }
+  // registered without entering anything
+  const entered = new Set(entries.map((entry) => entry.userId));
+  const none = members.filter((member) => !entered.has(member.userId));
+  if (none.length) lines.push('', '**Not in an event**', ...none.map((member) => `- ${memberName(member)}`));
+  return lines;
 }
 
 // one embed per event, best placement first
@@ -385,19 +409,21 @@ function upcomingCard(tournament, players, label, color) {
   return tournamentEmbed(color, label, tournament).setDescription(shown.join('\n'));
 }
 
-// sets is newest first. verbose lists every set and adds splits, streaks and when they first played
-export function headToHead(a, b, sets, verbose) {
+// sets is newest first. verbose lists every set and adds splits, streaks and when they first played.
+// melee means sets is only their melee ones, and otherGames is how many got left out
+export function headToHead(a, b, sets, { verbose = false, melee = false, otherGames = 0 } = {}) {
   const results = sets.map((set) => fromSide(set, a.playerId));
   const wins = results.filter((result) => result.won).length;
   const losses = results.length - wins;
 
-  const embed = baseEmbed(colors.clash).setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) });
+  const embed = baseEmbed(colors.clash, melee ? 'Sama-tracker · Melee' : undefined).setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) });
   if (b.image) embed.setThumbnail(b.image);
+  const leftOut = otherGames ? `${count(otherGames, 'set')} in other games left out` : null;
 
   if (!results.length) {
-    return [embed
-      .setTitle(`${escapeMarkdown(a.tag)} vs ${escapeMarkdown(b.tag)}`)
-      .setDescription('They haven\'t played each other in singles on start.gg yet.')];
+    const none = [`They haven't played each other in ${melee ? 'Melee ' : ''}singles on start.gg yet.`];
+    if (leftOut) none.push(`-# ${leftOut}, leave out \`melee\` to count them`);
+    return [embed.setTitle(`${escapeMarkdown(a.tag)} vs ${escapeMarkdown(b.tag)}`).setDescription(none.join('\n'))];
   }
 
   embed.setTitle(`${escapeMarkdown(a.tag)} ${wins}-${losses} ${escapeMarkdown(b.tag)}`);
@@ -417,6 +443,7 @@ export function headToHead(a, b, sets, verbose) {
   const shown = verbose ? results : results.slice(0, 10);
   lines.push(...shown.map(meetingLine));
   if (shown.length < results.length) lines.push(`-# ${count(results.length - shown.length, 'older set')} not shown, \`verbose:True\` lists them all`);
+  if (leftOut) lines.push(`-# Melee only, ${leftOut}`);
   return withLines(embed, lines);
 }
 
@@ -551,29 +578,76 @@ export function stats(player, standings, sets) {
   return embed.setDescription(lines.join('\n'));
 }
 
-export function run(player, tournament, entry, sets) {
-  const embed = tournamentEmbed(colors.live, `${player.tag}'s run`, tournament);
-  const finished = entry.done || entry.final || entry.dq;
-  const lines = [`**${escapeMarkdown(eventTitle(entry))}**`];
-  if (entry.dq) lines.push('Disqualified');
-  else if (finished) lines.push(`Finished${entry.placement ? ` · ${ordinal(entry.placement)} place` : ' · placement pending'}`);
-  else lines.push('Still in the bracket');
+// start.gg set states that are still to be played, the one that needs them soonest first:
+// in progress, called, queued, ready, then waiting
+const UP_NEXT = [2, 6, 7, 4, 1];
+const NEXT_TEXT = { 2: 'playing', 6: 'called vs', 7: 'queued vs', 4: 'ready vs', 1: 'next vs' };
+
+// where a run in one event stands. rank sorts the events by how soon they need them
+function runStatus(player, { entry, sets }) {
   const played = sets.filter((set) => set.state === 3 && set.winnerId)
     .sort((a, b) => a.completedAt - b.completedAt).map((set) => fromSide(set, player.playerId)).filter(Boolean);
-  lines.push('');
-  for (const { set, me, them, won } of played) {
-    lines.push(`${won ? 'W' : 'L'} ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}** · [${escapeMarkdown(set.round)}](${setUrl(set)})`);
+  const finished = entry.done || entry.final || entry.dq;
+  const pending = finished ? [] : sets.filter((set) => UP_NEXT.includes(set.state)).sort((a, b) => UP_NEXT.indexOf(a.state) - UP_NEXT.indexOf(b.state));
+  const next = pending.map((set) => fromSide(set, player.playerId)).find(Boolean);
+  let rank = UP_NEXT.length;
+  if (next) rank = UP_NEXT.indexOf(next.set.state);
+  else if (!entry.started) rank += 1;
+  else if (finished) rank += 2;
+  return { entry, played, finished, next, rank };
+}
+
+// called vs **Foo** · Winners Round 2, linked
+function nextText({ set, them }) {
+  const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
+  return `${NEXT_TEXT[set.state]} **${escapeMarkdown(them.name)}**${round}`;
+}
+
+function statusText({ entry, finished }) {
+  if (entry.dq) return 'Disqualified';
+  if (finished) return entry.placement ? `Finished ${medal(entry.placement)}${ordinal(entry.placement)}${entry.entrants ? ` of ${entry.entrants}` : ''}` : 'Finished, placement pending';
+  if (!entry.started) return 'Hasn\'t started yet';
+  return 'Still in the bracket';
+}
+
+// the overview says what's next for the ones still going
+function overviewText(status) {
+  if (status.finished || !status.entry.started) return statusText(status).replace(/^./, (letter) => letter.toLowerCase());
+  return status.next ? nextText(status.next) : 'waiting for the next opponent';
+}
+
+// one event's sets so far and what's next
+function runLines(status) {
+  const lines = status.played.map(({ set, me, them, won }) => {
+    const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
+    return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}**${round}`;
+  });
+  if (!lines.length && status.entry.started) lines.push('No completed sets reported yet.');
+  if (status.finished || !status.entry.started) return lines;
+  return [...lines, '', status.next ? `**Next:** ${nextText(status.next)}` : 'Next opponent has not been assigned yet.'];
+}
+
+// runs is { entry, sets } for each event they're in at the tournament. someone in several brackets goes back
+// and forth between them, so those get a card up top with the one that needs them soonest first
+export function run(player, tournament, runs) {
+  const statuses = runs.map((each) => runStatus(player, each)).sort((a, b) => a.rank - b.rank);
+  if (statuses.length === 1) {
+    const [status] = statuses;
+    const lines = [`**${escapeMarkdown(eventTitle(status.entry))}**`, statusText(status), '', ...runLines(status)];
+    return withLines(tournamentEmbed(colors.live, `${player.tag}'s run`, tournament), lines);
   }
-  if (!played.length) lines.push('No completed sets reported yet.');
-  if (!finished) {
-    const pending = sets.filter((set) => [1, 2, 6].includes(set.state));
-    const next = pending.find((set) => set.state === 2 || set.state === 6) ?? pending[0];
-    const result = next && fromSide(next, player.playerId);
-    lines.push('', result
-      ? `**Next:** ${escapeMarkdown(result.them.name)} · [${escapeMarkdown(next.round)}](${setUrl(next)})${next.state === 2 ? ' · in progress' : next.state === 6 ? ' · called' : ''}`
-      : 'Next opponent has not been assigned yet.');
+
+  const overview = statuses.map((status) => {
+    const record = status.played.length ? ` (${shortRecord(status.played)})` : '';
+    return `**${escapeMarkdown(status.entry.event)}**${record} · ${overviewText(status)}`;
+  });
+  overview.push('-# The one that needs you soonest is first');
+  const cards = withLines(tournamentEmbed(colors.live, `${player.tag}'s run · ${count(statuses.length, 'bracket')}`, tournament), overview);
+  for (const status of statuses.filter(({ entry }) => entry.started)) {
+    const card = baseEmbed(colors.live).setTitle(escapeMarkdown(eventTitle(status.entry))).setURL(startggUrl(status.entry.eventSlug));
+    cards.push(...withLines(card, [statusText(status), '', ...runLines(status)]));
   }
-  return withLines(embed, lines);
+  return cards;
 }
 
 // a card per game, the last 30 days over the 30 before. periods are newest first, each { since, until, summary }.
@@ -1273,7 +1347,7 @@ export function help() {
     '-# Tracked players with Discord connected on start.gg don\'t need to link, and /link tells them so',
     '',
     '**Player stats**',
-    '`/h2h` record against someone. `verbose:True` for every set, splits and streaks',
+    '`/h2h` record against someone. `verbose:True` for every set, splits and streaks. `melee:True` for Melee sets only',
     '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
     '`/characters` characters someone has reported and how they do on each. `game:` Ultimate or Melee, left out it\'s whichever has more reported. `verbose:True` adds every other game, picked one first',
     '`/predict` odds of beating someone. `verbose:True` shows how each part counts',
@@ -1286,7 +1360,7 @@ export function help() {
     '`/reg_admin` TOs whose start.gg tournaments get reg reminders automatically',
     '`/reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is connected on start.gg',
     '`/bracket` bracket links for reg reminder tournaments that are live or start within 30 min',
-    '`/registered` who in this server is registered for a tournament, by name so nobody gets pinged',
+    '`/registered` who in this server is registered for a tournament, by name so nobody gets pinged. `by_event:True` lists it by event',
     '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so',
     '',
     '**Fun**',

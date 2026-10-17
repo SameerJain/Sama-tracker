@@ -19,12 +19,27 @@ const fromCommand = new AsyncLocalStorage();
 // one queue per command, in here while it has requests waiting
 const commandQueues = [];
 const background = [];
+const REQUEST_GAP_MS = 800;
 let nextSlot = 0;
 let timer;
 
-export const asCommand = (fn) => fromCommand.run([], fn);
+// a command's queue also counts what it sent and how often start.gg said to slow down
+export const asCommand = (fn) => fromCommand.run(Object.assign([], { sent: 0, limited: 0 }), fn);
 export const inBackground = (fn) => fromCommand.run(background, fn);
 export const queueLength = () => commandQueues.reduce((sum, queue) => sum + queue.length, background.length);
+
+// for the command that calls it, a function that says how many requests it has sent and has waiting, and
+// about how many seconds until the last one goes out. taking turns means another command gets a slot for
+// each of its own that's left
+export function commandProgress() {
+  const queue = fromCommand.getStore();
+  return () => {
+    if (!queue || queue === background) return { sent: 0, waiting: 0, limited: 0, seconds: 0 };
+    const slots = commandQueues.reduce((sum, other) => sum + (other === queue ? 0 : Math.min(other.length, queue.length)), queue.length);
+    const seconds = queue.length ? Math.max(0, nextSlot - Date.now()) / 1000 + (slots * REQUEST_GAP_MS) / 1000 : 0;
+    return { sent: queue.sent, waiting: queue.length, limited: queue.limited, seconds };
+  };
+}
 
 function takeTurn() {
   return new Promise((resolve) => {
@@ -45,8 +60,11 @@ function sendNext() {
     const next = queue.shift();
     if (!next) return;
     // back of the line for its next one
-    if (queue !== background && queue.length) commandQueues.push(queue);
-    nextSlot = Date.now() + 800;
+    if (queue !== background) {
+      queue.sent++;
+      if (queue.length) commandQueues.push(queue);
+    }
+    nextSlot = Date.now() + REQUEST_GAP_MS;
     next();
     sendNext();
   }, Math.max(0, nextSlot - Date.now()));
@@ -68,6 +86,8 @@ async function query(text, variables, retries = 2) {
   });
   // still got limited, probably another copy running on the same token. everything waits
   if (res.status === 429 && retries > 0) {
+    const queue = fromCommand.getStore();
+    if (queue && queue !== background) queue.limited++;
     nextSlot = Date.now() + 15_000;
     return query(text, variables, retries - 1);
   }
@@ -172,6 +192,8 @@ const SET_FIELDS = `
 `;
 
 function toSet(node) {
+  // its event got deleted, which old sets far back in someone's history can have
+  if (!node.event) return null;
   // still waiting on a player
   if (node.slots?.length !== 2 || !node.slots[0].entrant || !node.slots[1].entrant) return null;
 
@@ -179,7 +201,7 @@ function toSet(node) {
     id: slot.entrant.id,
     name: slot.entrant.name,
     seed: slot.entrant.initialSeedNum,
-    playerIds: slot.entrant.participants.map((participant) => participant.player?.id),
+    playerIds: (slot.entrant.participants ?? []).map((participant) => participant.player?.id),
     score: slot.standing?.stats?.score?.value ?? null,
     characters: charactersPlayed(node.games, slot.entrant.id),
   }));
@@ -236,7 +258,7 @@ export async function getSetHistory(playerId, page, filters = {}) {
             completedAt
             fullRoundText
             winnerId
-            event { slug videogame { displayName } tournament { name } }
+            event { slug videogame { id displayName } tournament { name } }
             slots {
               entrant { id name initialSeedNum participants { player { id } } }
               standing { stats { score { value } } }
@@ -313,7 +335,8 @@ export async function getEventHistory(userId) {
   const events = [];
   for (const { userEntrant: entrant, state, ...event } of pages.flatMap((page) => page.nodes)) {
     const placement = entrant?.standing?.placement;
-    if (state !== 'COMPLETED' || !placement) continue;
+    // placement lines link the tournament
+    if (state !== 'COMPLETED' || !placement || !event.tournament) continue;
     events.push({ placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event });
   }
   return events.sort((a, b) => b.event.startAt - a.event.startAt);
@@ -384,8 +407,9 @@ export async function getCharacterSets(playerId, page, perPage = 40) {
   }
 
   const connection = data.player?.sets;
-  const sets = (connection?.nodes ?? []).map((node) => {
-    const mine = node.slots.find((slot) => slot.entrant?.participants.some((participant) => participant.player?.id === playerId))?.entrant.id;
+  // no event means it got deleted, so there's no game to put it under
+  const sets = (connection?.nodes ?? []).filter((node) => node.event?.videogame).map((node) => {
+    const mine = node.slots?.find((slot) => slot.entrant?.participants?.some((participant) => participant.player?.id === playerId))?.entrant.id;
     const games = [];
     for (const game of node.games ?? []) {
       const picks = game.selections ?? [];
@@ -604,4 +628,10 @@ export async function getParticipants(tournamentId) {
   // TOs can add people who don't have an account
   return pages.flatMap((page) => page.nodes)
     .map((node) => ({ tag: node.gamerTag, userId: node.user?.id, discordId: node.user?.authorizations?.[0]?.externalId }));
+}
+
+// a TO can hide who's registered. start.gg then sends no participants and no count, which is only
+// different from nobody being registered yet because that has a count of 0
+export function attendeesHidden(tournament, participants) {
+  return !participants.length && tournament.numAttendees !== 0;
 }

@@ -138,6 +138,8 @@ const runs = [
   ['scout', { values: { profile: 'start.gg/user/opponent' } }, /Scouting Opponent/],
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
   ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival/], ['h2h', { values: { opponent: '2', verbose: true } }, /First played/],
+  // the fake sets are all ultimate
+  ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out/],
   ['stats', {}, /Recent sets/], ['stats', { values: { verbose: true } }, /Lifetime stats/],
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
   ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /How it adds up/],

@@ -48,6 +48,8 @@ test('single-player options are optional, and h2h and predict take the opponent 
     assert.equal(verbose.name, 'verbose');
     assert.ok(!verbose.required);
   }
+  const melee = commands.find(c => c.name === 'h2h').options.at(-1);
+  assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined]);
 });
 
 test('leaving the player out looks up whoever ran it, from /link or a tracked discord', async () => {
@@ -163,7 +165,7 @@ test('h2h shows 10 sets by default and everything with splits and streaks when v
   assert.equal(short.match(/^[WL] /gm).length, 10);
   assert.match(short, /2 older sets not shown/);
 
-  const full = text(embeds.headToHead(a, b, sets, true));
+  const full = text(embeds.headToHead(a, b, sets, { verbose: true }));
   assert.equal(full.match(/^[WL] /gm).length, 12);
   assert.match(full, /By game:.*Ultimate.*Melee/);
   assert.match(full, /Seeded above B:\*\* A 7-4/);
@@ -171,6 +173,44 @@ test('h2h shows 10 sets by default and everything with splits and streaks when v
   assert.match(full, /Grand finals:\*\* A 0-1/);
   assert.match(full, /Streak:\*\* A has won the last 2/);
   assert.match(full, /First played:.*T11/);
+  assert.equal(embeds.headToHead(a, b, sets)[0].data.footer.text, 'Sama-tracker');
+});
+
+test('h2h melee says so in the footer and how many sets in other games it left out', () => {
+  const [card] = embeds.headToHead(a, b, [meeting(0, true, { game: 'Melee' })], { melee: true, otherGames: 3 });
+  assert.equal(card.data.title, 'A 1-0 B');
+  assert.equal(card.data.footer.text, 'Sama-tracker · Melee');
+  assert.match(card.data.description, /\n-# Melee only, 3 sets in other games left out$/);
+
+  const [none] = embeds.headToHead(a, b, [], { melee: true, otherGames: 1 });
+  assert.equal(none.data.title, 'A vs B');
+  assert.equal(none.data.description, 'They haven\'t played each other in Melee singles on start.gg yet.\n-# 1 set in other games left out, leave out `melee` to count them');
+  assert.equal(embeds.headToHead(a, b, [], { melee: true })[0].data.description, 'They haven\'t played each other in Melee singles on start.gg yet.');
+});
+
+test('h2h melee:True filters the cached histories by game instead of asking start.gg again', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: b };
+  state.links = {};
+  const MELEE = { id: 1, displayName: 'Melee' };
+  const ULTIMATE = { id: 1386, displayName: 'Ultimate' };
+  const node = (id, videogame, won) => ({
+    id, completedAt: 1000 - id, fullRoundText: 'Winners Final', winnerId: won ? 1 : 2,
+    event: { slug: `tournament/t${id}/event/singles`, videogame, tournament: { name: `T${id}` } },
+    slots: [[1, 10, 'Crew'], [2, 20, 'B']].map(([entrant, player, name]) => ({ entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] }, standing: null })),
+  });
+  // both histories get the same page, the set ids dedupe it
+  mockApi(() => ({ player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node(1, MELEE, true), node(2, ULTIMATE, false), node(3, MELEE, true)] } } }));
+  const all = (await run('h2h', 'crew-discord', { opponent: '2' })).embeds[0].data;
+  assert.equal(all.title, 'Crew 2-1 B');
+  assert.doesNotMatch(all.description, /other games/);
+
+  globalThis.fetch = async () => assert.fail('melee:True should reuse the histories it already has');
+  const melee = (await run('h2h', 'crew-discord', { opponent: '2', melee: true })).embeds[0].data;
+  assert.equal(melee.title, 'Crew 2-0 B');
+  assert.equal(melee.footer.text, 'Sama-tracker · Melee');
+  assert.equal(melee.description.match(/^[WL] /gm).length, 2);
+  assert.match(melee.description, /Melee only, 1 set in other games left out/);
+  assert.equal((await run('h2h', 'crew-discord', { opponent: '2', melee: false })).embeds[0].data.title, 'Crew 2-1 B');
 });
 
 test('predict verbose explains the same odds the short version shows', () => {

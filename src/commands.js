@@ -19,16 +19,19 @@ import { findAccount, rememberAccounts } from './accounts.js';
 const HISTORY_PAGES = 15; // 40 sets a page
 // 3000 sets, about a minute the first time for someone who's played that many
 const LIFETIME_PAGES = 75;
-// also 40 a page, so 400 sets, or 1600 for /characters verbose. the other games are usually further back
+// 1200 sets, years for most people. /scout verbose also has every event, so this keeps it near a minute
+const SCOUT_PAGES = 30;
+// also 40 a page, so 400 sets, 800 for /scout verbose, or 1600 for /characters verbose. the other games are usually further back
 const CHARACTER_PAGES = 10;
+const SCOUT_CHARACTER_PAGES = 20;
 const LIFETIME_CHARACTER_PAGES = 40;
 const HISTORY_CACHE_MINUTES = 10;
 // after that only their newest page gets fetched, and everything again this often to pick up edits to old sets
 const HISTORY_REFRESH_HOURS = 6;
-// per kind of history. whoever was looked up longest ago goes first.
-// a lifetime one is ~5MB for someone with 2500 sets, so only a few of those
-const HISTORY_CACHE_PLAYERS = 25;
-const LIFETIME_CACHE_PLAYERS = 5;
+// pages of each kind of history kept, whoever was looked up longest ago goes first. a lifetime one is
+// ~5MB for someone with 2500 sets, so this is about 25 players' usual history and 5 lifetimes
+const HISTORY_CACHE_PAGES = 25 * HISTORY_PAGES + 5 * LIFETIME_PAGES;
+const CHARACTER_CACHE_PAGES = 25 * CHARACTER_PAGES + 5 * LIFETIME_CHARACTER_PAGES;
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
 // /characters verbose, so the cards fit in one message
@@ -38,6 +41,11 @@ const PICKABLE_GAMES = [{ id: startgg.ULTIMATE, displayName: 'Ultimate' }, { id:
 // /progress compares the last two of these, verbose lists this many as a trend
 const PROGRESS_DAYS = 30;
 const TREND_PERIODS = 6;
+// a slow lookup's reply says how far along start.gg is once there's at least this long left.
+// the first check waits for the first pages, since those say how many more there are
+const WAIT_SHOWN_SECONDS = 20;
+const WAIT_FIRST_SECONDS = 5;
+const WAIT_UPDATE_SECONDS = 15;
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
 // remove autocompletes with the link as the value, which discord caps at 100
@@ -147,7 +155,11 @@ export const commands = [
   {
     name: 'h2h',
     description: 'Head-to-head record against another player',
-    options: [playerOption('Tracked player to compare with', 'opponent'), playerOption(YOU, 'player', false), verboseOption('Every set they\'ve played, plus splits and streaks. Slower')],
+    options: [
+      playerOption('Tracked player to compare with', 'opponent'), playerOption(YOU, 'player', false),
+      verboseOption('Every set they\'ve played, plus splits and streaks. Slower'),
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets' },
+    ],
   },
   {
     name: 'stats',
@@ -230,7 +242,10 @@ export const commands = [
   {
     name: 'registered',
     description: 'Who in this server is registered for a tournament, going by the Discord on their start.gg',
-    options: [{ type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true }],
+    options: [
+      { type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true },
+      { type: Option.Boolean, name: 'by_event', description: 'Each event with who\'s in it, instead of each person with their events' },
+    ],
   },
   {
     name: 'reg_warn',
@@ -408,8 +423,48 @@ function readPlayer(interaction, name = 'player') {
 async function sendEmbeds(interaction, list) {
   for (const [i, batch] of embeds.messages(list).entries()) {
     if (i > 0) await interaction.followUp({ embeds: batch, ...(interaction.ephemeral && { flags: MessageFlags.Ephemeral }) });
-    else if (interaction.deferred) await interaction.editReply({ embeds: batch });
+    // null clears a countdown from withCountdown
+    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch });
     else await interaction.reply({ embeds: batch });
+  }
+}
+
+// about 40 seconds, about 3 minutes
+function roughly(seconds) {
+  return seconds < 90 ? `${Math.ceil(seconds / 10) * 10} seconds` : `${Math.round(seconds / 60)} minutes`;
+}
+
+// awaits work, which is already running. while start.gg has a lot left for this command, the reply says how
+// far along it is, above preview if there's a quick answer to show in the meantime. an edit already going out
+// finishes first, so it can't land after the answer and replace it
+async function withCountdown(interaction, doing, work, preview) {
+  const progress = startgg.commandProgress();
+  let edit = Promise.resolve();
+  let timer;
+  let previewed = false;
+  const update = () => {
+    const { sent, waiting, seconds } = progress();
+    // with a preview there's something to look at, so it goes up for any wait
+    if (!waiting || seconds < (preview ? 0 : WAIT_SHOWN_SECONDS)) return;
+    const content = `**${doing}** · ${sent} of ${sent + waiting} start.gg requests done, about ${roughly(seconds)} left\n`
+      + '-# start.gg allows 80 requests a minute, so the first look takes a while. Asking again in the next few hours is quick';
+    const payload = preview && !previewed ? { content, embeds: embeds.messages(preview)[0] } : content;
+    previewed ||= Boolean(preview);
+    edit = edit.then(() => interaction.editReply(payload)).catch(() => {});
+  };
+  const check = (seconds) => {
+    timer = setTimeout(() => {
+      update();
+      check(WAIT_UPDATE_SECONDS);
+    }, seconds * 1000);
+  };
+  // a preview goes up once the pages it waits on are queued, which is right away
+  check(preview ? 0 : WAIT_FIRST_SECONDS);
+  try {
+    return await work;
+  } finally {
+    clearTimeout(timer);
+    await edit;
   }
 }
 
@@ -699,11 +754,13 @@ async function run(interaction) {
   const cards = [];
   for (const found of current) {
     const tournament = await startgg.getTournament(found.id, [player.userId]);
-    for (const entry of tournament?.entries ?? []) {
-      if (!entry.started) continue;
-      const sets = await startgg.getRunSets(entry.eventId, player.playerId);
-      cards.push(...embeds.run(player, tournament, entry, sets));
-    }
+    // no entries means they only admin it
+    if (!tournament?.entries.length) continue;
+    // every bracket they're in, asked for at once. ones that haven't started yet still get a line
+    const runs = await Promise.all(tournament.entries.map(async (entry) => ({
+      entry, sets: entry.started ? await startgg.getRunSets(entry.eventId, player.playerId) : [],
+    })));
+    cards.push(...embeds.run(player, tournament, runs));
   }
   if (!cards.length) return interaction.editReply(`${player.tag} has no current tournament run on start.gg.`);
   return sendEmbeds(interaction, cards);
@@ -719,12 +776,12 @@ async function progress(interaction) {
   const span = PROGRESS_DAYS * 24 * 60 * 60;
   // newest first, the first two get compared
   const periods = Array.from({ length: verbose ? TREND_PERIODS : 2 }, (_, i) => ({ since: now - (i + 1) * span, until: now - i * span }));
-  const [sets, events, characterSets] = await Promise.all([
+  const [sets, events, characterSets] = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s sets`, Promise.all([
     startgg.getPeriodHistory(player.playerId, periods.at(-1).since, now),
     startgg.getEventHistory(player.userId),
     // the rest still says plenty without characters, so start.gg failing here doesn't sink it
     verbose ? characterHistory(player.playerId).catch(() => null) : null,
-  ]);
+  ]));
   for (const period of periods) period.summary = periodSummary(player, sets, events, period.since, period.until);
   return sendEmbeds(interaction, embeds.progress(player, periods, { verbose, characterSets }));
 }
@@ -739,18 +796,19 @@ async function scout(interaction) {
   if (!opponent) return interaction.editReply('Couldn\'t find that start.gg player. Use their profile link or ID.');
   if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
 
-  if (!interaction.options.getBoolean('verbose')) {
-    const [mine, theirs, characters] = await Promise.all([
-      setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
-    ]);
-    return sendEmbeds(interaction, embeds.scout(player, opponent, mine, theirs, characters));
-  }
-  // everything about them. yours is only for meeting them and the odds, so the usual amount is plenty
-  const [mine, theirs, characterSets, events] = await Promise.all([
-    setHistory(player.playerId), lifetimeHistory(opponent.playerId), lifetimeCharacterHistory(opponent.playerId), startgg.getEventHistory(opponent.userId),
-  ]);
-  const odds = predictOdds(player, opponent, mine, theirs);
-  return sendEmbeds(interaction, embeds.scoutReport(player, opponent, { mine, theirs, characterSets, events, odds, players: state.players }));
+  const [mine, theirs, characters] = await withCountdown(interaction, `Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
+    setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
+  ]));
+  const quick = embeds.scout(player, opponent, mine, theirs, characters);
+  if (!interaction.options.getBoolean('verbose')) return sendEmbeds(interaction, quick);
+
+  // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
+  // meeting them and the odds, so the usual amount is plenty
+  const [deeper, characterSets, events] = await withCountdown(interaction, 'Full report on its way', Promise.all([
+    setHistories(opponent.playerId, SCOUT_PAGES), characterHistories(opponent.playerId, SCOUT_CHARACTER_PAGES), startgg.getEventHistory(opponent.userId),
+  ]), quick);
+  const odds = predictOdds(player, opponent, mine, deeper);
+  return sendEmbeds(interaction, embeds.scoutReport(player, opponent, { mine, theirs: deeper, characterSets, events, odds, players: state.players }));
 }
 
 // the tracked player with this discord connected on start.gg. checked live, so disconnecting it there
@@ -764,50 +822,113 @@ async function trackedCaller(discordId) {
   }
 }
 
-// caching the promise means two lookups at once share a fetch
-function cachedHistory(getPage, pages = HISTORY_PAGES, keep = HISTORY_CACHE_PLAYERS) {
-  const histories = new Map();
-  return (playerId) => {
+// a player's history of one kind, newest first, shared by every command that reads it. each asks for so many
+// pages: a deeper copy already here gets cut down to that, and a shallower one gets the rest added on, so
+// /scout verbose after /scout doesn't fetch the first pages twice. the promise is what's kept, so two lookups
+// at once share a fetch. keep is how many pages to hold, whoever was looked up longest ago goes first
+function historyCache(getPage, keep) {
+  const players = new Map();
+
+  // resolves to { sets, ends, totalPages }, ends being how many sets the first 1, 2, 3... pages came to
+  function lookup(playerId, pages) {
     const now = Date.now();
-    const cached = histories.get(playerId);
-    let entry = cached;
-    if (!cached || now - cached.fullAt > HISTORY_REFRESH_HOURS * 60 * 60 * 1000) {
-      entry = { at: now, fullAt: now, sets: fetchHistory(getPage, playerId, pages) };
-    } else if (now - cached.at > HISTORY_CACHE_MINUTES * 60 * 1000) {
-      // if start.gg errors it keeps what it had
-      entry = { ...cached, at: now, sets: cached.sets.then((sets) => topUp(getPage, playerId, pages, sets).catch(() => sets)) };
-    }
-    if (entry !== cached) entry.sets.catch(() => histories.get(playerId) === entry && histories.delete(playerId));
+    const cached = players.get(playerId);
+    const fresh = !cached || now - cached.fullAt > HISTORY_REFRESH_HOURS * 60 * 60 * 1000;
+    const stale = !fresh && now - cached.at > HISTORY_CACHE_MINUTES * 60 * 1000;
+    let base = fresh ? fetchPages(getPage, playerId, pages) : cached.known;
+    // if start.gg errors it keeps what it had
+    if (stale) base = base.then((history) => topUp(getPage, playerId, history).catch(() => history));
+    const known = base.then((history) => (history.ends.length < Math.min(pages, history.totalPages) ? extend(getPage, playerId, history, pages) : history));
+
+    const entry = { at: fresh || stale ? now : cached.at, fullAt: fresh ? now : cached.fullAt, pages: Math.max(pages, fresh ? 0 : cached.pages), known };
+    // more pages failing keeps the copy it was adding to, as long as that one came back fine
+    known.catch(() => base.then(() => !fresh, () => false).then((keepCached) => {
+      if (players.get(playerId) !== entry) return;
+      if (keepCached) players.set(playerId, cached);
+      else players.delete(playerId);
+    }));
     // map order is least recently looked up first
-    histories.delete(playerId);
-    histories.set(playerId, entry);
-    if (histories.size > keep) histories.delete(histories.keys().next().value);
-    return entry.sets;
-  };
+    players.delete(playerId);
+    players.set(playerId, entry);
+    let total = [...players.values()].reduce((sum, each) => sum + each.pages, 0);
+    for (const [id, each] of players) {
+      if (total <= keep || id === playerId) break;
+      players.delete(id);
+      total -= each.pages;
+    }
+    return known;
+  }
+
+  const history = (playerId, pages) => lookup(playerId, pages).then(({ sets, ends }) => sets.slice(0, ends[Math.min(pages, ends.length) - 1] ?? 0));
+  // from their first page, which every lookup starts with anyway
+  history.totalPages = (playerId) => lookup(playerId, 1).then(({ totalPages }) => totalPages);
+  return history;
 }
 
 // the first page says how many there are, then the rest get asked for all at once.
 // the rate limit spaces them out, so nothing sits waiting on a slow page
-async function fetchHistory(getPage, playerId, pages) {
+async function fetchPages(getPage, playerId, pages) {
   const first = await getPage(playerId, 1);
-  const rest = [];
-  for (let page = 2; page <= Math.min(pages, first.totalPages); page++) rest.push(getPage(playerId, page));
-  return [first, ...await Promise.all(rest)].flatMap((page) => page.sets);
+  return extend(getPage, playerId, { sets: first.sets, ends: [first.sets.length], totalPages: first.totalPages }, pages);
 }
 
-// their newest page on top of what's cached. none of it being cached means more than a page is new
-async function topUp(getPage, playerId, pages, cached) {
-  const { sets } = await getPage(playerId, 1);
-  const known = new Set(cached.map((set) => set.id));
-  const added = sets.filter((set) => !known.has(set.id));
-  if (added.length && added.length === sets.length) return fetchHistory(getPage, playerId, pages);
-  return [...added, ...cached];
+// the pages after the ones it has. sets played since push everything down a little, so the first of these
+// can repeat a few it has already, which get skipped
+async function extend(getPage, playerId, history, pages) {
+  const next = [];
+  for (let page = history.ends.length + 1; page <= Math.min(pages, history.totalPages); page++) next.push(getPage(playerId, page));
+  const sets = [...history.sets];
+  const ids = new Set(sets.map((set) => set.id));
+  const ends = [...history.ends];
+  let { totalPages } = history;
+  for (const page of await Promise.all(next)) {
+    for (const set of page.sets) {
+      if (ids.has(set.id)) continue;
+      ids.add(set.id);
+      sets.push(set);
+    }
+    ends.push(sets.length);
+    totalPages = Math.max(totalPages, page.totalPages);
+  }
+  return { sets, ends, totalPages };
 }
 
-const setHistory = cachedHistory(startgg.getSetHistory);
-const characterHistory = cachedHistory(startgg.getCharacterSets, CHARACTER_PAGES);
-const lifetimeHistory = cachedHistory(startgg.getSetHistory, LIFETIME_PAGES, LIFETIME_CACHE_PLAYERS);
-const lifetimeCharacterHistory = cachedHistory(startgg.getCharacterSets, LIFETIME_CHARACTER_PAGES, LIFETIME_CACHE_PLAYERS);
+// their newest page on top of what's cached. none of it being cached means more than a page is new,
+// so everything it had gets fetched again
+async function topUp(getPage, playerId, history) {
+  const first = await getPage(playerId, 1);
+  const ids = new Set(history.sets.map((set) => set.id));
+  const added = first.sets.filter((set) => !ids.has(set.id));
+  if (added.length && added.length === first.sets.length) return fetchPages(getPage, playerId, history.ends.length);
+  return { sets: [...added, ...history.sets], ends: history.ends.map((end) => end + added.length), totalPages: first.totalPages };
+}
+
+const setHistories = historyCache(startgg.getSetHistory, HISTORY_CACHE_PAGES);
+const characterHistories = historyCache(startgg.getCharacterSets, CHARACTER_CACHE_PAGES);
+const setHistory = (playerId) => setHistories(playerId, HISTORY_PAGES);
+const characterHistory = (playerId) => characterHistories(playerId, CHARACTER_PAGES);
+const lifetimeHistory = (playerId) => setHistories(playerId, LIFETIME_PAGES);
+const lifetimeCharacterHistory = (playerId) => characterHistories(playerId, LIFETIME_CHARACTER_PAGES);
+
+// every set between two players is in both their histories, so one is enough when it fits in pages: the one
+// with fewer sets. past that it takes both, since either can get cut off before older sets
+async function meetingPlayers(a, b, pages) {
+  const [pagesA, pagesB] = await Promise.all([setHistories.totalPages(a.playerId), setHistories.totalPages(b.playerId)]);
+  if (Math.min(pagesA, pagesB) > pages) return [a, b];
+  return [pagesA <= pagesB ? a : b];
+}
+
+const historiesOf = (players, pages) => Promise.all(players.map((player) => setHistories(player.playerId, pages)));
+
+// their singles sets against each other, newest first, DQs left out
+function meetings(a, b, histories) {
+  const played = new Map();
+  for (const set of histories.flat()) {
+    const result = startgg.fromSide(set, a.playerId);
+    if (result?.them.playerIds.includes(b.playerId) && !result.dq) played.set(set.id, set);
+  }
+  return [...played.values()].sort((x, y) => y.completedAt - x.completedAt);
+}
 
 async function headToHead(interaction) {
   const b = readPlayer(interaction, 'opponent');
@@ -818,18 +939,20 @@ async function headToHead(interaction) {
 
   await interaction.deferReply();
   const verbose = interaction.options.getBoolean('verbose') ?? false;
-  const history = verbose ? lifetimeHistory : setHistory;
-  // start.gg can't search sets between two players, so go through both histories
-  // (either one can get cut off before older sets) and dedupe by set id
-  const [historyA, historyB] = await Promise.all([history(a.playerId), history(b.playerId)]);
-  const played = new Map();
-  for (const set of [...historyA, ...historyB]) {
-    const result = startgg.fromSide(set, a.playerId);
-    if (result?.them.playerIds.includes(b.playerId) && !result.dq) played.set(set.id, set);
-  }
-  const sets = [...played.values()].sort((x, y) => y.completedAt - x.completedAt);
-
-  await sendEmbeds(interaction, embeds.headToHead(a, b, sets, verbose));
+  // the histories have every game, so this costs no extra requests
+  const melee = interaction.options.getBoolean('melee') ?? false;
+  const cards = (sets, full) => {
+    const shown = melee ? sets.filter((set) => set.event.videogame?.id === startgg.MELEE) : sets;
+    return embeds.headToHead(a, b, shown, { verbose: full, melee, otherGames: sets.length - shown.length });
+  };
+  // start.gg can't search sets between two players, so it goes through their histories
+  const readers = await meetingPlayers(a, b, verbose ? LIFETIME_PAGES : HISTORY_PAGES);
+  const doing = `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`;
+  const recent = meetings(a, b, await withCountdown(interaction, doing, historiesOf(readers, HISTORY_PAGES)));
+  if (!verbose) return sendEmbeds(interaction, cards(recent, false));
+  // every set is the same pages and more, so the latest show while it loads
+  const all = meetings(a, b, await withCountdown(interaction, 'Every set on its way', historiesOf(readers, LIFETIME_PAGES), cards(recent, false)));
+  return sendEmbeds(interaction, cards(all, true));
 }
 
 async function stats(interaction) {
@@ -837,12 +960,13 @@ async function stats(interaction) {
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  if (interaction.options.getBoolean('verbose')) {
-    const [events, sets] = await Promise.all([startgg.getEventHistory(player.userId), lifetimeHistory(player.playerId)]);
-    return sendEmbeds(interaction, embeds.lifetimeStats(player, events, sets, state.players));
-  }
   const { standings, sets } = await startgg.getStats(player.playerId);
-  await interaction.editReply({ embeds: [embeds.stats(player, standings, sets)] });
+  const recent = embeds.stats(player, standings, sets);
+  if (!interaction.options.getBoolean('verbose')) return interaction.editReply({ embeds: [recent] });
+  // one request for the recent card means there's something to look at while the lifetime one loads
+  const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
+    Promise.all([startgg.getEventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
+  return sendEmbeds(interaction, embeds.lifetimeStats(player, events, history, state.players));
 }
 
 async function characters(interaction) {
@@ -852,41 +976,52 @@ async function characters(interaction) {
   await interaction.deferReply();
   const verbose = interaction.options.getBoolean('verbose');
   const picked = interaction.options.getInteger('game');
-  const sets = await (verbose ? lifetimeCharacterHistory : characterHistory)(player.playerId);
-  const usageIn = (game) => ({ game, usage: characterUsage(sets.filter((set) => set.videogame.id === game.id)) });
-  const mostGames = (a, b) => b.usage.games - a.usage.games;
-
-  // left out, it's the one with more reported games, then more sets. a tie goes to ultimate
-  const pickable = PICKABLE_GAMES.map(usageIn);
-  const top = pickable.find(({ game }) => game.id === picked) ?? pickable.reduce((a, b) => ((mostGames(a, b) || b.usage.scanned - a.usage.scanned) > 0 ? b : a));
-
-  let cards = [top];
-  let note;
+  let sets = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s reported characters`, characterHistory(player.playerId));
   if (verbose) {
-    const games = [...new Map(sets.map((set) => [set.videogame.id, set.videogame])).values()].map(usageIn);
-    // picked goes first even with nothing reported, since it's what they asked about
-    const first = picked || top.usage.reported ? [top] : [];
-    // then a card for each other game with characters reported, most games first
-    const rest = games.filter(({ game, usage }) => game.id !== top.game.id && usage.reported).sort(mostGames);
-    cards = [...first, ...rest].slice(0, CHARACTER_GAMES);
-    // so it's clear the rest got looked at too
-    const unreported = games.filter(({ game, usage }) => !usage.reported && !cards.some((card) => card.game.id === game.id))
-      .sort((a, b) => b.usage.scanned - a.usage.scanned).map(({ game }) => game.displayName);
-    const shown = unreported.length > 4 ? [...unreported.slice(0, 3), `${unreported.length - 3} other games`] : unreported;
-    if (cards.length && shown.length) note = `No characters reported for ${new Intl.ListFormat('en').format(shown)}`;
-    if (!cards.length) cards = [{ usage: characterUsage(sets) }];
+    // every game is the same pages and more, so the usual card shows while it loads
+    const usual = characterCards(sets, false, picked).cards
+      .map(({ game, usage }) => embeds.characters(player, usage, { game: game?.displayName, searched: sets.length }));
+    sets = await withCountdown(interaction, 'Every game on its way', lifetimeCharacterHistory(player.playerId), usual);
   }
+  const { cards, note } = characterCards(sets, verbose, picked);
 
   // no picture beats no reply
   const art = await Promise.all(cards.map(({ game, usage }) => (game && usage.characters.length
     ? startgg.getCharacterArt(usage.characters[0].name, game.id).catch(() => null)
     : null)));
   await interaction.editReply({
+    // clears a countdown
+    content: null,
     embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, {
       game: game?.displayName, file: art[i]?.name, note: i === cards.length - 1 ? note : undefined, searched: sets.length,
     })),
     files: art.filter(Boolean),
   });
+}
+
+// a card for the picked game, or whichever has more reported. verbose adds one for each other game with
+// characters reported, and a note naming the ones without
+function characterCards(sets, verbose, picked) {
+  const usageIn = (game) => ({ game, usage: characterUsage(sets.filter((set) => set.videogame.id === game.id)) });
+  const mostGames = (a, b) => b.usage.games - a.usage.games;
+
+  // left out, it's the one with more reported games, then more sets. a tie goes to ultimate
+  const pickable = PICKABLE_GAMES.map(usageIn);
+  const top = pickable.find(({ game }) => game.id === picked) ?? pickable.reduce((a, b) => ((mostGames(a, b) || b.usage.scanned - a.usage.scanned) > 0 ? b : a));
+  if (!verbose) return { cards: [top] };
+
+  const games = [...new Map(sets.map((set) => [set.videogame.id, set.videogame])).values()].map(usageIn);
+  // picked goes first even with nothing reported, since it's what they asked about
+  const first = picked || top.usage.reported ? [top] : [];
+  // then a card for each other game with characters reported, most games first
+  const rest = games.filter(({ game, usage }) => game.id !== top.game.id && usage.reported).sort(mostGames);
+  const cards = [...first, ...rest].slice(0, CHARACTER_GAMES);
+  if (!cards.length) return { cards: [{ usage: characterUsage(sets) }] };
+  // so it's clear the rest got looked at too
+  const unreported = games.filter(({ game, usage }) => !usage.reported && !cards.some((card) => card.game.id === game.id))
+    .sort((a, b) => b.usage.scanned - a.usage.scanned).map(({ game }) => game.displayName);
+  const shown = unreported.length > 4 ? [...unreported.slice(0, 3), `${unreported.length - 3} other games`] : unreported;
+  return { cards, note: shown.length ? `No characters reported for ${new Intl.ListFormat('en').format(shown)}` : undefined };
 }
 
 // verbose explains the same odds instead of changing them
@@ -898,7 +1033,8 @@ async function predict(interaction) {
   if (a.userId === b.userId) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
 
   await interaction.deferReply();
-  const [historyA, historyB] = await Promise.all([setHistory(a.playerId), setHistory(b.playerId)]);
+  const [historyA, historyB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
+    Promise.all([setHistory(a.playerId), setHistory(b.playerId)]));
   const odds = predictOdds(a, b, historyA, historyB);
   if (!odds) return interaction.editReply(`${a.tag} and ${b.tag} haven't played singles in the same game on start.gg.`);
 
@@ -1088,6 +1224,9 @@ async function registered(interaction) {
 
   const participants = await startgg.getParticipants(found.id);
   rememberAccounts(participants);
+  if (startgg.attendeesHidden(found, participants)) {
+    return interaction.editReply(`start.gg hides who's registered for ${escapeMarkdown(found.name)}, so there's no list to show.`);
+  }
   const linked = participants.filter((participant) => participant.discordId);
   const members = await serverMembers(interaction.guild, [...new Set(linked.map((participant) => participant.discordId))]);
   // their name in this server goes on the card instead of a mention
@@ -1096,7 +1235,8 @@ async function registered(interaction) {
     .map((participant) => ({ ...participant, name: members.get(participant.discordId).displayName }));
   // for the events each of them is in
   const tournament = await startgg.getTournament(found.id, here.map((participant) => participant.userId));
-  return sendEmbeds(interaction, embeds.registered(tournament ?? found, here, participants.length, linked.length));
+  const byEvent = interaction.options.getBoolean('by_event') ?? false;
+  return sendEmbeds(interaction, embeds.registered(tournament ?? found, here, { byEvent }));
 }
 
 // goes by the discord connected on start.gg, and only pings when they're not registered
@@ -1118,6 +1258,10 @@ async function regWarn(interaction) {
   const deadline = regDeadline(tournament);
   if (deadline <= secondsNow()) return interaction.editReply(`Registration for ${tournament.name} already closed.`);
   if (!tournament.isRegistrationOpen) return interaction.editReply(`Registration for ${tournament.name} isn't open right now.`);
+  // not on a hidden list means nothing, so no warning
+  if (startgg.attendeesHidden(tournament, participants)) {
+    return interaction.editReply(`start.gg hides who's registered for ${escapeMarkdown(tournament.name)}, so there's no telling if they are. No warning sent.`);
+  }
 
   // editing the reply wouldn't ping them, and a follow-up shows "Original message was deleted"
   // once the thinking reply is gone, so the warning goes in the channel as its own message

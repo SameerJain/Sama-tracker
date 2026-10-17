@@ -1,4 +1,5 @@
 # Sama-tracker
+(By Samatron)
 
 <img src="screenshots/predict.png" alt="/predict" width="56%"> <img src="screenshots/h2h.png" alt="/h2h" width="42%">
 
@@ -13,7 +14,7 @@ Follows start.gg players and posts to a Discord channel when one of them:
 - is entered in a tournament starting within the hour, if 3 or more of the crew are
 - finishes a tournament, with where everyone placed. That waits 12 hours after the end since TOs often report top 4 late, or 24 if someone's placement still isn't in. After that it posts anyway, with start.gg's projected placement for anyone left in an unfinished bracket
 
-Every Sunday at 9 pm New York time it also posts a weekly crew recap with everyone's results, the biggest upset, the best finish and what they're signed up for next week. Only tracked players with at least one singles set that wasn't a DQ get in, and a week where nobody played posts nothing. `/messages` changes the day, time and timezone, or turns it off.
+Every Sunday at 9 pm EST it also posts a weekly crew recap with everyone's results, the biggest upset, the best finish and what they're signed up for next week. Only tracked players with at least one singles set that wasn't a DQ get in, and a week where nobody played posts nothing. `/messages` changes the day, time and timezone, or turns it off.
 
 Recap placements come from finished events where the player played a set that week, even if the event started the week before. If the bot is down when the recap is due, it still goes out once it's back, as long as that's within a day. A restart partway through sends whatever hadn't gone out yet instead of starting over.
 
@@ -108,6 +109,7 @@ Linking doesn't track you. You won't be in `/track list` or the player picker, s
 ```
 /h2h opponent:<name>                           your record against them, DQs left out
 /h2h opponent:<name> verbose:True              every set, plus splits and streaks
+/h2h opponent:<name> melee:True                just your Melee sets against them
 /stats                                         recent set record, best finish, biggest upset
 /stats verbose:True                            lifetime report
 /characters                                    characters from reported Ultimate or Melee games
@@ -123,7 +125,7 @@ Linking doesn't track you. You won't be in `/track list` or the player picker, s
 
 Leaving out `player` looks up whoever ran the command. Add `player:<name>` for someone tracked instead, like `/h2h opponent:Sparg0 player:Leo`.
 
-`verbose` is off unless you add `verbose:True`. Discord makes you pick True or False once you add the option, so leaving it out is how you get the short version.
+`verbose` is off unless you add `verbose:True`, and `/h2h`'s `melee` works the same way. Discord makes you pick True or False once you add the option, so leaving it out is the same as False.
 
 ### Registration
 
@@ -136,6 +138,7 @@ Leaving out `player` looks up whoever ran the command. Add `player:<name>` for s
 /reg_role ping:<on|off>                        reg reminder pings for yourself
 /bracket                                       bracket links for live reg reminder tournaments
 /registered tournament:<link>                  who in this server is registered
+/registered tournament:<link> by_event:True    the same, listed by event
 /reg_warn tournament:<link> user:<@someone>    warn someone who isn't registered yet
 ```
 
@@ -161,13 +164,15 @@ Tournaments a reg admin is an admin of on start.gg get reminders set on their ow
 
 `/bracket` links every event's bracket for reg reminder tournaments from 30 minutes before they start until 6 hours after their end time.
 
-Pings go to whoever turned them on with `/reg_role`, which only ever changes your own setting. If your Discord is connected on start.gg, you don't get pinged for tournaments you're already registered for. The bot also gives you a Reg Reminders role so everyone can see who's in.
+Pings go to whoever turned them on with `/reg_role`, which only ever changes your own setting. If your Discord is connected on start.gg, you don't get pinged for tournaments you're already registered for. Some tournaments hide who's registered, and for those everyone with pings on gets pinged. The bot also gives you a Reg Reminders role so everyone can see who's in.
 
-`/registered` is `/upcoming` for one tournament, going by everyone in the server instead of the tracked list. It lists each person by start.gg tag, with their server name after it when that's different, and the events they're in. It uses names instead of mentions, so nobody gets pinged. start.gg only knows someone's Discord if they connected it there, so people who didn't won't show up, and the card says how many of the registered players have.
+`/registered` is `/upcoming` for one tournament, going by everyone in the server instead of the tracked list. It lists each person by start.gg tag in bold, with their server name after it when that's different, and the events they're in listed underneath. It uses names instead of mentions, so nobody gets pinged. start.gg only knows someone's Discord if they connected it there, so people who didn't won't show up. `by_event:True` lists each event instead, the one with the most people from the server first, with how many of its entrants they are, then anyone registered who isn't in an event. If the tournament hides who's registered on start.gg, it says so.
 
-`/reg_warn` is a manual, half-serious nudge. If they're registered it says "Already registered." and leaves them alone, with no mention and no ping. If they aren't, it pings them with a warning and the register link. It also goes by the Discord connected on start.gg, so the warning tells them to connect it if they did register. Once registration closes it just says so.
+`/reg_warn` is a manual, half-serious nudge. If they're registered it says "Already registered." and leaves them alone, with no mention and no ping. If they aren't, it pings them with a warning and the register link. It goes by the Discord connected on start.gg, so someone who registered without connecting it still gets warned. If the tournament hides who's registered, there's no telling, so it says so and sends nothing. Once registration closes it just says so.
 
 `/h2h` goes through up to 600 singles sets each and lists the last 10 meetings. With `verbose:True` it goes through up to 3000 each and lists every set, plus the record by game, as the higher and the lower seed and in grand finals, the current streak and when they first played.
+
+`melee:True` counts only Melee sets, and works with or without `verbose:True`. It filters the same sets, so it's no slower, and the reply says how many sets in other games it left out. Someone who mostly plays Ultimate can have older Melee sets past the 600, so add `verbose:True` if some are missing.
 
 `/predict` weighs head-to-head, results against common opponents, seeding at shared brackets and their last 40 sets. `verbose:True` gives the same odds and shows how much each part counted, what it says on its own, the common opponents and the shared brackets.
 
