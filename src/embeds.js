@@ -289,13 +289,21 @@ export function regWarning(tournament, deadline) {
   return embed;
 }
 
-// /registered. members are the participants who are in this server, entries say what they're in
+// start.gg tag, then their name in the server when it's different
+function memberName({ tag, name }) {
+  if (!tag) return escapeMarkdown(name ?? 'Unknown');
+  if (!name || name.toLowerCase() === tag.toLowerCase()) return escapeMarkdown(tag);
+  return `${escapeMarkdown(tag)} (${escapeMarkdown(name)})`;
+}
+
+// /registered. members are the participants who are in this server, entries say what they're in.
+// names, not mentions, so nobody looks called out
 export function registered(tournament, members, total, linked) {
   const events = Map.groupBy(tournament.entries ?? [], (entry) => entry.userId);
   const lines = [`**Time:** ${timeText(tournament.startAt)}`, `**Location:** ${locationText(tournament)}`, ''];
   for (const member of members.toSorted((a, b) => (a.tag ?? '').localeCompare(b.tag ?? ''))) {
     const entered = events.get(member.userId)?.map((entry) => entry.event);
-    lines.push(`<@${member.discordId}> · ${escapeMarkdown(member.tag ?? '')}${entered ? `: ${entered.join(', ')}` : ''}`);
+    lines.push(`${memberName(member)}${entered ? `: ${entered.join(', ')}` : ''}`);
   }
   if (!members.length) lines.push('Nobody from this server yet.');
   lines.push(`-# Goes by the Discord connected on start.gg, which ${linked} of the ${total} registered have`);
@@ -480,7 +488,6 @@ export function prediction(a, b, odds, verbose) {
     .map(({ name, a: x, b: y }) => `${escapeMarkdown(name)}: ${tagA} ${x.wins}-${x.total - x.wins} · ${tagB} ${y.wins}-${y.total - y.wins}`));
   section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
     .map(({ set, a: x, b: y }) => `[${escapeMarkdown(set.event.tournament.name)}](${startggUrl(set.event.slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
-  lines.push('-# Each part is weighted by how much it matters and how many sets it goes off, then they\'re averaged as log odds');
   return withLines(embed, lines);
 }
 
@@ -892,6 +899,29 @@ export function socials(links) {
   return withLines(embed, lines);
 }
 
+// the commands where a blank player falls back to whoever ran it
+const LOOKUP_COMMANDS = ['/stats', '/recent', '/upcoming', '/run', '/progress', '/characters', '/h2h', '/predict'];
+
+// /link worked. says what a blank player does now, and what linking doesn't do
+export function linked(player, previous) {
+  const lines = [
+    'Leave the player blank in these and they look you up:',
+    LOOKUP_COMMANDS.map((name) => `\`${name}\``).join(' '),
+    '',
+    'Try `/stats` with nothing filled in. Typing your name won\'t find you, since only tracked players can be picked.',
+    '',
+    '**Not tracked:** nothing about you gets posted, and you won\'t be in `/track list`.',
+  ];
+  if (previous) lines.push(`-# Replaced your link to ${escapeMarkdown(previous.tag)}`);
+  lines.push('-# `/unlink` to undo');
+  const embed = baseEmbed(colors.brand)
+    .setTitle(`Linked to ${escapeMarkdown(player.tag)}`)
+    .setURL(startggUrl(player.slug))
+    .setDescription(lines.join('\n'));
+  if (player.image) embed.setThumbnail(player.image);
+  return embed;
+}
+
 export function added(player) {
   const embed = baseEmbed(colors.brand)
     .setDescription(`Now tracking ${playerLink(player)}.`);
@@ -951,7 +981,7 @@ export function help() {
     '**Looking yourself up**',
     '`/link` link your start.gg, then leave the player out of a command to get yourself. It doesn\'t track you',
     '`/unlink` undo that',
-    '-# Tracked players with Discord connected on start.gg don\'t need to link',
+    '-# Tracked players with Discord connected on start.gg don\'t need to link, and /link tells them so',
     '',
     '**Player stats**',
     '`/h2h` record against someone. `verbose:True` for every set, splits and streaks',
@@ -967,7 +997,7 @@ export function help() {
     '`/reg_admin` TOs whose start.gg tournaments get reg reminders automatically',
     '`/reg_role` reg reminder pings on or off, skipped once you\'re registered if your Discord is connected on start.gg',
     '`/bracket` bracket links for reg reminder tournaments that are live or start within 30 min',
-    '`/registered` who in this server is registered for a tournament',
+    '`/registered` who in this server is registered for a tournament, by name so nobody gets pinged',
     '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so',
     '',
     '**Fun**',

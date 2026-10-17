@@ -73,9 +73,15 @@ test('/link checks the discord on start.gg and does not track them', async () =>
   const profile = authorizations => ({ user: { id: 7, slug: 'user/me', player: { id: 70, gamerTag: 'Me' }, authorizations } });
 
   mockApi(() => profile([{ externalId: 'me-discord' }]));
-  assert.match((await run('link', 'me-discord', { profile: 'start.gg/user/me' })).toString(), /Linked to Me/);
+  const [linked] = (await run('link', 'me-discord', { profile: 'start.gg/user/me' })).embeds;
+  assert.equal(linked.data.title, 'Linked to Me');
+  // says which commands work now, that typing your name won't, and that you aren't tracked
+  assert.match(linked.data.description, /`\/stats` `\/recent`.*`\/predict`/);
+  assert.match(linked.data.description, /Typing your name won't find you/);
+  assert.match(linked.data.description, /Not tracked/);
   assert.equal(state.links['me-discord'].playerId, 70);
   assert.deepEqual(Object.keys(state.players), ['1']);
+  assert.match(await run('link', 'me-discord', { profile: 'start.gg/user/me' }), /^Already linked to Me/);
 
   mockApi(() => profile([{ externalId: 'someone-else' }]));
   assert.match(await run('link', 'imposter', { profile: 'start.gg/user/me' }), /different Discord/);
@@ -85,6 +91,43 @@ test('/link checks the discord on start.gg and does not track them', async () =>
 
   assert.match((await run('unlink', 'me-discord')).content, /Unlinked from Me/);
   assert.equal(state.links['me-discord'], undefined);
+});
+
+test('/link refuses when commands already find you, and fixes a tracked discord that was out of date', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = {};
+  globalThis.fetch = async () => assert.fail('no start.gg lookup when the tracked discord already matches');
+  const tracked = await run('link', 'crew-discord', { profile: 'start.gg/user/crew' });
+  assert.ok(tracked.flags);
+  assert.match(tracked.content, /^No need to link\. You're tracked as Crew/);
+  assert.equal(state.links['crew-discord'], undefined);
+
+  // connected discord on start.gg after the last refresh
+  state.players = { 1: { ...crew } };
+  mockApi(() => ({ user: { id: 1, slug: 'user/crew', player: { id: 10, gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] } }));
+  assert.match(await run('link', 'crew-discord', { profile: 'start.gg/user/crew' }), /^No need to link/);
+  assert.equal(state.links['crew-discord'], undefined);
+  assert.equal(state.players[1].discordId, 'crew-discord');
+  mockApi(noStats);
+  assert.equal((await run('stats', 'crew-discord')).embeds[0].data.title, 'Crew');
+});
+
+test('/link to a different profile says what it replaced', async () => {
+  state.players = {};
+  state.links = { 'me-discord': { ...me, userId: 8, tag: 'Old Me' } };
+  mockApi(() => ({ user: { id: 7, slug: 'user/me', player: { id: 70, gamerTag: 'Me' }, authorizations: [{ externalId: 'me-discord' }] } }));
+  const [linked] = (await run('link', 'me-discord', { profile: 'start.gg/user/me' })).embeds;
+  assert.match(linked.data.description, /Replaced your link to Old Me/);
+  assert.equal(state.links['me-discord'].userId, 7);
+});
+
+test('/stream for someone from /link says there are no alerts instead of pretending', async () => {
+  state.players = { 1: crew };
+  state.links = { 'me-discord': me };
+  const reply = await run('stream', 'me-discord', { alerts: 'off' });
+  assert.ok(reply.flags);
+  assert.match(reply.content, /aren't tracked/);
+  assert.equal(state.links['me-discord'].streamAlerts, undefined);
 });
 
 test('autocomplete explains an empty list instead of showing nothing', async () => {

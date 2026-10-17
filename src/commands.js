@@ -519,6 +519,10 @@ async function trackRemove(interaction) {
 // only lets commands default to them, they don't get tracked.
 // their start.gg has to have this discord connected so nobody can link as someone else
 async function link(interaction) {
+  // commands already find them, a link would change nothing
+  const tracked = Object.values(state.players).find((player) => player.discordId === interaction.user.id);
+  if (tracked) return interaction.reply({ content: noLinkNeeded(tracked), flags: MessageFlags.Ephemeral });
+
   const input = interaction.options.getString('profile', true).trim();
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -531,10 +535,25 @@ async function link(interaction) {
       ? `${player.tag}'s start.gg has a different Discord account connected.`
       : 'Connect your Discord on your start.gg profile first, then try again.');
   }
+  // tracked, but connected discord after the last profile refresh. saving it finds them right away
+  const trackedProfile = state.players[player.userId];
+  if (trackedProfile) {
+    trackedProfile.discordId = player.discordId;
+    save();
+    return interaction.editReply(noLinkNeeded(trackedProfile));
+  }
 
+  const previous = state.links[interaction.user.id];
   state.links[interaction.user.id] = player;
   save();
-  return interaction.editReply(`Linked to ${player.tag}. Leave the player out of commands like \`/stats\` or \`/h2h\` to look yourself up. You aren't tracked, so you won't be in \`/track list\` or get posted about.`);
+  if (previous?.userId === player.userId) {
+    return interaction.editReply(`Already linked to ${player.tag}. Leave the player out of a command like \`/stats\` to look yourself up.`);
+  }
+  return interaction.editReply({ embeds: [embeds.linked(player, previous)] });
+}
+
+function noLinkNeeded(player) {
+  return `No need to link. You're tracked as ${player.tag} with this Discord on your start.gg, so leaving the player out of a command already looks you up.`;
 }
 
 function unlink(interaction) {
@@ -820,6 +839,10 @@ async function predict(interaction) {
 function streamAlerts(interaction) {
   const choice = readChoice(interaction);
   if (!choice) return replyNoPlayer(interaction);
+  // someone from /link, their streams never get posted
+  if (choice !== 'all' && !state.players[choice.userId]) {
+    return interaction.reply({ content: 'You aren\'t tracked, so there are no stream alerts to change.', flags: MessageFlags.Ephemeral });
+  }
 
   const on = interaction.options.getString('alerts', true) === 'on';
   const players = choice === 'all' ? Object.values(state.players) : [choice];
@@ -968,10 +991,10 @@ async function regRole(interaction) {
   return interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }
 
-// which of these discord ids are in the server. asking by id doesn't need the server members intent.
-// discord can say to slow down, then it gets one more try after waiting
-async function inServer(guild, ids) {
-  const found = new Set();
+// the ones of these discord ids that are in the server, id to member. asking by id doesn't need
+// the server members intent. discord can say to slow down, then it gets one more try after waiting
+async function serverMembers(guild, ids) {
+  const found = new Map();
   for (let i = 0; i < ids.length; i += MEMBERS_PER_FETCH) {
     const user = ids.slice(i, i + MEMBERS_PER_FETCH);
     const members = await guild.members.fetch({ user }).catch(async (err) => {
@@ -979,7 +1002,7 @@ async function inServer(guild, ids) {
       await new Promise((resolve) => setTimeout(resolve, err.data.retry_after * 1000));
       return guild.members.fetch({ user });
     });
-    for (const id of members.keys()) found.add(id);
+    for (const [id, member] of members) found.set(id, member);
   }
   return found;
 }
@@ -994,8 +1017,11 @@ async function registered(interaction) {
 
   const participants = await startgg.getParticipants(found.id);
   const linked = participants.filter((participant) => participant.discordId);
-  const members = await inServer(interaction.guild, [...new Set(linked.map((participant) => participant.discordId))]);
-  const here = linked.filter((participant) => members.has(participant.discordId));
+  const members = await serverMembers(interaction.guild, [...new Set(linked.map((participant) => participant.discordId))]);
+  // their name in this server goes on the card instead of a mention
+  const here = linked
+    .filter((participant) => members.has(participant.discordId))
+    .map((participant) => ({ ...participant, name: members.get(participant.discordId).displayName }));
   // for the events each of them is in
   const tournament = await startgg.getTournament(found.id, here.map((participant) => participant.userId));
   return sendEmbeds(interaction, embeds.registered(tournament ?? found, here, participants.length, linked.length));
@@ -1020,13 +1046,17 @@ async function regWarn(interaction) {
   if (deadline <= secondsNow()) return interaction.editReply(`Registration for ${tournament.name} already closed.`);
   if (!tournament.isRegistrationOpen) return interaction.editReply(`Registration for ${tournament.name} isn't open right now.`);
 
-  // editing the reply wouldn't ping them, so the warning goes out as a new message
-  await interaction.deleteReply();
-  return interaction.followUp({
+  // editing the reply wouldn't ping them, and a follow-up shows "Original message was deleted"
+  // once the thinking reply is gone, so the warning goes in the channel as its own message
+  const warning = {
     content: `<@${user.id}>`,
     embeds: [embeds.regWarning(tournament, deadline)],
     allowedMentions: { users: [user.id] },
-  });
+  };
+  const sent = await interaction.channel?.send(warning).catch(() => null);
+  await interaction.deleteReply();
+  // can't post in that channel, a follow-up still pings them
+  if (!sent) return interaction.followUp(warning);
 }
 
 // just the picture, as big as discord has it

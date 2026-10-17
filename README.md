@@ -4,6 +4,8 @@
 
 <img src="screenshots/sm4sh.png" alt="/sm4sh" width="53%"> <img src="screenshots/recent.png" alt="/recent" width="45%">
 
+See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
+
 Follows start.gg players and posts to a Discord channel when one of them:
 
 - finishes a set. Only their first DQ in an event gets posted, and big wins over higher seeds are marked as major upsets
@@ -94,9 +96,9 @@ Only tracked players get their sets, streams and placements posted, and only tra
 /unlink                                        undo it
 ```
 
-Leave the player out of `/upcoming`, `/recent`, `/run`, `/progress`, `/h2h`, `/stats`, `/characters` or `/predict` and it looks you up. If you're tracked and your start.gg has your Discord connected, that works with no setup. Anyone else runs `/link` once. It checks that the start.gg profile has your Discord connected, so nobody can link as someone else.
+Leave the player out of `/upcoming`, `/recent`, `/run`, `/progress`, `/h2h`, `/stats`, `/characters` or `/predict` and it looks you up. If you're tracked and your start.gg has your Discord connected, that works with no setup, and `/link` says you don't need it instead of linking. Anyone else runs `/link` once. It checks that the start.gg profile has your Discord connected, so nobody can link as someone else. The reply lists the commands that work now.
 
-Linking doesn't track you. You won't be in `/track list` or the player picker, nothing about you gets posted, and those commands look you up on start.gg each time instead.
+Linking doesn't track you. You won't be in `/track list` or the player picker, so typing your own name won't find you; leave it blank. Nothing about you gets posted, `/stream` has nothing to turn off, and those commands look you up on start.gg each time instead.
 
 ### Player stats
 
@@ -155,7 +157,7 @@ Tournaments a reg admin is an admin of on start.gg get reminders set on their ow
 
 Pings go to whoever turned them on with `/reg_role`, which only ever changes your own setting. If your Discord is connected on start.gg, you don't get pinged for tournaments you're already registered for. The bot also gives you a Reg Reminders role so everyone can see who's in.
 
-`/registered` is `/upcoming` for one tournament, going by everyone in the server instead of the tracked list. It lists each person and the events they're in. start.gg only knows someone's Discord if they connected it there, so people who didn't won't show up, and the card says how many of the registered players have.
+`/registered` is `/upcoming` for one tournament, going by everyone in the server instead of the tracked list. It lists each person by start.gg tag, with their server name after it when that's different, and the events they're in. It uses names instead of mentions, so nobody gets pinged. start.gg only knows someone's Discord if they connected it there, so people who didn't won't show up, and the card says how many of the registered players have.
 
 `/reg_warn` is a manual, half-serious nudge. If they're registered it says "Already registered." and leaves them alone, with no mention and no ping. If they aren't, it pings them with a warning and the register link. It also goes by the Discord connected on start.gg, so the warning tells them to connect it if they did register. Once registration closes it just says so.
 

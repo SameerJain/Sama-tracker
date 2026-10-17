@@ -103,6 +103,7 @@ function interaction(commandName, { subcommand = null, values = {}, user = 'crew
     editReply: async (result) => calls.push(['edit', result]),
     deleteReply: async () => calls.push(['delete']),
     followUp: async (result) => calls.push(['followUp', result]),
+    channel: { send: async (result) => { calls.push(['send', result]); return {}; } },
   };
   return run;
 }
@@ -133,7 +134,7 @@ const runs = [
   ['reg_admin', { subcommand: 'remove', values: { admin: '3' } }, /No more automatic reminders/],
   ['bracket', {}, /No tournaments set as active/],
   ['reg_role', { values: { ping: 'on' } }, /pinged for reg reminders/],
-  ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /<@crew-discord> · Crew/],
+  ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /Registered from this server · 1/],
   ['reg_warn', { values: { tournament: 'start.gg/tournament/soon', user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /"content":"<@someone>"/],
   ['sm4sh'], ['melee'], ['ult'], ['64'], ['brawl'], ['pplus'], ['pfp', {}, /pfp\.png/],
 ];

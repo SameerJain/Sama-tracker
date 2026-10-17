@@ -41,13 +41,14 @@ function mockStartgg(closesAt) {
   };
 }
 
-// records every reply, edit, delete and follow-up in order
-function interaction(commandName, values, user) {
+// records every reply, edit, delete, follow-up and channel message in order
+function interaction(commandName, values, user, send = async () => ({})) {
   const calls = [];
   return {
     calls,
     commandName,
-    guild: { members: { fetch: async ({ user: ids }) => new Map(ids.filter(id => id === 'in-server').map(id => [id, {}])) } },
+    guild: { members: { fetch: async ({ user: ids }) => new Map(ids.filter(id => id === 'in-server').map(id => [id, { displayName: 'Herb' }])) } },
+    channel: { send: async r => { calls.push(['send', r]); return send(r); } },
     options: {
       getSubcommand: () => null, getString: name => values[name] ?? null,
       getUser: () => user, getMember: () => user && { displayName: user.displayName },
@@ -78,14 +79,15 @@ test('participants come from every page, including ones with no account', async 
   assert.deepEqual(pagesAsked.sort(), [1, 2]);
 });
 
-test('registered lists only server members, with their events', async () => {
+test('registered lists only server members by name, with their events, and mentions nobody', async () => {
   state.players = {};
   mockStartgg();
   const run = interaction('registered', { tournament: 'https://www.start.gg/tournament/local/details' });
   await handleCommand(run);
   const [, reply] = run.calls.at(-1);
   const text = reply.embeds.map(e => e.data.description).join('\n');
-  assert.match(text, /<@in-server> · Here: Ultimate Singles$/m);
+  assert.match(text, /^Here \(Herb\): Ultimate Singles$/m);
+  assert.doesNotMatch(JSON.stringify(reply), /<@/);
   assert.doesNotMatch(text, /Elsewhere|No Discord|Added by the TO/);
   assert.match(text, /2 of the 4 registered/);
   assert.match(reply.embeds[0].data.author.name, /Registered from this server · 1/);
@@ -101,16 +103,28 @@ test('reg_warn says already registered without a mention or a ping', async () =>
   assert.doesNotMatch(content, /<@/);
 });
 
-test('reg_warn pings someone who is not registered in a new message', async () => {
+test('reg_warn pings someone who is not registered in a channel message, not a follow-up', async () => {
   mockStartgg();
   const run = interaction('reg_warn', { tournament: 'start.gg/tournament/local' }, { id: 'slacker', displayName: 'Slacker' });
   await handleCommand(run);
-  assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'delete', 'followUp']);
-  const [, warning] = run.calls[2];
+  // a follow-up would show "Original message was deleted" above it
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'send', 'delete']);
+  const [, warning] = run.calls[1];
   assert.equal(warning.content, '<@slacker>');
   assert.deepEqual(warning.allowedMentions, { users: ['slacker'] });
   assert.equal(warning.embeds[0].data.title, 'Local');
   assert.match(warning.embeds[0].data.description, /start\.gg\/tournament\/local\/register/);
+});
+
+test('reg_warn falls back to a follow-up when it cannot post in the channel', async () => {
+  mockStartgg();
+  const missingAccess = async () => { throw new Error('Missing Permissions'); };
+  const run = interaction('reg_warn', { tournament: 'local' }, { id: 'slacker', displayName: 'Slacker' }, missingAccess);
+  await handleCommand(run);
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'send', 'delete', 'followUp']);
+  const [, warning] = run.calls[3];
+  assert.equal(warning.content, '<@slacker>');
+  assert.deepEqual(warning.allowedMentions, { users: ['slacker'] });
 });
 
 test('reg_warn does not ping once registration closed, or for bots', async () => {
