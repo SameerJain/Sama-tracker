@@ -101,7 +101,7 @@ test('more pages failing keeps the copy it was adding to', async () => {
   fakeStartgg({ 99: 60 }, { fail: (request) => request === 'sets 99 40' });
   await assert.rejects(settle(startgg.asCommand(() => handleCommand({
     commandName: 'stats', user: { id: 'me' },
-    options: { getSubcommand: () => null, getString: () => '2', getBoolean: () => true },
+    options: { getSubcommand: () => null, getString: () => '2', getBoolean: (name) => name === 'verbose' },
     deferReply: async () => {}, editReply: async () => {},
   }))), /HTTP 500/);
   // the 30 pages are still there, so /scout verbose needs none of them again

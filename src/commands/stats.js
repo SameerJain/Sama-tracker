@@ -9,7 +9,7 @@ import { periodSummary } from '../reports.js';
 import { PICKABLE_GAMES } from './definitions.js';
 import { HISTORY_PAGES, LIFETIME_PAGES, SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory } from './history.js';
 import { verifiedCaller } from '../accounts.js';
-import { profileSlug, readPlayer, replyNoPlayer, sendEmbeds, withCountdown } from './shared.js';
+import { profileSlug, readPlayer, replyNoPlayer, sendEmbeds, withCountdown, flag } from './shared.js';
 
 // /characters verbose, so the cards fit in one message
 const CHARACTER_GAMES = 6;
@@ -18,12 +18,33 @@ const CHARACTER_GAMES = 6;
 const PROGRESS_DAYS = 30;
 const TREND_PERIODS = 6;
 
+// the melee option and its filter, the same for sets, standings, events and character sets
+const onlyMelee = (list, melee) => (melee ? list.filter(startgg.isMelee) : list);
+function meleeOption(interaction) {
+  const melee = flag(interaction, 'melee');
+  return { melee, only: (list) => onlyMelee(list, melee) };
+}
+
+// the two players a matchup command works on, opponent first. null when it already answered
+function pair(interaction) {
+  const b = readPlayer(interaction, 'opponent');
+  if (!b) { replyNoPlayer(interaction, 'opponent'); return null; }
+  const a = readPlayer(interaction);
+  if (!a) { replyNoPlayer(interaction); return null; }
+  if (a.userId === b.userId) {
+    interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
+    return null;
+  }
+  return [a, b];
+}
+
 async function progress(interaction) {
   const player = readPlayer(interaction);
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  const verbose = interaction.options.getBoolean('verbose') ?? false;
+  const verbose = flag(interaction, 'verbose');
+  const { melee, only } = meleeOption(interaction);
   const now = secondsNow();
   const span = PROGRESS_DAYS * 24 * 60 * 60;
   // newest first, the first two get compared
@@ -34,8 +55,10 @@ async function progress(interaction) {
     // the rest still says plenty without characters, so start.gg failing here doesn't sink it
     verbose ? characterHistory(player.playerId).catch(() => null) : null,
   ]));
-  for (const period of periods) period.summary = periodSummary(player, sets, events, period.since, period.until);
-  return sendEmbeds(interaction, embeds.progress(player, periods, { verbose, characterSets }));
+  const played = only(sets);
+  const finishes = only(events);
+  for (const period of periods) period.summary = periodSummary(player, played, finishes, period.since, period.until);
+  return sendEmbeds(interaction, embeds.progress(player, periods, { verbose, characterSets: characterSets && only(characterSets), melee }));
 }
 
 async function scout(interaction) {
@@ -48,11 +71,13 @@ async function scout(interaction) {
   if (!opponent) return interaction.editReply('Couldn\'t find that start.gg player. Use their profile link or ID.');
   if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
 
+  const { melee, only } = meleeOption(interaction);
   const [mine, theirs, characters] = await withCountdown(interaction, `Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
     setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
   ]));
-  const quick = embeds.scout(player, opponent, mine, theirs, characters);
-  if (!interaction.options.getBoolean('verbose')) return sendEmbeds(interaction, quick);
+  const mySets = only(mine);
+  const quick = embeds.scout(player, opponent, mySets, only(theirs), only(characters), { melee });
+  if (!flag(interaction, 'verbose')) return sendEmbeds(interaction, quick);
 
   // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
   // meeting them and the odds, so the usual amount is plenty
@@ -60,8 +85,11 @@ async function scout(interaction) {
     setHistories(opponent.playerId, SCOUT_PAGES), characterHistories(opponent.playerId, SCOUT_CHARACTER_PAGES), eventHistory(opponent.userId),
     eventHistory(player.userId).catch(() => null),
   ]), quick);
-  const odds = predictOdds(player, opponent, mine, deeper, { eventsA: myEvents, eventsB: events });
-  return sendEmbeds(interaction, embeds.scoutReport(player, opponent, { mine, theirs: deeper, characterSets, events, odds, players: state.players }));
+  const theirSets = only(deeper);
+  const odds = predictOdds(player, opponent, mySets, theirSets, { game: melee ? 'Melee' : undefined, eventsA: myEvents && only(myEvents), eventsB: only(events) });
+  return sendEmbeds(interaction, embeds.scoutReport(player, opponent, {
+    mine: mySets, theirs: theirSets, characterSets: only(characterSets), events: only(events), odds, players: state.players, melee,
+  }));
 }
 
 // every set between two players is in both their histories, so one is enough when it fits in pages: the one
@@ -81,18 +109,16 @@ function meetings(a, b, histories) {
 }
 
 async function headToHead(interaction) {
-  const b = readPlayer(interaction, 'opponent');
-  if (!b) return replyNoPlayer(interaction, 'opponent');
-  const a = readPlayer(interaction);
-  if (!a) return replyNoPlayer(interaction);
-  if (a.userId === b.userId) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
+  const players = pair(interaction);
+  if (!players) return;
+  const [a, b] = players;
 
   await interaction.deferReply();
-  const verbose = interaction.options.getBoolean('verbose') ?? false;
+  const verbose = flag(interaction, 'verbose');
   // the histories have every game, so this costs no extra requests
-  const melee = interaction.options.getBoolean('melee') ?? false;
+  const { melee, only } = meleeOption(interaction);
   const cards = (sets, full) => {
-    const shown = melee ? sets.filter((set) => set.event.videogame?.id === startgg.MELEE) : sets;
+    const shown = only(sets);
     return embeds.headToHead(a, b, shown, { verbose: full, melee, otherGames: sets.length - shown.length });
   };
   // start.gg can't search sets between two players, so it goes through their histories
@@ -110,13 +136,14 @@ async function stats(interaction) {
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
+  const { melee, only } = meleeOption(interaction);
   const { standings, sets } = await startgg.getStats(player.playerId);
-  const recent = embeds.stats(player, standings, sets);
-  if (!interaction.options.getBoolean('verbose')) return interaction.editReply({ embeds: [recent] });
+  const recent = embeds.stats(player, only(standings), only(sets), { melee });
+  if (!flag(interaction, 'verbose')) return interaction.editReply({ embeds: [recent] });
   // one request for the recent card means there's something to look at while the lifetime one loads
   const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
     Promise.all([eventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
-  return sendEmbeds(interaction, embeds.lifetimeStats(player, events, history, state.players));
+  return sendEmbeds(interaction, embeds.lifetimeStats(player, only(events), only(history), state.players, { melee }));
 }
 
 async function characters(interaction) {
@@ -124,7 +151,7 @@ async function characters(interaction) {
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  const verbose = interaction.options.getBoolean('verbose');
+  const verbose = flag(interaction, 'verbose');
   const picked = interaction.options.getInteger('game');
   let sets = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s reported characters`, characterHistory(player.playerId));
   if (verbose) {
@@ -175,20 +202,19 @@ function characterCards(sets, verbose, picked) {
 
 // verbose explains the same odds instead of changing them
 async function predict(interaction) {
-  const b = readPlayer(interaction, 'opponent');
-  if (!b) return replyNoPlayer(interaction, 'opponent');
-  const a = readPlayer(interaction);
-  if (!a) return replyNoPlayer(interaction);
-  if (a.userId === b.userId) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
+  const players = pair(interaction);
+  if (!players) return;
+  const [a, b] = players;
 
   await interaction.deferReply();
+  const melee = flag(interaction, 'melee');
   // events say how big each bracket was, which helps seeding count. the odds still work without them
   const [historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
     Promise.all([setHistory(a.playerId), setHistory(b.playerId), eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null)]));
-  const odds = predictOdds(a, b, historyA, historyB, { eventsA, eventsB });
-  if (!odds) return interaction.editReply(`${a.tag} and ${b.tag} haven't played singles in the same game on start.gg.`);
+  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB });
+  if (!odds) return interaction.editReply(`${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)} haven't ${melee ? 'both played Melee singles' : 'played singles in the same game'} on start.gg.`);
 
-  await sendEmbeds(interaction, embeds.prediction(a, b, odds, interaction.options.getBoolean('verbose') ?? false));
+  await sendEmbeds(interaction, embeds.prediction(a, b, odds, flag(interaction, 'verbose')));
 }
 
 export { progress, scout, headToHead, stats, characters, predict };

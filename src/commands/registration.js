@@ -4,7 +4,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, endTime, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts } from '../accounts.js';
-import { lookup, profileSlug, sendEmbeds } from './shared.js';
+import { lookup, profileSlug, sendEmbeds, flag } from './shared.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
@@ -178,7 +178,7 @@ async function registered(interaction) {
     .map((participant) => ({ ...participant, name: members.get(participant.discordId).displayName }));
   // for the events each of them is in
   const tournament = await startgg.getTournament(found.id, here.map((participant) => participant.userId));
-  const byEvent = interaction.options.getBoolean('by_event') ?? false;
+  const byEvent = flag(interaction, 'by_event');
   return sendEmbeds(interaction, embeds.registered(tournament ?? found, here, { byEvent }));
 }
 

@@ -48,8 +48,10 @@ test('single-player options are optional, and h2h and predict take the opponent 
     assert.equal(verbose.name, 'verbose');
     assert.ok(!verbose.required);
   }
-  const melee = commands.find(c => c.name === 'h2h').options.at(-1);
-  assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined]);
+  for (const name of ['h2h', 'stats', 'progress', 'scout', 'predict']) {
+    const melee = commands.find(c => c.name === name).options.at(-1);
+    assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined], name);
+  }
 });
 
 test('leaving the player out looks up whoever ran it, from /link or a tracked discord', async () => {
@@ -266,6 +268,23 @@ test('h2h melee:True filters the cached histories by game instead of asking star
   assert.equal(melee.description.match(/^\*\*[WL]\*\* /gm).length, 2);
   assert.match(melee.description, /Melee only, 1 set in other games left out/);
   assert.equal((await run('h2h', 'crew-discord', { opponent: '2', melee: false })).embeds[0].data.title, 'Crew 2-1 B');
+});
+
+test('h2h melee and verbose combine: splits and streaks come from the Melee sets only', () => {
+  const sets = [
+    meeting(0, true, { game: 'Melee' }), meeting(1, false, { seedA: 9, seedB: 2, game: 'Melee' }),
+    meeting(2, true), meeting(3, true),
+  ];
+  const meleeSets = sets.filter(({ event }) => event.videogame.displayName === 'Melee');
+  const [card] = embeds.headToHead(a, b, meleeSets, { verbose: true, melee: true, otherGames: 2 });
+  assert.equal(card.data.footer.text, 'Sama-tracker by Samatron · Melee');
+  assert.match(card.data.description, /Seeded above B:\*\* \*\*A\*\* 1-0/);
+  assert.match(card.data.description, /Seeded below B:\*\* \*\*A\*\* 0-1/);
+  assert.match(card.data.description, /First played:.*T1/);
+  assert.match(card.data.description, /Melee only, 2 sets in other games left out/);
+  assert.equal(card.data.description.match(/^\*\*[WL]\*\* /gm).length, 2);
+  // just the one game left, so no split line
+  assert.doesNotMatch(card.data.description, /By game/);
 });
 
 test('predict verbose explains the same odds the short version shows', () => {

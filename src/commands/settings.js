@@ -7,6 +7,14 @@ import { readChoice, replyNoPlayer } from './shared.js';
 // remove autocompletes with the link as the value, which discord caps at 100
 const SOCIAL_URL_LENGTH = 100;
 
+// "America/New_York" reads as "ET". zones whose label is a word or two, like Japan Time, keep their
+// full name since an abbreviation wouldn't mean anything
+function zoneLabel(timezone) {
+  const label = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'shortGeneric' })
+    .formatToParts(new Date()).find((part) => part.type === 'timeZoneName')?.value;
+  return label && /^[A-Z]{2,4}$/.test(label) ? label : timezone;
+}
+
 function configureMessages(interaction) {
   const reply = (content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return reply('You need Manage Server permission to control automatic messages.');
@@ -45,9 +53,14 @@ function configureMessages(interaction) {
     save();
   }
   const settings = messageSettings();
-  const lines = Object.entries(MESSAGE_TYPES).map(([key, label]) => `${label}: ${settings[key] ? 'on' : 'off'}`);
-  lines.push('', `Recap schedule: ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} (${settings.timezone})`,
-    'Whatever comes due while something is off gets skipped, not sent later. Schedule changes start with the next recap.');
+  const lines = ['**Automatic posts**'];
+  for (const [key, label] of Object.entries(MESSAGE_TYPES)) {
+    if (key === 'recap') continue;
+    lines.push(`**${label}:** ${settings[key] ? 'on' : 'off'}`);
+  }
+  lines.push('', '**Weekly recap**',
+    `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
+    '-# Whatever comes due while something is off gets skipped, not sent later. Schedule changes start with the next recap.');
   return reply(lines.join('\n'));
 }
 

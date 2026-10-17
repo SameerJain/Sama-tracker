@@ -174,6 +174,33 @@ export function seedLine(played) {
   return parts.length ? parts.join(' · ') : null;
 }
 
+// sets won without dropping a game, and lost without taking one
+export function sweepLine(played) {
+  const scored = played.filter(({ me, them }) => me.score !== null && them.score !== null);
+  const wins = scored.filter(({ won }) => won);
+  const losses = scored.filter(({ won }) => !won);
+  const sweeps = [];
+  if (wins.length) sweeps.push(`won ${wins.filter(({ them }) => them.score === 0).length} of ${wins.length} without dropping a game`);
+  if (losses.length) sweeps.push(`lost ${losses.filter(({ me }) => me.score === 0).length} of ${losses.length} without taking one`);
+  return sweeps.length ? `**Sweeps:** ${sweeps.join(' · ')}` : null;
+}
+
+// played is newest first. the run at the newest end, then the longest each way
+export function streaks(played) {
+  let best = 0;
+  let worst = 0;
+  let win = 0;
+  let loss = 0;
+  for (const { won } of played) {
+    win = won ? win + 1 : 0;
+    loss = won ? 0 : loss + 1;
+    best = Math.max(best, win);
+    worst = Math.max(worst, loss);
+  }
+  const ended = played.findIndex((result) => result.won !== played[0]?.won);
+  return { now: played.length ? (ended === -1 ? played.length : ended) : 0, nowWon: played[0]?.won ?? false, best, worst };
+}
+
 // W 2-1 · Winners Final · Tournament · date
 export function meetingLine({ set, me, them, won }) {
   return `**${won ? 'W' : 'L'}** ${scoreText(me, them)}${set.round ? ` · ${set.round}` : ''} · ${setLink(set)} · <t:${set.completedAt}:d>`;

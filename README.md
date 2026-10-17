@@ -14,7 +14,7 @@ Follows start.gg players and posts to a Discord channel when one of them:
 - is entered in a tournament starting within the hour, if 3 or more of the crew are
 - finishes a tournament, with where everyone placed. That waits 12 hours after the end since TOs often report top 4 late, or 24 if someone's placement still isn't in. After that it posts anyway, with start.gg's projected placement for anyone left in an unfinished bracket
 
-Every Sunday at 9 pm  it also posts a weekly crew recap with everyone's results, the biggest upset, the best finish and what they're signed up for next week. Only tracked players with at least one singles set that wasn't a DQ get in, and a week where nobody played posts nothing. `/messages` changes the day, time and timezone, or turns it off.
+Every Sunday at 9 pm ET it also posts a weekly crew recap with everyone's results, the biggest upset, the best finish and what they're signed up for next week. Only tracked players with at least one singles set that wasn't a DQ get in, and a week where nobody played posts nothing. `/messages` changes the day, time and timezone, or turns it off.
 
 Recap placements come from finished events where the player played a set that week, even if the event started the week before. If the bot is down when the recap is due, it still goes out once it's back, as long as that's within a day. A restart partway through sends whatever hadn't gone out yet instead of starting over.
 
@@ -27,14 +27,50 @@ It also pings everyone who turned on reg pings when registration is about to clo
 3. Copy `.env.example` to `.env` and fill it in. With Developer Mode on in Discord, right-click the server and the channel to copy their IDs. `ANTHROPIC_API_KEY` and `YOUTUBE_API_KEY` are optional. For the YouTube one, make a project in the Google Cloud Console, enable YouTube Data API v3 and create an API key under Credentials.
 4. `npm install` and `npm start`. Needs Node 22.9+. `npm run dev` restarts it when you save a file. `npm test` runs the tests, which fake Discord and start.gg, so they never post anything.
 
-Only run one copy at a time or everything gets posted twice.
+### Deploying
 
-### Railway
+Only run one copy at a time or everything gets posted twice. The bot keeps what it knows in one `state.json`. Point `STATE_DIR` at a folder that survives restarts, or leave it alone to keep `data/` in the project folder.
+
+**Any Node host.** A VPS, a home server, an old laptop. Needs Node 22.9+.
+
+```sh
+npm install
+npm start
+```
+
+To keep it running, use systemd or pm2. A unit file looks like:
+
+```ini
+# /etc/systemd/system/sama-tracker.service
+[Unit]
+Description=Sama-tracker
+After=network-online.target
+
+[Service]
+WorkingDirectory=/srv/sama-tracker
+ExecStart=/usr/bin/npm start
+Restart=always
+EnvironmentFile=/srv/sama-tracker/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Docker.** Same places, plus Render, Fly.io, a NAS and anything else that runs containers.
+
+```sh
+docker build -t sama-tracker .
+docker run -d --name sama-tracker --restart unless-stopped --env-file .env -v sama-data:/app/data sama-tracker
+```
+
+The `-v` keeps `state.json` in a named volume, so restarts and rebuilds don't wipe it. Skip it and a new container starts from nothing. Mount the volume somewhere else instead and set `STATE_DIR` to that path.
+
+**Railway.** The included Dockerfile works as-is.
 
 1. New project, deploy from this GitHub repo.
 2. Put everything from `.env.example` in the service's Variables.
-3. Right-click the canvas, add a volume and connect it to the service. Any mount path works. Without it 
-Pushing to GitHub redeploys it.
+3. Right-click the canvas, add a volume and connect it to the service. The bot reads `RAILWAY_VOLUME_MOUNT_PATH` and writes there, so no setting needed. Without a volume, state is wiped on every redeploy.
+4. Pushing to GitHub redeploys it.
 
 ### Discord name and roles
 
@@ -117,20 +153,24 @@ Nothing about you gets posted, and you're not in `/track list`. Tracked players 
 /h2h opponent:<name> melee:True                just your Melee sets against them
 /stats                                         recent set record, best finish, biggest upset
 /stats verbose:True                            lifetime report
+/stats melee:True                              Melee sets and placements only
 /characters                                    characters from reported Ultimate or Melee games
 /characters game:Melee                         just Melee, or game:Ultimate for just Ultimate
 /characters verbose:True                       every game with characters reported
 /predict opponent:<name>                       your odds of beating them
 /predict opponent:<name> verbose:True          how each part of the prediction counts
+/predict opponent:<name> melee:True            Melee odds even if they play another game more
 /scout profile:<link or ID>                    scout any opponent, if you're tracked or linked
 /scout profile:<link or ID> verbose:True       more history, habits, stages, your odds
+/scout profile:<link or ID> melee:True         their Melee sets, characters and your Melee odds
 /progress                                      last 30 days against the 30 before, by game
 /progress verbose:True                         more on each period, plus 6 months of trend
+/progress melee:True                           Melee only, at either length
 ```
 
 Leaving out `player` looks up whoever ran the command. Add `player:<name>` for someone tracked instead, like `/h2h opponent:Sparg0 player:Leo`.
 
-`verbose` is off unless you add `verbose:True`, and `/h2h`'s `melee` works the same way. Discord makes you pick True or False once you add the option, so leaving it out is the same as False.
+`verbose` is off unless you add `verbose:True`, and the `melee` options work the same way. Discord makes you pick True or False once you add the option, so leaving it out is the same as False.
 
 ### Registration
 
@@ -188,13 +228,13 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 - how much a seed gap is worth comes from your own seeded sets in that game, and it's adjusted for whoever has been beating their seeding over their last 40 sets
 - the less there is to go on, the closer the odds stay to 50%
 
-It's the same from either side, so if A gets 70%, B gets 30%. Backtested in October 2026 on 368 past sets between tracked players, predicting each from only what was known before that tournament, it picked the winner 83% of the time, and when it said 90% or more the favourite won 97% of those. `verbose:True` gives the same odds and shows how much each part counted, what it says on its own, the common opponents, the shared brackets and what a seed was worth.
+It's the same from either side, so if A gets 70%, B gets 30%. Backtested in October 2026 on 368 past sets between tracked players, predicting each from only what was known before that tournament, it picked the winner 83% of the time, and when it said 90% or more the favourite won 97% of those. `verbose:True` gives the same odds and shows how much each part counted, what it says on its own, the common opponents, the shared brackets and what a seed was worth. With `melee:True` it goes by your Melee sets even when you play another game together more, and says so if you've never played Melee.
 
 `/run` looks up the player's current tournaments directly, including ones that ended in the last 6 hours. It lists their finished sets and whether their placement is final. The next opponent shows up once start.gg has assigned one. It doesn't guess.
 
 Someone in several brackets at once, like Ultimate, Melee and 64 at the same tournament, gets a card up top listing every event with the one that needs them soonest first: playing now, then called, queued, ready, waiting on a set, waiting for an opponent, not started and finished. Each line has their record in that event and the opponent, linked to the set. Every event that started gets its own card under that.
 
-`/scout` answers privately, and only for tracked or linked players whose start.gg still has their Discord connected, checked on start.gg each time. It takes any opponent's profile without tracking them and shows their recent singles results, reported characters by game and your record against them. It looks at up to 600 sets each and 400 for characters, so older meetings and unreported characters can be missing.
+`/scout` answers privately, and only for tracked or linked players whose start.gg still has their Discord connected, checked on start.gg each time. It takes any opponent's profile without tracking them and shows their recent singles results, reported characters by game and your record against them. It looks at up to 600 sets each and 400 for characters, so older meetings and unreported characters can be missing. `melee:True` limits it to Melee sets, characters and odds.
 
 `/scout verbose:True` reads up to 1200 of their sets, 800 for characters and stages, and every event they placed in. The quick `/scout` card shows first while the rest loads, then the full report replaces it. Every card stays private. You get:
 
@@ -204,9 +244,9 @@ Someone in several brackets at once, like Ultimate, Melee and 64 at the same tou
 - each character's record and when they last played it, then the opponent characters and stages they lose and win on most. Those need 3 or more games, and stages only show up if the TO reported them
 - your odds, worked out the same way as `/predict`, your last 10 sets against them and the opponents you've both played
 
-`/progress` compares the 30 days before you run it with the 30 before that. Each game gets a card with the set record, average and best placement, and finishes above, on or below seed. DQs are left out. Placements come from finished events, counted in the 30 days the event started in. Seed comparisons use the same placement tiers as `/stats`, so seed 6 finishing 5th counts as on seed. A period with no sets shows no win rate instead of a made-up 0%.
+`/progress` compares the 30 days before you run it with the 30 before that. Each game gets a card with the set record, games won, the current streak, average and best placement, and finishes above, on or below seed. DQs are left out. Placements come from finished events, counted in the 30 days the event started in. Seed comparisons use the same placement tiers as `/stats`, so seed 6 finishing 5th counts as on seed. A period with no sets shows no win rate instead of a made-up 0%. `melee:True` counts Melee only, at either length.
 
-`/progress verbose:True` adds the game record, close sets, record against higher and lower seeds, best win and worst loss by seed, and the game record on each reported character to both periods. Under What changed it lists the change in win rate, games won and average finish, and anyone played in both periods with the record each time. Last is every 30 days for the past 180, newest first. If start.gg won't send the characters, it answers without them.
+`/progress verbose:True` adds streaks (now, best and worst), close sets, sweeps, record against higher and lower seeds, best win and worst loss by seed, and the game record on each reported character to both periods. Under What changed it lists the change in win rate, games won and average finish, and anyone played in both periods with the record each time. Last is every 30 days for the past 180, newest first. If start.gg won't send the characters, it answers without them.
 
 With `ANTHROPIC_API_KEY` set, the Smash fun commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game, or a stage for P+. Otherwise they just say the line.
 
@@ -218,9 +258,9 @@ YouTube's official API does not let an API key download captions from someone el
 
 `/characters` shows one game, Ultimate or Melee. Pick it with `game`, or leave it out to get whichever of the two has more games with characters reported, or more sets if neither has any. `verbose:True` puts that game first, then a card for each other game they have characters reported in, up to 6 in all. A game you picked always gets its card, even with nothing reported. It looks at their last 400 singles sets in every game, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg. With verbose, the usual card shows while the rest loads.
 
-`/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked. The short `/stats` card shows while it loads.
+`/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked. The short `/stats` card shows while it loads. `melee:True` counts only Melee events and sets.
 
-start.gg allows 80 requests a minute, and every page of someone's history is a request, so the first look at a player takes a while: 10 to 30 seconds for `/h2h`, `/predict` and `/characters`, and about a minute for the verbose ones with someone who has a couple thousand sets. When that's more than about 20 seconds, the reply says how many of the requests are done and about how long is left. After that it's a second or two for the next few hours, since every command shares the history already fetched and only asks for newer sets. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. Any command that makes 20 or more requests logs how many, how long it took and whether start.gg said to slow down, so Railway's logs show what a slow one was waiting on. State is saved in `data/state.json`, or on the volume on Railway.
+start.gg allows 80 requests a minute, and every page of someone's history is a request, so the first look at a player takes a while: 10 to 30 seconds for `/h2h`, `/predict` and `/characters`, and about a minute for the verbose ones with someone who has a couple thousand sets. When that's more than about 20 seconds, the reply says how many of the requests are done and about how long is left. After that it's a second or two for the next few hours, since every command shares the history already fetched and only asks for newer sets. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. Any command that makes 20 or more requests logs how many, how long it took and whether start.gg said to slow down, so the host's logs show what a slow one was waiting on. State is saved in `data/state.json`, or wherever `STATE_DIR` points.
 
 ## Source layout
 

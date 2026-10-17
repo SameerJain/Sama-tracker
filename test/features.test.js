@@ -191,7 +191,7 @@ test('scout verbose goes through their whole history and every event, and stays 
   const replies = [];
   const interaction = {
     commandName: 'scout', user: { id: 'allowed' },
-    options: { getSubcommand: () => null, getString: () => 'start.gg/user/deep', getBoolean: () => true },
+    options: { getSubcommand: () => null, getString: () => 'start.gg/user/deep', getBoolean: (name) => name === 'verbose' },
     deferReply: async options => { assert.ok(options.flags); Object.assign(interaction, { deferred: true, ephemeral: true }); },
     editReply: async r => replies.push(r),
     followUp: async r => { assert.ok(r.flags, 'follow-ups stay private'); replies.push(r); },
@@ -349,7 +349,9 @@ test('progress verbose digs into both periods, says what changed, and shows six 
     `-# <t:${until - 30 * DAY}:d> to <t:${until}:d>`,
     '**Sets:** 2-1 (67%)',
     '**Games:** 5-3 (63%)',
+    '**Streaks:** now W2 · best W2 · worst L1',
     '**Close sets:** 1-1 (50%)',
+    '**Sweeps:** won 1 of 2 without dropping a game · lost 0 of 1 without taking one',
     '**Vs higher seeds:** 1-0 (100%) · **Vs lower seeds:** 1-1 (50%)',
   ].join('\n')), text);
   assert.match(text, /\*\*Best win:\*\* beat \*\*Rival\*\* \(seed 2\) 2-1 as seed 9/);
@@ -370,9 +372,11 @@ test('progress verbose digs into both periods, says what changed, and shows six 
   assert.match(trend[5], /no sets or events/);
   assert.doesNotMatch(text, /NaN|undefined|null/);
 
-  // the short one is left as it was
+  // the short one keeps the headline numbers and the streak, without the verbose dig
   const short = embeds.progress(crewPlayer, periods.slice(0, 2)).map(e => e.toJSON().description).join('\n');
-  assert.doesNotMatch(short, /Games:|Close sets|What changed|Every 30 days|Game record/);
+  assert.doesNotMatch(short, /Streaks:|Sweeps|Close sets|What changed|Every 30 days|Game record/);
+  assert.match(short, /\*\*Games:\*\* 5-3 \(63%\)/);
+  assert.match(short, /\*\*Streak:\*\* W2 going in/);
   assert.match(short, /\n\*\*Win rate:\*\* up 66\.7 points\n/);
 });
 
@@ -394,7 +398,7 @@ test('progress verbose asks start.gg about six periods and still answers when ch
   let reply;
   await handleCommand({
     commandName: 'progress', user: { id: 'anyone' }, deferred: true,
-    options: { getSubcommand: () => null, getString: () => '12', getBoolean: () => true },
+    options: { getSubcommand: () => null, getString: () => '12', getBoolean: (name) => name === 'verbose' },
     deferReply: async () => {}, editReply: async r => { reply = r; },
   });
   assert.ok(Math.abs(asked - (now - 180 * DAY)) < 60, 'six 30 day periods back');

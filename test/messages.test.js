@@ -43,8 +43,8 @@ test('message switches and recap schedule save immediately and return private se
   state.messages = {};
   const reply = await configure({ sets: false, streams: false, recap_day: 0, recap_time: '18:30', timezone: 'America/Los_Angeles' });
   assert.ok(reply.flags);
-  assert.match(reply.content, /Set results: off/);
-  assert.match(reply.content, /Sunday.*18:30.*America\/Los_Angeles/);
+  assert.match(reply.content, /Set results:\*\* off/);
+  assert.match(reply.content, /Sunday 18:30 PT/);
   const saved = JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).messages;
   assert.equal(saved.sets, false);
   assert.equal(saved.results, undefined);
@@ -65,8 +65,8 @@ test('invalid schedules do not partially apply accompanying switches', async () 
 test('running messages without options shows defaults without writing settings', async () => {
   state.messages = {};
   const reply = await configure();
-  assert.match(reply.content, /Set results: on/);
-  assert.match(reply.content, /Sunday.*21:00.*America\/New_York/);
+  assert.match(reply.content, /Set results:\*\* on/);
+  assert.match(reply.content, /Sunday 21:00 ET/);
   assert.deepEqual(state.messages, {});
 });
 

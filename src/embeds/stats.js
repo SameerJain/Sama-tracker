@@ -1,7 +1,7 @@
 import { escapeMarkdown } from 'discord.js';
 import { singles, startggUrl } from '../startgg.js';
 import { characterUsage } from '../characters.js';
-import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, section, bold, shortRecord, playerLink, setLink, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
+import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
 
 const RECENT_EVENTS = 4;
 
@@ -12,7 +12,7 @@ const UPSETS_SHOWN = 3;
 // /progress verbose, opponents played in both periods
 const REMATCHES_SHOWN = 5;
 
-export function stats(player, standings, sets) {
+export function stats(player, standings, sets, { melee = false } = {}) {
   const embed = baseEmbed(colors.brand)
     .setAuthor({ name: 'Stats' })
     .setTitle(escapeMarkdown(player.tag))
@@ -20,7 +20,7 @@ export function stats(player, standings, sets) {
   if (player.image) embed.setThumbnail(player.image);
 
   const played = singles(sets, player);
-  if (!played.length && !standings.length) return embed.setDescription('Nothing on start.gg yet.');
+  if (!played.length && !standings.length) return embed.setDescription(melee ? 'No Melee sets or events on start.gg yet.' : 'Nothing on start.gg yet.');
 
   const lines = [];
   if (played.length) {
@@ -50,15 +50,18 @@ export function stats(player, standings, sets) {
 }
 
 // a card per game, the last 30 days over the 30 before. periods are newest first, each { since, until, summary }.
-// verbose goes further into both and lists every period as a trend. characterSets is null if it couldn't be fetched
-export function progress(player, periods, { verbose = false, characterSets = null } = {}) {
+// verbose goes further into both and lists every period as a trend. characterSets is null if it couldn't be fetched.
+// melee means the sets, events and characters were filtered before they got here
+export function progress(player, periods, { verbose = false, characterSets = null, melee = false } = {}) {
   const [current, previous] = periods;
   const days = Math.round((current.until - current.since) / DAY);
   const title = `${escapeMarkdown(player.tag)}'s progress`;
   const inGame = (period, game) => period.summary.games.find((entry) => entry.game === game);
   const games = [...new Set(periods.flatMap((period) => period.summary.games.map(({ game }) => game)))];
   if (!games.length) {
-    return [baseEmbed(colors.brand).setTitle(title).setDescription(`No singles results in the last ${days * periods.length} days.`)];
+    return [baseEmbed(colors.brand).setTitle(title).setDescription(melee
+      ? `No Melee singles results in the last ${days * periods.length} days.`
+      : `No singles results in the last ${days * periods.length} days.`)];
   }
   const range = ({ since, until }) => `<t:${since}:d> to <t:${until}:d>`;
 
@@ -85,14 +88,18 @@ export function progress(player, periods, { verbose = false, characterSets = nul
   });
 }
 
-// one game in one period of /progress. verbose adds games, close sets, seeds, upsets and characters
+// one game in one period of /progress. verbose adds streaks this long, close sets, sweeps, seeds, upsets and characters
 function periodLines(data, verbose = false, characters = null) {
   if (!data) return ['No sets or finished events.'];
   const lines = [`**Sets:** ${winLoss(data.wins, data.losses)}`];
+  const games = gameCount(data.played);
+  if (games.won + games.lost) lines.push(`**Games:** ${winLoss(games.won, games.lost)}`);
+  const streak = streaks(data.played);
   if (verbose) {
-    const games = gameCount(data.played);
-    if (games.won + games.lost) lines.push(`**Games:** ${winLoss(games.won, games.lost)}`);
-    lines.push(closeLine(data.played), seedLine(data.played));
+    if (streak.best > 1 || streak.worst > 1) lines.push(`**Streaks:** now ${streak.nowWon ? 'W' : 'L'}${streak.now} · best W${streak.best} · worst L${streak.worst}`);
+    lines.push(closeLine(data.played), sweepLine(data.played), seedLine(data.played));
+  } else if (streak.now > 1) {
+    lines.push(`**Streak:** ${streak.nowWon ? 'W' : 'L'}${streak.now} going in`);
   }
 
   const sized = data.events.filter(({ event }) => event.numEntrants > 0);
@@ -255,7 +262,7 @@ function breakdownLine({ key, events, wins, losses }) {
 }
 
 // two cards: the lifetime numbers, then the results behind them. /scout verbose labels them its own way
-export function lifetimeStats(player, events, sets, players, label = 'Lifetime stats') {
+export function lifetimeStats(player, events, sets, players, { label = 'Lifetime stats', melee = false } = {}) {
   const overview = baseEmbed(colors.brand)
     .setAuthor({ name: label })
     .setTitle(escapeMarkdown(player.tag))
@@ -264,7 +271,7 @@ export function lifetimeStats(player, events, sets, players, label = 'Lifetime s
 
   const entered = events.filter((entry) => !entry.dq);
   const played = singles(sets, player);
-  if (!entered.length && !played.length) return [overview.setDescription('Nothing on start.gg yet.')];
+  if (!entered.length && !played.length) return [overview.setDescription(melee ? 'No Melee sets or events on start.gg yet.' : 'Nothing on start.gg yet.')];
 
   const from = [];
   if (played.length) from.push(`${count(played.length, 'singles set')} since <t:${played.at(-1).set.completedAt}:D>`);
@@ -298,14 +305,8 @@ export function lifetimeStats(player, events, sets, players, label = 'Lifetime s
     stat('Finish vs seed', `better ${percent(better, seeded.length)} · worse ${percent(worse, seeded.length)}`);
   }
   if (played.length) {
-    let run = 0;
-    let longest = 0;
-    for (const { won } of played) {
-      run = won ? run + 1 : 0;
-      longest = Math.max(longest, run);
-    }
-    const streak = played.findIndex((result) => result.won !== played[0].won);
-    stat('Win streak', `best ${longest}, now ${played[0].won ? 'W' : 'L'}${streak === -1 ? played.length : streak}`);
+    const streak = streaks(played);
+    stat('Win streak', `best W${streak.best}, now ${streak.nowWon ? 'W' : 'L'}${streak.now}`);
   }
 
   const byGame = breakdown(entered, played, gameName, (set) => gameName(set.event))

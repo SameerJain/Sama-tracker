@@ -90,13 +90,18 @@ export const commands = [
   {
     name: 'progress',
     description: 'Last 30 days compared with the previous 30, by game',
-    options: [playerOption(YOU, 'player', false), verboseOption('Games, close sets, seeds, upsets, rematches and characters, plus a 6 month trend. Slower')],
+    options: [
+      playerOption(YOU, 'player', false),
+      verboseOption('Streaks, close sets, seeds, upsets, rematches and characters, plus a 6 month trend. Slower'),
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets, placements and characters' },
+    ],
   },
   {
     name: 'scout', description: 'Scout any start.gg opponent. Needs you tracked or linked, with Discord connected on start.gg',
     options: [
       { type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true },
       verboseOption('Much more of their history, habits, matchups, stages and your odds against them. Slower'),
+      { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and your Melee odds' },
     ],
   },
   // discord wants required options before optional ones, so the opponent goes first
@@ -112,7 +117,10 @@ export const commands = [
   {
     name: 'stats',
     description: 'Recent placements and set record',
-    options: [playerOption(YOU, 'player', false), verboseOption('Full lifetime report, slower')],
+    options: [
+      playerOption(YOU, 'player', false), verboseOption('Full lifetime report, slower'),
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and placements' },
+    ],
   },
   {
     name: 'characters',
@@ -129,7 +137,11 @@ export const commands = [
   {
     name: 'predict',
     description: 'Odds of beating another player',
-    options: [playerOption('Tracked or linked player to go up against', 'opponent'), playerOption(YOU, 'player', false), verboseOption('Show how each part of the prediction counts')],
+    options: [
+      playerOption('Tracked or linked player to go up against', 'opponent'), playerOption(YOU, 'player', false),
+      verboseOption('Show how each part of the prediction counts'),
+      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more' },
+    ],
   },
   {
     name: 'stream',

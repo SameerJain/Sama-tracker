@@ -103,12 +103,12 @@ export function help() {
     '-# Tracking posts someone\'s results here. Linking is just so commands know who you are. Tracked players with Discord connected on start.gg don\'t need it',
     '',
     '**Player stats**',
-    '`/h2h` record against someone. `verbose:True` for every set, splits and streaks. `melee:True` for Melee sets only',
-    '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
-    '`/characters` characters someone has reported and how they do on each. `game:` Ultimate or Melee, left out it\'s whichever has more reported. `verbose:True` adds every other game, picked one first',
-    '`/predict` odds of beating someone. `verbose:True` shows how each part counts',
-    '`/scout profile:<link or ID>` scout any opponent. Needs you tracked or linked. `verbose:True` adds much more of their history, habits, matchups, stages and your odds',
-    '`/progress` last 30 days vs the previous 30, by game. `verbose:True` adds games, close sets, seeds, upsets, rematches and a 6 month trend',
+    '`/h2h` record against someone. `verbose:True` every set, splits and streaks. `melee:True` Melee sets only',
+    '`/stats` set record, placements and best upset. `verbose:True` a lifetime report. `melee:True` Melee sets and placements only',
+    '`/characters` characters someone has reported, by game. `game:` picks Ultimate or Melee, left out it\'s whichever has more reported. `verbose:True` every game they have characters reported in',
+    '`/predict` odds of beating someone. `verbose:True` shows how each part counts. `melee:True` Melee odds even when they play another game more',
+    '`/scout profile:<link or ID>` any opponent. Needs you tracked or linked. `verbose:True` more history, habits, matchups, stages and your odds. `melee:True` just their Melee',
+    '`/progress` last 30 days vs the previous 30, by game. `verbose:True` streaks, close sets, seeds, upsets, rematches and a 6 month trend. `melee:True` Melee only',
     '',
     '**Registration**',
     '`/set_reg_reminder` ping everyone with reg pings on as a tournament\'s registration deadline gets close',
@@ -136,7 +136,7 @@ export function help() {
     '• a roll call an hour before a tournament with 3+ of the crew',
     '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
     '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting',
-    '• weekly crew recap, only players with a non-DQ singles set that week. Sunday 9 pm New York by default, `/messages` changes it',
+    '• weekly crew recap, only players with a non-DQ singles set that week. Sunday 9 pm ET by default, `/messages` changes it',
   ];
   return baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'));
 }

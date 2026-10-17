@@ -109,4 +109,7 @@ function profileSlug(input) {
   return input.match(/user\/([\w-]+)/)?.[1] ?? input;
 }
 
-export { pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, profileSlug };
+// a boolean option, false when left out
+const flag = (interaction, name) => interaction.options.getBoolean(name) ?? false;
+
+export { pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, profileSlug, flag };

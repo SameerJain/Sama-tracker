@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 
-// railway sets this when a volume is attached, anything else is wiped on redeploy
-const DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH ?? 'data';
+// where state.json lives. STATE_DIR works anywhere; Railway sets its own when a volume is
+// attached, and anything else is wiped on redeploy, so the fallback is only for local runs
+const DIR = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUNT_PATH ?? 'data';
 const FILE = `${DIR}/state.json`;
 
 // players and regAdmins are keyed by start.gg user id, regReminders by tournament id. posted/streamed/dqs are ids already announced.

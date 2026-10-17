@@ -74,7 +74,7 @@ function fakeStartgg(pages) {
 function scoutInteraction(edits, verbose) {
   const interaction = {
     commandName: 'scout', user: { id: 'me' },
-    options: { getSubcommand: () => null, getString: () => 'start.gg/user/them', getBoolean: () => verbose },
+    options: { getSubcommand: () => null, getString: () => 'start.gg/user/them', getBoolean: (name) => name === 'verbose' && verbose },
     deferReply: async () => Object.assign(interaction, { deferred: true, ephemeral: true }),
     editReply: async (result) => {
       // slow enough that one is usually still going out when the answer is ready

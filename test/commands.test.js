@@ -129,7 +129,7 @@ function interaction(commandName, { subcommand = null, values = {}, user = 'crew
 
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
-  ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results: off/], ['socials', {}, /Nothing yet/],
+  ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
   ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\]/],
@@ -142,14 +142,23 @@ const runs = [
   ['upcoming', {}, /Live · Crew/], ['upcoming', { values: { player: 'all' } }, /Live · everyone/],
   ['recent', {}, /W · Crew 2-1 Rival/], ['recent', { values: { player: 'all' } }, /Crew 2-1 Rival/],
   ['run', {}, /Crew's run/], ['progress', {}, /Crew's progress/], ['progress', { values: { verbose: true } }, /Every 30 days, newest first/],
+  ['progress', { values: { melee: true } }, /No Melee singles results in the last 60 days/],
+  ['progress', { values: { verbose: true, melee: true } }, /No Melee singles results in the last 180 days/],
   ['scout', { values: { profile: 'start.gg/user/opponent' } }, /Scouting Opponent/],
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
+  ['scout', { values: { profile: 'start.gg/user/opponent', melee: true } }, /No recent Melee singles sets\./],
+  ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
   ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival/], ['h2h', { values: { opponent: '2', verbose: true } }, /First played/],
   // the fake sets are all ultimate
   ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out/],
+  ['h2h', { values: { opponent: '2', verbose: true, melee: true } }, /haven't played each other in Melee singles on start\.gg yet/],
   ['stats', {}, /Recent sets/], ['stats', { values: { verbose: true } }, /Lifetime stats/],
+  ['stats', { values: { melee: true } }, /No Melee sets or events on start\.gg yet\./],
+  ['stats', { values: { verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
   ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /How it adds up/],
+  ['predict', { values: { opponent: '2', melee: true } }, /haven't both played Melee singles/],
+  ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /haven't both played Melee singles/],
   ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
   ['sets', { values: { player: 'all', results: 'off' } }, /Set results off for everyone/],
   ['set_reg_reminder', { values: { tournament: 'start.gg/tournament/soon' } }, /gets pinged 12 hours before registration for Soon ends/],

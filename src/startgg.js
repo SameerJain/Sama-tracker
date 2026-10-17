@@ -237,6 +237,10 @@ export function singles(sets, player) {
   return sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
 }
 
+// sets, standings and events carry their game under event, character sets at the top, and results
+// wrap their set. one predicate covers every list a melee option filters
+export const isMelee = (entry) => ((entry.set ?? entry).event?.videogame ?? entry.videogame)?.id === MELEE;
+
 // set states: 1 waiting, 2 in progress, 3 done, 6 called
 export async function getSets(playerIds, { since, perPage = 10, states = [3] } = {}) {
   const data = await lookupMany(playerIds, (group) => `
@@ -328,7 +332,7 @@ export async function getEventHistory(userId) {
             startAt
             numEntrants
             state
-            videogame { displayName }
+            videogame { id displayName }
             tournament { name }
             userEntrant(userId: $id) { initialSeedNum isDisqualified standing { placement } }
           }
@@ -358,7 +362,7 @@ export async function getStats(playerId) {
           entrant {
             initialSeedNum
             isDisqualified
-            event { name slug numEntrants startAt tournament { name slug } }
+            event { name slug numEntrants startAt videogame { id } tournament { name slug } }
           }
         }
         sets(perPage: 30, page: 1, filters: { state: [3], entrantSize: [1] }) {
@@ -366,7 +370,7 @@ export async function getStats(playerId) {
             id
             completedAt
             winnerId
-            event { slug videogame { displayName } tournament { name } }
+            event { slug videogame { id displayName } tournament { name } }
             ${SET_SLOTS}
           }
         }

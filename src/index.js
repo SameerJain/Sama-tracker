@@ -12,7 +12,7 @@ function quit(message) {
 }
 
 for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN', 'GUILD_ID', 'CHANNEL_ID']) {
-  if (!process.env[name]) quit(`${name} isn't set, put it in .env or the Railway variables`);
+  if (!process.env[name]) quit(`${name} isn't set, put it in .env or the host's environment variables`);
 }
 
 await checkToken().catch((err) => quit(`bad STARTGG_TOKEN (${err.message}), make a new one in start.gg Settings > Developer Settings`));
