@@ -32,6 +32,9 @@ const LIFETIME_CACHE_PLAYERS = 5;
 const RECENT_ALL_PLAYERS = 40;
 // /characters verbose, so the cards fit in one message
 const CHARACTER_GAMES = 6;
+// /progress compares the last two of these, verbose lists this many as a trend
+const PROGRESS_DAYS = 30;
+const TREND_PERIODS = 6;
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
 // remove autocompletes with the link as the value, which discord caps at 100
@@ -120,10 +123,17 @@ export const commands = [
   { name: 'upcoming', description: 'Upcoming tournaments', options: [playerOption(YOU_OR_ALL, 'player', false)] },
   { name: 'recent', description: 'Latest reported sets', options: [playerOption(YOU_OR_ALL, 'player', false)] },
   { name: 'run', description: 'Current tournament run and next opponent', options: [playerOption(YOU, 'player', false)] },
-  { name: 'progress', description: 'Last 30 days compared with the previous 30, by game', options: [playerOption(YOU, 'player', false)] },
+  {
+    name: 'progress',
+    description: 'Last 30 days compared with the previous 30, by game',
+    options: [playerOption(YOU, 'player', false), verboseOption('Games, close sets, seeds, upsets, rematches and characters, plus a 6 month trend. Slower')],
+  },
   {
     name: 'scout', description: 'Scout any start.gg opponent, for tracked players with Discord connected on start.gg',
-    options: [{ type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true }],
+    options: [
+      { type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true },
+      verboseOption('Their whole history, habits, matchups, stages and your odds against them. Slower'),
+    ],
   },
   // discord wants required options before optional ones, so the opponent goes first
   {
@@ -666,16 +676,19 @@ async function progress(interaction) {
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  const until = secondsNow();
-  const middle = until - 30 * 24 * 60 * 60;
-  const since = middle - 30 * 24 * 60 * 60;
-  const [sets, events] = await Promise.all([
-    startgg.getPeriodHistory(player.playerId, since, until),
+  const verbose = interaction.options.getBoolean('verbose') ?? false;
+  const now = secondsNow();
+  const span = PROGRESS_DAYS * 24 * 60 * 60;
+  // newest first, the first two get compared
+  const periods = Array.from({ length: verbose ? TREND_PERIODS : 2 }, (_, i) => ({ since: now - (i + 1) * span, until: now - i * span }));
+  const [sets, events, characterSets] = await Promise.all([
+    startgg.getPeriodHistory(player.playerId, periods.at(-1).since, now),
     startgg.getEventHistory(player.userId),
+    // the rest still says plenty without characters, so start.gg failing here doesn't sink it
+    verbose ? characterHistory(player.playerId).catch(() => null) : null,
   ]);
-  const current = periodSummary(player, sets, events, middle, until);
-  const previous = periodSummary(player, sets, events, since, middle);
-  return sendEmbeds(interaction, embeds.progress(player, current, previous, { since, middle, until }));
+  for (const period of periods) period.summary = periodSummary(player, sets, events, period.since, period.until);
+  return sendEmbeds(interaction, embeds.progress(player, periods, { verbose, characterSets }));
 }
 
 async function scout(interaction) {
@@ -688,10 +701,18 @@ async function scout(interaction) {
   if (!opponent) return interaction.editReply('Couldn\'t find that start.gg player. Use their profile link or ID.');
   if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
 
-  const [mine, theirs, characters] = await Promise.all([
-    setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
+  if (!interaction.options.getBoolean('verbose')) {
+    const [mine, theirs, characters] = await Promise.all([
+      setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
+    ]);
+    return sendEmbeds(interaction, embeds.scout(player, opponent, mine, theirs, characters));
+  }
+  // everything about them. yours is only for meeting them and the odds, so the usual amount is plenty
+  const [mine, theirs, characterSets, events] = await Promise.all([
+    setHistory(player.playerId), lifetimeHistory(opponent.playerId), lifetimeCharacterHistory(opponent.playerId), startgg.getEventHistory(opponent.userId),
   ]);
-  return sendEmbeds(interaction, embeds.scout(player, opponent, mine, theirs, characters));
+  const odds = predictOdds(player, opponent, mine, theirs);
+  return sendEmbeds(interaction, embeds.scoutReport(player, opponent, { mine, theirs, characterSets, events, odds, players: state.players }));
 }
 
 // the tracked player with this discord connected on start.gg. checked live, so disconnecting it there
@@ -975,6 +996,8 @@ async function regRole(interaction) {
   let content = on
     ? 'You\'ll get pinged for reg reminders. If your Discord is connected on start.gg, not for ones you\'re already registered for.'
     : 'No more reg reminder pings.';
+  // making the role or handing it out can take discord past the 3 seconds a command gets to answer
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
     let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
     if (on) {
@@ -988,7 +1011,7 @@ async function regRole(interaction) {
     if (err.code !== 50013) throw err;
     content += ` I couldn't change your ${REG_ROLE} role though, that needs Manage Roles and my role above it.`;
   }
-  return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  return interaction.editReply(content);
 }
 
 // the ones of these discord ids that are in the server, id to member. asking by id doesn't need

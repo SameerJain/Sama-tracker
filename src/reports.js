@@ -12,14 +12,15 @@ export function periodSummary(player, sets, events, since, until) {
   const games = new Map();
   function gameFor(event) {
     const game = event.videogame?.displayName ?? 'Other';
-    if (!games.has(game)) games.set(game, { game, wins: 0, losses: 0, events: [] });
+    if (!games.has(game)) games.set(game, { game, wins: 0, losses: 0, played: [], events: [] });
     return games.get(game);
   }
-  for (const result of played) gameFor(result.set.event)[result.won ? 'wins' : 'losses']++;
-  for (const finish of finishes) {
-    const game = gameFor(finish.event);
-    game.events.push(finish);
+  for (const result of played) {
+    const game = gameFor(result.set.event);
+    game[result.won ? 'wins' : 'losses']++;
+    game.played.push(result);
   }
+  for (const finish of finishes) gameFor(finish.event).events.push(finish);
   return { played, finishes, games: [...games.values()] };
 }
 

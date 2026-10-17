@@ -112,7 +112,9 @@ Linking doesn't track you. You won't be in `/track list` or the player picker, s
 /predict opponent:<name>                       your odds of beating them
 /predict opponent:<name> verbose:True          how each part of the prediction counts
 /scout profile:<link or ID>                    scout any opponent, for tracked players
+/scout profile:<link or ID> verbose:True       their whole history, habits, stages, your odds
 /progress                                      last 30 days against the 30 before, by game
+/progress verbose:True                         more on each period, plus 6 months of trend
 ```
 
 Leaving out `player` looks up whoever ran the command. Add `player:<name>` for someone tracked instead, like `/h2h opponent:Sparg0 player:Leo`.
@@ -169,7 +171,17 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 
 `/scout` answers privately, and only for tracked players whose start.gg has their Discord connected, checked on start.gg each time. It takes any opponent's profile without tracking them and shows their recent singles results, reported characters by game and your record against them. It looks at up to 600 sets each and 400 for characters, so older meetings and unreported characters can be missing.
 
+`/scout verbose:True` reads up to 3000 of their sets, 1600 for characters and stages, and every event they placed in. Every card stays private. You get:
+
+- their `/stats verbose:True` cards, including their record against everyone tracked
+- form in each game over their last 20 sets and the last 90 days
+- habits in the game you both play, or their main one if you don't share one. That's close sets (2-1, 3-2), record against higher and lower seeds, record on winners side, losers side and in grand finals, and how often they sweep or get swept
+- each character's record and when they last played it, then the opponent characters and stages they lose and win on most. Those need 3 or more games, and stages only show up if the TO reported them
+- your odds, worked out the same way as `/predict`, your last 10 sets against them and the opponents you've both played
+
 `/progress` compares the 30 days before you run it with the 30 before that. Each game gets a card with the set record, average and best placement, and finishes above, on or below seed. DQs are left out. Placements come from finished events, counted in the 30 days the event started in. Seed comparisons use the same placement tiers as `/stats`, so seed 6 finishing 5th counts as on seed. A period with no sets shows no win rate instead of a made-up 0%.
+
+`/progress verbose:True` adds the game record, close sets, record against higher and lower seeds, best win and worst loss by seed, and the game record on each reported character to both periods. Under What changed it lists the change in win rate, games won and average finish, and anyone played in both periods with the record each time. Last is every 30 days for the past 180, newest first. If start.gg won't send the characters, it answers without them.
 
 With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game, or a stage for P+. Otherwise they just say the line.
 
@@ -177,4 +189,4 @@ With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post
 
 `/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked.
 
-start.gg allows 80 requests a minute, so `/h2h`, `/predict` and `/characters` take 10 to 30 seconds the first time for a player, then a second or two since only their newest sets get fetched again. The verbose ones can take a minute for someone with a couple thousand sets. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. State is saved in `data/state.json`, or on the volume on Railway.
+start.gg allows 80 requests a minute, so `/h2h`, `/predict` and `/characters` take 10 to 30 seconds the first time for a player, then a second or two since only their newest sets get fetched again. The verbose ones can take a minute for someone with a couple thousand sets, and `/scout verbose:True` up to two, since it reads their characters that far back too. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. State is saved in `data/state.json`, or on the volume on Railway.

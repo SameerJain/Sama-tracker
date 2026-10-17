@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -69,8 +70,18 @@ function respond(query, variables) {
   throw new Error(`no fake for ${query.slice(0, 80)}`);
 }
 
+// the command a request came from. background checks a command kicked off still count as that
+// command, but by then it has answered
+const runningCommand = new AsyncLocalStorage();
+// discord gives up on a command that doesn't answer or defer within 3 seconds, and start.gg
+// requests wait their turn 800ms apart, so nothing should go out before that
+function beforeAnswer(run, what) {
+  if (run && !run.replied && !run.deferred) run.waitedOn.push(what);
+}
+
 let lastFetch = Date.now();
 globalThis.fetch = async (url, options) => {
+  beforeAnswer(runningCommand.getStore(), 'start.gg');
   lastFetch = Date.now();
   // character art
   if (!String(url).includes('api.start.gg')) return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
@@ -80,14 +91,15 @@ globalThis.fetch = async (url, options) => {
 
 function interaction(commandName, { subcommand = null, values = {}, user = 'crew-discord' } = {}) {
   const calls = [];
+  const discord = (what, result) => async () => { beforeAnswer(run, what); return result; };
   const run = {
-    commandName, calls,
+    commandName, calls, waitedOn: [],
     user: { id: user, bot: false, displayName: 'Crew' },
     guild: {
-      members: { fetch: async ({ user: ids }) => new Map(ids.map((id) => [id, {}])) },
-      roles: { cache: { find: () => undefined }, create: async () => ({}) },
+      members: { fetch: async ({ user: ids }) => { beforeAnswer(run, 'discord members'); return new Map(ids.map((id) => [id, {}])); } },
+      roles: { cache: { find: () => undefined }, create: discord('discord role create', {}) },
     },
-    member: { roles: { add: async () => {}, remove: async () => {} } },
+    member: { roles: { add: discord('discord role add'), remove: discord('discord role remove') } },
     memberPermissions: { has: () => true },
     client: { user: { displayAvatarURL: () => 'https://cdn.example/avatar.png' } },
     options: {
@@ -120,8 +132,9 @@ const runs = [
   ['unlink', { user: 'opponent-discord' }, /Unlinked from Opponent/],
   ['upcoming', {}, /Live · Crew/], ['upcoming', { values: { player: 'all' } }, /Live · everyone/],
   ['recent', {}, /W · Crew 2-1 Rival/], ['recent', { values: { player: 'all' } }, /Crew 2-1 Rival/],
-  ['run', {}, /Crew's run/], ['progress', {}, /Crew's progress/],
+  ['run', {}, /Crew's run/], ['progress', {}, /Crew's progress/], ['progress', { values: { verbose: true } }, /Every 30 days, newest first/],
   ['scout', { values: { profile: 'start.gg/user/opponent' } }, /Scouting Opponent/],
+  ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
   ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival/], ['h2h', { values: { opponent: '2', verbose: true } }, /First played/],
   ['stats', {}, /Recent sets/], ['stats', { values: { verbose: true } }, /Lifetime stats/],
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
@@ -154,8 +167,9 @@ test('every command and subcommand answers without throwing', async () => {
   for (const [name, options = {}, expected] of runs) {
     const label = `/${name} ${options.subcommand ?? ''}`;
     const run = interaction(name, options);
-    await handleCommand(run);
+    await runningCommand.run(run, () => handleCommand(run));
     covered.add(options.subcommand ? `${name} ${options.subcommand}` : name);
+    assert.deepEqual(run.waitedOn, [], `${label} waits on ${run.waitedOn.join(', ')} before answering, so discord can give up on it`);
     const answers = run.calls.filter(([kind]) => kind !== 'defer');
     assert.ok(answers.length, `${label} never answered`);
     if (expected) assert.match(JSON.stringify(answers), expected, label);

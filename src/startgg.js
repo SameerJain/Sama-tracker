@@ -356,8 +356,8 @@ export async function getStats(playerId) {
   return { standings, sets };
 }
 
-// for /characters. every game they reported a character for, newest set first.
-// the limit counts what comes back, and a bo5 with characters is ~46 objects. most sets have
+// for /characters and /scout. every game they reported a character for, newest set first.
+// the limit counts what comes back, and a bo5 with characters and stages is ~51 objects. most sets have
 // nothing reported so 40 usually fit, and a page that goes over gets asked for again as two of 20
 export async function getCharacterSets(playerId, page, perPage = 40) {
   const data = await query(`
@@ -370,7 +370,7 @@ export async function getCharacterSets(playerId, page, perPage = 40) {
             completedAt
             event { videogame { id displayName } }
             slots { entrant { id participants { player { id } } } }
-            games { winnerId selections { entrant { id } character { name } } }
+            games { winnerId stage { name } selections { entrant { id } character { name } } }
           }
         }
       }
@@ -391,7 +391,7 @@ export async function getCharacterSets(playerId, page, perPage = 40) {
       const picks = game.selections ?? [];
       const character = picks.find((pick) => pick.entrant?.id === mine)?.character?.name;
       const against = picks.find((pick) => pick.entrant?.id !== mine)?.character?.name;
-      if (character && game.winnerId) games.push({ character, against, won: game.winnerId === mine });
+      if (character && game.winnerId) games.push({ character, against, stage: game.stage?.name, won: game.winnerId === mine });
     }
     return { id: String(node.id), completedAt: node.completedAt, videogame: node.event.videogame, games };
   });
