@@ -64,4 +64,13 @@ export default makeJoke({
   prompt: PROMPT,
   styles: STYLES,
   points: TALKING_POINTS,
+  focus: /Ultimate/,
+  articles: [
+    'Characters (SSBU)', 'Techniques (SSBU)', 'Stages (SSBU)', 'Items (SSBU)', 'Glitches (SSBU)', 'Final Smashes (SSBU)',
+    'Update lists (SSBU)', 'Major tournaments (SSBU)',
+  ],
+  videos: [
+    'smash ultimate grand finals', 'smash ultimate steve', 'smash ultimate patch notes', 'smash ultimate tier list', 'smash ultimate elite smash',
+    'smash ultimate top 10 plays', 'smash ultimate competitive history', 'smash ultimate combo video', 'smash ultimate rant', 'smash ultimate kazuya',
+  ],
 });

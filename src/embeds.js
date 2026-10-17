@@ -1296,6 +1296,7 @@ export function help() {
     '`/64` a 64 old head who says 64 did it first',
     '`/brawl` the last person still defending Brawl',
     '`/pplus` a Project+ player who wants you on netplay',
+    '-# Claude Haiku writes those from real facts: the game\'s talking points, a random SmashWiki article and a YouTube video',
     '`/pfp` my profile picture, full size',
     '',
     '**Posted here automatically**',

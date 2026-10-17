@@ -53,4 +53,14 @@ export default makeJoke({
   prompt: PROMPT,
   styles: STYLES,
   points: TALKING_POINTS,
+  focus: /Smash 4|Wii U|SSB4/,
+  // the wii u ones where there's a split. no tournaments, they're mostly who won
+  articles: [
+    'Characters (SSB4)', 'Techniques (SSB4)', 'Stages (SSB4-Wii U)', 'Items (SSB4)', 'Pokémon (SSB4)', 'Glitches (SSB4)',
+    'Final Smashes (SSB4)', 'Event Matches (SSB4-Wii U)', 'Trophies (SSB4-Wii U)', 'Update lists (SSB4-Wii U)', 'Modes (SSB4-Wii U)',
+  ],
+  videos: [
+    'smash 4 wii u combo video', 'smash 4 grand finals', 'smash 4 hype moments', 'smash 4 bayonetta', 'smash wii u for glory',
+    'smash 4 tier list', 'smash 4 retrospective', 'smash 4 tech tutorial', 'smash 4 cloud', 'smash 4 patch',
+  ],
 });

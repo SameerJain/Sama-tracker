@@ -55,4 +55,14 @@ export default makeJoke({
   prompt: PROMPT,
   styles: STYLES,
   points: TALKING_POINTS,
+  // smashwiki calls it the original Super Smash Bros.
+  focus: /Smash 64|original Super Smash Bros|SSB64|N64/,
+  articles: [
+    'Characters (SSB)', 'Techniques (SSB)', 'Stages (SSB)', 'Items (SSB)', 'Pokémon (SSB)', 'Glitches (SSB)', 'Modes (SSB)',
+    'Major tournaments (SSB)',
+  ],
+  videos: [
+    'smash 64 combo video', 'smash 64 grand finals', 'smash 64 history', 'smash 64 tech tutorial', 'super smash bros 64 retrospective',
+    'smash remix', 'smash 64 zero to death', 'smash 64 pikachu', 'smash 64 tier list',
+  ],
 });

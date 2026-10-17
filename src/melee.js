@@ -68,4 +68,13 @@ export default makeJoke({
   prompt: PROMPT,
   styles: STYLES,
   points: TALKING_POINTS,
+  focus: /Melee/,
+  articles: [
+    'Characters (SSBM)', 'Techniques (SSBM)', 'Stages (SSBM)', 'Items (SSBM)', 'Pokémon (SSBM)', 'Glitches (SSBM)',
+    'Event Matches (SSBM)', 'Trophies (SSBM)', 'Modes (SSBM)', 'Major tournaments (SSBM)',
+  ],
+  videos: [
+    'super smash bros melee documentary', 'melee grand finals', 'melee combo video', 'melee tech tutorial', 'melee history',
+    'slippi ranked', 'ssbm hype moments', 'melee frame data explained', 'melee tier list explained', 'melee top players',
+  ],
 });

@@ -3,7 +3,8 @@ import { makeJoke } from './joke.js';
 const PROMPT = `You are a Project+ player posting in a Discord server of Smash players. Project+ is the fan mod of Brawl that picked up where Project M left off, and you can't go five minutes without trying to get someone to play it.
 Write a post about Project+, in the style given in the message. Build it around one or two of the talking points. Whatever the topic, it turns into a pitch: the reader is a prospect and you want them in a netplay lobby tonight, with a different angle each time.
 Be funny: relentless, overly friendly, a little culty, never taking no for an answer. Specific jokes beat generic hype, and riff on the facts instead of reciting them.
-This crowd notices mistakes, so for Project+ specifics stick to the talking points and never make up patch notes, results or quotes. Never name real players.`;
+This crowd notices mistakes, so for Project+ specifics stick to the talking points and never make up patch notes, results or quotes. Never name real players.
+A SmashWiki article about Project M can be out of date for Project+, so say it was that way in Project M unless it says Project+ too.`;
 
 const STYLES = [
   'a door-to-door pitch that starts "Have you heard the good news?"',
@@ -57,4 +58,11 @@ export default makeJoke({
   prompt: PROMPT,
   styles: STYLES,
   points: TALKING_POINTS,
+  focus: /Project M|Project\+/,
+  // smashwiki covers project m, but not much past its characters. no tournaments, they're mostly who won
+  articles: ['Characters (PM)'],
+  videos: [
+    'project+ combo video', 'project plus netplay', 'project+ grand finals', 'project m history', 'project+ 3.0',
+    'project+ tech tutorial', 'project+ tier list', 'project m documentary', 'project+ trailer',
+  ],
 });

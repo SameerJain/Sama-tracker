@@ -58,4 +58,13 @@ export default makeJoke({
   prompt: PROMPT,
   styles: STYLES,
   points: TALKING_POINTS,
+  focus: /Brawl\b/,
+  articles: [
+    'Characters (SSBB)', 'Techniques (SSBB)', 'Stages (SSBB)', 'Items (SSBB)', 'Pokémon (SSBB)', 'Glitches (SSBB)',
+    'Final Smashes (SSBB)', 'Event Matches (SSBB)', 'Trophies (SSBB)', 'Modes (SSBB)', 'Major tournaments (SSBB)',
+  ],
+  videos: [
+    'super smash bros brawl retrospective', 'brawl meta knight', 'brawl grand finals', 'brawl tripping', 'subspace emissary',
+    'brawl combo video', 'brawl tier list', 'brawl planking', 'brawl glitches', 'brawl competitive history',
+  ],
 });
