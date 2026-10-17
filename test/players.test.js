@@ -9,8 +9,8 @@ process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
 // the jokes would call claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
-const { commands, handleAutocomplete, handleCommand } = await import('../src/commands.js');
-const embeds = await import('../src/embeds.js');
+const { commands, handleAutocomplete, handleCommand } = await import('../src/commands/index.js');
+const embeds = await import('../src/embeds/index.js');
 const { predict } = await import('../src/predict.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });

@@ -3,9 +3,9 @@ import test, { after, beforeEach } from 'node:test';
 
 // the jokes would call claude on import
 delete process.env.ANTHROPIC_API_KEY;
-const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../src/smashwiki.js');
-const { searchVideos } = await import('../src/youtube.js');
-const { jokeMessage, makeJoke } = await import('../src/joke.js');
+const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../src/jokes/smashwiki.js');
+const { searchVideos } = await import('../src/jokes/youtube.js');
+const { jokeMessage, makeJoke } = await import('../src/jokes/joke.js');
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
 after(() => { globalThis.fetch = originalFetch; console.error = originalError; });

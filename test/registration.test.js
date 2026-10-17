@@ -9,7 +9,7 @@ process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
 // the jokes would call claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
-const { handleCommand } = await import('../src/commands.js');
+const { handleCommand } = await import('../src/commands/index.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
@@ -99,7 +99,7 @@ test('registered lists only server members by name, with their events, and menti
 });
 
 test('registered puts a gap between people, names in bold and their events under them', async () => {
-  const { registered } = await import('../src/embeds.js');
+  const { registered } = await import('../src/embeds/index.js');
   const entries = [
     { userId: 1, event: 'Ultimate Singles' }, { userId: 1, event: 'Doubles *pot bonus*' },
     { userId: 2, event: 'Melee Singles' },
@@ -118,7 +118,7 @@ test('registered puts a gap between people, names in bold and their events under
 });
 
 test('registered by_event lists the event with the most people first, then anyone in no event', async () => {
-  const { registered } = await import('../src/embeds.js');
+  const { registered } = await import('../src/embeds/index.js');
   const entries = [
     { userId: 1, event: 'Melee *Singles*', eventSlug: 'melee', entrants: 12 },
     { userId: 1, event: 'Ultimate Singles', eventSlug: 'ult', entrants: 40 },

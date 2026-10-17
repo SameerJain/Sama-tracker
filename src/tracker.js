@@ -1,5 +1,5 @@
 import * as startgg from './startgg.js';
-import * as embeds from './embeds.js';
+import * as embeds from './embeds/index.js';
 import { state, save } from './store.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
 import { messageEnabled, messageSettings } from './message-settings.js';

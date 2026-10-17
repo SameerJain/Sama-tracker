@@ -1,5 +1,5 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
-import { commands, handleAutocomplete, handleCommand } from './commands.js';
+import { commands, handleAutocomplete, handleCommand } from './commands/index.js';
 import { asCommand, checkToken, commandProgress } from './startgg.js';
 import { startTracking } from './tracker.js';
 

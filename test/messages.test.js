@@ -10,7 +10,7 @@ process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
 // the jokes would call claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
-const { commands, handleCommand } = await import('../src/commands.js');
+const { commands, handleCommand } = await import('../src/commands/index.js');
 const { postWeeklyRecap } = await import('../src/tracker.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 

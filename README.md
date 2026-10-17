@@ -14,7 +14,7 @@ Follows start.gg players and posts to a Discord channel when one of them:
 - is entered in a tournament starting within the hour, if 3 or more of the crew are
 - finishes a tournament, with where everyone placed. That waits 12 hours after the end since TOs often report top 4 late, or 24 if someone's placement still isn't in. After that it posts anyway, with start.gg's projected placement for anyone left in an unfinished bracket
 
-Every Sunday at 9 pm EST it also posts a weekly crew recap with everyone's results, the biggest upset, the best finish and what they're signed up for next week. Only tracked players with at least one singles set that wasn't a DQ get in, and a week where nobody played posts nothing. `/messages` changes the day, time and timezone, or turns it off.
+Every Sunday at 9 pm  it also posts a weekly crew recap with everyone's results, the biggest upset, the best finish and what they're signed up for next week. Only tracked players with at least one singles set that wasn't a DQ get in, and a week where nobody played posts nothing. `/messages` changes the day, time and timezone, or turns it off.
 
 Recap placements come from finished events where the player played a set that week, even if the event started the week before. If the bot is down when the recap is due, it still goes out once it's back, as long as that's within a day. A restart partway through sends whatever hadn't gone out yet instead of starting over.
 
@@ -33,15 +33,14 @@ Only run one copy at a time or everything gets posted twice.
 
 1. New project, deploy from this GitHub repo.
 2. Put everything from `.env.example` in the service's Variables.
-3. Right-click the canvas, add a volume and connect it to the service. Any mount path works. Without it the tracked players get wiped on every deploy.
-
+3. Right-click the canvas, add a volume and connect it to the service. Any mount path works. Without it 
 Pushing to GitHub redeploys it.
 
 ### Discord name and roles
 
 The app and bot username are `Sama-tracker` in the Discord Developer Portal. You can also rename the bot's server role to `Sama-tracker`. Keep its permissions and position, above `Reg Reminders`, so it can assign that role.
 
-Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message footers say `Sama-tracker by Samatron`, from `FOOTER` at the top of `src/embeds.js`, and changing it there only affects new messages.
+Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message footers say `Sama-tracker by Samatron`, from `FOOTER` in `src/embeds/shared.js`, and changing it there only affects new messages. Head-to-head cards add the game when all their sets are from that game, including Ultimate and Melee.
 
 `/messages` always needs Manage Server. `/socials_edit` needs it by default, and you can hand it to other roles under Server Settings > Integrations > Sama-tracker.
 
@@ -196,10 +195,18 @@ Someone in several brackets at once, like Ultimate, Melee and 64 at the same tou
 
 With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game, or a stage for P+. Otherwise they just say the line.
 
-Each post gets real facts to work from so Haiku doesn't make things up: two of the game's own talking points from its file in `src/`, a few paragraphs from a random SmashWiki article, and with `YOUTUBE_API_KEY` set, a YouTube video's title, channel, year, views and description. Articles come from that game's characters, techniques, stages, items, glitches, final smashes, trophies, event matches, modes and major tournaments, plus patch notes for Ultimate and Smash 4. That's about 700 to 1100 articles a game, 260 for 64 and 42 Project M character pages for P+. A category is picked first and then an article in it, so the big ones like trophies don't crowd out the rest. Each excerpt comes from a random spot in the article, starting at a paragraph about that game when it covers several. The Smash 4 and P+ posts skip tournament pages since they don't name players. Videos come from about ten searches a game, like grand finals, combo videos, tech tutorials and history, and only ones with 10,000+ views unless a search has none. A search's results get reused for a day, so it stays inside YouTube's free daily quota. YouTube only gives captions to a video's owner, so a video's title and description are all Haiku gets. If SmashWiki or YouTube is down, the post goes out without that part.
+Each post gets real facts to work from so Haiku doesn't make things up: two of the game's own talking points from its file in `src/jokes/`, a few paragraphs from a random SmashWiki article, and with `YOUTUBE_API_KEY` set, a YouTube video's title, channel, year, views and description. Articles come from that game's characters, techniques, stages, items, glitches, final smashes, trophies, event matches, modes and major tournaments, plus patch notes for Ultimate and Smash 4. That's about 700 to 1100 articles a game, 260 for 64 and 42 Project M character pages for P+. A category is picked first and then an article in it, so the big ones like trophies don't crowd out the rest. Each excerpt comes from a random spot in the article, starting at a paragraph about that game when it covers several. The Smash 4 and P+ posts skip tournament pages since they don't name players. Videos come from about ten searches a game, like grand finals, combo videos, tech tutorials and history, and only ones with 10,000+ views unless a search has none. A search's results get reused for a day, so it stays inside YouTube's free daily quota. YouTube only gives captions to a video's owner, so a video's title and description are all Haiku gets. If SmashWiki or YouTube is down, the post goes out without that part.
 
 `/characters` shows one game, Ultimate or Melee. Pick it with `game`, or leave it out to get whichever of the two has more games with characters reported, or more sets if neither has any. `verbose:True` puts that game first, then a card for each other game they have characters reported in, up to 6 in all. A game you picked always gets its card, even with nothing reported. It looks at their last 400 singles sets in every game, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg. With verbose, the usual card shows while the rest loads.
 
 `/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked. The short `/stats` card shows while it loads.
 
 start.gg allows 80 requests a minute, and every page of someone's history is a request, so the first look at a player takes a while: 10 to 30 seconds for `/h2h`, `/predict` and `/characters`, and about a minute for the verbose ones with someone who has a couple thousand sets. When that's more than about 20 seconds, the reply says how many of the requests are done and about how long is left. After that it's a second or two for the next few hours, since every command shares the history already fetched and only asks for newer sets. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. Any command that makes 20 or more requests logs how many, how long it took and whether start.gg said to slow down, so Railway's logs show what a slow one was waiting on. State is saved in `data/state.json`, or on the volume on Railway.
+
+## Source layout
+
+- `src/commands/`: command definitions, routing and handlers grouped by players, stats, registration and settings. `history.js` owns the shared history caches.
+- `src/embeds/`: Discord cards grouped by tournaments, stats, scouting, players and system messages. `shared.js` holds formatting and the footer.
+- `src/jokes/`: all six game joke commands, their reply handler and shared generator, plus SmashWiki and YouTube helpers.
+- `src/startgg.js`: start.gg requests, pagination and rate limiting.
+- `src/tracker.js`: background checks and scheduled posts. `src/store.js` saves their state.

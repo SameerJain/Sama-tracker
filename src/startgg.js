@@ -412,28 +412,36 @@ const OBJECT_LIMIT = 1000;
 
 // for /characters and /scout. every game they reported a character for, newest set first, 40 sets a page.
 // the limit counts what comes back, and a bo5 with characters and stages is ~51 objects. most sets have
-// nothing reported so 40 usually fit, and a page that goes over gets asked for as two of 20
+// nothing reported so 40 usually fit. pages that go over split into 20, then 10 if needed
 export async function getCharacterSets(playerId, page, perPage = 40) {
   let halved = false;
   const data = await query(CHARACTER_QUERY, () => {
     halved = perPage === 40 && Boolean(denseCharacters.get(playerId));
     return halved ? { id: playerId, page: page * 2 - 1, perPage: 20 } : { id: playerId, page, perPage };
   }).catch((err) => {
-    if (perPage === 20 || halved || !err.message.includes('complexity')) throw err;
+    if (perPage <= 10 || !err.message.includes('complexity')) throw err;
   });
   if (halved) {
+    const first = data ? characterPage(data, playerId) : await splitCharacterPage(playerId, page * 2 - 1, 20);
     const second = await getCharacterSets(playerId, page * 2, 20);
-    const first = characterPage(data, playerId);
-    denseCharacters.set(playerId, objectCount(data) + second.objects > OBJECT_LIMIT);
+    denseCharacters.set(playerId, first.objects + second.objects > OBJECT_LIMIT);
     return { totalPages: Math.ceil(first.totalPages / 2), sets: [...first.sets, ...second.sets] };
   }
   if (!data) {
-    denseCharacters.set(playerId, true);
-    const halves = await Promise.all([getCharacterSets(playerId, page * 2 - 1, 20), getCharacterSets(playerId, page * 2, 20)]);
-    return { totalPages: Math.ceil(halves[0].totalPages / 2), sets: halves.flatMap((half) => half.sets) };
+    if (perPage === 40) denseCharacters.set(playerId, true);
+    return splitCharacterPage(playerId, page, perPage);
   }
   if (perPage === 40) denseCharacters.set(playerId, false);
   return characterPage(data, playerId);
+}
+
+async function splitCharacterPage(playerId, page, perPage) {
+  const halves = await Promise.all([getCharacterSets(playerId, page * 2 - 1, perPage / 2), getCharacterSets(playerId, page * 2, perPage / 2)]);
+  return {
+    totalPages: Math.ceil(halves[0].totalPages / 2),
+    sets: halves.flatMap((half) => half.sets),
+    objects: halves.reduce((sum, half) => sum + half.objects, 0),
+  };
 }
 
 // { totalPages, sets, objects } out of one reply

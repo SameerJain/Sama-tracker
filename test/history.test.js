@@ -12,7 +12,7 @@ delete process.env.ANTHROPIC_API_KEY;
 // start.gg requests go out 800ms apart, a fake clock gets through minutes of them right away
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
 const { state } = await import('../src/store.js');
-const { handleCommand } = await import('../src/commands.js');
+const { handleCommand } = await import('../src/commands/index.js');
 const startgg = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });

@@ -1,0 +1,373 @@
+import { escapeMarkdown } from 'discord.js';
+import { fromSide, startggUrl } from '../startgg.js';
+import { characterUsage } from '../characters.js';
+import { colors, FOOTER, baseEmbed, split, withLines, percent, step, upsetFactor, count, winLoss, singles, gameName, gameCount, closeLine, seedLine, section, bold, shortRecord, playerLink, setLink, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
+
+const RECENT_EVENTS = 4;
+
+const LIFETIME_EVENTS = 5;
+
+const UPSETS_SHOWN = 3;
+
+// /progress verbose, opponents played in both periods
+const REMATCHES_SHOWN = 5;
+
+export function stats(player, standings, sets) {
+  const embed = baseEmbed(colors.brand)
+    .setAuthor({ name: 'Stats' })
+    .setTitle(escapeMarkdown(player.tag))
+    .setURL(startggUrl(player.slug));
+  if (player.image) embed.setThumbnail(player.image);
+
+  const played = sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
+  if (!played.length && !standings.length) return embed.setDescription('Nothing on start.gg yet.');
+
+  const lines = [];
+  if (played.length) {
+    const records = new Map();
+    for (const { set, won } of played) {
+      const game = gameName(set.event);
+      if (!records.has(game)) records.set(game, { wins: 0, losses: 0 });
+      records.get(game)[won ? 'wins' : 'losses']++;
+    }
+    const recordText = [...records].map(([game, { wins, losses }]) => `${game} ${wins}-${losses} (${percent(wins, wins + losses)})`);
+    lines.push(`**Recent sets:** ${recordText.join(' · ')}`);
+  }
+
+  // relative to bracket size, so 4th of 84 beats 3rd of 20
+  const best = standings
+    .filter(({ event }) => event.numEntrants)
+    .sort((x, y) => x.placement / x.event.numEntrants - y.placement / y.event.numEntrants)[0];
+  if (best) lines.push(`**Best finish:** ${placementLine(best)}`);
+
+  // sets are newest first, so ties go to the latest one
+  const upset = played
+    .filter(({ me, them, won }) => won && upsetFactor(me, them) > 0)
+    .sort((x, y) => upsetFactor(y.me, y.them) - upsetFactor(x.me, x.them))[0];
+  if (upset) lines.push(`**Biggest upset:** ${upsetLine(upset)}`);
+
+  section(lines, 'Latest events', standings.slice(0, RECENT_EVENTS).map(placementLine));
+
+  const from = [];
+  if (played.length) from.push(played.length === 1 ? '1 singles set' : `${played.length} singles sets`);
+  if (standings.length) from.push(standings.length === 1 ? '1 event' : `${standings.length} events`);
+  lines.push(`-# From their last ${from.join(' and ')} on start.gg`);
+
+  return embed.setDescription(lines.join('\n'));
+}
+
+// a card per game, the last 30 days over the 30 before. periods are newest first, each { since, until, summary }.
+// verbose goes further into both and lists every period as a trend. characterSets is null if it couldn't be fetched
+export function progress(player, periods, { verbose = false, characterSets = null } = {}) {
+  const [current, previous] = periods;
+  const days = Math.round((current.until - current.since) / DAY);
+  const title = `${escapeMarkdown(player.tag)}'s progress`;
+  const inGame = (period, game) => period.summary.games.find((entry) => entry.game === game);
+  const games = [...new Set(periods.flatMap((period) => period.summary.games.map(({ game }) => game)))];
+  if (!games.length) {
+    return [baseEmbed(colors.brand).setTitle(title).setDescription(`No singles results in the last ${days * periods.length} days.`)];
+  }
+  const range = ({ since, until }) => `<t:${since}:d> to <t:${until}:d>`;
+
+  return games.flatMap((game) => {
+    const recent = inGame(current, game);
+    const before = inGame(previous, game);
+    const characters = ({ since, until }) => verbose && characterSets
+      && characterLine(characterSets.filter((set) => set.videogame.displayName === game && set.completedAt >= since && set.completedAt < until));
+    const lines = [
+      `### Last ${days} days`, `-# ${range(current)}`, ...periodLines(recent, verbose, characters(current)),
+      `### Previous ${days} days`, `-# ${range(previous)}`, ...periodLines(before, verbose, characters(previous)),
+    ];
+    const winRate = pointsLine('Win rate', setRate(recent), setRate(before));
+    if (verbose) {
+      section(lines, 'What changed', [winRate, ...changeLines(recent, before)].filter(Boolean));
+      section(lines, `Every ${days} days, newest first`, periods.map((period) => `${range(period)} · ${trendText(inGame(period, game))}`));
+      lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in. Seeds go by placement tier, `
+        + 'close sets are ones that went to the last game, and characters only show up if the TO reported them');
+    } else {
+      if (winRate) lines.push('', winRate);
+      lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in, and vs seed goes by placement tier`);
+    }
+    return withLines(baseEmbed(colors.brand, `${FOOTER} · ${game}`).setTitle(title).setURL(startggUrl(player.slug)), lines);
+  });
+}
+
+// one game in one period of /progress. verbose adds games, close sets, seeds, upsets and characters
+function periodLines(data, verbose = false, characters = null) {
+  if (!data) return ['No sets or finished events.'];
+  const lines = [`**Sets:** ${winLoss(data.wins, data.losses)}`];
+  if (verbose) {
+    const games = gameCount(data.played);
+    if (games.won + games.lost) lines.push(`**Games:** ${winLoss(games.won, games.lost)}`);
+    lines.push(closeLine(data.played), seedLine(data.played));
+  }
+
+  const sized = data.events.filter(({ event }) => event.numEntrants > 0);
+  if (sized.length) {
+    lines.push(`**Placements:** ${count(data.events.length, 'event')} · average ${topText(averageFinish(sized))}`);
+    lines.push(`**Best:** ${placementLine(sized.toSorted(byFinish)[0])}`);
+  } else if (data.events.length) {
+    lines.push(`**Placements:** ${count(data.events.length, 'event')}, no bracket sizes reported`);
+  } else {
+    lines.push('**Placements:** no finished events');
+  }
+
+  const seeded = data.events.filter(({ seed }) => seed > 0);
+  if (seeded.length) {
+    const better = seeded.filter(({ placement, seed }) => step(placement) < step(seed)).length;
+    const worse = seeded.filter(({ placement, seed }) => step(placement) > step(seed)).length;
+    lines.push(`**Vs seed:** ${better} better · ${seeded.length - better - worse} on seed · ${worse} worse`);
+  } else {
+    lines.push('**Vs seed:** no seeded finishes reported');
+  }
+
+  if (verbose) {
+    const { win, loss } = biggestUpsets(data.played);
+    if (win) lines.push(`**Best win:** ${upsetLine(win)}`);
+    if (loss) lines.push(`**Worst loss:** ${upsetLine(loss)}`);
+    lines.push(characters);
+  }
+  return lines.filter(Boolean);
+}
+
+// share of sets or games won, null with nothing played
+const setRate = (data) => (data?.wins + data?.losses ? data.wins / (data.wins + data.losses) : null);
+
+function gameRate(data) {
+  const { won, lost } = gameCount(data?.played ?? []);
+  return won + lost ? won / (won + lost) : null;
+}
+
+// Win rate: up 4.0 points. null unless both rates exist
+function pointsLine(label, now, before) {
+  if (now === null || before === null) return null;
+  const points = 100 * (now - before);
+  return `**${label}:** ${points >= 0 ? 'up' : 'down'} ${Math.abs(points).toFixed(1)} points`;
+}
+
+// verbose /progress, the last period against the one before
+function changeLines(recent, before) {
+  const lines = [pointsLine('Games won', gameRate(recent), gameRate(before))];
+  const [now, then] = [recent, before].map((data) => averageFinish(data?.events ?? []));
+  if (now !== null && then !== null) lines.push(`**Average finish:** ${topText(then)} → ${topText(now)}`);
+  lines.push(rematchLine(recent?.played ?? [], before?.played ?? []));
+  return lines;
+}
+
+// opponents from both periods and how each went, the most sets first
+function rematchLine(recent, before) {
+  const byOpponent = (played) => Map.groupBy(played, ({ them }) => them.playerIds[0] ?? them.name);
+  const now = byOpponent(recent);
+  const then = byOpponent(before);
+  const sets = ([id, list]) => list.length + then.get(id).length;
+  const both = [...now].filter(([id]) => then.has(id))
+    .sort((x, y) => sets(y) - sets(x))
+    .slice(0, REMATCHES_SHOWN)
+    .map(([id, list]) => `${bold(list[0].them.name)} ${shortRecord(then.get(id))} → ${shortRecord(list)}`);
+  return both.length ? `**Rematches, before → now:** ${both.join(' · ')}` : null;
+}
+
+// one period of the verbose /progress trend
+function trendText(data) {
+  if (!data) return 'no sets or events';
+  const parts = [];
+  if (data.played.length) parts.push(`sets ${winLoss(data.wins, data.losses)}`);
+  const average = averageFinish(data.events);
+  if (data.events.length) parts.push(`${count(data.events.length, 'event')}${average === null ? '' : `, average ${topText(average)}`}`);
+  return parts.join(' · ');
+}
+
+// verbose /progress, game record on each character they reported
+function characterLine(sets) {
+  const usage = characterUsage(sets);
+  if (!usage.reported) return null;
+  const shown = usage.characters.slice(0, LEANS_SHOWN).map(({ name, wins, games }) => `${escapeMarkdown(name)} ${winLoss(wins, games - wins)}`);
+  return `**Game record by character:** ${shown.join(' · ')}`;
+}
+
+// upcoming is [{ tournament, players }] for the active players' entries before the next recap
+export function weeklyRecap(crew, upcoming, { since, until }) {
+  const lines = [`<t:${since}:d> to <t:${until}:d> · ${count(crew.length, 'active player')}`];
+  const wins = crew.flatMap(({ player, summary }) => summary.played.filter((result) => result.won).map((result) => ({ ...result, player })));
+  const upset = wins.filter(({ me, them }) => upsetFactor(me, them) > 0)
+    .sort((a, b) => upsetFactor(b.me, b.them) - upsetFactor(a.me, a.them))[0];
+  if (upset) lines.push('', `**Biggest upset:** ${playerLink(upset.player)} ${upsetLine(upset)}`);
+  const finishes = crew.flatMap(({ player, summary }) => summary.finishes.map((entry) => ({ ...entry, player })))
+    .filter(({ event }) => event.numEntrants).sort(byFinish);
+  if (finishes.length) lines.push(`**Best finish:** ${playerLink(finishes[0].player)} · ${placementLine(finishes[0])}`);
+  for (const { player, summary } of crew) {
+    lines.push('', `**${escapeMarkdown(player.tag)}**`);
+    for (const game of summary.games) lines.push(`${escapeMarkdown(game.game)}: ${winLoss(game.wins, game.losses)}`);
+    lines.push(...summary.finishes.map(placementLine));
+    if (!summary.finishes.length) lines.push('No final placements reported for this week\'s events yet.');
+  }
+  const next = upcoming.map(({ tournament, players }) => `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)}) · `
+    + `<t:${tournament.startAt}:f> · ${players.map((player) => escapeMarkdown(player.tag)).join(', ')}`);
+  section(lines, 'Upcoming this week', next.length ? next : ['Nobody who played this week is signed up for anything yet.']);
+  lines.push('-# Singles only, and only people who played a set that wasn\'t a DQ');
+  return withLines(baseEmbed(colors.results).setTitle('Weekly crew recap'), lines);
+}
+
+// beat Foo (seed 2) 3-1 as seed 9 at Tournament
+function upsetLine({ set, me, them, won }) {
+  const score = scoreText(me, them) === 'vs' ? '' : ` ${scoreText(me, them)}`;
+  return `${won ? 'beat' : 'lost to'} ${bold(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}`;
+}
+
+// how big an upset the set was, whichever way it went
+function upsetSize(result) {
+  return result.won ? upsetFactor(result.me, result.them) : upsetFactor(result.them, result.me);
+}
+
+// their biggest upset win and the biggest upset they lost to. ties go to the newest
+function biggestUpsets(played) {
+  const upsets = played.filter((result) => upsetSize(result) > 0).sort((x, y) => upsetSize(y) - upsetSize(x));
+  return { win: upsets.find(({ won }) => won), loss: upsets.find(({ won }) => !won) };
+}
+
+// relative to bracket size, so 4th of 84 beats 3rd of 20
+const finish = (entry) => entry.placement / entry.event.numEntrants;
+
+const byFinish = (x, y) => finish(x) - finish(y) || y.event.numEntrants - x.event.numEntrants;
+
+// mean of finish, null with no bracket sizes to go on
+function averageFinish(events) {
+  const sized = events.filter(({ event }) => event.numEntrants > 0);
+  return sized.length ? sized.reduce((total, entry) => total + finish(entry), 0) / sized.length : null;
+}
+
+const topText = (share) => `top ${Math.ceil(share * 100)}%`;
+
+// events entered and set record, grouped by game or year
+function breakdown(entered, played, eventKey, setKey) {
+  const groups = new Map();
+  const group = (key) => {
+    if (!groups.has(key)) groups.set(key, { key, events: [], wins: 0, losses: 0 });
+    return groups.get(key);
+  };
+  for (const entry of entered) group(eventKey(entry.event)).events.push(entry);
+  for (const { set, won } of played) group(setKey(set))[won ? 'wins' : 'losses']++;
+  return [...groups.values()];
+}
+
+// Ultimate · 180 events · won 3 · sets 420-300 (58%)
+function breakdownLine({ key, events, wins, losses }) {
+  const parts = [`**${escapeMarkdown(String(key))}**`];
+  if (events.length) parts.push(count(events.length, 'event'));
+  const firsts = events.filter((entry) => entry.placement === 1).length;
+  const best = events.filter((entry) => entry.event.numEntrants).sort(byFinish)[0];
+  if (firsts) parts.push(`won ${firsts}`);
+  else if (best) parts.push(`best ${ordinal(best.placement)} of ${best.event.numEntrants}`);
+  if (wins + losses) parts.push(`sets ${winLoss(wins, losses)}`);
+  return parts.join(' · ');
+}
+
+// two cards: the lifetime numbers, then the results behind them. /scout verbose labels them its own way
+export function lifetimeStats(player, events, sets, players, label = 'Lifetime stats') {
+  const overview = baseEmbed(colors.brand)
+    .setAuthor({ name: label })
+    .setTitle(escapeMarkdown(player.tag))
+    .setURL(startggUrl(player.slug));
+  if (player.image) overview.setThumbnail(player.image);
+
+  const entered = events.filter((entry) => !entry.dq);
+  const played = singles(sets, player);
+  if (!entered.length && !played.length) return [overview.setDescription('Nothing on start.gg yet.')];
+
+  const from = [];
+  if (played.length) from.push(`${count(played.length, 'singles set')} since <t:${played.at(-1).set.completedAt}:D>`);
+  if (entered.length) from.push(`${count(entered.length, 'event')} since <t:${entered.at(-1).event.startAt}:D>`);
+  const dqs = events.length - entered.length;
+  const latest = Math.max(played[0]?.set.completedAt ?? 0, entered[0]?.event.startAt ?? 0);
+  overview.setDescription(`Last played <t:${latest}:R>\n-# From ${from.join(' and ')} on start.gg${dqs ? `, ${count(dqs, 'DQ')} left out` : ''}`);
+
+  const sized = entered.filter((entry) => entry.event.numEntrants);
+  const seeded = entered.filter((entry) => entry.seed);
+  const stat = (name, value) => overview.addFields({ name, value: String(value), inline: true });
+
+  if (entered.length) stat('Events', entered.length);
+  if (played.length) {
+    const wins = played.filter((result) => result.won).length;
+    stat('Sets', winLoss(wins, played.length - wins));
+  }
+  const games = gameCount(played);
+  if (games.won + games.lost) stat('Games', winLoss(games.won, games.lost));
+
+  if (entered.length) {
+    stat('1st places', entered.filter((entry) => entry.placement === 1).length);
+    stat('Top 3s', entered.filter((entry) => entry.placement <= 3).length);
+    // top 8 of an 8 person bracket doesn't count
+    stat('Top 8s', sized.filter((entry) => entry.event.numEntrants > 8 && entry.placement <= 8).length);
+  }
+  if (sized.length) {
+    const finishes = sized.map(finish).sort((a, b) => a - b);
+    stat('Typical finish', `top ${Math.ceil(finishes[Math.floor(finishes.length / 2)] * 100)}%`);
+  }
+  if (seeded.length) {
+    const better = seeded.filter((entry) => step(entry.placement) < step(entry.seed)).length;
+    const worse = seeded.filter((entry) => step(entry.placement) > step(entry.seed)).length;
+    stat('Finish vs seed', `better ${percent(better, seeded.length)} · worse ${percent(worse, seeded.length)}`);
+  }
+  if (played.length) {
+    let run = 0;
+    let longest = 0;
+    for (const { won } of played) {
+      run = won ? run + 1 : 0;
+      longest = Math.max(longest, run);
+    }
+    const streak = played.findIndex((result) => result.won !== played[0].won);
+    stat('Win streak', `best ${longest}, now ${played[0].won ? 'W' : 'L'}${streak === -1 ? played.length : streak}`);
+  }
+
+  const byGame = breakdown(entered, played, gameName, (set) => gameName(set.event))
+    .sort((a, b) => b.events.length - a.events.length || b.wins + b.losses - (a.wins + a.losses));
+  if (byGame.length > 1) overview.addFields({ name: 'By game', value: byGame.slice(0, GAMES_SHOWN).map(breakdownLine).join('\n') });
+
+  const yearOf = (seconds) => new Date(seconds * 1000).getUTCFullYear();
+  const byYear = breakdown(entered, played, (event) => yearOf(event.startAt), (set) => yearOf(set.completedAt))
+    .sort((a, b) => b.key - a.key);
+  if (byYear.length > 1) overview.addFields({ name: 'By year', value: byYear.map(breakdownLine).join('\n') });
+
+  const lines = [];
+  const upsets = played.filter((result) => upsetSize(result) > 0).sort((x, y) => upsetSize(y) - upsetSize(x));
+  // one per event, a bracket reset in grands is the same upset twice
+  const top = (list) => list
+    .filter((result, i) => list.findIndex((other) => other.set.event.slug === result.set.event.slug) === i)
+    .slice(0, UPSETS_SHOWN)
+    .map((result) => `${upsetLine(result)} · <t:${result.set.completedAt}:d>`);
+  section(lines, 'Best finishes', sized.toSorted(byFinish).slice(0, LIFETIME_EVENTS).map(placementLine));
+  section(lines, 'Latest events', entered.slice(0, LIFETIME_EVENTS).map(placementLine));
+  section(lines, 'Biggest wins', top(upsets.filter((result) => result.won)));
+  section(lines, 'Toughest losses', top(upsets.filter((result) => !result.won)));
+
+  const results = baseEmbed(colors.brand);
+  // way past what fits only with a lot of long tournament names
+  if (lines.length) results.setDescription(split(lines)[0].join('\n'));
+
+  const tracked = new Map(Object.values(players).map((each) => [each.playerId, each]));
+  const opponents = new Map();
+  for (const { them, won } of played) {
+    // no start.gg account means no id, so those go by name
+    const id = them.playerIds[0] ?? them.name;
+    if (!opponents.has(id)) opponents.set(id, { name: tracked.get(id)?.tag ?? them.name, crew: tracked.has(id), wins: 0, losses: 0 });
+    opponents.get(id)[won ? 'wins' : 'losses']++;
+  }
+  // sort is stable and sets are newest first, so ties go to who they played last
+  const mostPlayed = [...opponents.values()].sort((a, b) => b.wins + b.losses - (a.wins + a.losses));
+  const crew = mostPlayed.filter((each) => each.crew);
+  const opponentLines = (list) => list.slice(0, OPPONENTS_SHOWN).map(({ name, wins, losses }) => `${bold(name)} ${wins}-${losses}`).join('\n');
+  if (mostPlayed.length) results.addFields({ name: 'Most played', value: opponentLines(mostPlayed), inline: true });
+  if (crew.length) results.addFields({ name: 'Vs the crew', value: opponentLines(crew), inline: true });
+
+  return [overview, results];
+}
+
+// 3rd of 20 (seed 2) · Ultimate Singles · Tournament · date
+function placementLine({ placement, seed, dq, event }) {
+  let text = `${medal(placement)}**${ordinal(placement)}**`;
+  if (event.numEntrants) text += ` of ${event.numEntrants}`;
+  const notes = [seed && `seed ${seed}`, dq && 'DQ'].filter(Boolean);
+  if (notes.length) text += ` (${notes.join(', ')})`;
+  const link = `[${escapeMarkdown(event.tournament.name)}](${startggUrl(event.slug)})`;
+  return `${text} · ${escapeMarkdown(event.name)} · ${link} · <t:${event.startAt}:d>`;
+}
