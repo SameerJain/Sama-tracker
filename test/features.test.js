@@ -92,6 +92,43 @@ test('tracked callers can scout an untracked opponent without adding them', asyn
   assert.deepEqual(Object.keys(state.players), ['1']);
 });
 
+test('scout quick shows toughest opponents without the caller, and worst matchups by game', async () => {
+  const crew = { ...crewPlayer, tag: 'Crew' };
+  const target = { userId: 2, playerId: 99, tag: 'Target', slug: 'user/target' };
+  const theirs = [
+    result('m1', 900, [99, 'Target', 2], [10, 'Crew', 1], true, [2, 1], 'Winners Final'),
+    result('m2', 800, [99, 'Target', 2], [10, 'Crew', 1], false, [0, 2], 'Losers Final'),
+    result('c1', 700, [99, 'Target', 1], [50, 'Common', 9], true, [2, 0], 'Grand Final'),
+    result('c2', 600, [99, 'Target', 3], [50, 'Common', 4], false, [1, 2], 'Losers Round 1'),
+    result('c3', 500, [99, 'Target', 3], [50, 'Common', 4], false, [1, 2], 'Losers Round 1'),
+  ];
+  const mine = [theirs[0], theirs[1]];
+  const ultimate = { id: 1386, displayName: 'Ultimate' };
+  const characterSets = [
+    { id: 'x1', completedAt: 900, videogame: ultimate, games: [
+      { character: 'Fox', against: 'Sheik', stage: 'Smashville', won: false },
+      { character: 'Fox', against: 'Sheik', stage: 'Smashville', won: false },
+      { character: 'Fox', against: 'Sheik', stage: 'Battlefield', won: true },
+    ] },
+    { id: 'x2', completedAt: 700, videogame: ultimate, games: [
+      { character: 'Fox', against: 'Marth', stage: 'Battlefield', won: true },
+      { character: 'Fox', against: 'Marth', stage: 'Battlefield', won: true },
+      { character: 'Falco', against: 'Marth', stage: 'Smashville', won: true },
+    ] },
+  ];
+  const quick = embeds.scout(crew, target, mine, theirs, characterSets).map((card) => card.toJSON().description).join('\n');
+  // most losses first, and the caller stays out of it since head-to-head covers them
+  assert.match(quick, /### Toughest opponents\n\*\*Common\*\* 1-2 \(33%\)/);
+  assert.doesNotMatch(quick, /### Toughest opponents\n.*\*\*Crew\*\*/);
+  // worst win rate against one character, by game
+  assert.match(quick, /### Worst matchups\n\*\*Ultimate:\*\* Sheik 1-2 \(33%\)/);
+  assert.match(quick, /that can be out of date/);
+
+  // undefeated means no toughest opponents, and unreported means no worst matchups
+  const clean = embeds.scout(crew, target, [], [theirs[0]], []).map((card) => card.toJSON().description).join('\n');
+  assert.doesNotMatch(clean, /Toughest opponents|Worst matchups/);
+});
+
 test('scout verbose covers their history, habits, matchups, stages and your odds', async () => {
   const { predict } = await import('../src/predict.js');
   const crew = { ...crewPlayer, tag: 'Crew' };
@@ -138,8 +175,12 @@ test('scout verbose covers their history, habits, matchups, stages and your odds
   assert.match(text, /\*\*W\*\* 2-1 vs \*\*Crew\*\* · Winners Final · \[T-m1\]/);
 
   assert.match(text, /Characters and stages\n### Ultimate\n1\\\. \*\*Fox\*\* · 83% of games · won 3 of 5 \(60%\) · last <t:900:R>\n2\\\. \*\*Falco\*\*/);
-  assert.match(text, /\*\*Struggles against:\*\* Sheik 1-2 \(33%\)\n\*\*Strong against:\*\* Marth 3-0 \(100%\)\n\*\*Worst stages:\*\* Smashville 1-2 \(33%\)\n\*\*Best stages:\*\* Battlefield 3-0 \(100%\)/);
-  assert.match(text, /Reported in 2 of their last 2 Ultimate sets/);
+  assert.match(text, /\*\*Struggles against:\*\* Sheik 1-2 \(33%\)\n\*\*Strong against:\*\* Marth 3-0 \(100%\)\n\*\*Fox struggles most vs:\*\* Sheik 1-2 \(33%\)\n\*\*Worst stages:\*\* Smashville 1-2 \(33%\)\n\*\*Best stages:\*\* Battlefield 3-0 \(100%\)/);
+  assert.match(text, /Reported in 2 of their last 2 Ultimate sets · TO reporting can be out of date/);
+
+  // players and characters they lose to most, with your record against the shared one
+  assert.match(text, /### Toughest opponents in Ultimate\n\*\*Common\*\* 1-1 \(50%\) · you're 1-0 vs them/);
+  assert.match(text, /### Worst matchups in Ultimate\nSheik 1-2 \(33%\)/);
 
   // the same odds /predict gives, from the caller's side
   const matchup = cards.at(-1);

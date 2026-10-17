@@ -117,9 +117,11 @@ export function rollCall(tournament, players) {
 export function regReminder(tournament, deadline, lastCall) {
   const register = startggUrl(`${tournament.slug}/register`);
   const closesFirst = deadline < tournament.startAt;
+  // a late post reads wrong in present tense, like closes 21 hours ago
+  const closed = deadline <= Math.floor(Date.now() / 1000);
 
-  const lines = [`## ${closesFirst ? 'Registration closes' : 'Starts'} <t:${deadline}:R>`];
-  if (closesFirst) lines.push(`**Closes:** <t:${deadline}:F>`);
+  const lines = [`## ${closesFirst ? (closed ? 'Registration closed' : 'Registration closes') : 'Starts'} <t:${deadline}:R>`];
+  if (closesFirst) lines.push(`**${closed ? 'Closed' : 'Closes'}:** <t:${deadline}:F>`);
   lines.push(`**Starts:** <t:${tournament.startAt}:F>`, `**Location:** ${locationText(tournament)}`);
   if (tournament.numAttendees) lines.push(`**Registered so far:** ${tournament.numAttendees}`);
   lines.push('', `**[Register on start.gg](${register})**`);

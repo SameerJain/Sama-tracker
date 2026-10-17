@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
+import { MessageFlags } from 'discord.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,6 +44,7 @@ async function characters(sets, values = {}) {
   };
 
   let reply;
+  let deferred;
   await handleCommand({
     commandName: 'characters',
     user: { id: 'crew-discord' },
@@ -50,9 +52,10 @@ async function characters(sets, values = {}) {
       getSubcommand: () => null, getString: () => '1',
       getBoolean: (name) => values[name] ?? null, getInteger: (name) => values[name] ?? null,
     },
-    deferReply: async () => {},
+    deferReply: async (options) => { deferred = options; },
     editReply: async (result) => { reply = result; },
   });
+  assert.equal(deferred?.flags, MessageFlags.Ephemeral, 'only the caller sees it');
   return reply.embeds.map((embed) => ({ game: embed.data.footer.text.replace('Sama-tracker by Samatron · ', ''), text: embed.data.description }));
 }
 

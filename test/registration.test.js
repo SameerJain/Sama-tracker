@@ -187,6 +187,19 @@ test('reg_warn pings someone who is not registered in a channel message, not a f
   assert.doesNotMatch(warning.embeds[0].data.description, /Connect Discord/);
 });
 
+test('a reminder out after the deadline reads closed, not closes', async () => {
+  const { regReminder } = await import('../src/embeds/index.js');
+  const late = regReminder(tournament(now - 3600), now - 3600, true).data.description;
+  assert.match(late, /## Registration closed <t:\d+:R>/);
+  assert.match(late, /\*\*Closed:\*\* <t:\d+:F>/);
+  assert.doesNotMatch(late, /closes|Closes/);
+
+  const upcoming = regReminder(tournament(now + 3600), now + 3600, true).data.description;
+  assert.match(upcoming, /## Registration closes <t:\d+:R>/);
+  assert.match(upcoming, /\*\*Closes:\*\* <t:\d+:F>/);
+  assert.doesNotMatch(upcoming, /closed|Closed/);
+});
+
 test('reg_warn sends nothing when start.gg hides who is registered', async () => {
   mockStartgg(undefined, { hidden: true });
   const run = interaction('reg_warn', { tournament: 'local' }, { id: 'in-server', displayName: 'Here' });

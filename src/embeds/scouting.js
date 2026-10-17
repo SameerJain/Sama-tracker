@@ -17,6 +17,13 @@ const SCOUT_CHARACTER_GAMES = 3;
 
 const MEETINGS_SHOWN = 10;
 
+// quick shows a few, verbose shows more of who they lose to most
+const TRICKY_QUICK = 3;
+
+const TRICKY_VERBOSE = 8;
+
+const TRICKY_MAINS = 3;
+
 // their record over their last 20 sets in each game, the game they played last first.
 // verbose adds the last 90 days, which says more for someone who doesn't play much
 function formLines(played, verbose = false) {
@@ -43,6 +50,56 @@ function meetingsOf(player, opponent, mine, theirs) {
     .sort((x, y) => y.set.completedAt - x.set.completedAt);
 }
 
+// players they have lost to most, most losses then worst rate.
+// exclude is player ids to leave out, so the caller doesn't show up next to their own head-to-head
+function trickyOpponents(played, limit, exclude = []) {
+  const byOpponent = new Map();
+  for (const { them, won } of played) {
+    const id = them.playerIds[0] ?? `name:${them.name}`;
+    if (exclude.includes(them.playerIds[0])) continue;
+    if (!byOpponent.has(id)) byOpponent.set(id, { name: them.name, playerIds: them.playerIds, wins: 0, losses: 0 });
+    const record = byOpponent.get(id);
+    if (won) record.wins++;
+    else record.losses++;
+  }
+  const rate = ({ wins, losses }) => wins / (wins + losses);
+  return [...byOpponent.values()]
+    .filter((record) => record.losses > 0)
+    .sort((a, b) => b.losses - a.losses || rate(a) - rate(b) || (b.wins + b.losses) - (a.wins + a.losses))
+    .slice(0, limit);
+}
+
+// your record against one of their toughest opponents, for the player vs player opening
+function callerRecord(mine, player, tricky) {
+  const key = tricky.playerIds[0] ?? `name:${tricky.name}`;
+  let wins = 0;
+  let losses = 0;
+  let found = false;
+  for (const { them, won } of singles(mine, player)) {
+    if ((them.playerIds[0] ?? `name:${them.name}`) !== key) continue;
+    found = true;
+    if (won) wins++;
+    else losses++;
+  }
+  return found ? ` · you're ${wins}-${losses} vs them` : '';
+}
+
+function trickyOpponentLine(record) {
+  return `${bold(record.name)} ${winLoss(record.wins, record.losses)}`;
+}
+
+// worst win rate against one character, even though TO reporting can be out of date
+function trickyMatchupLines(characterSets, limit = LEANS_SHOWN) {
+  const lines = [];
+  for (const { game, usage } of characterUsageByGame(characterSets).slice(0, GAMES_SHOWN)) {
+    if (!usage.reported) continue;
+    const { bad } = leans(usage.against);
+    if (!bad.length) continue;
+    lines.push(`**${escapeMarkdown(game.displayName)}:** ${bad.slice(0, limit).map(({ name, wins, games }) => `${escapeMarkdown(name)} ${winLoss(wins, games - wins)}`).join(' · ')}`);
+  }
+  return lines;
+}
+
 // melee means every list holds only Melee, filtered before it got here
 export function scout(player, opponent, mine, theirs, characterSets, { melee = false } = {}) {
   const played = singles(theirs, opponent);
@@ -56,11 +113,14 @@ export function scout(player, opponent, mine, theirs, characterSets, { melee = f
     characterLines.push(`**${escapeMarkdown(game.displayName)}:** ${usage.characters.slice(0, 3).map((c) => `${escapeMarkdown(c.name)} (${count(c.games, 'game')})`).join(', ')}`);
   }
   section(lines, 'Reported characters', characterLines.length ? characterLines : [melee ? 'No Melee characters reported in their recent sets.' : 'No characters reported in their recent sets.']);
+  const tricky = trickyOpponents(played, TRICKY_QUICK, [player.playerId]);
+  section(lines, 'Toughest opponents', tricky.length ? [tricky.map(trickyOpponentLine).join(' · ')] : []);
+  section(lines, 'Worst matchups', trickyMatchupLines(characterSets));
   const h2h = [...Map.groupBy(meetings, ({ set }) => gameName(set.event))].slice(0, GAMES_SHOWN)
     .map(([game, list]) => `**${escapeMarkdown(game)}:** ${recordOf(list)}`);
   section(lines, `You vs ${escapeMarkdown(opponent.tag)}`, h2h.length ? h2h
     : [melee ? 'You haven\'t played each other in Melee singles, as far back as this checks.' : 'You haven\'t played each other in singles, as far back as this checks.']);
-  lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them. \`verbose:True\` for the full report`);
+  lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date. \`verbose:True\` for the full report`);
   return withLines(baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(`Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug)), lines);
 }
 
@@ -71,11 +131,11 @@ export function scoutReport(player, opponent, { mine, theirs, characterSets, eve
   const cards = lifetimeStats(opponent, events, theirs, players, { label: 'Scouting', melee });
   const played = singles(theirs, opponent);
   const meetings = meetingsOf(player, opponent, mine, theirs);
-  if (!played.length) return [...cards, ...matchup(player, opponent, meetings, odds, melee)];
+  if (!played.length) return [...cards, ...matchup(player, opponent, { meetings, odds, melee })];
 
   // the game you'd play them in, or their most played if you don't share one
   const focus = odds?.game ?? [...Map.groupBy(played, ({ set }) => gameName(set.event))].sort(([, x], [, y]) => y.length - x.length)[0][0];
-  return [...cards, ...tendencies(played, focus), ...scoutCharacters(characterSets, focus), ...matchup(player, opponent, meetings, odds, melee)];
+  return [...cards, ...tendencies(played, focus), ...scoutCharacters(characterSets, focus), ...matchup(player, opponent, { meetings, odds, melee, mine, played, focus, characterSets })];
 }
 
 // /scout verbose, form in every game and how they play the one that matters
@@ -115,11 +175,24 @@ function scoutCharacters(characterSets, focus) {
       ...usage.characters.slice(0, CHARACTERS_SHOWN).map((character, i) => `${characterRank(usage, character, i)} · last <t:${character.last}:R>`),
       more > 0 && `-# and ${more} more`,
       ...leanLines(usage.against, 'Struggles against', 'Strong against'),
+      ...mainTroubleLines(usage),
       ...leanLines(usage.stages, 'Worst stages', 'Best stages'),
-      `-# Reported in ${usage.reported} of their last ${count(usage.scanned, `${game.displayName} set`)}`,
+      `-# Reported in ${usage.reported} of their last ${count(usage.scanned, `${game.displayName} set`)} · TO reporting can be out of date`,
     ].filter(Boolean));
   }
   return withLines(embed, lines);
+}
+
+// each of their most played characters against the one it loses to most, the character vs character to pick
+function mainTroubleLines(usage, limit = TRICKY_MAINS) {
+  const lines = [];
+  for (const character of usage.characters.slice(0, limit)) {
+    const { bad } = leans([...character.matchups.values()]);
+    if (!bad.length) continue;
+    const worst = bad[0];
+    lines.push(`**${escapeMarkdown(character.name)} struggles most vs:** ${escapeMarkdown(worst.name)} ${winLoss(worst.wins, worst.games - worst.wins)}`);
+  }
+  return lines;
 }
 
 // the ones they lose most then win most, with enough games to go on. losing first since that's what to pick
@@ -129,8 +202,9 @@ function leanLines(records, badLabel, goodLabel) {
   return [bad.length && `**${badLabel}:** ${list(bad)}`, good.length && `**${goodLabel}:** ${list(good)}`].filter(Boolean);
 }
 
-// /scout verbose, the caller against them
-function matchup(player, opponent, meetings, odds, melee = false) {
+// /scout verbose, the caller against them. mine and played show your record against their toughest
+// opponents, and characterSets shows the characters they struggle with in the game that matters
+function matchup(player, opponent, { meetings, odds, melee = false, mine = [], played = [], focus = null, characterSets = [] }) {
   const tagA = bold(player.tag);
   const tagB = bold(opponent.tag);
   const lines = [];
@@ -146,8 +220,19 @@ function matchup(player, opponent, meetings, odds, melee = false) {
   } else {
     lines.push(`**Head-to-head:** you haven't played each other in ${melee ? 'Melee ' : ''}singles, as far back as this checks`);
   }
+  if (played.length) {
+    const inFocus = focus ? played.filter(({ set }) => gameName(set.event) === focus) : [];
+    const tricky = trickyOpponents(inFocus.length ? inFocus : played, TRICKY_VERBOSE, [player.playerId]);
+    section(lines, `Toughest opponents${focus ? ` in ${escapeMarkdown(focus)}` : ''}`,
+      tricky.map((record) => `${trickyOpponentLine(record)}${mine.length ? callerRecord(mine, player, record) : ''}`));
+    if (focus && characterSets.length) {
+      const bad = trickyMatchupLines(characterSets.filter((set) => set.videogame?.displayName === focus), LEANS_SHOWN)
+        .map((line) => line.replace(/^\*\*.+?:\*\* /, ''));
+      if (bad.length) section(lines, `Worst matchups in ${escapeMarkdown(focus)}`, bad);
+    }
+  }
   if (odds?.common.total) section(lines, `Common opponents · ${odds.common.total} in ${escapeMarkdown(odds.game)}`, commonOpponentLines(odds, tagA, tagB));
   lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. `
-    + `${odds ? 'Odds work like /predict, and characters' : 'Characters'} and stages only show up if the TO reported them`);
+    + `${odds ? 'Odds work like /predict, and characters' : 'Characters'} and stages only show up if the TO reported them, and that can be out of date`);
   return withLines(baseEmbed(colors.clash).setTitle(`${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`), lines);
 }

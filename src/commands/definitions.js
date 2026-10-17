@@ -103,7 +103,7 @@ export const commands = [
     name: 'scout', description: 'Scout any start.gg opponent. Needs you tracked or linked, with Discord connected on start.gg',
     options: [
       { type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true },
-      verboseOption('Much more of their history, habits, matchups, stages and your odds against them. Slower'),
+      verboseOption('More history, habits, toughest opponents and worst matchups, stages and your odds. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and your Melee odds' },
     ],
   },

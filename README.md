@@ -46,13 +46,13 @@ Anyone can change `/stream` and `/sets` for tracked players. Use `/messages` for
 | `/stats` | Recent record, placements, and biggest upset. | Lifetime results, opponents, and seed performance. |
 | `/h2h opponent:<name or link/ID>` | Overall record, last 10 meetings, and one-line predicted odds. | Every meeting, splits, streaks, and one-line predicted odds. |
 | `/predict opponent:<name or link/ID>` | Estimated odds of winning. | The same odds, with the reasoning behind them. |
-| `/scout profile:<link or ID>` | Any opponent's form, characters, and your head-to-head. | More history, habits, matchups, stages, and your odds. |
+| `/scout profile:<link or ID>` | Any opponent's form, characters, toughest opponents and worst matchups, and your head-to-head. | More history, habits, toughest opponents and worst matchups, stages, and your odds. |
 | `/progress` | Last 30 days against the previous 30, with changes in win rates and placements. | More detail on each period and a 6-month trend. |
 | `/characters` | Reported characters in Ultimate or Melee. | More history and other games with reported characters. |
 
 Add `player:<name or link/ID>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/h2h` odds run the same prediction as `/predict` but stay one line. `verbose:True` doesn't change them, use `/predict` for the reasoning. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
 
-These reports count singles and leave DQs out of set records. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
+These reports count singles and leave DQs out of set records. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters, and replies privately.
 
 ### Registration
 

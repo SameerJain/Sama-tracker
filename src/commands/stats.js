@@ -141,7 +141,7 @@ async function characters(interaction) {
   const player = readPlayer(interaction);
   if (!player) return replyNoPlayer(interaction);
 
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const verbose = flag(interaction, 'verbose');
   const picked = interaction.options.getInteger('game');
   let sets = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s reported characters`, characterHistory(player.playerId));
