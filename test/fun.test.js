@@ -6,6 +6,7 @@ delete process.env.ANTHROPIC_API_KEY;
 const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../src/fun/smashwiki.js');
 const { addCommunity, searchVideos } = await import('../src/fun/youtube.js');
 const { billsImagePool } = await import('../src/fun/bills.js');
+const { default: bills } = await import('../src/fun/bills.js');
 const { funMessage, makeFun } = await import('../src/fun/generated.js');
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
@@ -136,6 +137,37 @@ test('bills images come from the fan, player, team, stadium and mascot Commons c
     name: 'Bills fan', image: 'https://images.example/fan.jpg', page: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg',
   }]);
   assert.deepEqual(asked, ['Category:Bills Mafia', 'Category:Buffalo Bills players', 'Category:Buffalo Bills', 'Category:Highmark Stadium (Orchard Park, New York)', 'Category:New Highmark Stadium', 'Category:Billy Buffalo']);
+});
+
+test('bills uploads the image instead of hotlinking it', async () => {
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('commons.wikimedia.org')) return json({ query: { pages: [
+      { title: 'File:Bills fan.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/fan.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg' }] },
+    ] } });
+    return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
+  };
+  const post = await bills.takePost();
+  assert.ok(Buffer.isBuffer(post.file.attachment));
+  assert.equal(post.file.name, 'bills.jpg');
+  const reply = bills.format(post);
+  assert.equal(reply.embeds[0].data.image.url, 'attachment://bills.jpg');
+  assert.deepEqual(reply.files, [post.file]);
+  assert.match(reply.embeds[0].data.footer.text, /Wikimedia Commons/);
+});
+
+test('bills falls back to the image url when the download fails', async () => {
+  console.error = () => {};
+  try {
+    // the pool is cached from the last test, so this only breaks the download
+    globalThis.fetch = async () => { throw new Error('nope'); };
+    const post = await bills.takePost();
+    assert.equal(post.file, undefined);
+    const reply = bills.format(post);
+    assert.equal(reply.embeds[0].data.image.url, 'https://images.example/fan.jpg');
+    assert.deepEqual(reply.files, []);
+  } finally {
+    console.error = originalError;
+  }
 });
 
 test('the message lists the game\'s points, then the video and article as more of them', () => {

@@ -39,6 +39,14 @@ export async function billsImagePool() {
 
 let images;
 
+// discord can't always load wikimedia images, so upload the file like the smash posts do
+async function download(image) {
+  const res = await fetch(image, { headers: { 'User-Agent': 'Sama-tracker' }, signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`Wikimedia Commons image returned ${res.status}`);
+  const extension = new URL(image).pathname.split('.').pop().toLowerCase();
+  return { attachment: Buffer.from(await res.arrayBuffer()), name: `bills.${extension}` };
+}
+
 async function takePost() {
   images ??= billsImagePool();
   let pool;
@@ -49,10 +57,15 @@ async function takePost() {
     throw err;
   }
   if (!pool.length) throw new Error('Wikimedia Commons found no Bills images');
-  return {
-    ...pool[Math.floor(Math.random() * pool.length)],
-    title: TITLES[Math.floor(Math.random() * TITLES.length)],
-  };
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  // a failed download falls back to the url, which discord usually still loads
+  let file;
+  try {
+    file = await download(picked.image);
+  } catch (err) {
+    console.error('bills image download failed:', err.message);
+  }
+  return { ...picked, file, title: TITLES[Math.floor(Math.random() * TITLES.length)] };
 }
 
 export default {
@@ -60,5 +73,8 @@ export default {
   line: 'GO BILLS! 🦬🔥',
   enabled: true,
   takePost,
-  format: ({ title, image, page, name }) => ({ embeds: [embeds.funImage(title, image, page, name)] }),
+  format: ({ title, image, file, page, name }) => ({
+    embeds: [embeds.funImage(title, file ? `attachment://${file.name}` : image, page, name)],
+    files: file ? [file] : [],
+  }),
 };
