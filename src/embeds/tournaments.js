@@ -344,6 +344,8 @@ export function run(player, tournament, runs) {
   const cards = withLines(tournamentEmbed(colors.live, `${player.tag}'s run · ${count(statuses.length, 'bracket')}`, tournament), overview);
   for (const status of statuses.filter(({ entry }) => entry.started)) {
     const card = baseEmbed(colors.live).setTitle(escapeMarkdown(eventTitle(status.entry))).setURL(startggUrl(status.entry.eventSlug));
+    const image = tournament.images?.[0]?.url;
+    if (image) card.setThumbnail(image);
     cards.push(...withLines(card, [statusText(status), '', ...runLines(status)]));
   }
   return cards;

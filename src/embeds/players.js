@@ -160,6 +160,7 @@ export function characters(player, usage, { game, file, note, searched = 0 } = {
     .setTitle(escapeMarkdown(player.tag))
     .setURL(startggUrl(player.slug));
   if (file) embed.setThumbnail(`attachment://${file}`);
+  else if (player.image) embed.setThumbnail(player.image);
 
   const sets = game ? `${game} singles set` : 'singles set';
   const from = `their last ${count(usage.scanned, sets)}`;

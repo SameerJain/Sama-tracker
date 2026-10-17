@@ -59,9 +59,11 @@ export function progress(player, periods, { verbose = false, characterSets = nul
   const inGame = (period, game) => period.summary.games.find((entry) => entry.game === game);
   const games = [...new Set(periods.flatMap((period) => period.summary.games.map(({ game }) => game)))];
   if (!games.length) {
-    return [baseEmbed(colors.brand).setTitle(title).setDescription(melee
+    const empty = baseEmbed(colors.brand).setTitle(title).setDescription(melee
       ? `No Melee singles results in the last ${days * periods.length} days.`
-      : `No singles results in the last ${days * periods.length} days.`)];
+      : `No singles results in the last ${days * periods.length} days.`);
+    if (player.image) empty.setThumbnail(player.image);
+    return [empty];
   }
   const range = ({ since, until }) => `<t:${since}:d> to <t:${until}:d>`;
 
@@ -84,7 +86,9 @@ export function progress(player, periods, { verbose = false, characterSets = nul
     } else {
       lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in. Seeds go by placement tier, and close sets went to the last game`);
     }
-    return withLines(baseEmbed(colors.brand, `${FOOTER} · ${game}`).setTitle(title).setURL(startggUrl(player.slug)), lines);
+    const card = baseEmbed(colors.brand, `${FOOTER} · ${game}`).setTitle(title).setURL(startggUrl(player.slug));
+    if (player.image) card.setThumbnail(player.image);
+    return withLines(card, lines);
   });
 }
 

@@ -121,7 +121,9 @@ export function scout(player, opponent, mine, theirs, characterSets, { melee = f
   section(lines, `You vs ${escapeMarkdown(opponent.tag)}`, h2h.length ? h2h
     : [melee ? 'You haven\'t played each other in Melee singles, as far back as this checks.' : 'You haven\'t played each other in singles, as far back as this checks.']);
   lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date. \`verbose:True\` for the full report`);
-  return withLines(baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(`Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug)), lines);
+  const card = baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(`Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug));
+  if (opponent.image) card.setThumbnail(opponent.image);
+  return withLines(card, lines);
 }
 
 // /scout verbose. their lifetime cards, then how they play, their characters and stages, and how you match up.
@@ -234,5 +236,9 @@ function matchup(player, opponent, { meetings, odds, melee = false, mine = [], p
   if (odds?.common.total) section(lines, `Common opponents · ${odds.common.total} in ${escapeMarkdown(odds.game)}`, commonOpponentLines(odds, tagA, tagB));
   lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. `
     + `${odds ? 'Odds work like /predict, and characters' : 'Characters'} and stages only show up if the TO reported them, and that can be out of date`);
-  return withLines(baseEmbed(colors.clash).setTitle(`${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`), lines);
+  const card = baseEmbed(colors.clash)
+    .setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) })
+    .setTitle(`${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`);
+  if (opponent.image) card.setThumbnail(opponent.image);
+  return withLines(card, lines);
 }

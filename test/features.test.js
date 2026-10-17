@@ -267,6 +267,45 @@ test('scout verbose goes through their whole history and every event, and stays 
   assert.deepEqual(titles.filter(Boolean), ['Deep', 'Form and tendencies', 'Characters and stages', 'Active vs Deep']);
 });
 
+test('progress, scout, characters and run cards show the start.gg profile picture', async () => {
+  const { characterUsage } = await import('../src/characters.js');
+  const crew = { ...crewPlayer, tag: 'Crew', slug: 'user/crew', image: 'https://images.example/crew.png' };
+  const target = { userId: 2, playerId: 99, tag: 'Target', slug: 'user/target', image: 'https://images.example/target.png' };
+  const until = 200 * DAY;
+
+  // /progress, a game with results and the empty card
+  const sets = [result('p1', until - DAY, [10, 'Crew', 1], [20, 'Rival', 2], true, [2, 0])];
+  const [progressCard] = embeds.progress(crew, periodsFor(crew, sets, [], until)).map((card) => card.toJSON());
+  assert.equal(progressCard.thumbnail.url, crew.image);
+  const [emptyCard] = embeds.progress(crew, periodsFor(crew, [], [], until)).map((card) => card.toJSON());
+  assert.equal(emptyCard.thumbnail.url, crew.image);
+
+  // /scout quick shows the opponent
+  const theirs = [result('m1', 900, [99, 'Target', 2], [50, 'Common', 1], true, [2, 0])];
+  const [scoutCard] = embeds.scout(crew, target, [], theirs, []).map((card) => card.toJSON());
+  assert.equal(scoutCard.thumbnail.url, target.image);
+
+  // /scout verbose matchup shows the caller as author and the opponent as thumbnail
+  const report = embeds.scoutReport(crew, target, { mine: [], theirs, characterSets: [], events: [], odds: null, players: {} }).map((card) => card.toJSON());
+  const versus = report.at(-1);
+  assert.equal(versus.title, 'Crew vs Target');
+  assert.equal(versus.author.icon_url, crew.image);
+  assert.equal(versus.thumbnail.url, target.image);
+
+  // /characters falls back to it without art, art still wins
+  assert.equal(embeds.characters(crew, characterUsage([]), {}).toJSON().thumbnail.url, crew.image);
+  assert.equal(embeds.characters(crew, characterUsage([]), { file: 'character-1386.png' }).toJSON().thumbnail.url, 'attachment://character-1386.png');
+
+  // /run per-event cards show the tournament picture like the overview
+  const tournament = { name: 'Local', slug: 'tournament/local', images: [{ url: 'https://images.example/local.png' }] };
+  const cards = embeds.run(crew, tournament, [
+    runIn('Singles', { sets: [['1', 3, 'Rival', 'Winners round 1', true]] }),
+    runIn('Doubles', { sets: [['2', 3, 'Team', 'Winners round 1', true]] }),
+  ]);
+  assert.ok(cards.length > 2);
+  for (const card of cards) assert.equal(card.toJSON().thumbnail.url, 'https://images.example/local.png');
+});
+
 test('period history paginates through edits and filters by completion time', async () => {
   const node = (id, completedAt) => ({
     id, completedAt, winnerId: 10, event: { slug: 'event/test' },
