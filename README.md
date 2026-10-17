@@ -54,6 +54,7 @@ Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message f
 /socials                                       streams and social links saved for this server
 /socials_edit add name:<who> link:<url>        add a link
 /socials_edit remove link:<link>               remove one
+/profile user:<@someone>                       their start.gg profile, if it has their Discord connected
 /messages                                      show or change automatic posts
 ```
 
@@ -62,6 +63,8 @@ Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message f
 ```
 /socials_edit add name:abbrchive link:youtube.com/@abbrchive/featured
 ```
+
+`/profile` links a server member's start.gg profile, or yours if you leave `user` out. It only counts a start.gg that has their Discord connected, checked on start.gg each time, so nobody can claim someone else's. start.gg can't be searched by Discord, so the bot goes through the accounts it already knows: tracked players, `/link`, and anyone it has seen registered with Discord connected through reg reminders, `/registered` or `/reg_warn`. It keeps the last 5000 of those. If none match, it reads who's registered for the current reg reminder tournaments. Someone it can't find can connect Discord on start.gg and run `/link`.
 
 `/messages` turns each kind of automatic post on or off for the whole server and sets when the recap goes out. Every option is optional, so you can change several at once, or run it with none to see where things stand. Changes save right away and survive restarts.
 
@@ -107,7 +110,8 @@ Linking doesn't track you. You won't be in `/track list` or the player picker, s
 /h2h opponent:<name> verbose:True              every set, plus splits and streaks
 /stats                                         recent set record, best finish, biggest upset
 /stats verbose:True                            lifetime report
-/characters                                    Ultimate characters from reported games
+/characters                                    characters from reported Ultimate or Melee games
+/characters game:Melee                         just Melee, or game:Ultimate for just Ultimate
 /characters verbose:True                       every game with characters reported
 /predict opponent:<name>                       your odds of beating them
 /predict opponent:<name> verbose:True          how each part of the prediction counts
@@ -185,7 +189,7 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 
 With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game, or a stage for P+. Otherwise they just say the line.
 
-`/characters` is Ultimate only unless you add `verbose:True`, which gives a card for each game they have characters reported in, up to 6. It looks at their last 400 singles sets, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg.
+`/characters` shows one game, Ultimate or Melee. Pick it with `game`, or leave it out to get whichever of the two has more games with characters reported, or more sets if neither has any. `verbose:True` puts that game first, then a card for each other game they have characters reported in, up to 6 in all. A game you picked always gets its card, even with nothing reported. It looks at their last 400 singles sets in every game, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg.
 
 `/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked.
 

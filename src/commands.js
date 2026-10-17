@@ -14,6 +14,7 @@ import { predict as predictOdds } from './predict.js';
 import { characterUsage } from './characters.js';
 import { periodSummary } from './reports.js';
 import { MESSAGE_TYPES, WEEKDAYS, messageSettings } from './message-settings.js';
+import { findAccount, rememberAccounts } from './accounts.js';
 
 const HISTORY_PAGES = 15; // 40 sets a page
 // 3000 sets, about a minute the first time for someone who's played that many
@@ -32,6 +33,8 @@ const LIFETIME_CACHE_PLAYERS = 5;
 const RECENT_ALL_PLAYERS = 40;
 // /characters verbose, so the cards fit in one message
 const CHARACTER_GAMES = 6;
+// /characters game choices. left out, it goes with whichever has more reported
+const PICKABLE_GAMES = [{ id: startgg.ULTIMATE, displayName: 'Ultimate' }, { id: startgg.MELEE, displayName: 'Melee' }];
 // /progress compares the last two of these, verbose lists this many as a trend
 const PROGRESS_DAYS = 30;
 const TREND_PERIODS = 6;
@@ -120,6 +123,11 @@ export const commands = [
     options: [{ type: Option.String, name: 'profile', description: 'Your start.gg profile link or ID', required: true }],
   },
   { name: 'unlink', description: 'Unlink the start.gg you linked with /link' },
+  {
+    name: 'profile',
+    description: 'Someone\'s start.gg profile, if their start.gg has their Discord connected',
+    options: [{ type: Option.User, name: 'user', description: 'Server member, leave out for yourself' }],
+  },
   { name: 'upcoming', description: 'Upcoming tournaments', options: [playerOption(YOU_OR_ALL, 'player', false)] },
   { name: 'recent', description: 'Latest reported sets', options: [playerOption(YOU_OR_ALL, 'player', false)] },
   { name: 'run', description: 'Current tournament run and next opponent', options: [playerOption(YOU, 'player', false)] },
@@ -148,8 +156,15 @@ export const commands = [
   },
   {
     name: 'characters',
-    description: 'Ultimate characters a player has reported',
-    options: [playerOption(YOU, 'player', false), verboseOption('Every game they have characters reported in, going further back, slower')],
+    description: 'Characters a player has reported in Ultimate or Melee',
+    options: [
+      playerOption(YOU, 'player', false),
+      {
+        type: Option.Integer, name: 'game', description: 'Ultimate or Melee, leave out for whichever has more reported',
+        choices: PICKABLE_GAMES.map((game) => ({ name: game.displayName, value: game.id })),
+      },
+      verboseOption('Every other game they have characters reported in too, going further back. Slower'),
+    ],
   },
   {
     name: 'predict',
@@ -259,6 +274,8 @@ export async function handleCommand(interaction) {
       return link(interaction);
     case 'unlink':
       return unlink(interaction);
+    case 'profile':
+      return profile(interaction);
     case 'upcoming':
       return upcoming(interaction);
     case 'recent':
@@ -577,6 +594,27 @@ function unlink(interaction) {
   return interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }
 
+// goes by the discord connected on start.gg, so nobody can claim someone else's
+async function profile(interaction) {
+  const picked = interaction.options.getUser('user');
+  const user = picked ?? interaction.user;
+  const member = picked ? interaction.options.getMember('user') : interaction.member;
+  if (!member) return interaction.reply({ content: 'Pick someone in this server.', flags: MessageFlags.Ephemeral });
+  if (user.bot) return interaction.reply({ content: 'Bots don\'t have start.gg accounts.', flags: MessageFlags.Ephemeral });
+
+  await interaction.deferReply();
+  const account = await findAccount(user.id);
+  if (account) return interaction.editReply({ embeds: [embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })] });
+  if (user.id === interaction.user.id) {
+    return interaction.editReply('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.');
+  }
+  // their name and not a mention, so nobody gets pinged. a name can spell out a role mention, so mentions are off too
+  return interaction.editReply({
+    content: `Couldn't find a start.gg with ${escapeMarkdown(member.displayName)}'s Discord connected.\n-# start.gg can't be searched by Discord, so this only finds tracked players, people who used \`/link\` and people registered for tournaments the bot has checked`,
+    allowedMentions: { parse: [] },
+  });
+}
+
 async function upcoming(interaction) {
   const choice = readChoice(interaction);
   if (!choice) return replyNoPlayer(interaction);
@@ -813,19 +851,27 @@ async function characters(interaction) {
 
   await interaction.deferReply();
   const verbose = interaction.options.getBoolean('verbose');
+  const picked = interaction.options.getInteger('game');
   const sets = await (verbose ? lifetimeCharacterHistory : characterHistory)(player.playerId);
   const usageIn = (game) => ({ game, usage: characterUsage(sets.filter((set) => set.videogame.id === game.id)) });
+  const mostGames = (a, b) => b.usage.games - a.usage.games;
 
-  let cards = [usageIn({ id: startgg.ULTIMATE, displayName: 'Ultimate' })];
+  // left out, it's the one with more reported games, then more sets. a tie goes to ultimate
+  const pickable = PICKABLE_GAMES.map(usageIn);
+  const top = pickable.find(({ game }) => game.id === picked) ?? pickable.reduce((a, b) => ((mostGames(a, b) || b.usage.scanned - a.usage.scanned) > 0 ? b : a));
+
+  let cards = [top];
   let note;
   if (verbose) {
-    // a card for each game with characters reported, most games first
     const games = [...new Map(sets.map((set) => [set.videogame.id, set.videogame])).values()].map(usageIn);
-    cards = games.filter(({ usage }) => usage.reported)
-      .sort((a, b) => b.usage.games - a.usage.games)
-      .slice(0, CHARACTER_GAMES);
+    // picked goes first even with nothing reported, since it's what they asked about
+    const first = picked || top.usage.reported ? [top] : [];
+    // then a card for each other game with characters reported, most games first
+    const rest = games.filter(({ game, usage }) => game.id !== top.game.id && usage.reported).sort(mostGames);
+    cards = [...first, ...rest].slice(0, CHARACTER_GAMES);
     // so it's clear the rest got looked at too
-    const unreported = games.filter(({ usage }) => !usage.reported).sort((a, b) => b.usage.scanned - a.usage.scanned).map(({ game }) => game.displayName);
+    const unreported = games.filter(({ game, usage }) => !usage.reported && !cards.some((card) => card.game.id === game.id))
+      .sort((a, b) => b.usage.scanned - a.usage.scanned).map(({ game }) => game.displayName);
     const shown = unreported.length > 4 ? [...unreported.slice(0, 3), `${unreported.length - 3} other games`] : unreported;
     if (cards.length && shown.length) note = `No characters reported for ${new Intl.ListFormat('en').format(shown)}`;
     if (!cards.length) cards = [{ usage: characterUsage(sets) }];
@@ -836,7 +882,9 @@ async function characters(interaction) {
     ? startgg.getCharacterArt(usage.characters[0].name, game.id).catch(() => null)
     : null)));
   await interaction.editReply({
-    embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, game?.displayName, art[i]?.name, i === cards.length - 1 ? note : undefined)),
+    embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, {
+      game: game?.displayName, file: art[i]?.name, note: i === cards.length - 1 ? note : undefined, searched: sets.length,
+    })),
     files: art.filter(Boolean),
   });
 }
@@ -1039,6 +1087,7 @@ async function registered(interaction) {
   if (!found) return interaction.editReply(tournamentNotFound(input));
 
   const participants = await startgg.getParticipants(found.id);
+  rememberAccounts(participants);
   const linked = participants.filter((participant) => participant.discordId);
   const members = await serverMembers(interaction.guild, [...new Set(linked.map((participant) => participant.discordId))]);
   // their name in this server goes on the card instead of a mention
@@ -1061,6 +1110,7 @@ async function regWarn(interaction) {
   if (!tournament) return interaction.editReply(tournamentNotFound(input));
 
   const participants = await startgg.getParticipants(tournament.id);
+  rememberAccounts(participants);
   if (participants.some((participant) => participant.discordId === user.id)) {
     const name = interaction.options.getMember('user')?.displayName ?? user.displayName;
     return interaction.editReply(`Already registered.\n-# ${escapeMarkdown(name)} · ${escapeMarkdown(tournament.name)}`);

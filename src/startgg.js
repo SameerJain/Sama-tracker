@@ -136,15 +136,15 @@ export async function getPlayer(id) {
   };
 }
 
-// [userId, { tag, image, discordId }] for each of them, null if they're gone from start.gg
+// [userId, { slug, tag, image, discordId }] for each of them, null if they're gone from start.gg
 export async function getProfiles(userIds) {
   const data = await lookupMany(userIds, (group) => `{
-    ${group.map((id) => `u${id}: user(id: ${id}) { images(type: "profile") { url } player { gamerTag } authorizations(types: [DISCORD]) { externalId } }`).join('\n')}
+    ${group.map((id) => `u${id}: user(id: ${id}) { slug images(type: "profile") { url } player { gamerTag } authorizations(types: [DISCORD]) { externalId } }`).join('\n')}
   }`);
 
   return userIds.map((userId) => {
     const user = data[`u${userId}`];
-    return [userId, user?.player ? { tag: user.player.gamerTag, image: user.images?.[0]?.url, discordId: user.authorizations?.[0]?.externalId } : null];
+    return [userId, user?.player ? { slug: user.slug, tag: user.player.gamerTag, image: user.images?.[0]?.url, discordId: user.authorizations?.[0]?.externalId } : null];
   });
 }
 
@@ -399,6 +399,7 @@ export async function getCharacterSets(playerId, page, perPage = 40) {
 }
 
 export const ULTIMATE = 1386;
+export const MELEE = 1;
 
 // rosters don't change, so each game's only gets fetched once
 const rosters = new Map();

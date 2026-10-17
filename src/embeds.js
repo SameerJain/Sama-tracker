@@ -1096,8 +1096,9 @@ function characterRank(usage, character, i) {
   return `${i + 1}\\. ${name}${share} · ${won}`;
 }
 
-// file is the uploaded art of their main. no game means it covers every game. note goes at the bottom
-export function characters(player, usage, game, file, note) {
+// file is the uploaded art of their main. no game means it covers every game. note goes at the bottom.
+// searched is how many sets got looked through across every game
+export function characters(player, usage, { game, file, note, searched = 0 } = {}) {
   const embed = baseEmbed(colors.brand, game ? `Sama-tracker · ${game}` : undefined)
     .setAuthor({ name: 'Characters' })
     .setTitle(escapeMarkdown(player.tag))
@@ -1106,8 +1107,11 @@ export function characters(player, usage, game, file, note) {
 
   const sets = game ? `${game} singles set` : 'singles set';
   const from = `their last ${count(usage.scanned, sets)}`;
-  if (!usage.scanned) return embed.setDescription(`No ${sets}s on start.gg yet.`);
-  if (!usage.reported) return embed.setDescription(`No characters reported in ${from}. Lots of tournaments don't bother.`);
+  let nothing;
+  // only a few hundred get looked at, so they could have older ones
+  if (!usage.scanned) nothing = searched ? `No ${sets}s in their last ${count(searched, 'singles set')}.` : `No ${sets}s on start.gg yet.`;
+  else if (!usage.reported) nothing = `No characters reported in ${from}. Lots of tournaments don't bother.`;
+  if (nothing) return embed.setDescription(note ? `${nothing}\n-# ${note}` : nothing);
 
   const lines = [];
   for (const [i, character] of usage.characters.slice(0, CHARACTERS_SHOWN).entries()) {
@@ -1194,6 +1198,18 @@ export function linked(player, previous) {
   return embed;
 }
 
+// /profile. who they are here on top, their start.gg under it
+export function profile(account, member) {
+  const url = startggUrl(account.slug);
+  const embed = baseEmbed(colors.brand)
+    .setAuthor({ name: member.name, iconURL: member.avatar })
+    .setTitle(escapeMarkdown(account.tag))
+    .setURL(url)
+    .setDescription(`[${url.replace('https://www.', '')}](${url})\n-# Discord connected on start.gg`);
+  if (account.image) embed.setThumbnail(account.image);
+  return embed;
+}
+
 export function added(player) {
   const embed = baseEmbed(colors.brand)
     .setDescription(`Now tracking ${playerLink(player)}.`);
@@ -1236,6 +1252,7 @@ export function help() {
     '**General**',
     '`/help` show the commands',
     '`/status` uptime and the last start.gg checks',
+    '`/profile` someone\'s start.gg profile, if their start.gg has their Discord connected',
     '`/socials` streams and social links saved for this server',
     '`/socials_edit` add or remove those links. Manage Server permission by default',
     '`/messages` automatic post switches and recap day/time/timezone. Manage Server permission required',
@@ -1258,7 +1275,7 @@ export function help() {
     '**Player stats**',
     '`/h2h` record against someone. `verbose:True` for every set, splits and streaks',
     '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
-    '`/characters` Ultimate characters someone has reported and how they do on each, `verbose:True` for every game',
+    '`/characters` characters someone has reported and how they do on each. `game:` Ultimate or Melee, left out it\'s whichever has more reported. `verbose:True` adds every other game, picked one first',
     '`/predict` odds of beating someone. `verbose:True` shows how each part counts',
     '`/scout profile:<link or ID>` scout any opponent. Only for tracked players with Discord connected on start.gg. `verbose:True` adds their whole history, habits, matchups, stages and your odds',
     '`/progress` last 30 days vs the previous 30, by game. `verbose:True` adds games, close sets, seeds, upsets, rematches and a 6 month trend',

@@ -91,6 +91,8 @@ test('registered lists only server members by name, with their events, and menti
   assert.doesNotMatch(text, /Elsewhere|No Discord|Added by the TO/);
   assert.match(text, /2 of the 4 registered/);
   assert.match(reply.embeds[0].data.author.name, /Registered from this server · 1/);
+  // everyone with discord connected, in the server or not, for /profile
+  assert.deepEqual(state.accounts, { 'in-server': 1, 'not-in-server': 2 });
 });
 
 test('reg_warn says already registered without a mention or a ping', async () => {

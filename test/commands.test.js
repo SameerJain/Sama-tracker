@@ -64,7 +64,7 @@ function respond(query, variables) {
   }
   if (query.includes('tournamentView')) return each({ tournaments: { nodes: [] } });
   if (query.includes('tournaments(query:')) return each({ tournaments: { nodes: [live] } });
-  if (query.includes('authorizations')) return each({ images: [], player: { gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] });
+  if (query.includes('authorizations')) return each({ slug: 'user/crew', images: [], player: { gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] });
   if (aliases.length) return each({ sets: { nodes: sets } });
   if (query.includes('player(id: $id)')) return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: sets } } };
   throw new Error(`no fake for ${query.slice(0, 80)}`);
@@ -99,7 +99,7 @@ function interaction(commandName, { subcommand = null, values = {}, user = 'crew
       members: { fetch: async ({ user: ids }) => { beforeAnswer(run, 'discord members'); return new Map(ids.map((id) => [id, {}])); } },
       roles: { cache: { find: () => undefined }, create: discord('discord role create', {}) },
     },
-    member: { roles: { add: discord('discord role add'), remove: discord('discord role remove') } },
+    member: { displayName: 'Crew', displayAvatarURL: () => 'https://cdn.example/crew.png', roles: { add: discord('discord role add'), remove: discord('discord role remove') } },
     memberPermissions: { has: () => true },
     client: { user: { displayAvatarURL: () => 'https://cdn.example/avatar.png' } },
     options: {
@@ -108,7 +108,7 @@ function interaction(commandName, { subcommand = null, values = {}, user = 'crew
       getBoolean: (name) => values[name] ?? null,
       getInteger: (name) => values[name] ?? null,
       getUser: () => values.user ?? null,
-      getMember: () => (values.user ? { displayName: values.user.displayName } : null),
+      getMember: () => (values.user ? { displayName: values.user.displayName, displayAvatarURL: () => 'https://cdn.example/member.png' } : null),
     },
     reply: async (result) => { calls.push(['reply', result]); run.replied = true; },
     deferReply: async () => { calls.push(['defer']); run.deferred = true; },
@@ -130,6 +130,8 @@ const runs = [
   ['track', { subcommand: 'remove', values: { player: '3' } }, /Stopped tracking Opponent/],
   ['link', { values: { profile: 'start.gg/user/opponent' }, user: 'opponent-discord' }, /Linked to Opponent/],
   ['unlink', { user: 'opponent-discord' }, /Unlinked from Opponent/],
+  ['profile', {}, /"title":"Crew","url":"https:\/\/www\.start\.gg\/user\/crew"/],
+  ['profile', { values: { user: { id: 'stranger', bot: false, displayName: 'Stranger' } } }, /Couldn't find a start\.gg with Stranger's Discord connected/],
   ['upcoming', {}, /Live · Crew/], ['upcoming', { values: { player: 'all' } }, /Live · everyone/],
   ['recent', {}, /W · Crew 2-1 Rival/], ['recent', { values: { player: 'all' } }, /Crew 2-1 Rival/],
   ['run', {}, /Crew's run/], ['progress', {}, /Crew's progress/], ['progress', { values: { verbose: true } }, /Every 30 days, newest first/],

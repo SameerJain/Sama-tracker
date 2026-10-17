@@ -3,6 +3,7 @@ import * as embeds from './embeds.js';
 import { state, save } from './store.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
 import { messageEnabled, messageSettings } from './message-settings.js';
+import { rememberAccounts } from './accounts.js';
 
 const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
@@ -429,7 +430,9 @@ export async function postRegReminders(postChannel = channel) {
       const dueAt = deadline - REG_REMINDER_HOURS[due] * HOUR;
       if (tournament.isRegistrationOpen && messageEnabled('registration', dueAt)) {
         // people one by one, a role ping would hit the ones already registered
-        const registered = new Set((await startgg.getParticipants(tournament.id)).map((participant) => participant.discordId));
+        const participants = await startgg.getParticipants(tournament.id);
+        rememberAccounts(participants);
+        const registered = new Set(participants.map((participant) => participant.discordId));
         const ping = state.regPings.filter((id) => !registered.has(id));
         // the embed goes with the first batch of pings, or alone if there's nobody to ping
         for (let i = 0; i === 0 || i < ping.length; i += MENTIONS_PER_MESSAGE) {
