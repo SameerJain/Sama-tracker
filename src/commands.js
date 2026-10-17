@@ -41,9 +41,10 @@ const PICKABLE_GAMES = [{ id: startgg.ULTIMATE, displayName: 'Ultimate' }, { id:
 // /progress compares the last two of these, verbose lists this many as a trend
 const PROGRESS_DAYS = 30;
 const TREND_PERIODS = 6;
-// a slow lookup's reply says how far along start.gg is once there's at least this long left.
-// the first check waits for the first pages, since those say how many more there are
+// a slow lookup's reply says how far along start.gg is once there's at least this long left, or this long
+// with a quick answer to show meanwhile. the first check waits for the first pages, since those say how many more there are
 const WAIT_SHOWN_SECONDS = 20;
+const WAIT_PREVIEW_SECONDS = 5;
 const WAIT_FIRST_SECONDS = 5;
 const WAIT_UPDATE_SECONDS = 15;
 // /bracket shows a tournament this long before it starts
@@ -148,7 +149,7 @@ export const commands = [
     name: 'scout', description: 'Scout any start.gg opponent, for tracked players with Discord connected on start.gg',
     options: [
       { type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true },
-      verboseOption('Their whole history, habits, matchups, stages and your odds against them. Slower'),
+      verboseOption('Much more of their history, habits, matchups, stages and your odds against them. Slower'),
     ],
   },
   // discord wants required options before optional ones, so the opponent goes first
@@ -444,22 +445,23 @@ async function withCountdown(interaction, doing, work, preview) {
   let previewed = false;
   const update = () => {
     const { sent, waiting, seconds } = progress();
-    // with a preview there's something to look at, so it goes up for any wait
-    if (!waiting || seconds < (preview ? 0 : WAIT_SHOWN_SECONDS)) return;
+    // with a preview there's something to look at, so it goes up for a shorter wait
+    if (!waiting || seconds < (preview ? WAIT_PREVIEW_SECONDS : WAIT_SHOWN_SECONDS)) return;
     const content = `**${doing}** · ${sent} of ${sent + waiting} start.gg requests done, about ${roughly(seconds)} left\n`
       + '-# start.gg allows 80 requests a minute, so the first look takes a while. Asking again in the next few hours is quick';
     const payload = preview && !previewed ? { content, embeds: embeds.messages(preview)[0] } : content;
     previewed ||= Boolean(preview);
     edit = edit.then(() => interaction.editReply(payload)).catch(() => {});
   };
-  const check = (seconds) => {
+  const check = ([seconds, ...later]) => {
     timer = setTimeout(() => {
       update();
-      check(WAIT_UPDATE_SECONDS);
+      check(later.length ? later : [WAIT_UPDATE_SECONDS]);
     }, seconds * 1000);
   };
-  // a preview goes up once the pages it waits on are queued, which is right away
-  check(preview ? 0 : WAIT_FIRST_SECONDS);
+  // more pages on top of cached ones are all queued right away, so a preview can go up then. a fresh
+  // history only queues the rest once its first page is back, so it's checked again a little later
+  check(preview ? [0, WAIT_FIRST_SECONDS] : [WAIT_FIRST_SECONDS]);
   try {
     return await work;
   } finally {

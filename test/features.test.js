@@ -88,8 +88,7 @@ test('tracked callers can scout an untracked opponent without adding them', asyn
   });
   const text = reply.embeds.map(e => e.toJSON().description).join('\n');
   assert.match(text, /Fox/);
-  assert.match(text, /Your head-to-head/);
-  assert.match(text, /Ultimate: 1-0/);
+  assert.match(text, /### You vs Target\n\*\*Ultimate:\*\* 1-0/);
   assert.deepEqual(Object.keys(state.players), ['1']);
 });
 
@@ -126,29 +125,29 @@ test('scout verbose covers their history, habits, matchups, stages and your odds
   // their lifetime numbers, including how they do against the crew
   assert.equal(cards[0].author.name, 'Scouting');
   assert.equal(cards[0].title, 'Target');
-  assert.match(text, /Vs the crew: Crew 1-1/);
+  assert.match(text, /Vs the crew: \*\*Crew\*\* 1-1/);
 
-  assert.match(text, /Form and tendencies\n\*\*Recent form\*\*\nUltimate: 2-2 \(50%\) · last 4 sets · none in the last 90 days/);
+  assert.match(text, /Form and tendencies\n### Recent form\n\*\*Ultimate:\*\* 2-2 \(50%\) · last 4 sets · none in the last 90 days/);
   assert.ok(text.includes([
-    '**Habits · Ultimate**',
-    'Close sets: 1-1 (50%)',
-    'Against higher seeds 1-1 (50%) · lower seeds 1-1 (50%)',
-    'Bracket: winners side 1-0 (100%) · losers side 0-2 (0%) · grand finals 1-0 (100%)',
-    'Sweeps: won 1 of 2 without dropping a game · lost 1 of 2 without taking one',
+    '### Habits in Ultimate',
+    '**Close sets:** 1-1 (50%)',
+    '**Vs higher seeds:** 1-1 (50%) · **Vs lower seeds:** 1-1 (50%)',
+    '**Bracket:** winners side 1-0 (100%) · losers side 0-2 (0%) · grand finals 1-0 (100%)',
+    '**Sweeps:** won 1 of 2 without dropping a game · lost 1 of 2 without taking one',
   ].join('\n')), text);
-  assert.match(text, /W 2-1 vs Crew · Winners Final · \[T-m1\]/);
+  assert.match(text, /\*\*W\*\* 2-1 vs \*\*Crew\*\* · Winners Final · \[T-m1\]/);
 
-  assert.match(text, /Characters and stages\n\*\*Ultimate\*\*\n1\\\. \*\*Fox\*\* · 83% of games · won 3 of 5 \(60%\) · last <t:900:R>\n2\\\. Falco/);
-  assert.match(text, /Struggles against: Sheik 1-2 \(33%\)\nStrong against: Marth 3-0 \(100%\)\nWorst stages: Smashville 1-2 \(33%\)\nBest stages: Battlefield 3-0 \(100%\)/);
+  assert.match(text, /Characters and stages\n### Ultimate\n1\\\. \*\*Fox\*\* · 83% of games · won 3 of 5 \(60%\) · last <t:900:R>\n2\\\. \*\*Falco\*\*/);
+  assert.match(text, /\*\*Struggles against:\*\* Sheik 1-2 \(33%\)\n\*\*Strong against:\*\* Marth 3-0 \(100%\)\n\*\*Worst stages:\*\* Smashville 1-2 \(33%\)\n\*\*Best stages:\*\* Battlefield 3-0 \(100%\)/);
   assert.match(text, /Reported in 2 of their last 2 Ultimate sets/);
 
   // the same odds /predict gives, from the caller's side
   const matchup = cards.at(-1);
   assert.equal(matchup.title, 'Crew vs Target');
   const [, chance] = embeds.prediction(crew, target, odds)[0].data.title.match(/^Crew (\d+)%/);
-  assert.match(matchup.description, new RegExp(`^\\*\\*Odds:\\*\\* Crew ${chance}% · ${100 - chance}% Target in Ultimate\\n`
-    + '\\*\\*Head-to-head:\\*\\* Ultimate 1-1 \\(50%\\)\\nL 1-2 · Winners Final · \\[T-m1\\].*\\nW 2-0 · Losers Final'));
-  assert.match(matchup.description, /\*\*Common opponents · 1 in Ultimate\*\*\nCommon: Crew 1-0 · Target 1-1/);
+  assert.match(matchup.description, new RegExp(`^\\*\\*Odds:\\*\\* \\*\\*Crew\\*\\* ${chance}% · ${100 - chance}% \\*\\*Target\\*\\* in Ultimate\\n`
+    + '\\*\\*Head-to-head:\\*\\* Ultimate 1-1 \\(50%\\)\\n\\*\\*L\\*\\* 1-2 · Winners Final · \\[T-m1\\].*\\n\\*\\*W\\*\\* 2-0 · Losers Final'));
+  assert.match(matchup.description, /### Common opponents · 1 in Ultimate\n\*\*Common\*\*: \*\*Crew\*\* 1-0 · \*\*Target\*\* 1-1/);
   assert.doesNotMatch(text, /NaN|undefined|null/);
   for (const batch of embeds.messages(embeds.scoutReport(crew, target, { mine, theirs, characterSets, events, odds, players: { 1: crew } }))) {
     assert.ok(batch.length <= 10);
@@ -216,22 +215,96 @@ test('period history paginates through edits and filters by completion time', as
   assert.deepEqual((await api.getPeriodHistory(10, 100, 200)).map(s => s.id), ['inside']);
 });
 
-test('run cards use final standings and show completed and pending opponents', () => {
-  const player = { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew' };
-  const tournament = { name: 'Local', slug: 'tournament/local' };
-  const entry = { event: 'Singles', eventSlug: 'tournament/local/event/singles', entrants: 32, final: false, done: false };
-  const sides = [{ id: 1, name: 'Crew', playerIds: [10], score: 2 }, { id: 2, name: 'Rival', playerIds: [20], score: 1 }];
-  const sets = [
-    { id: '1', state: 3, winnerId: 1, completedAt: 100, round: 'Winners round 1', sides },
-    { id: '2', state: 6, round: 'Winners round 2', sides },
-  ].map(s => ({ ...s, event: { slug: entry.eventSlug } }));
-  const text = embeds.run(player, tournament, entry, sets).map(e => e.data.description).join('\n');
-  assert.match(text, /Still in/i);
-  assert.match(text, /W 2-1.*Rival/);
-  assert.match(text, /Next.*Rival/);
-  const ended = embeds.run(player, tournament, { ...entry, final: true, placement: 5 }, sets).map(e => e.data.description).join('\n');
-  assert.match(ended, /Finished.*5th/i);
-  assert.doesNotMatch(ended, /Next.*Rival/);
+const runPlayer = { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew' };
+const runTournament = { name: 'Local', slug: 'tournament/local' };
+// a run in one event: entry like getTournament's, sets like getRunSets'. Crew is entrant 1
+const runIn = (event, { started = true, sets = [], ...entry } = {}) => {
+  const eventSlug = `tournament/local/event/${event.toLowerCase().replaceAll(' ', '-')}`;
+  return {
+    entry: { event, eventSlug, entrants: 32, started, final: false, done: false, ...entry },
+    sets: sets.map(([id, setState, opponent, round, won]) => ({
+      id, state: setState, round, completedAt: setState === 3 ? Number(id) : null, winnerId: setState === 3 ? (won ? 1 : 2) : null,
+      event: { slug: eventSlug },
+      sides: [{ id: 1, name: 'Crew', playerIds: [10], score: setState === 3 ? (won ? 2 : 0) : null }, { id: 2, name: opponent, playerIds: [20], score: setState === 3 ? (won ? 1 : 2) : null }],
+    })),
+  };
+};
+const descriptions = cards => cards.map(e => e.data.description).join('\n');
+
+test('a run in one bracket shows the sets so far, the final standing and what is next', () => {
+  const run = runIn('Singles', { sets: [['1', 3, 'Rival', 'Winners round 1', true], ['2', 6, 'Rival', 'Winners round 2']] });
+  const cards = embeds.run(runPlayer, runTournament, [run]);
+  assert.equal(cards.length, 1);
+  const text = descriptions(cards);
+  assert.match(text, /Still in the bracket/);
+  assert.match(text, /\*\*W\*\* 2-1 vs \*\*Rival\*\*/);
+  assert.match(text, /\*\*Next:\*\* called vs \*\*Rival\*\* · \[Winners round 2\]/);
+  const ended = descriptions(embeds.run(runPlayer, runTournament, [{ ...run, entry: { ...run.entry, final: true, placement: 5 } }]));
+  assert.match(ended, /Finished 5th of 32/);
+  assert.doesNotMatch(ended, /Next/);
+});
+
+test('a run in several brackets at once puts the one that needs them soonest first', () => {
+  const cards = embeds.run(runPlayer, runTournament, [
+    runIn('Melee Singles', { sets: [['1', 3, 'Fox Main', 'Winners round 1', true], ['5', 1, 'Marth Main', 'Winners round 2']] }),
+    runIn('Brawl Singles', { done: true, final: true, placement: 3, sets: [['2', 3, 'Snake', 'Winners final', false]] }),
+    runIn('Ultimate Singles', { sets: [['3', 3, 'Steve', 'Winners round 1', true], ['6', 6, 'Kazuya', 'Winners round 2']] }),
+    runIn('64 Singles', { started: false }),
+    runIn('P+ Singles', { sets: [['4', 3, 'Someone', 'Losers round 1', false]] }),
+    runIn('Smash 4 Singles', { sets: [['7', 7, 'Bayo', 'Winners round 1']] }),
+    runIn('Doubles', { sets: [['8', 4, 'Team', 'Winners round 1']] }),
+  ]);
+  const overview = cards[0].data;
+  assert.equal(overview.author.name, 'Crew\'s run · 7 brackets');
+  assert.deepEqual(overview.description.split('\n').slice(0, 7), [
+    '**Ultimate Singles** (1-0) · called vs **Kazuya** · [Winners round 2](https://www.start.gg/tournament/local/event/ultimate-singles/set/6)',
+    '**Smash 4 Singles** · queued vs **Bayo** · [Winners round 1](https://www.start.gg/tournament/local/event/smash-4-singles/set/7)',
+    '**Doubles** · ready vs **Team** · [Winners round 1](https://www.start.gg/tournament/local/event/doubles/set/8)',
+    '**Melee Singles** (1-0) · next vs **Marth Main** · [Winners round 2](https://www.start.gg/tournament/local/event/melee-singles/set/5)',
+    '**P+ Singles** (0-1) · waiting for the next opponent',
+    '**64 Singles** · hasn\'t started yet',
+    '**Brawl Singles** (0-1) · finished 🥉 3rd of 32',
+  ]);
+  // a card for each that started, in the same order
+  assert.deepEqual(cards.slice(1).map(card => card.data.title), [
+    'Ultimate Singles · 32 entrants', 'Smash 4 Singles · 32 entrants', 'Doubles · 32 entrants', 'Melee Singles · 32 entrants', 'P+ Singles · 32 entrants', 'Brawl Singles · 32 entrants',
+  ]);
+  assert.match(descriptions(cards.slice(1, 2)), /\*\*Next:\*\* called vs \*\*Kazuya\*\*/);
+  assert.match(descriptions(cards.slice(-1)), /Finished 🥉 3rd of 32\n\n\*\*L\*\* 0-2 vs \*\*Snake\*\*/);
+});
+
+test('/run asks for every bracket they are in at once', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...runPlayer } };
+  state.tournaments = {};
+  const asked = [];
+  mockApi(({ query, variables }) => {
+    if (query.includes('tournaments(query:')) return { u1: { tournaments: { nodes: [{ id: 5, name: 'Local', slug: 'tournament/local', startAt: now - 3600, endAt: now + 3600 }] } } };
+    if (query.includes('userEntrant')) {
+      return { tournament: { id: 5, name: 'Local', slug: 'tournament/local', startAt: now - 3600, endAt: now + 3600, events: [
+        { id: 50, name: 'Ultimate Singles', slug: 'tournament/local/event/ultimate', state: 'ACTIVE', numEntrants: 40, u1: { id: 1, standing: null } },
+        { id: 51, name: 'Melee Singles', slug: 'tournament/local/event/melee', state: 'ACTIVE', numEntrants: 20, u1: { id: 1, standing: null } },
+        { id: 52, name: '64 Singles', slug: 'tournament/local/event/64', state: 'CREATED', numEntrants: 12, u1: { id: 1, standing: null } },
+        { id: 53, name: 'Brawl Singles', slug: 'tournament/local/event/brawl', state: 'ACTIVE', numEntrants: 8, u1: null },
+      ] } };
+    }
+    asked.push(variables.id);
+    const opponent = variables.id === 50 ? 'Steve' : 'Fox Main';
+    return { event: { sets: { pageInfo: { totalPages: 1 }, nodes: [{
+      id: variables.id * 10, state: variables.id === 51 ? 6 : 1, fullRoundText: 'Winners round 2', event: { slug: 'tournament/local/event/x' },
+      slots: [[1, 10, 'Crew'], [2, 20, opponent]].map(([id, player, name]) => ({ entrant: { id, name, initialSeedNum: 1, participants: [{ player: { id: player } }] }, standing: null })),
+    }] } } };
+  });
+  let reply;
+  await handleCommand({
+    commandName: 'run', user: { id: 'anyone' }, deferred: true,
+    options: { getSubcommand: () => null, getString: () => '1' },
+    deferReply: async () => {}, editReply: async (r) => { reply = r; },
+  });
+  // not the one that hasn't started, or the one they aren't in
+  assert.deepEqual(asked.toSorted(), [50, 51]);
+  const text = reply.embeds.map(e => e.toJSON().description).join('\n');
+  assert.match(text, /^\*\*Melee Singles\*\* · called vs \*\*Fox Main\*\*.*\n\*\*Ultimate Singles\*\* · next vs \*\*Steve\*\*.*\n\*\*64 Singles\*\* · hasn't started yet/);
 });
 
 test('progress handles placements without sets or seeds without inventing win rates', () => {
@@ -270,13 +343,26 @@ test('progress verbose digs into both periods, says what changed, and shows six 
   const periods = periodsFor(crewPlayer, sets, events, until, 6);
   const text = embeds.progress(crewPlayer, periods, { verbose: true, characterSets }).map(e => e.toJSON().description).join('\n');
 
-  assert.match(text, /Sets: 2-1 \(67%\)\nGames: 5-3 \(63%\)\nClose sets: 1-1 \(50%\)\nAgainst higher seeds 1-0 \(100%\) · lower seeds 1-1 \(50%\)/);
-  assert.match(text, /Best win: beat Rival \(seed 2\) 2-1 as seed 9/);
-  assert.match(text, /Worst loss: lost to Upset \(seed 25\) 1-2 as seed 1/);
-  assert.match(text, /Game record by character: Fox 2-0 \(100%\)/);
-  assert.match(text, /Game record by character: Falco 0-1 \(0%\)/);
-  assert.match(text, /\*\*What changed\*\*\nWin rate up 66\.7 points\nGames won up 62\.5 points\nAverage finish top 50% → top 10%\nRematches, before → now: Rival 0-1 → 1-0/);
-  const trend = text.split('**Every 30 days, newest first**\n')[1].split('\n').slice(0, 6);
+  assert.ok(text.startsWith([
+    '### Last 30 days',
+    `-# <t:${until - 30 * DAY}:d> to <t:${until}:d>`,
+    '**Sets:** 2-1 (67%)',
+    '**Games:** 5-3 (63%)',
+    '**Close sets:** 1-1 (50%)',
+    '**Vs higher seeds:** 1-0 (100%) · **Vs lower seeds:** 1-1 (50%)',
+  ].join('\n')), text);
+  assert.match(text, /\*\*Best win:\*\* beat \*\*Rival\*\* \(seed 2\) 2-1 as seed 9/);
+  assert.match(text, /\*\*Worst loss:\*\* lost to \*\*Upset\*\* \(seed 25\) 1-2 as seed 1/);
+  assert.match(text, /\*\*Game record by character:\*\* Fox 2-0 \(100%\)/);
+  assert.match(text, /\*\*Game record by character:\*\* Falco 0-1 \(0%\)/);
+  assert.ok(text.includes([
+    '### What changed',
+    '**Win rate:** up 66.7 points',
+    '**Games won:** up 62.5 points',
+    '**Average finish:** top 50% → top 10%',
+    '**Rematches, before → now:** **Rival** 0-1 → 1-0',
+  ].join('\n')), text);
+  const trend = text.split('### Every 30 days, newest first\n')[1].split('\n').slice(0, 6);
   assert.equal(trend.length, 6);
   assert.match(trend[0], /sets 2-1 \(67%\) · 1 event, average top 10%/);
   assert.match(trend[4], /sets 1-0 \(100%\)/);
@@ -286,7 +372,7 @@ test('progress verbose digs into both periods, says what changed, and shows six 
   // the short one is left as it was
   const short = embeds.progress(crewPlayer, periods.slice(0, 2)).map(e => e.toJSON().description).join('\n');
   assert.doesNotMatch(short, /Games:|Close sets|What changed|Every 30 days|Game record/);
-  assert.match(short, /\nWin rate up 66\.7 points\n/);
+  assert.match(short, /\n\*\*Win rate:\*\* up 66\.7 points\n/);
 });
 
 test('progress verbose asks start.gg about six periods and still answers when characters fail', async () => {

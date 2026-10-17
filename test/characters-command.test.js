@@ -53,7 +53,7 @@ async function characters(sets, values = {}) {
     deferReply: async () => {},
     editReply: async (result) => { reply = result; },
   });
-  return reply.embeds.map((embed) => ({ game: embed.data.footer.text.replace('Sama-tracker · ', ''), text: embed.data.description }));
+  return reply.embeds.map((embed) => ({ game: embed.data.footer.text.replace('Sama-tracker by Samatron · ', ''), text: embed.data.description }));
 }
 
 test('game is an optional choice of ultimate or melee', () => {

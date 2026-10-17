@@ -41,7 +41,7 @@ Pushing to GitHub redeploys it.
 
 The app and bot username are `Sama-tracker` in the Discord Developer Portal. You can also rename the bot's server role to `Sama-tracker`. Keep its permissions and position, above `Reg Reminders`, so it can assign that role.
 
-Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message footers come from `src/embeds.js`, and changing them there only affects new messages.
+Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message footers say `Sama-tracker by Samatron`, from `FOOTER` at the top of `src/embeds.js`, and changing it there only affects new messages.
 
 `/messages` always needs Manage Server. `/socials_edit` needs it by default, and you can hand it to other roles under Server Settings > Integrations > Sama-tracker.
 
@@ -87,7 +87,7 @@ Recap times are 24-hour `HH:MM` in a timezone like `America/New_York`, `America/
 /track list                                    everyone being tracked
 /upcoming                                      your tournaments, live ones first
 /recent                                        your last 5 sets
-/run                                           your current tournament run and next opponent
+/run                                           your current run in every bracket, next opponents
 /stream player:<name or all> alerts:<on|off>   on-stream alerts on or off
 ```
 
@@ -118,7 +118,7 @@ Linking doesn't track you. You won't be in `/track list` or the player picker, s
 /predict opponent:<name>                       your odds of beating them
 /predict opponent:<name> verbose:True          how each part of the prediction counts
 /scout profile:<link or ID>                    scout any opponent, for tracked players
-/scout profile:<link or ID> verbose:True       their whole history, habits, stages, your odds
+/scout profile:<link or ID> verbose:True       more history, habits, stages, your odds
 /progress                                      last 30 days against the 30 before, by game
 /progress verbose:True                         more on each period, plus 6 months of trend
 ```
@@ -170,7 +170,7 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 
 `/reg_warn` is a manual, half-serious nudge. If they're registered it says "Already registered." and leaves them alone, with no mention and no ping. If they aren't, it pings them with a warning and the register link. It goes by the Discord connected on start.gg, so someone who registered without connecting it still gets warned. If the tournament hides who's registered, there's no telling, so it says so and sends nothing. Once registration closes it just says so.
 
-`/h2h` goes through up to 600 singles sets each and lists the last 10 meetings. With `verbose:True` it goes through up to 3000 each and lists every set, plus the record by game, as the higher and the lower seed and in grand finals, the current streak and when they first played.
+`/h2h` lists the last 10 meetings. Every set between two players is in both their histories, so it reads just the one with fewer sets when all of it fits in 600 sets, and the last 600 of each when neither does. With `verbose:True` that goes up to 3000, and it lists every set, plus the record by game, as the higher and the lower seed and in grand finals, the current streak and when they first played. The last 10 show while the rest loads.
 
 `melee:True` counts only Melee sets, and works with or without `verbose:True`. It filters the same sets, so it's no slower, and the reply says how many sets in other games it left out. Someone who mostly plays Ultimate can have older Melee sets past the 600, so add `verbose:True` if some are missing.
 
@@ -178,11 +178,13 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 
 `/run` looks up the player's current tournaments directly, including ones that ended in the last 6 hours. It lists their finished sets and whether their placement is final. The next opponent shows up once start.gg has assigned one. It doesn't guess.
 
+Someone in several brackets at once, like Ultimate, Melee and 64 at the same tournament, gets a card up top listing every event with the one that needs them soonest first: playing now, then called, queued, ready, waiting on a set, waiting for an opponent, not started and finished. Each line has their record in that event and the opponent, linked to the set. Every event that started gets its own card under that.
+
 `/scout` answers privately, and only for tracked players whose start.gg has their Discord connected, checked on start.gg each time. It takes any opponent's profile without tracking them and shows their recent singles results, reported characters by game and your record against them. It looks at up to 600 sets each and 400 for characters, so older meetings and unreported characters can be missing.
 
-`/scout verbose:True` reads up to 3000 of their sets, 1600 for characters and stages, and every event they placed in. Every card stays private. You get:
+`/scout verbose:True` reads up to 1200 of their sets, 800 for characters and stages, and every event they placed in. The quick `/scout` card shows first while the rest loads, then the full report replaces it. Every card stays private. You get:
 
-- their `/stats verbose:True` cards, including their record against everyone tracked
+- the same two cards as `/stats verbose:True` for them, including their record against everyone tracked
 - form in each game over their last 20 sets and the last 90 days
 - habits in the game you both play, or their main one if you don't share one. That's close sets (2-1, 3-2), record against higher and lower seeds, record on winners side, losers side and in grand finals, and how often they sweep or get swept
 - each character's record and when they last played it, then the opponent characters and stages they lose and win on most. Those need 3 or more games, and stages only show up if the TO reported them
@@ -196,8 +198,8 @@ With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post
 
 Each post gets real facts to work from so Haiku doesn't make things up: two of the game's own talking points from its file in `src/`, a few paragraphs from a random SmashWiki article, and with `YOUTUBE_API_KEY` set, a YouTube video's title, channel, year, views and description. Articles come from that game's characters, techniques, stages, items, glitches, final smashes, trophies, event matches, modes and major tournaments, plus patch notes for Ultimate and Smash 4. That's about 700 to 1100 articles a game, 260 for 64 and 42 Project M character pages for P+. A category is picked first and then an article in it, so the big ones like trophies don't crowd out the rest. Each excerpt comes from a random spot in the article, starting at a paragraph about that game when it covers several. The Smash 4 and P+ posts skip tournament pages since they don't name players. Videos come from about ten searches a game, like grand finals, combo videos, tech tutorials and history, and only ones with 10,000+ views unless a search has none. A search's results get reused for a day, so it stays inside YouTube's free daily quota. YouTube only gives captions to a video's owner, so a video's title and description are all Haiku gets. If SmashWiki or YouTube is down, the post goes out without that part.
 
-`/characters` shows one game, Ultimate or Melee. Pick it with `game`, or leave it out to get whichever of the two has more games with characters reported, or more sets if neither has any. `verbose:True` puts that game first, then a card for each other game they have characters reported in, up to 6 in all. A game you picked always gets its card, even with nothing reported. It looks at their last 400 singles sets in every game, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg.
+`/characters` shows one game, Ultimate or Melee. Pick it with `game`, or leave it out to get whichever of the two has more games with characters reported, or more sets if neither has any. `verbose:True` puts that game first, then a card for each other game they have characters reported in, up to 6 in all. A game you picked always gets its card, even with nothing reported. It looks at their last 400 singles sets in every game, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg. With verbose, the usual card shows while the rest loads.
 
-`/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked.
+`/stats verbose:True` is two cards covering every singles event and up to 3000 sets: record by game and year, top 8s, finishes against seed, win streaks, biggest wins and losses, most played opponents and the record against everyone else tracked. The short `/stats` card shows while it loads.
 
-start.gg allows 80 requests a minute, so `/h2h`, `/predict` and `/characters` take 10 to 30 seconds the first time for a player, then a second or two since only their newest sets get fetched again. The verbose ones can take a minute for someone with a couple thousand sets, and `/scout verbose:True` up to two, since it reads their characters that far back too. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. State is saved in `data/state.json`, or on the volume on Railway.
+start.gg allows 80 requests a minute, and every page of someone's history is a request, so the first look at a player takes a while: 10 to 30 seconds for `/h2h`, `/predict` and `/characters`, and about a minute for the verbose ones with someone who has a couple thousand sets. When that's more than about 20 seconds, the reply says how many of the requests are done and about how long is left. After that it's a second or two for the next few hours, since every command shares the history already fetched and only asks for newer sets. When a few people run commands at once they take turns, so a slow one doesn't hold up the rest. Any command that makes 20 or more requests logs how many, how long it took and whether start.gg said to slow down, so Railway's logs show what a slow one was waiting on. State is saved in `data/state.json`, or on the volume on Railway.

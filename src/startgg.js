@@ -70,6 +70,7 @@ function sendNext() {
   }, Math.max(0, nextSlot - Date.now()));
 }
 
+// variables can be a function, which gets called once it's this request's turn
 async function query(text, variables, retries = 2) {
   await takeTurn();
 
@@ -79,7 +80,7 @@ async function query(text, variables, retries = 2) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${process.env.STARTGG_TOKEN}`,
     },
-    body: JSON.stringify({ query: text, variables }),
+    body: JSON.stringify({ query: text, variables: typeof variables === 'function' ? variables() : variables }),
     signal: AbortSignal.timeout(30_000),
   }).catch((err) => {
     throw new Error(`start.gg didn't respond (${err.message})`);
@@ -379,33 +380,64 @@ export async function getStats(playerId) {
   return { standings, sets };
 }
 
-// for /characters and /scout. every game they reported a character for, newest set first.
-// the limit counts what comes back, and a bo5 with characters and stages is ~51 objects. most sets have
-// nothing reported so 40 usually fit, and a page that goes over gets asked for again as two of 20
-export async function getCharacterSets(playerId, page, perPage = 40) {
-  const data = await query(`
-    query ($id: ID!, $page: Int!, $perPage: Int!) {
-      player(id: $id) {
-        sets(perPage: $perPage, page: $page, filters: { state: [3], entrantSize: [1] }) {
-          pageInfo { totalPages }
-          nodes {
-            id
-            completedAt
-            event { videogame { id displayName } }
-            slots { entrant { id participants { player { id } } } }
-            games { winnerId stage { name } selections { entrant { id } character { name } } }
-          }
+const CHARACTER_QUERY = `
+  query ($id: ID!, $page: Int!, $perPage: Int!) {
+    player(id: $id) {
+      sets(perPage: $perPage, page: $page, filters: { state: [3], entrantSize: [1] }) {
+        pageInfo { totalPages }
+        nodes {
+          id
+          completedAt
+          event { videogame { id displayName } }
+          slots { entrant { id participants { player { id } } } }
+          games { winnerId stage { name } selections { entrant { id } character { name } } }
         }
       }
     }
-  `, { id: playerId, page, perPage }).catch((err) => {
-    if (perPage === 20 || !err.message.includes('complexity')) throw err;
+  }
+`;
+
+// about how many objects start.gg counts in a reply toward its limit
+function objectCount(value) {
+  if (Array.isArray(value)) return value.reduce((sum, each) => sum + objectCount(each), 0);
+  if (!value || typeof value !== 'object') return 0;
+  return 1 + Object.values(value).reduce((sum, each) => sum + objectCount(each), 0);
+}
+
+// players whose last page of characters went over the limit, so their next ones go straight to halves
+// instead of trying 40 first. halves that would have fit as one let them try 40 again. pages near each
+// other are alike, and a page asked for as halves costs 2 requests against 3 for one that goes over
+const denseCharacters = new Map();
+const OBJECT_LIMIT = 1000;
+
+// for /characters and /scout. every game they reported a character for, newest set first, 40 sets a page.
+// the limit counts what comes back, and a bo5 with characters and stages is ~51 objects. most sets have
+// nothing reported so 40 usually fit, and a page that goes over gets asked for as two of 20
+export async function getCharacterSets(playerId, page, perPage = 40) {
+  let halved = false;
+  const data = await query(CHARACTER_QUERY, () => {
+    halved = perPage === 40 && Boolean(denseCharacters.get(playerId));
+    return halved ? { id: playerId, page: page * 2 - 1, perPage: 20 } : { id: playerId, page, perPage };
+  }).catch((err) => {
+    if (perPage === 20 || halved || !err.message.includes('complexity')) throw err;
   });
+  if (halved) {
+    const second = await getCharacterSets(playerId, page * 2, 20);
+    const first = characterPage(data, playerId);
+    denseCharacters.set(playerId, objectCount(data) + second.objects > OBJECT_LIMIT);
+    return { totalPages: Math.ceil(first.totalPages / 2), sets: [...first.sets, ...second.sets] };
+  }
   if (!data) {
+    denseCharacters.set(playerId, true);
     const halves = await Promise.all([getCharacterSets(playerId, page * 2 - 1, 20), getCharacterSets(playerId, page * 2, 20)]);
     return { totalPages: Math.ceil(halves[0].totalPages / 2), sets: halves.flatMap((half) => half.sets) };
   }
+  if (perPage === 40) denseCharacters.set(playerId, false);
+  return characterPage(data, playerId);
+}
 
+// { totalPages, sets, objects } out of one reply
+function characterPage(data, playerId) {
   const connection = data.player?.sets;
   // no event means it got deleted, so there's no game to put it under
   const sets = (connection?.nodes ?? []).filter((node) => node.event?.videogame).map((node) => {
@@ -419,7 +451,7 @@ export async function getCharacterSets(playerId, page, perPage = 40) {
     }
     return { id: String(node.id), completedAt: node.completedAt, videogame: node.event.videogame, games };
   });
-  return { totalPages: connection?.pageInfo?.totalPages ?? 0, sets };
+  return { totalPages: connection?.pageInfo?.totalPages ?? 0, sets, objects: objectCount(data) };
 }
 
 export const ULTIMATE = 1386;

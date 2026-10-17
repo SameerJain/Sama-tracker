@@ -47,7 +47,10 @@ const LEANS_SHOWN = 3;
 const REMATCHES_SHOWN = 5;
 const DAY = 24 * 60 * 60;
 
-function baseEmbed(color, footer = 'Sama-tracker') {
+// on the bottom of every card. a game or source goes after it
+const FOOTER = 'Sama-tracker by Samatron';
+
+function baseEmbed(color, footer = FOOTER) {
   return new EmbedBuilder().setColor(color).setFooter({ text: footer });
 }
 
@@ -180,7 +183,7 @@ function setEmbed(set, color, player) {
   const game = set.event.videogame?.displayName;
   const tournament = set.event.tournament;
 
-  const embed = baseEmbed(color, game ? `Sama-tracker · ${game}` : undefined)
+  const embed = baseEmbed(color, game ? `${FOOTER} · ${game}` : undefined)
     .setDescription(`**${set.round}** · ${escapeMarkdown(set.event.name)}\n[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})`);
 
   if (player) embed.setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) });
@@ -416,7 +419,7 @@ export function headToHead(a, b, sets, { verbose = false, melee = false, otherGa
   const wins = results.filter((result) => result.won).length;
   const losses = results.length - wins;
 
-  const embed = baseEmbed(colors.clash, melee ? 'Sama-tracker · Melee' : undefined).setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) });
+  const embed = baseEmbed(colors.clash, melee ? `${FOOTER} · Melee` : undefined).setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) });
   if (b.image) embed.setThumbnail(b.image);
   const leftOut = otherGames ? `${count(otherGames, 'set')} in other games left out` : null;
 
@@ -449,7 +452,8 @@ export function headToHead(a, b, sets, { verbose = false, melee = false, otherGa
 
 // /h2h verbose, from a's side like the title
 function rivalry(a, b, results) {
-  const tagA = escapeMarkdown(a.tag);
+  // b goes in bold labels, which can't hold more bold
+  const tagA = bold(a.tag);
   const tagB = escapeMarkdown(b.tag);
   const lines = [];
 
@@ -468,7 +472,7 @@ function rivalry(a, b, results) {
 
   const streak = results.findIndex((result) => result.won !== results[0].won);
   const run = streak === -1 ? results.length : streak;
-  if (run > 1) lines.push(`**Streak:** ${escapeMarkdown((results[0].won ? a : b).tag)} has won the last ${run}`);
+  if (run > 1) lines.push(`**Streak:** ${bold((results[0].won ? a : b).tag)} has won the last ${run}`);
 
   const first = results.at(-1);
   lines.push(`**First played:** <t:${first.set.completedAt}:D> at ${setLink(first.set)}`);
@@ -486,19 +490,19 @@ function chancePercent(odds) {
 function commonOpponentLines(odds, tagA, tagB) {
   const played = ({ a: x, b: y }) => x.total + y.total;
   return odds.common.opponents.toSorted((x, y) => played(y) - played(x)).slice(0, OPPONENTS_SHOWN)
-    .map(({ name, a: x, b: y }) => `${escapeMarkdown(name)}: ${tagA} ${x.wins}-${x.total - x.wins} · ${tagB} ${y.wins}-${y.total - y.wins}`);
+    .map(({ name, a: x, b: y }) => `${bold(name)}: ${tagA} ${x.wins}-${x.total - x.wins} · ${tagB} ${y.wins}-${y.total - y.wins}`);
 }
 
 // verbose shows how much each part counted and what it says on its own, plus what's behind them
 export function prediction(a, b, odds, verbose) {
   const chanceA = chancePercent(odds);
-  const embed = baseEmbed(colors.clash, `Sama-tracker · ${odds.game}`)
+  const embed = baseEmbed(colors.clash, `${FOOTER} · ${odds.game}`)
     .setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) })
     .setTitle(`${escapeMarkdown(a.tag)} ${chanceA}% · ${100 - chanceA}% ${escapeMarkdown(b.tag)}`);
   if (b.image) embed.setThumbnail(b.image);
 
-  const tagA = escapeMarkdown(a.tag);
-  const tagB = escapeMarkdown(b.tag);
+  const tagA = bold(a.tag);
+  const tagB = bold(b.tag);
   const { h2h, common, seeding, form } = odds;
   const lines = [];
 
@@ -519,12 +523,12 @@ export function prediction(a, b, odds, verbose) {
   if (!verbose) return [embed.setDescription(lines.join('\n'))];
 
   section(lines, 'How it adds up', odds.factors.map(({ key, n, share, chance }) => {
-    if (!n) return `${FACTORS[key]}: nothing to go on, so it doesn't count`;
+    if (!n) return `**${FACTORS[key]}:** nothing to go on, so it doesn't count`;
     const lean = Math.round(chance * 100);
     let says = 'even';
     if (lean > 50) says = `${tagA} ${lean}%`;
     if (lean < 50) says = `${tagB} ${100 - lean}%`;
-    return `${FACTORS[key]}: counts for ${percent(share, 1)} · on its own, ${says}`;
+    return `**${FACTORS[key]}:** counts for ${percent(share, 1)} · on its own, ${says}`;
   }));
   section(lines, 'Common opponents', commonOpponentLines(odds, tagA, tagB));
   section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
@@ -566,9 +570,7 @@ export function stats(player, standings, sets) {
     .sort((x, y) => upsetFactor(y.me, y.them) - upsetFactor(x.me, x.them))[0];
   if (upset) lines.push(`**Biggest upset:** ${upsetLine(upset)}`);
 
-  if (standings.length) {
-    lines.push('', '**Latest events**', ...standings.slice(0, RECENT_EVENTS).map(placementLine));
-  }
+  section(lines, 'Latest events', standings.slice(0, RECENT_EVENTS).map(placementLine));
 
   const from = [];
   if (played.length) from.push(played.length === 1 ? '1 singles set' : `${played.length} singles sets`);
@@ -669,9 +671,8 @@ export function progress(player, periods, { verbose = false, characterSets = nul
     const characters = ({ since, until }) => verbose && characterSets
       && characterLine(characterSets.filter((set) => set.videogame.displayName === game && set.completedAt >= since && set.completedAt < until));
     const lines = [
-      `**Last ${days} days** · ${range(current)}`, ...periodLines(recent, verbose, characters(current)),
-      '',
-      `**Previous ${days} days** · ${range(previous)}`, ...periodLines(before, verbose, characters(previous)),
+      `### Last ${days} days`, `-# ${range(current)}`, ...periodLines(recent, verbose, characters(current)),
+      `### Previous ${days} days`, `-# ${range(previous)}`, ...periodLines(before, verbose, characters(previous)),
     ];
     const winRate = pointsLine('Win rate', setRate(recent), setRate(before));
     if (verbose) {
@@ -683,43 +684,43 @@ export function progress(player, periods, { verbose = false, characterSets = nul
       if (winRate) lines.push('', winRate);
       lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in, and vs seed goes by placement tier`);
     }
-    return withLines(baseEmbed(colors.brand, `Sama-tracker · ${game}`).setTitle(title).setURL(startggUrl(player.slug)), lines);
+    return withLines(baseEmbed(colors.brand, `${FOOTER} · ${game}`).setTitle(title).setURL(startggUrl(player.slug)), lines);
   });
 }
 
 // one game in one period of /progress. verbose adds games, close sets, seeds, upsets and characters
 function periodLines(data, verbose = false, characters = null) {
   if (!data) return ['No sets or finished events.'];
-  const lines = [`Sets: ${winLoss(data.wins, data.losses)}`];
+  const lines = [`**Sets:** ${winLoss(data.wins, data.losses)}`];
   if (verbose) {
     const games = gameCount(data.played);
-    if (games.won + games.lost) lines.push(`Games: ${winLoss(games.won, games.lost)}`);
+    if (games.won + games.lost) lines.push(`**Games:** ${winLoss(games.won, games.lost)}`);
     lines.push(closeLine(data.played), seedLine(data.played));
   }
 
   const sized = data.events.filter(({ event }) => event.numEntrants > 0);
   if (sized.length) {
-    lines.push(`Placements: ${count(data.events.length, 'event')} · average ${topText(averageFinish(sized))}`);
-    lines.push(`Best: ${placementLine(sized.toSorted(byFinish)[0])}`);
+    lines.push(`**Placements:** ${count(data.events.length, 'event')} · average ${topText(averageFinish(sized))}`);
+    lines.push(`**Best:** ${placementLine(sized.toSorted(byFinish)[0])}`);
   } else if (data.events.length) {
-    lines.push(`Placements: ${count(data.events.length, 'event')}, no bracket sizes reported`);
+    lines.push(`**Placements:** ${count(data.events.length, 'event')}, no bracket sizes reported`);
   } else {
-    lines.push('Placements: no finished events');
+    lines.push('**Placements:** no finished events');
   }
 
   const seeded = data.events.filter(({ seed }) => seed > 0);
   if (seeded.length) {
     const better = seeded.filter(({ placement, seed }) => step(placement) < step(seed)).length;
     const worse = seeded.filter(({ placement, seed }) => step(placement) > step(seed)).length;
-    lines.push(`Vs seed: ${better} better · ${seeded.length - better - worse} on seed · ${worse} worse`);
+    lines.push(`**Vs seed:** ${better} better · ${seeded.length - better - worse} on seed · ${worse} worse`);
   } else {
-    lines.push('Vs seed: no seeded finishes reported');
+    lines.push('**Vs seed:** no seeded finishes reported');
   }
 
   if (verbose) {
     const { win, loss } = biggestUpsets(data.played);
-    if (win) lines.push(`Best win: ${upsetLine(win)}`);
-    if (loss) lines.push(`Worst loss: ${upsetLine(loss)}`);
+    if (win) lines.push(`**Best win:** ${upsetLine(win)}`);
+    if (loss) lines.push(`**Worst loss:** ${upsetLine(loss)}`);
     lines.push(characters);
   }
   return lines.filter(Boolean);
@@ -732,18 +733,18 @@ function gameRate(data) {
   return won + lost ? won / (won + lost) : null;
 }
 
-// Win rate up 4.0 points. null unless both rates exist
+// Win rate: up 4.0 points. null unless both rates exist
 function pointsLine(label, now, before) {
   if (now === null || before === null) return null;
   const points = 100 * (now - before);
-  return `${label} ${points >= 0 ? 'up' : 'down'} ${Math.abs(points).toFixed(1)} points`;
+  return `**${label}:** ${points >= 0 ? 'up' : 'down'} ${Math.abs(points).toFixed(1)} points`;
 }
 
 // verbose /progress, the last period against the one before
 function changeLines(recent, before) {
   const lines = [pointsLine('Games won', gameRate(recent), gameRate(before))];
   const [now, then] = [recent, before].map((data) => averageFinish(data?.events ?? []));
-  if (now !== null && then !== null) lines.push(`Average finish ${topText(then)} → ${topText(now)}`);
+  if (now !== null && then !== null) lines.push(`**Average finish:** ${topText(then)} → ${topText(now)}`);
   lines.push(rematchLine(recent?.played ?? [], before?.played ?? []));
   return lines;
 }
@@ -757,8 +758,8 @@ function rematchLine(recent, before) {
   const both = [...now].filter(([id]) => then.has(id))
     .sort((x, y) => sets(y) - sets(x))
     .slice(0, REMATCHES_SHOWN)
-    .map(([id, list]) => `${escapeMarkdown(list[0].them.name)} ${shortRecord(then.get(id))} → ${shortRecord(list)}`);
-  return both.length ? `Rematches, before → now: ${both.join(' · ')}` : null;
+    .map(([id, list]) => `${bold(list[0].them.name)} ${shortRecord(then.get(id))} → ${shortRecord(list)}`);
+  return both.length ? `**Rematches, before → now:** ${both.join(' · ')}` : null;
 }
 
 // one period of the verbose /progress trend
@@ -776,7 +777,7 @@ function characterLine(sets) {
   const usage = characterUsage(sets);
   if (!usage.reported) return null;
   const shown = usage.characters.slice(0, LEANS_SHOWN).map(({ name, wins, games }) => `${escapeMarkdown(name)} ${winLoss(wins, games - wins)}`);
-  return `Game record by character: ${shown.join(' · ')}`;
+  return `**Game record by character:** ${shown.join(' · ')}`;
 }
 
 // their record over their last 20 sets in each game, the game they played last first.
@@ -785,7 +786,7 @@ function formLines(played, verbose = false) {
   const since = Math.floor(Date.now() / 1000) - 90 * DAY;
   return [...Map.groupBy(played, ({ set }) => gameName(set.event))].slice(0, GAMES_SHOWN).map(([game, list]) => {
     const recent = list.slice(0, RECENT_SETS);
-    const line = `${escapeMarkdown(game)}: ${recordOf(recent)} · last ${count(recent.length, 'set')}`;
+    const line = `**${escapeMarkdown(game)}:** ${recordOf(recent)} · last ${count(recent.length, 'set')}`;
     if (!verbose) return line;
     const lately = list.filter(({ set }) => set.completedAt >= since);
     return `${line} · ${lately.length ? recordOf(lately) : 'none'} in the last 90 days`;
@@ -794,7 +795,7 @@ function formLines(played, verbose = false) {
 
 // W 2-1 vs Foo · Tournament · date, with the round for verbose
 function latestSetLine({ set, me, them, won }, round = false) {
-  return `${won ? 'W' : 'L'} ${scoreText(me, them)} vs ${escapeMarkdown(them.name)}${round ? ` · ${set.round}` : ''} · ${setLink(set)} · <t:${set.completedAt}:d>`;
+  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs ${bold(them.name)}${round && set.round ? ` · ${set.round}` : ''} · ${setLink(set)} · <t:${set.completedAt}:d>`;
 }
 
 // sets between the two from player's side, newest first. both histories since either can get cut off
@@ -808,24 +809,20 @@ function meetingsOf(player, opponent, mine, theirs) {
 export function scout(player, opponent, mine, theirs, characterSets) {
   const played = singles(theirs, opponent);
   const meetings = meetingsOf(player, opponent, mine, theirs);
-  const lines = ['**Recent form**', ...formLines(played)];
-  if (!played.length) lines.push('No recent singles sets.');
+  const lines = [];
+  section(lines, 'Recent form', played.length ? formLines(played) : ['No recent singles sets.']);
   section(lines, 'Latest sets', played.slice(0, LATEST_SETS).map((result) => latestSetLine(result)));
-  lines.push('', '**Reported characters**');
   const characterGames = [...new Map(characterSets.map((set) => [set.videogame.id, set.videogame])).values()];
-  let reported = false;
+  const characterLines = [];
   for (const game of characterGames.slice(0, GAMES_SHOWN)) {
     const usage = characterUsage(characterSets.filter((set) => set.videogame.id === game.id));
     if (!usage.reported) continue;
-    reported = true;
-    lines.push(`${escapeMarkdown(game.displayName)}: ${usage.characters.slice(0, 3).map((c) => `${escapeMarkdown(c.name)} (${count(c.games, 'game')})`).join(', ')}`);
+    characterLines.push(`**${escapeMarkdown(game.displayName)}:** ${usage.characters.slice(0, 3).map((c) => `${escapeMarkdown(c.name)} (${count(c.games, 'game')})`).join(', ')}`);
   }
-  if (!reported) lines.push('No characters reported in their recent sets.');
-  lines.push('', `**Your head-to-head** · ${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`);
-  for (const [game, list] of [...Map.groupBy(meetings, ({ set }) => gameName(set.event))].slice(0, GAMES_SHOWN)) {
-    lines.push(`${escapeMarkdown(game)}: ${recordOf(list)}`);
-  }
-  if (!meetings.length) lines.push('You haven\'t played each other in singles, as far back as this checks.');
+  section(lines, 'Reported characters', characterLines.length ? characterLines : ['No characters reported in their recent sets.']);
+  const h2h = [...Map.groupBy(meetings, ({ set }) => gameName(set.event))].slice(0, GAMES_SHOWN)
+    .map(([game, list]) => `**${escapeMarkdown(game)}:** ${recordOf(list)}`);
+  section(lines, `You vs ${escapeMarkdown(opponent.tag)}`, h2h.length ? h2h : ['You haven\'t played each other in singles, as far back as this checks.']);
   lines.push('-# From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them. `verbose:True` for the full report');
   return withLines(baseEmbed(colors.brand).setTitle(`Scouting ${opponent.tag}`).setURL(startggUrl(opponent.slug)), lines);
 }
@@ -845,8 +842,9 @@ export function scoutReport(player, opponent, { mine, theirs, characterSets, eve
 
 // /scout verbose, form in every game and how they play the one that matters
 function tendencies(played, focus) {
-  const lines = ['**Recent form**', ...formLines(played, true)];
-  section(lines, `Habits · ${escapeMarkdown(focus)}`, habitLines(played.filter(({ set }) => gameName(set.event) === focus)));
+  const lines = [];
+  section(lines, 'Recent form', formLines(played, true));
+  section(lines, `Habits in ${escapeMarkdown(focus)}`, habitLines(played.filter(({ set }) => gameName(set.event) === focus)));
   section(lines, 'Latest sets', played.slice(0, SCOUT_LATEST_SETS).map((result) => latestSetLine(result, true)));
   return withLines(baseEmbed(colors.brand).setTitle('Form and tendencies'), lines);
 }
@@ -857,7 +855,7 @@ function habitLines(played) {
   const sides = [['winners side', /winners/i], ['losers side', /losers/i], ['grand finals', GRAND_FINALS]]
     .map(([name, pattern]) => [name, played.filter(({ set }) => pattern.test(set.round ?? ''))])
     .filter(([, list]) => list.length);
-  if (sides.length) lines.push(`Bracket: ${sides.map(([name, list]) => `${name} ${recordOf(list)}`).join(' · ')}`);
+  if (sides.length) lines.push(`**Bracket:** ${sides.map(([name, list]) => `${name} ${recordOf(list)}`).join(' · ')}`);
 
   const scored = played.filter(({ me, them }) => me.score !== null && them.score !== null);
   const wins = scored.filter(({ won }) => won);
@@ -865,7 +863,7 @@ function habitLines(played) {
   const sweeps = [];
   if (wins.length) sweeps.push(`won ${wins.filter(({ them }) => them.score === 0).length} of ${wins.length} without dropping a game`);
   if (losses.length) sweeps.push(`lost ${losses.filter(({ me }) => me.score === 0).length} of ${losses.length} without taking one`);
-  if (sweeps.length) lines.push(`Sweeps: ${sweeps.join(' · ')}`);
+  if (sweeps.length) lines.push(`**Sweeps:** ${sweeps.join(' · ')}`);
   return lines.filter(Boolean);
 }
 
@@ -898,13 +896,13 @@ function scoutCharacters(characterSets, focus) {
 function leanLines(records, badLabel, goodLabel) {
   const { good, bad } = leans(records);
   const list = (each) => each.slice(0, LEANS_SHOWN).map(({ name, wins, games }) => `${escapeMarkdown(name)} ${winLoss(wins, games - wins)}`).join(' · ');
-  return [bad.length && `${badLabel}: ${list(bad)}`, good.length && `${goodLabel}: ${list(good)}`].filter(Boolean);
+  return [bad.length && `**${badLabel}:** ${list(bad)}`, good.length && `**${goodLabel}:** ${list(good)}`].filter(Boolean);
 }
 
 // /scout verbose, the caller against them
 function matchup(player, opponent, meetings, odds) {
-  const tagA = escapeMarkdown(player.tag);
-  const tagB = escapeMarkdown(opponent.tag);
+  const tagA = bold(player.tag);
+  const tagB = bold(opponent.tag);
   const lines = [];
   if (odds) {
     const chance = chancePercent(odds);
@@ -919,9 +917,9 @@ function matchup(player, opponent, meetings, odds) {
     lines.push('**Head-to-head:** you haven\'t played each other in singles, as far back as this checks');
   }
   if (odds?.common.total) section(lines, `Common opponents · ${odds.common.total} in ${escapeMarkdown(odds.game)}`, commonOpponentLines(odds, tagA, tagB));
-  lines.push('-# From up to 3000 of their singles sets, 1600 for characters and stages, every event they placed in and up to 600 of yours. '
+  lines.push('-# From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. '
     + `${odds ? 'Odds work like /predict, and characters' : 'Characters'} and stages only show up if the TO reported them`);
-  return withLines(baseEmbed(colors.clash).setTitle(`${tagA} vs ${tagB}`), lines);
+  return withLines(baseEmbed(colors.clash).setTitle(`${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`), lines);
 }
 
 // upcoming is [{ tournament, players }] for the active players' entries before the next recap
@@ -950,7 +948,7 @@ export function weeklyRecap(crew, upcoming, { since, until }) {
 // beat Foo (seed 2) 3-1 as seed 9 at Tournament
 function upsetLine({ set, me, them, won }) {
   const score = scoreText(me, them) === 'vs' ? '' : ` ${scoreText(me, them)}`;
-  return `${won ? 'beat' : 'lost to'} ${escapeMarkdown(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}`;
+  return `${won ? 'beat' : 'lost to'} ${bold(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}`;
 }
 
 // how big an upset the set was, whichever way it went
@@ -1002,7 +1000,7 @@ const isClose = ({ me, them }) => me.score > 0 && them.score > 0 && Math.abs(me.
 
 function closeLine(played) {
   const close = played.filter(isClose);
-  return close.length ? `Close sets: ${recordOf(close)}` : null;
+  return close.length ? `**Close sets:** ${recordOf(close)}` : null;
 }
 
 // against people seeded a placement tier above them in that bracket, then below
@@ -1010,13 +1008,13 @@ function seedLine(played) {
   const seeded = played.filter(({ me, them }) => me.seed && them.seed);
   const higher = seeded.filter(({ me, them }) => step(them.seed) < step(me.seed));
   const lower = seeded.filter(({ me, them }) => step(them.seed) > step(me.seed));
-  const parts = [higher.length && `higher seeds ${recordOf(higher)}`, lower.length && `lower seeds ${recordOf(lower)}`].filter(Boolean);
-  return parts.length ? `Against ${parts.join(' · ')}` : null;
+  const parts = [higher.length && `**Vs higher seeds:** ${recordOf(higher)}`, lower.length && `**Vs lower seeds:** ${recordOf(lower)}`].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 // W 2-1 · Winners Final · Tournament · date
 function meetingLine({ set, me, them, won }) {
-  return `${won ? 'W' : 'L'} ${scoreText(me, them)} · ${set.round} · ${setLink(set)} · <t:${set.completedAt}:d>`;
+  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)}${set.round ? ` · ${set.round}` : ''} · ${setLink(set)} · <t:${set.completedAt}:d>`;
 }
 
 // relative to bracket size, so 4th of 84 beats 3rd of 20
@@ -1055,10 +1053,15 @@ function breakdownLine({ key, events, wins, losses }) {
   return parts.join(' · ');
 }
 
+// a small heading over the list, which leaves bold for the labels and names inside it
 function section(lines, title, list) {
   if (!list.length) return;
-  if (lines.length) lines.push('');
-  lines.push(`**${title}**`, ...list);
+  lines.push(`### ${title}`, ...list);
+}
+
+// player names stand out in a line full of numbers
+function bold(name) {
+  return `**${escapeMarkdown(name)}**`;
 }
 
 // two cards: the lifetime numbers, then the results behind them. /scout verbose labels them its own way
@@ -1154,26 +1157,25 @@ export function lifetimeStats(player, events, sets, players, label = 'Lifetime s
   // sort is stable and sets are newest first, so ties go to who they played last
   const mostPlayed = [...opponents.values()].sort((a, b) => b.wins + b.losses - (a.wins + a.losses));
   const crew = mostPlayed.filter((each) => each.crew);
-  const opponentLines = (list) => list.slice(0, OPPONENTS_SHOWN).map(({ name, wins, losses }) => `${escapeMarkdown(name)} ${wins}-${losses}`).join('\n');
+  const opponentLines = (list) => list.slice(0, OPPONENTS_SHOWN).map(({ name, wins, losses }) => `${bold(name)} ${wins}-${losses}`).join('\n');
   if (mostPlayed.length) results.addFields({ name: 'Most played', value: opponentLines(mostPlayed), inline: true });
   if (crew.length) results.addFields({ name: 'Vs the crew', value: opponentLines(crew), inline: true });
 
   return [overview, results];
 }
 
-// 1. Fox · 70% of games · won 40 of 60 (67%), the main in bold
+// 1. Fox · 70% of games · won 40 of 60 (67%)
 function characterRank(usage, character, i) {
   const share = usage.characters.length > 1 ? ` · ${percent(character.games, usage.games)} of games` : '';
   const won = `won ${character.wins} of ${character.games} (${percent(character.wins, character.games)})`;
-  const name = i === 0 ? `**${character.name}**` : character.name;
   // escaped so discord shows "1." as typed instead of making it a list
-  return `${i + 1}\\. ${name}${share} · ${won}`;
+  return `${i + 1}\\. ${bold(character.name)}${share} · ${won}`;
 }
 
 // file is the uploaded art of their main. no game means it covers every game. note goes at the bottom.
 // searched is how many sets got looked through across every game
 export function characters(player, usage, { game, file, note, searched = 0 } = {}) {
-  const embed = baseEmbed(colors.brand, game ? `Sama-tracker · ${game}` : undefined)
+  const embed = baseEmbed(colors.brand, game ? `${FOOTER} · ${game}` : undefined)
     .setAuthor({ name: 'Characters' })
     .setTitle(escapeMarkdown(player.tag))
     .setURL(startggUrl(player.slug));
@@ -1314,7 +1316,7 @@ export function status(info) {
 }
 
 export function joke(name, title, { text, screenshot, image }) {
-  return baseEmbed(colors[name], `Sama-tracker · ${screenshot.name}`)
+  return baseEmbed(colors[name], `${FOOTER} · ${screenshot.name}`)
     .setTitle(title)
     .setURL(screenshot.page)
     .setDescription(text.slice(0, 4096))
@@ -1337,7 +1339,7 @@ export function help() {
     '`/track list` everyone tracked',
     '`/upcoming` live and upcoming tournaments',
     '`/recent` latest sets',
-    '`/run` current tournament run, results and next opponent',
+    '`/run` current tournament run and next opponent in every bracket, the one that needs you soonest first',
     '`/stream` stream alerts on or off',
     '-# Only tracked players can be picked as the player. upcoming, recent and stream also take `all`',
     '',
@@ -1351,7 +1353,7 @@ export function help() {
     '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
     '`/characters` characters someone has reported and how they do on each. `game:` Ultimate or Melee, left out it\'s whichever has more reported. `verbose:True` adds every other game, picked one first',
     '`/predict` odds of beating someone. `verbose:True` shows how each part counts',
-    '`/scout profile:<link or ID>` scout any opponent. Only for tracked players with Discord connected on start.gg. `verbose:True` adds their whole history, habits, matchups, stages and your odds',
+    '`/scout profile:<link or ID>` scout any opponent. Only for tracked players with Discord connected on start.gg. `verbose:True` adds much more of their history, habits, matchups, stages and your odds',
     '`/progress` last 30 days vs the previous 30, by game. `verbose:True` adds games, close sets, seeds, upsets, rematches and a 6 month trend',
     '',
     '**Registration**',

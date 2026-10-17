@@ -1,7 +1,10 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { commands, handleAutocomplete, handleCommand } from './commands.js';
-import { asCommand, checkToken } from './startgg.js';
+import { asCommand, checkToken, commandProgress } from './startgg.js';
 import { startTracking } from './tracker.js';
+
+// commands that ask start.gg this much get a line in the logs, so a slow one shows what it spent its time on
+const LOGGED_REQUESTS = 20;
 
 function quit(message) {
   console.error(message);
@@ -60,7 +63,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
   busy.add(userId);
 
   try {
-    await asCommand(() => handleCommand(interaction));
+    await asCommand(async () => {
+      const progress = commandProgress();
+      const started = Date.now();
+      try {
+        await handleCommand(interaction);
+      } finally {
+        const { sent, limited } = progress();
+        const verbose = interaction.options.getBoolean('verbose') ? ' verbose' : '';
+        if (sent >= LOGGED_REQUESTS) {
+          console.log(`/${interaction.commandName}${verbose}: ${sent} start.gg requests in ${Math.round((Date.now() - started) / 1000)}s${limited ? `, rate limited ${limited} times` : ''}`);
+        }
+      }
+    });
   } catch (err) {
     console.error(err);
     const message = `Something went wrong: ${err.message}`;
