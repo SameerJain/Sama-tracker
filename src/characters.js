@@ -1,4 +1,4 @@
-export const MATCHUP_MIN_GAMES = 3;
+const MATCHUP_MIN_GAMES = 3;
 
 // most games, then most sets, then most recent. a full tie keeps whichever came first
 const byUse = (a, b) => b.games - a.games || b.sets - a.sets || b.last - a.last;

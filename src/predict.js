@@ -46,7 +46,7 @@ function maximize(slopeAndBend, start = 0) {
 // odds for a gap of mean with this much uncertainty. unsure pulls it toward 50%
 const chanceOf = (mean, variance) => sigmoid(mean / Math.sqrt(1 + (Math.PI * variance) / 8));
 
-function sharedGame(historyA, historyB) {
+export function sharedGame(historyA, historyB) {
   const count = (sets) => {
     const games = new Map();
     for (const set of sets) {
@@ -68,8 +68,13 @@ function sharedGame(historyA, historyB) {
 
 const recency = (at, now) => 0.5 ** (Math.max(0, now - at) / (HALF_LIFE_DAYS * DAY));
 
+// the singles sets they played in this game, from their side. /predict names whoever has none
+export function gameSets(history, player, game) {
+  return singles(history.filter((set) => set.event.videogame?.displayName === game), player);
+}
+
 function results(history, player, game, now) {
-  return singles(history.filter((set) => set.event.videogame?.displayName === game), player)
+  return gameSets(history, player, game)
     .map((result) => ({ ...result, opponent: result.them.playerIds[0], weight: recency(result.set.completedAt, now) }));
 }
 

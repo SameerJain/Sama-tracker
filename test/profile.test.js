@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { MessageFlags } from 'discord.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-profile-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
@@ -113,6 +113,9 @@ test('a start.gg that disconnected their discord does not count, and gets forgot
   const calls = await profile({ picked: { id: HERB, bot: false } });
   const [, miss] = calls[1];
   assert.match(miss.content, /^Couldn't find a start\.gg with Herb's Discord connected/);
+  // says what they have to do, since start.gg has no way to search by discord
+  assert.match(miss.content, /Ask them to run `\/link` with their start\.gg link once/);
+  assert.match(miss.content, /register for a tournament the bot checks/);
   // by name, so they don't get pinged or even mentioned
   assert.doesNotMatch(miss.content, /<@/);
   assert.deepEqual(miss.allowedMentions, { parse: [] });

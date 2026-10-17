@@ -54,10 +54,7 @@ function historyCache(getPage, keep) {
     return known;
   }
 
-  const history = (playerId, pages) => lookup(playerId, pages).then(({ sets, ends }) => sets.slice(0, ends[Math.min(pages, ends.length) - 1] ?? 0));
-  // from their first page, which every lookup starts with anyway
-  history.totalPages = (playerId) => lookup(playerId, 1).then(({ totalPages }) => totalPages);
-  return history;
+  return (playerId, pages) => lookup(playerId, pages).then(({ sets, ends }) => sets.slice(0, ends[Math.min(pages, ends.length) - 1] ?? 0));
 }
 
 // the first page says how many there are, then the rest get asked for all at once.
@@ -121,4 +118,4 @@ function eventHistory(userId) {
   return events;
 }
 
-export { HISTORY_PAGES, LIFETIME_PAGES, SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory };
+export { SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory };

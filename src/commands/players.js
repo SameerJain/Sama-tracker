@@ -4,19 +4,17 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { RUNS_LATE_HOURS, checkTournaments, endTime, secondsNow } from '../tracker.js';
 import { findAccount } from '../accounts.js';
-import { linkedPlayer, profileSlug, readChoice, readPlayer, replyNoPlayer, sendEmbeds } from './shared.js';
+import { findPlayer, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
 
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
 
 async function trackAdd(interaction) {
-  const input = interaction.options.getString('profile', true).trim();
+  const input = interaction.options.getString('profile', true);
 
   await interaction.deferReply();
-  const player = await startgg.getPlayer(profileSlug(input));
-  if (!player) {
-    return interaction.editReply(`Couldn't find a start.gg player for \`${input}\`. Use their profile link, like start.gg/user/f64a83c8.`);
-  }
+  const player = await findPlayer(interaction, input);
+  if (!player) return;
   if (state.players[player.userId]) {
     return interaction.editReply(`Already tracking ${player.tag}.`);
   }
@@ -43,15 +41,13 @@ async function trackRemove(interaction) {
 async function link(interaction) {
   // commands already find them, a link would change nothing
   const tracked = Object.values(state.players).find((player) => player.discordId === interaction.user.id);
-  if (tracked) return interaction.reply({ content: noLinkNeeded(tracked), flags: MessageFlags.Ephemeral });
+  if (tracked) return replyEphemeral(interaction, noLinkNeeded(tracked));
 
-  const input = interaction.options.getString('profile', true).trim();
+  const input = interaction.options.getString('profile', true);
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const player = await startgg.getPlayer(profileSlug(input));
-  if (!player) {
-    return interaction.editReply(`Couldn't find a start.gg player for \`${input}\`. Use your profile link, like start.gg/user/f64a83c8.`);
-  }
+  const player = await findPlayer(interaction, input, 'your');
+  if (!player) return;
   if (player.discordId !== interaction.user.id) {
     return interaction.editReply(player.discordId
       ? `${player.tag}'s start.gg has a different Discord account connected.`
@@ -87,7 +83,7 @@ function unlink(interaction) {
   const still = linkedPlayer(interaction.user.id);
   if (still) content += ` Commands still find you as ${still.tag}, since you're tracked with this Discord on your start.gg.`;
   else if (linked) content += ' Leaving the player blank won\'t find you now, you\'re off the player list and `/scout` needs a link.';
-  return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  return replyEphemeral(interaction, content);
 }
 
 // goes by the discord connected on start.gg, so nobody can claim someone else's
@@ -95,8 +91,8 @@ async function profile(interaction) {
   const picked = interaction.options.getUser('user');
   const user = picked ?? interaction.user;
   const member = picked ? interaction.options.getMember('user') : interaction.member;
-  if (!member) return interaction.reply({ content: 'Pick someone in this server.', flags: MessageFlags.Ephemeral });
-  if (user.bot) return interaction.reply({ content: 'Bots don\'t have start.gg accounts.', flags: MessageFlags.Ephemeral });
+  if (!member) return replyEphemeral(interaction, 'Pick someone in this server.');
+  if (user.bot) return replyEphemeral(interaction, 'Bots don\'t have start.gg accounts.');
 
   await interaction.deferReply();
   const account = await findAccount(user.id);
@@ -106,7 +102,7 @@ async function profile(interaction) {
   }
   // their name and not a mention, so nobody gets pinged. a name can spell out a role mention, so mentions are off too
   return interaction.editReply({
-    content: `Couldn't find a start.gg with ${escapeMarkdown(member.displayName)}'s Discord connected.\n-# start.gg can't be searched by Discord, so this only finds tracked players, people who used \`/link\` and people registered for tournaments the bot has checked`,
+    content: `Couldn't find a start.gg with ${escapeMarkdown(member.displayName)}'s Discord connected.\n-# Ask them to run \`/link\` with their start.gg link once, or to register for a tournament the bot checks, and then this finds them. start.gg can't be searched by Discord`,
     allowedMentions: { parse: [] },
   });
 }

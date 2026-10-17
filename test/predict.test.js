@@ -89,9 +89,26 @@ test('verbose says how the parts add up and how much a seed is worth', () => {
   assert.match(text, /\*\*Head-to-head:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
   assert.match(text, /\*\*Seeding and form:\*\* counts for \d+%/);
   assert.match(text, /\*\*Starting from even:\*\* counts for \d+%/);
-  assert.match(text, /the seed twice as high won \d+% of the time/);
-  assert.match(text, /Seeding:\*\* \*\*A\*\* seeded higher in 8 of 8 shared brackets, about 3\.0x higher on average/);
+  assert.match(text, /when one seed number was double the other's, the player with the lower one won \d+% of the time/);
+  assert.match(text, /Seeding:\*\* \*\*A\*\* got the better seed in 8 of 8 shared brackets, \*\*B\*\*'s average seed number was 3\.0x \*\*A\*\*'s/);
   const short = embeds.prediction(a, b, odds, false)[0].data.description;
   assert.match(short, /Form, last 40 sets:/);
   assert.doesNotMatch(short, /How it adds up/);
+});
+
+test('form says what seeding expected of their seeded sets', () => {
+  const historyA = [set(1, 100, true, { mySeed: 2, theirSeed: 8 }), set(1, 100, false, { mySeed: 2, theirSeed: 4 })];
+  const historyB = [set(2, 101, true, { mySeed: 4, theirSeed: 6 })];
+  const odds = predict(a, b, historyA, historyB, { now });
+  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  assert.match(short, /Form, last 40 sets:\*\* \*\*A\*\* 1-1 in seeded sets, seeding expected \d+-\d+ · \*\*B\*\* 1-0 in seeded sets, seeding expected \d+-\d+/);
+});
+
+test('common opponents name who did better and how many are even', () => {
+  const historyA = [set(1, 100, true), set(1, 100, true), set(1, 101, true), set(1, 101, false)];
+  const historyB = [set(2, 100, false), set(2, 100, false), set(2, 101, true), set(2, 101, false)];
+  const odds = predict(a, b, historyA, historyB, { now });
+  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  assert.equal(odds.common.total, 2);
+  assert.match(short, /Common opponents:\*\* 2 shared\. \*\*A\*\* did better against 1, \*\*B\*\* against 0, even against the other 1/);
 });

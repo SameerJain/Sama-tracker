@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-players-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
@@ -62,6 +62,16 @@ test('leaving the player out looks up whoever ran it, from /link or a tracked di
   assert.equal((await run('stats', 'crew-discord')).embeds[0].data.title, 'Crew');
 });
 
+test('stats asks start.gg for Melee standings only when the game option is enabled', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = {};
+  const requests = [];
+  mockApi(({ variables }) => { requests.push(variables); return noStats(); });
+  await run('stats', 'crew-discord', { melee: true });
+  await run('stats', 'crew-discord', { melee: false });
+  assert.deepEqual(requests.map(({ videogameId }) => videogameId), [1, undefined]);
+});
+
 test('nobody linked, or an untracked pick, says what to do instead', async () => {
   state.players = { 1: crew };
   state.links = {};
@@ -69,6 +79,68 @@ test('nobody linked, or an untracked pick, says what to do instead', async () =>
   assert.ok(unlinked.flags);
   assert.match(unlinked.content, /\/link/);
   assert.match((await run('stats', 'stranger', { player: 'Someone' })).content, /Only tracked or linked players.*\/track add.*\/link/);
+});
+
+test('matchup commands wait for every validation reply before finishing', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 7: me };
+  state.links = {};
+  // a typed pick that matches nobody gets looked up as a link, and this one resolves to nobody
+  mockApi(() => ({ user: null }));
+  for (const commandName of ['h2h', 'predict']) {
+    for (const [user, values, message] of [
+      ['crew-discord', { opponent: 'missing' }, /Couldn't find a start\.gg player/],
+      ['stranger', { opponent: '7' }, /\/link/],
+      ['crew-discord', { opponent: '1' }, /Pick two different players/],
+    ]) {
+      const reply = Promise.withResolvers();
+      let finished = false;
+      let content;
+      const interaction = {
+        commandName, user: { id: user },
+        options: { getSubcommand: () => null, getString: name => values[name] ?? null },
+        reply: result => { content = result.content; return reply.promise; },
+        deferReply: async () => { interaction.deferred = true; },
+        deleteReply: async () => {},
+        followUp: result => { content = result.content; return reply.promise; },
+      };
+      const handled = handleCommand(interaction).then(() => { finished = true; });
+      await new Promise(resolve => setImmediate(resolve));
+      const finishedBeforeReply = finished;
+      reply.resolve();
+      await handled;
+      assert.match(content, message);
+      assert.equal(finishedBeforeReply, false, `${commandName}: ${content}`);
+    }
+  }
+});
+
+test('h2h and predict take a start.gg link or ID for either player', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival' } };
+  state.links = {};
+  const requests = [];
+  mockApi(({ query, variables }) => {
+    requests.push({ query, variables });
+    if (query.includes('user(slug:')) {
+      // fresh ids, since the history caches outlive the test and later tests reuse 10 and 20
+      if (variables.slug === 'user/other') return { user: { id: 34, slug: 'user/other', player: { id: 304, gamerTag: 'Other' }, authorizations: [] } };
+      return { user: { id: 30, slug: 'user/opponent', player: { id: 300, gamerTag: 'Opponent' }, authorizations: [] } };
+    }
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+  });
+  // the opponent by link: the user lookup gives their player id, which drives the meetings lookup
+  const byLink = (await run('h2h', 'crew-discord', { opponent: 'start.gg/user/opponent' })).embeds[0].data;
+  assert.equal(byLink.title, 'Crew vs Opponent');
+  assert.equal(requests[0].variables.slug, 'user/opponent');
+  assert.equal(requests[1].variables.id, 10);
+  assert.equal(requests[1].variables.opponentId, 300);
+
+  // a bare ID works the same way, and the title still puts the opponent first
+  requests.length = 0;
+  const byId = (await run('h2h', 'crew-discord', { player: 'f64a83c8', opponent: '2' })).embeds[0].data;
+  assert.equal(byId.title, 'Opponent vs Rival');
+  assert.equal(requests[0].variables.slug, 'user/f64a83c8');
+  assert.equal(requests[1].variables.id, 300);
+  assert.equal(requests[1].variables.opponentId, 20);
 });
 
 test('/link checks the discord on start.gg and does not track them', async () => {
@@ -134,6 +206,16 @@ test('/scout works for someone linked, as long as start.gg still has their disco
   // disconnected on start.gg since linking
   await scout(null);
   assert.match(replies.at(-1), /needs to know who you are.*\/link/);
+});
+
+test('/scout says the same thing as /track add when start.gg has nobody for the profile', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = {};
+  mockApi(({ query }) => (query.includes('user(id:')
+    ? { u1: { player: { gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] } }
+    : { user: null }));
+  const reply = await run('scout', 'crew-discord', { profile: 'start.gg/user/ghost' });
+  assert.match(reply, /Couldn't find a start\.gg player for `start\.gg\/user\/ghost`\./);
 });
 
 test('/link refuses when commands already find you, and fixes a tracked discord that was out of date', async () => {
@@ -245,7 +327,7 @@ test('h2h melee says so in the footer and how many sets in other games it left o
   assert.equal(embeds.headToHead(a, b, [], { melee: true })[0].data.description, 'They haven\'t played each other in Melee singles on start.gg yet.');
 });
 
-test('h2h melee:True filters the cached histories by game instead of asking start.gg again', async () => {
+test('h2h fetches only meetings with the selected opponent and filters Melee from those', async () => {
   state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: b };
   state.links = {};
   const MELEE = { id: 1, displayName: 'Melee' };
@@ -255,13 +337,19 @@ test('h2h melee:True filters the cached histories by game instead of asking star
     event: { slug: `tournament/t${id}/event/singles`, videogame, tournament: { name: `T${id}` } },
     slots: [[1, 10, 'Crew'], [2, 20, 'B']].map(([entrant, player, name]) => ({ entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] }, standing: null })),
   });
-  // both histories get the same page, the set ids dedupe it
-  mockApi(() => ({ player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node(1, MELEE, true), node(2, ULTIMATE, false), node(3, MELEE, true)] } } }));
+  const requests = [];
+  mockApi(({ query, variables }) => {
+    requests.push({ query, variables });
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node(1, MELEE, true), node(2, ULTIMATE, false), node(3, MELEE, true)] } } };
+  });
   const all = (await run('h2h', 'crew-discord', { opponent: '2' })).embeds[0].data;
   assert.equal(all.title, 'Crew 2-1 B');
   assert.doesNotMatch(all.description, /other games/);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].variables.id, crew.playerId);
+  assert.equal(requests[0].variables.opponentId, b.playerId);
+  assert.match(requests[0].query, /opponentId:\s*\$opponentId/);
 
-  globalThis.fetch = async () => assert.fail('melee:True should reuse the histories it already has');
   const melee = (await run('h2h', 'crew-discord', { opponent: '2', melee: true })).embeds[0].data;
   assert.equal(melee.title, 'Crew 2-0 B');
   assert.equal(melee.footer.text, 'Sama-tracker by Samatron · Melee');
@@ -304,4 +392,41 @@ test('predict verbose explains the same odds the short version shows', () => {
   assert.match(text, /\*\*Head-to-head:\*\* counts for \d+%/);
   assert.match(text, /### Common opponents\n\*\*P30\*\*: \*\*A\*\* 1-1 · \*\*B\*\* 0-2/);
   assert.match(text, /Shared brackets/);
+});
+
+// a start.gg set node for /predict, entrant 1 winning. a -1 in scores makes it a DQ for both sides
+const predictNode = (id, videogame, players, scores = [2, 0]) => ({
+  id, completedAt: 1000 - id, fullRoundText: 'Winners Final', winnerId: 1,
+  event: { slug: `tournament/t${id}/event/singles`, videogame, tournament: { name: `T${id}` } },
+  slots: players.map((player, i) => ({ entrant: { id: i + 1, name: `P${player}`, initialSeedNum: i + 1, participants: [{ player: { id: player } }] }, standing: { stats: { score: { value: scores[i] } } } })),
+});
+const ULTIMATE = { id: 1386, displayName: 'Ultimate' };
+const MELEE = { id: 1, displayName: 'Melee' };
+
+test('predict melee names whoever has never played it, and the game the odds do work for', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival' } };
+  state.links = {};
+  // crew has a melee set and rival has never played it, so melee has no odds, but they have an ultimate set together
+  mockApi(({ query, variables }) => {
+    if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    const crewSets = [predictNode(1, ULTIMATE, [10, 20]), predictNode(2, MELEE, [10, 30])];
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: variables.id === 10 ? crewSets : [predictNode(1, ULTIMATE, [10, 20])] } } };
+  });
+  assert.equal(await run('predict', 'crew-discord', { opponent: '2', melee: true }),
+    'Rival hasn\'t played Melee singles on start.gg.\n-# Leave out `melee` for Ultimate odds');
+  // the wording is only about the reply, the odds without melee are the same as ever
+  assert.match((await run('predict', 'crew-discord', { opponent: '2' })).embeds[0].data.title, /Crew \d+% · \d+% Rival/);
+});
+
+test('predict melee gives no such hint when the shared game is all DQs for one of them', async () => {
+  state.players = { 1: { ...crew, playerId: 40, discordId: 'crew-discord' }, 2: { userId: 2, playerId: 50, tag: 'Rival', slug: 'user/rival' } };
+  state.links = {};
+  // rival's only ultimate set here is a DQ, so leaving melee out wouldn't give ultimate odds either
+  mockApi(({ query, variables }) => {
+    if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    const crewSets = [predictNode(1, MELEE, [40, 30]), predictNode(2, ULTIMATE, [40, 60]), predictNode(3, ULTIMATE, [40, 50], [2, -1])];
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: variables.id === 40 ? crewSets : [predictNode(3, ULTIMATE, [40, 50], [2, -1])] } } };
+  });
+  assert.equal(await run('predict', 'crew-discord', { opponent: '2', melee: true }),
+    'Rival hasn\'t played Melee singles on start.gg.');
 });

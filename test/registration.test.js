@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-registration-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');

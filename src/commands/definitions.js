@@ -13,6 +13,9 @@ function playerOption(description, name = 'player', required = true) {
 
 const YOU = 'Tracked or linked player, leave out for yourself';
 const YOU_OR_ALL = 'Tracked or linked player, or all for everyone tracked. Leave out for yourself';
+// /h2h and /predict also take a start.gg profile link or ID, so neither player has to be tracked or linked
+const MATCHUP = 'Tracked or linked player to compare with, or a start.gg profile link or ID';
+const MATCHUP_YOU = 'Tracked or linked player, or a start.gg profile link or ID. Leave out for yourself';
 
 function verboseOption(description) {
   return { type: Option.Boolean, name: 'verbose', description };
@@ -81,7 +84,7 @@ export const commands = [
   { name: 'unlink', description: 'Undo /link. Doesn\'t change whether you\'re tracked' },
   {
     name: 'profile',
-    description: 'Someone\'s start.gg profile, if their start.gg has their Discord connected',
+    description: 'Someone\'s start.gg profile, once the bot has seen their account',
     options: [{ type: Option.User, name: 'user', description: 'Server member, leave out for yourself' }],
   },
   { name: 'upcoming', description: 'Upcoming tournaments', options: [playerOption(YOU_OR_ALL, 'player', false)] },
@@ -109,7 +112,7 @@ export const commands = [
     name: 'h2h',
     description: 'Head-to-head record against another player',
     options: [
-      playerOption('Tracked or linked player to compare with', 'opponent'), playerOption(YOU, 'player', false),
+      playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
       verboseOption('Every set they\'ve played, plus splits and streaks. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets' },
     ],
@@ -138,7 +141,7 @@ export const commands = [
     name: 'predict',
     description: 'Odds of beating another player',
     options: [
-      playerOption('Tracked or linked player to go up against', 'opponent'), playerOption(YOU, 'player', false),
+      playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
       verboseOption('Show how each part of the prediction counts'),
       { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more' },
     ],

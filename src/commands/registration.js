@@ -4,7 +4,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, endTime, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts } from '../accounts.js';
-import { lookup, profileSlug, sendEmbeds, flag } from './shared.js';
+import { findPlayer, lookup, replyEphemeral, sendEmbeds, flag } from './shared.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
@@ -60,7 +60,7 @@ async function setRegReminder(interaction) {
 function deleteRegReminder(interaction) {
   const value = interaction.options.getString('tournament', true).toLowerCase();
   const reminder = lookup(state.regReminders, value, 'name');
-  if (!reminder) return interaction.reply({ content: 'No reminder set for that.', flags: MessageFlags.Ephemeral });
+  if (!reminder) return replyEphemeral(interaction, 'No reminder set for that.');
 
   delete state.regReminders[reminder.id];
   // so a reg admin's doesn't get added back
@@ -70,13 +70,11 @@ function deleteRegReminder(interaction) {
 }
 
 async function regAdminAdd(interaction) {
-  const input = interaction.options.getString('profile', true).trim();
+  const input = interaction.options.getString('profile', true);
 
   await interaction.deferReply();
-  const admin = await startgg.getPlayer(profileSlug(input));
-  if (!admin) {
-    return interaction.editReply(`Couldn't find a start.gg user for \`${input}\`. Use their profile link, like start.gg/user/f64a83c8.`);
-  }
+  const admin = await findPlayer(interaction, input);
+  if (!admin) return;
   if (state.regAdmins[admin.userId]) {
     return interaction.editReply(`${admin.tag} is already a reg admin.`);
   }
@@ -91,7 +89,7 @@ async function regAdminAdd(interaction) {
 
 function regAdminRemove(interaction) {
   const admin = lookup(state.regAdmins, interaction.options.getString('admin', true).toLowerCase(), 'tag');
-  if (!admin) return interaction.reply({ content: 'That\'s not a reg admin. See `/reg_admin list`.', flags: MessageFlags.Ephemeral });
+  if (!admin) return replyEphemeral(interaction, 'That\'s not a reg admin. See `/reg_admin list`.');
 
   delete state.regAdmins[admin.userId];
   save();
@@ -186,7 +184,7 @@ async function registered(interaction) {
 async function regWarn(interaction) {
   const input = interaction.options.getString('tournament', true).trim();
   const user = interaction.options.getUser('user', true);
-  if (user.bot) return interaction.reply({ content: 'Bots don\'t need to register.', flags: MessageFlags.Ephemeral });
+  if (user.bot) return replyEphemeral(interaction, 'Bots don\'t need to register.');
 
   await interaction.deferReply();
   const tournament = await startgg.getRegistration(tournamentSlug(input));

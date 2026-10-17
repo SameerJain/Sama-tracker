@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-countdown-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 // start.gg requests go out 800ms apart, a fake clock gets through minutes of them right away

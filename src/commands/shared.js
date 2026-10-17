@@ -96,12 +96,15 @@ async function withCountdown(interaction, doing, work, preview) {
   }
 }
 
+// failures and switches don't need the channel to see them
+const replyEphemeral = (interaction, content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+
 // left out with no start.gg linked, or someone picked who isn't on the list
 function replyNoPlayer(interaction, name = 'player', { trackedOnly = false } = {}) {
   let content = 'Only tracked or linked players can be picked. `/track add` them, or they can `/link` their own start.gg.';
   if (trackedOnly) content = 'Only tracked players can be picked here. `/track list` shows who\'s tracked.';
   if (interaction.options.getString(name) === null) content = 'Pick a player, or `/link` your start.gg so leaving it out looks you up.';
-  return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  return replyEphemeral(interaction, content);
 }
 
 // start.gg/user/f64a83c8 or just f64a83c8
@@ -109,7 +112,35 @@ function profileSlug(input) {
   return input.match(/user\/([\w-]+)/)?.[1] ?? input;
 }
 
+// the player behind a typed link or ID, for handlers that deferred first. null and a reply when
+// start.gg has nobody for it. whose is just for the wording, "use their/your profile link"
+async function findPlayer(interaction, input, whose = 'their') {
+  const text = input.trim();
+  const player = await startgg.getPlayer(profileSlug(text));
+  if (!player) await interaction.editReply(`Couldn't find a start.gg player for \`${text}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`);
+  return player;
+}
+
+// whoever a matchup option got that isn't tracked or linked: a start.gg profile link or ID. called
+// after deferReply, so a miss drops the thinking reply and answers ephemeral instead. null when nobody
+async function fetchPlayer(interaction, input) {
+  const text = input.trim();
+  const player = await startgg.getPlayer(profileSlug(text));
+  if (!player) {
+    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${text}\`. Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.`);
+  }
+  return player;
+}
+
+// an ephemeral reply that works after deferring too: the thinking reply gets dropped and the answer
+// goes out as its own ephemeral follow-up, since editing would put it in the channel for everyone
+async function replyEphemeralAfterDefer(interaction, content) {
+  if (!interaction.deferred) return replyEphemeral(interaction, content);
+  await interaction.deleteReply();
+  return interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+}
+
 // a boolean option, false when left out
 const flag = (interaction, name) => interaction.options.getBoolean(name) ?? false;
 
-export { pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, profileSlug, flag };
+export { pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag };

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
-import { getCharacterSets, getEventHistory, getSetHistory } from '../src/startgg.js';
+import { getCharacterSets, getEventHistory, getHeadToHead, getSetHistory, getStats } from '../src/startgg.js';
 import { predict } from '../src/predict.js';
 
 const originalFetch = globalThis.fetch;
@@ -23,6 +23,105 @@ function reply(data) {
 
 const event = { slug: 'tournament/t/event/e', name: 'Singles', videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'T' } };
 const slots = [10, 20].map((id) => ({ entrant: { id, name: `P${id}`, initialSeedNum: 1, participants: [{ player: { id } }] }, standing: { stats: { score: { value: 1 } } } }));
+
+test('game stats fetch older pages until they have 30 matching sets', async () => {
+  const melee = { ...event, videogame: { id: 1, displayName: 'Melee' } };
+  const nodes = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, completedAt: 100 - i, winnerId: 10, event: i < 35 ? event : melee, slots }));
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    calls.push(variables.page ?? 1);
+    const gameStandings = /recentStandings\([^)]*videogameId:\s*\$videogameId/.test(query) && variables.videogameId === 1;
+    const standings = [{ placement: 2, isFinal: true, entrant: { initialSeedNum: 3, isDisqualified: false, event: gameStandings ? melee : event } }];
+    const page = variables.page ?? 1;
+    const perPage = Number(query.match(/perPage:\s*(\d+)/)?.[1] ?? variables.perPage);
+    return { ok: true, json: async () => ({ data: { player: { recentStandings: standings, sets: { pageInfo: { totalPages: Math.ceil(nodes.length / perPage) }, nodes: nodes.slice((page - 1) * perPage, page * perPage) } } } }) };
+  };
+
+  const stats = await settle(getStats(10, { videogameId: 1 }));
+  assert.deepEqual(stats.standings.map((standing) => standing.event.videogame.id), [1]);
+  assert.deepEqual(stats.sets.map((set) => set.id), Array.from({ length: 30 }, (_, i) => String(i + 36)));
+  assert.deepEqual(calls, [1, 2, 3]);
+});
+
+test('game stats stop at totalPages when fewer than 30 matching sets exist', async () => {
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const { variables } = JSON.parse(options.body);
+    const page = variables.page ?? 1;
+    calls.push(page);
+    const nodes = page === 2 ? [{ id: 'older-melee', winnerId: 10, event: { ...event, videogame: { id: 1 } }, slots }] : [];
+    return { ok: true, json: async () => ({ data: { player: { recentStandings: [], sets: { pageInfo: { totalPages: 2 }, nodes } } } }) };
+  };
+
+  assert.deepEqual((await settle(getStats(10, { videogameId: 1 }))).sets.map((set) => set.id), ['older-melee']);
+  assert.deepEqual(calls, [1, 2]);
+});
+
+test('stats without a game filter keep the single-request recent window', async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return { ok: true, json: async () => ({ data: { player: { recentStandings: [], sets: { pageInfo: { totalPages: 20 }, nodes: [{ id: 1, winnerId: 10, event, slots }] } } } }) };
+  };
+  assert.deepEqual((await settle(getStats(10))).sets.map((set) => set.id), ['1']);
+  assert.equal(calls, 1);
+});
+
+test('head-to-head requests every opponent-filtered page and preserves normalized non-DQ meetings', async () => {
+  const nodes = Array.from({ length: 81 }, (_, i) => ({ id: i + 1, completedAt: 100 - i, winnerId: 10, event, slots }));
+  nodes.push(
+    { id: 'dq', completedAt: 2, winnerId: 10, event, slots: slots.map((slot, i) => i ? slot : { ...slot, standing: { stats: { score: { value: -1 } } } }) },
+    { id: 'deleted', completedAt: 1, winnerId: 10, event: null, slots },
+    { id: 'teams', completedAt: 1, winnerId: 10, event, slots: slots.map((slot) => ({ ...slot, entrant: { ...slot.entrant, participants: [...slot.entrant.participants, { player: { id: 30 } }] } })) },
+    { ...nodes[0] },
+  );
+  [nodes[0], nodes[1]] = [nodes[1], nodes[0]];
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    assert.match(query, /sets\([^)]*opponentId:\s*\$opponentId/);
+    assert.equal(variables.id, 10);
+    assert.equal(variables.opponentId, 20);
+    // start.gg rejects entrantSize together with opponentId, so singles must be checked after fetching
+    assert.deepEqual(variables.filters, { state: [3] });
+    calls.push(variables.page);
+    const perPage = Number(query.match(/perPage:\s*(\d+)/)?.[1] ?? variables.perPage);
+    return { ok: true, json: async () => ({ data: { player: { sets: { pageInfo: { totalPages: Math.ceil(nodes.length / perPage) }, nodes: nodes.slice((variables.page - 1) * perPage, variables.page * perPage) } } } }) };
+  };
+
+  const sets = await settle(getHeadToHead(10, 20));
+  assert.deepEqual(sets.map((set) => set.id), Array.from({ length: 81 }, (_, i) => String(i + 1)));
+  assert.deepEqual(sets[0].sides[0].playerIds, [10]);
+  assert.deepEqual(calls, [1, 2, 3]);
+});
+
+test('head-to-head fits in one request when its filtered history has one page', async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return { ok: true, json: async () => ({ data: { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [{ id: 1, winnerId: 20, event, slots }] } } } }) };
+  };
+  assert.deepEqual((await settle(getHeadToHead(10, 20))).map((set) => set.id), ['1']);
+  assert.equal(calls, 1);
+});
+
+test('head-to-head pages stay below the object limit when opponent results include doubles', async () => {
+  const doubles = slots.map((slot) => ({ ...slot, entrant: { ...slot.entrant, participants: [...slot.entrant.participants, { player: { id: 30 } }] } }));
+  const nodes = Array.from({ length: 40 }, (_, i) => ({ id: `doubles-${i}`, winnerId: 10, event, slots: doubles }));
+  nodes.push({ id: 'singles', winnerId: 10, event, slots });
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    const perPage = Number(query.match(/perPage:\s*(\d+)/)?.[1] ?? variables.perPage);
+    const selected = nodes.slice((variables.page - 1) * perPage, variables.page * perPage);
+    // A doubles set adds four participant/player objects to the usual ~24.
+    const body = selected.length * 28 + 4 > 1000
+      ? { errors: [{ message: 'Query complexity exceeds 1000 objects' }] }
+      : { data: { player: { sets: { pageInfo: { totalPages: Math.ceil(nodes.length / perPage) }, nodes: selected } } } };
+    return { ok: true, json: async () => body };
+  };
+  assert.deepEqual((await settle(getHeadToHead(10, 20))).map((set) => set.id), ['singles']);
+});
 
 // old sets far back in someone's history can have their event deleted. /scout verbose crashed on one in predict
 test('sets from a deleted event get left out instead of breaking everything after', async () => {

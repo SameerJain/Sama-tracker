@@ -5,7 +5,7 @@ const CATEGORIES = ['Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Hi
 const TITLES = [
   'GO BILLS! 🦬🔥',
   'BILLS MAFIA! ❤️💙',
-  'LET’S GO BUFFALO! 🦬',
+  'LET\'S GO BUFFALO! 🦬',
   'BILLS BY A BILLION! 🔥',
   'CIRCLE THE WAGONS! 🦬',
   'ONE BUFFALO! ❤️💙',

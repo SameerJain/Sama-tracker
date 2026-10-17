@@ -1,13 +1,13 @@
 import { escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
 import { FORM_SETS } from '../predict.js';
-import { colors, FOOTER, baseEmbed, withLines, percent, topText, count, gameName, gameCount, recordOf, GRAND_FINALS, bold, setLink, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
+import { colors, FOOTER, baseEmbed, withLines, percent, topText, count, gameName, gameCount, recordOf, winsOf, GRAND_FINALS, bold, setLink, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
 
 // sets is newest first. verbose lists every set and adds splits, streaks and when they first played.
 // melee means sets is only their melee ones, and otherGames is how many got left out
 export function headToHead(a, b, sets, { verbose = false, melee = false, otherGames = 0 } = {}) {
   const results = sets.map((set) => fromSide(set, a.playerId));
-  const wins = results.filter((result) => result.won).length;
+  const wins = winsOf(results);
   const losses = results.length - wins;
 
   const playedGames = [...new Set(sets.map(({ event }) => gameName(event)))];
@@ -74,11 +74,11 @@ function rivalry(a, b, results) {
 
 const FACTORS = { h2h: 'Head-to-head', common: 'Common opponents', seeding: 'Seeding and form' };
 
-// 28-12, seeding said 24-16. just the record if none of their sets were seeded
+// 28-12 in seeded sets, seeding expected 24-16. just the record if none of their sets were seeded
 function formText(tag, { wins, total, seededWins, seeded, expected }) {
   if (!seeded) return `${tag} ${wins}-${total - wins}`;
   const said = Math.round(expected);
-  return `${tag} ${seededWins}-${seeded - seededWins}, seeding said ${said}-${seeded - said}`;
+  return `${tag} ${seededWins}-${seeded - seededWins} in seeded sets, seeding expected ${said}-${seeded - said}`;
 }
 
 // a's odds as a whole percent. never 0 or 100, nothing's certain
@@ -112,12 +112,16 @@ export function prediction(a, b, odds, verbose) {
   else lines.push(`**Head-to-head:** ${h2h.wins > losses ? `${tagA} leads ${h2h.wins}-${losses}` : `${tagB} leads ${losses}-${h2h.wins}`}`);
 
   if (common.total) {
-    lines.push(`**Common opponents:** ${common.total} shared. ${tagA} did better against ${common.better}, ${tagB} against ${common.worse}`);
+    // equal records against someone count for neither, so the rest get named
+    const even = common.total - common.better - common.worse;
+    const rest = even ? `, even against the other ${even}` : '';
+    lines.push(`**Common opponents:** ${common.total} shared. ${tagA} did better against ${common.better}, ${tagB} against ${common.worse}${rest}`);
   }
   if (seeding.total) {
-    const [leader, times, higher] = seeding.ratio >= 1 ? [tagA, seeding.ratio, seeding.higher] : [tagB, 1 / seeding.ratio, seeding.lower];
-    const by = times < 1.15 ? 'about even on average' : `about ${times.toFixed(1)}x higher on average`;
-    lines.push(`**Seeding:** ${leader} seeded higher in ${higher} of ${seeding.total} shared brackets, ${by}`);
+    const [leader, trailing, times, higher] = seeding.ratio >= 1 ? [tagA, tagB, seeding.ratio, seeding.higher] : [tagB, tagA, 1 / seeding.ratio, seeding.lower];
+    // the ratio is the trailing player's average seed number over the leader's
+    const by = times < 1.15 ? 'their average seed numbers were about the same' : `${trailing}'s average seed number was ${times.toFixed(1)}x ${leader}'s`;
+    lines.push(`**Seeding:** ${leader} got the better seed in ${higher} of ${seeding.total} shared brackets, ${by}`);
   } else if (level.a && level.b) {
     lines.push(`**Usual seed:** ${tagA} ${topText(level.a.share)} of their brackets · ${tagB} ${topText(level.b.share)}`);
   }
@@ -139,7 +143,7 @@ export function prediction(a, b, odds, verbose) {
   section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
     .map(({ slug, name, a: x, b: y }) => `[${escapeMarkdown(name)}](${startggUrl(slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
   lines.push(`-# Newer sets count more, a year old counts half. In ${escapeMarkdown(odds.game)}, across the ${count(odds.seededSets, 'seeded set')} `
-    + `the two of them played, the seed twice as high won ${percent(odds.seedEdge, 1)} of the time, which is how much seeding counts`);
+    + `the two of them played, when one seed number was double the other's, the player with the lower one won ${percent(odds.seedEdge, 1)} of the time, which is how much seeding counts`);
   return withLines(embed, lines);
 }
 

@@ -133,15 +133,17 @@ export function winLoss(wins, losses) {
   return `${wins}-${losses}${wins + losses ? ` (${percent(wins, wins + losses)})` : ''}`;
 }
 
+export const winsOf = (list) => list.filter(({ won }) => won).length;
+
 // for a list of results from fromSide
 export function recordOf(list) {
-  const wins = list.filter(({ won }) => won).length;
+  const wins = winsOf(list);
   return winLoss(wins, list.length - wins);
 }
 
 // 2-1, without the percent
 export function shortRecord(list) {
-  const wins = list.filter(({ won }) => won).length;
+  const wins = winsOf(list);
   return `${wins}-${list.length - wins}`;
 }
 

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { PermissionFlagsBits } from 'discord.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-socials-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');

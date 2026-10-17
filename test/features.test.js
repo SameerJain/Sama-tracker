@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-features-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
@@ -349,7 +349,7 @@ test('progress verbose digs into both periods, says what changed, and shows six 
     `-# <t:${until - 30 * DAY}:d> to <t:${until}:d>`,
     '**Sets:** 2-1 (67%)',
     '**Games:** 5-3 (63%)',
-    '**Streaks:** now W2 · best W2 · worst L1',
+    '**Period-ending streak:** W2 · best W2 · worst L1',
     '**Close sets:** 1-1 (50%)',
     '**Sweeps:** won 1 of 2 without dropping a game · lost 0 of 1 without taking one',
     '**Vs higher seeds:** 1-0 (100%) · **Vs lower seeds:** 1-1 (50%)',
@@ -360,9 +360,9 @@ test('progress verbose digs into both periods, says what changed, and shows six 
   assert.match(text, /\*\*Game record by character:\*\* Falco 0-1 \(0%\)/);
   assert.ok(text.includes([
     '### What changed',
-    '**Win rate:** up 66.7 points',
-    '**Games won:** up 62.5 points',
-    '**Average finish:** top 50% → top 10%',
+    '**Win rate:** up 66.7 points (1 set → 3 sets)',
+    '**Games won:** up 62.5 points (2 games → 8 games)',
+    '**Average finish:** top 50% → top 10% (1 event → 1 event)',
     '**Rematches, before → now:** **Rival** 0-1 → 1-0',
   ].join('\n')), text);
   const trend = text.split('### Every 30 days, newest first\n')[1].split('\n').slice(0, 6);
@@ -372,12 +372,52 @@ test('progress verbose digs into both periods, says what changed, and shows six 
   assert.match(trend[5], /no sets or events/);
   assert.doesNotMatch(text, /NaN|undefined|null/);
 
-  // the short one keeps the headline numbers and the streak, without the verbose dig
+  // the short one compares results too; verbose keeps the longer breakdowns
   const short = embeds.progress(crewPlayer, periods.slice(0, 2)).map(e => e.toJSON().description).join('\n');
-  assert.doesNotMatch(short, /Streaks:|Sweeps|Close sets|What changed|Every 30 days|Game record/);
+  assert.doesNotMatch(short, /Sweeps|Rematches|Best win|Worst loss|Every 30 days|Game record/);
   assert.match(short, /\*\*Games:\*\* 5-3 \(63%\)/);
-  assert.match(short, /\*\*Streak:\*\* W2 going in/);
-  assert.match(short, /\n\*\*Win rate:\*\* up 66\.7 points\n/);
+  assert.match(short, /\*\*Period-ending streak:\*\* W2/);
+  assert.match(short, /\*\*Close sets:\*\* 1-1 \(50%\)/);
+  assert.match(short, /\*\*Vs higher seeds:\*\* 1-0 \(100%\) · \*\*Vs lower seeds:\*\* 1-1 \(50%\)/);
+  assert.ok(short.includes([
+    '### What changed',
+    '**Win rate:** up 66.7 points (1 set → 3 sets)',
+    '**Games won:** up 62.5 points (2 games → 8 games)',
+    '**Average finish:** top 50% → top 10% (1 event → 1 event)',
+  ].join('\n')), short);
+});
+
+test('progress describes streaks at the end of each period', () => {
+  const until = 200 * DAY;
+  const sets = [
+    ...[1, 2, 3].map((days) => result(`now-${days}`, until - days * DAY, [10, 'Active', 1], [20, 'Rival', 2], true, [2, 0])),
+    ...[40, 41].map((days) => result(`before-${days}`, until - days * DAY, [10, 'Active', 1], [20, 'Rival', 2], false, [0, 2])),
+  ];
+  const periods = periodsFor(crewPlayer, sets, [], until);
+  for (const verbose of [false, true]) {
+    const text = embeds.progress(crewPlayer, periods, { verbose }).map(e => e.toJSON().description).join('\n');
+    assert.match(text, /\*\*Period-ending streak:\*\* W3/);
+    assert.match(text, /### Previous 30 days[\s\S]*\*\*Period-ending streak:\*\* L2/);
+    assert.doesNotMatch(text, /going in|Streaks:\*\* now/);
+  }
+});
+
+test('progress comparisons use reported samples and omit unavailable scores and seeds', () => {
+  const until = 200 * DAY;
+  const sets = [
+    result('now', until - DAY, [10, 'Active', null], [20, 'Rival', null], true, [null, null]),
+    result('before', until - 40 * DAY, [10, 'Active', null], [20, 'Rival', null], false, [0, 2]),
+  ];
+  const events = [
+    { event: { ...event, startAt: until - DAY, numEntrants: 40 }, placement: 4, seed: null },
+    { event: { ...event, startAt: until - 2 * DAY, numEntrants: null }, placement: 2, seed: null },
+    { event: { ...event, startAt: until - 40 * DAY, numEntrants: 40 }, placement: 20, seed: null },
+  ];
+  const text = embeds.progress(crewPlayer, periodsFor(crewPlayer, sets, events, until)).map(e => e.toJSON().description).join('\n');
+  assert.match(text, /\*\*Placements:\*\* 2 events · average top 10% \(1 with bracket size\)/);
+  assert.match(text, /\*\*Average finish:\*\* top 50% → top 10% \(1 event → 1 event\)/);
+  assert.match(text, /\*\*Win rate:\*\* up 100\.0 points \(1 set → 1 set\)/);
+  assert.doesNotMatch(text, /Games won|Close sets|Vs higher seeds|Vs lower seeds|NaN|undefined|null/);
 });
 
 test('progress verbose asks start.gg about six periods and still answers when characters fail', async () => {

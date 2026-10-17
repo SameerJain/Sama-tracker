@@ -74,37 +74,36 @@ export function progress(player, periods, { verbose = false, characterSets = nul
       `### Last ${days} days`, `-# ${range(current)}`, ...periodLines(recent, verbose, characters(current)),
       `### Previous ${days} days`, `-# ${range(previous)}`, ...periodLines(before, verbose, characters(previous)),
     ];
-    const winRate = pointsLine('Win rate', setRate(recent), setRate(before));
+    const winRate = pointsLine('Win rate', setRate(recent), setRate(before),
+      [before, recent].map((data) => count(data?.played.length ?? 0, 'set')));
+    section(lines, 'What changed', [winRate, ...changeLines(recent, before, verbose)].filter(Boolean));
     if (verbose) {
-      section(lines, 'What changed', [winRate, ...changeLines(recent, before)].filter(Boolean));
       section(lines, `Every ${days} days, newest first`, periods.map((period) => `${range(period)} · ${trendText(inGame(period, game))}`));
       lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in. Seeds go by placement tier, `
         + 'close sets are ones that went to the last game, and characters only show up if the TO reported them');
     } else {
-      if (winRate) lines.push('', winRate);
-      lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in, and vs seed goes by placement tier`);
+      lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in. Seeds go by placement tier, and close sets went to the last game`);
     }
     return withLines(baseEmbed(colors.brand, `${FOOTER} · ${game}`).setTitle(title).setURL(startggUrl(player.slug)), lines);
   });
 }
 
-// one game in one period of /progress. verbose adds streaks this long, close sets, sweeps, seeds, upsets and characters
+// one game in one period of /progress. verbose adds best/worst streaks, sweeps, upsets and characters
 function periodLines(data, verbose = false, characters = null) {
   if (!data) return ['No sets or finished events.'];
   const lines = [`**Sets:** ${winLoss(data.wins, data.losses)}`];
   const games = gameCount(data.played);
   if (games.won + games.lost) lines.push(`**Games:** ${winLoss(games.won, games.lost)}`);
   const streak = streaks(data.played);
-  if (verbose) {
-    if (streak.best > 1 || streak.worst > 1) lines.push(`**Streaks:** now ${streak.nowWon ? 'W' : 'L'}${streak.now} · best W${streak.best} · worst L${streak.worst}`);
-    lines.push(closeLine(data.played), sweepLine(data.played), seedLine(data.played));
-  } else if (streak.now > 1) {
-    lines.push(`**Streak:** ${streak.nowWon ? 'W' : 'L'}${streak.now} going in`);
+  if (streak.now > 1 || (verbose && (streak.best > 1 || streak.worst > 1))) {
+    lines.push(`**Period-ending streak:** ${streak.nowWon ? 'W' : 'L'}${streak.now}${verbose ? ` · best W${streak.best} · worst L${streak.worst}` : ''}`);
   }
+  lines.push(closeLine(data.played), verbose && sweepLine(data.played), seedLine(data.played));
 
   const sized = data.events.filter(({ event }) => event.numEntrants > 0);
   if (sized.length) {
-    lines.push(`**Placements:** ${count(data.events.length, 'event')} · average ${topText(averageFinish(sized))}`);
+    lines.push(`**Placements:** ${count(data.events.length, 'event')} · average ${topText(averageFinish(sized))}`
+      + (sized.length < data.events.length ? ` (${sized.length} with bracket size)` : ''));
     lines.push(`**Best:** ${placementLine(sized.toSorted(byFinish)[0])}`);
   } else if (data.events.length) {
     lines.push(`**Placements:** ${count(data.events.length, 'event')}, no bracket sizes reported`);
@@ -139,18 +138,20 @@ function gameRate(data) {
 }
 
 // Win rate: up 4.0 points. null unless both rates exist
-function pointsLine(label, now, before) {
+function pointsLine(label, now, before, samples) {
   if (now === null || before === null) return null;
   const points = 100 * (now - before);
-  return `**${label}:** ${points >= 0 ? 'up' : 'down'} ${Math.abs(points).toFixed(1)} points`;
+  return `**${label}:** ${points >= 0 ? 'up' : 'down'} ${Math.abs(points).toFixed(1)} points (${samples.join(' → ')})`;
 }
 
-// verbose /progress, the last period against the one before
-function changeLines(recent, before) {
-  const lines = [pointsLine('Games won', gameRate(recent), gameRate(before))];
-  const [now, then] = [recent, before].map((data) => averageFinish(data?.events ?? []));
-  if (now !== null && then !== null) lines.push(`**Average finish:** ${topText(then)} → ${topText(now)}`);
-  lines.push(rematchLine(recent?.played ?? [], before?.played ?? []));
+// /progress, the last period against the one before. verbose also compares rematches
+function changeLines(recent, before, verbose) {
+  const games = [before, recent].map((data) => gameCount(data?.played ?? []));
+  const lines = [pointsLine('Games won', gameRate(recent), gameRate(before), games.map(({ won, lost }) => count(won + lost, 'game')))];
+  const events = [before, recent].map((data) => (data?.events ?? []).filter(({ event }) => event.numEntrants > 0));
+  const [then, now] = events.map(averageFinish);
+  if (now !== null && then !== null) lines.push(`**Average finish:** ${topText(then)} → ${topText(now)} (${events.map((list) => count(list.length, 'event')).join(' → ')})`);
+  if (verbose) lines.push(rematchLine(recent?.played ?? [], before?.played ?? []));
   return lines;
 }
 

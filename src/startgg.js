@@ -259,14 +259,15 @@ export async function getSets(playerIds, { since, perPage = 10, states = [3] } =
   return [...setsById.values()];
 }
 
-// for h2h/predict. no games or characters, so 40 sets come to about 960 objects. that's close: adding
-// numEntrants to event put a page at 1003, over the limit, so bracket sizes come from getEventHistory.
+// for history/predict and opponent-filtered h2h. no games or characters, so 40 sets come to about 960
+// objects. adding numEntrants put a page at 1003, so bracket sizes come from getEventHistory.
+// opponent lookups can include teams, so 30 leaves room for their extra participants
 // pages can come back short or empty in the middle, so totalPages is the only way to know it's the end
-export async function getSetHistory(playerId, page, filters = {}) {
+export async function getSetHistory(playerId, page, { opponentId, ...filters } = {}) {
   const data = await query(`
-    query ($id: ID!, $page: Int!, $filters: SetFilters) {
+    query ($id: ID!, $page: Int!, $opponentId: ID, $filters: SetFilters) {
       player(id: $id) {
-        sets(perPage: 40, page: $page, filters: $filters) {
+        sets(perPage: ${opponentId ? 30 : 40}, page: $page, opponentId: $opponentId, filters: $filters) {
           pageInfo { totalPages }
           nodes {
             id
@@ -279,10 +280,19 @@ export async function getSetHistory(playerId, page, filters = {}) {
         }
       }
     }
-  `, { id: playerId, page, filters: { state: [3], entrantSize: [1], ...filters } });
+  `, { id: playerId, page, opponentId, filters: { state: [3], ...(opponentId ? {} : { entrantSize: [1] }), ...filters } });
 
   const connection = data.player?.sets;
   return { totalPages: connection?.pageInfo?.totalPages ?? 0, sets: (connection?.nodes ?? []).map(toSet).filter(Boolean) };
+}
+
+// every singles meeting, newest first, DQs left out. usually one opponent-filtered page is enough
+export async function getHeadToHead(playerId, opponentId) {
+  const pages = await allPages((page) => getSetHistory(playerId, page, { opponentId }));
+  // start.gg rejects entrantSize with opponentId, so singles get checked here
+  const sets = pages.flatMap((page) => page.sets).filter((set) => set.sides.every((side) => side.playerIds.length === 1));
+  const played = singles(sets, { playerId }).filter(({ them }) => them.playerIds.includes(opponentId));
+  return [...new Map(played.map(({ set }) => [set.id, set])).values()].sort((a, b) => b.completedAt - a.completedAt);
 }
 
 // sets completed in [since, until), newest first. updatedAfter also brings back old sets that got
@@ -352,11 +362,11 @@ export async function getEventHistory(userId) {
 }
 
 // 30 sets keeps this under the object limit
-export async function getStats(playerId) {
-  const data = await query(`
-    query ($id: ID!) {
+export async function getStats(playerId, { videogameId } = {}) {
+  const getPage = (page) => query(`
+    query ($id: ID!, $videogameId: ID, $page: Int!, $standings: Boolean!) {
       player(id: $id) {
-        recentStandings(limit: 15) {
+        recentStandings(limit: 15, videogameId: $videogameId) @include(if: $standings) {
           placement
           isFinal
           entrant {
@@ -365,7 +375,8 @@ export async function getStats(playerId) {
             event { name slug numEntrants startAt videogame { id } tournament { name slug } }
           }
         }
-        sets(perPage: 30, page: 1, filters: { state: [3], entrantSize: [1] }) {
+        sets(perPage: 30, page: $page, filters: { state: [3], entrantSize: [1] }) {
+          pageInfo { totalPages }
           nodes {
             id
             completedAt
@@ -376,13 +387,23 @@ export async function getStats(playerId) {
         }
       }
     }
-  `, { id: playerId });
+  `, { id: playerId, videogameId, page, standings: page === 1 });
 
+  const data = await getPage(1);
   const standings = (data.player?.recentStandings ?? [])
     .filter((standing) => standing.isFinal && standing.placement && standing.entrant?.event)
     .map(({ placement, entrant }) => ({ placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event: entrant.event }));
   const sets = (data.player?.sets?.nodes ?? []).map(toSet).filter(Boolean);
-  return { standings, sets };
+  if (!videogameId) return { standings, sets };
+
+  // Player.sets has no videogame filter, so keep reading until the recent window is full for this game
+  const matching = sets.filter((set) => set.event.videogame?.id === videogameId);
+  const totalPages = data.player?.sets?.pageInfo?.totalPages ?? 0;
+  for (let page = 2; page <= totalPages && matching.length < 30; page++) {
+    const next = await getPage(page);
+    matching.push(...(next.player?.sets?.nodes ?? []).map(toSet).filter((set) => set?.event.videogame?.id === videogameId));
+  }
+  return { standings, sets: matching.slice(0, 30) };
 }
 
 const CHARACTER_QUERY = `
@@ -679,4 +700,40 @@ export async function getParticipants(tournamentId) {
 // different from nobody being registered yet because that has a count of 0
 export function attendeesHidden(tournament, participants) {
   return !participants.length && tournament.numAttendees !== 0;
+}
+
+// everyone registered, with the account behind each one, for tools/track-attendees.js. eventIds
+// narrows to those events, the way the attendees page's filter does. a participant with its
+// player and user is about 6 objects, so 100 a page stays under the limit
+export async function getAttendees(tournamentId, { eventIds } = {}) {
+  const filtered = eventIds?.length > 0;
+  const pages = await allPages(async (page) => connectionPage((await query(`
+    query ($id: ID!, $page: Int!${filtered ? ', $eventIds: [ID]' : ''}) {
+      tournament(id: $id) {
+        participants(query: { page: $page, perPage: 100${filtered ? ', filter: { eventIds: $eventIds }' : ''} }) {
+          pageInfo { totalPages }
+          nodes {
+            gamerTag
+            player { id gamerTag }
+            user {
+              id
+              slug
+              images(type: "profile") { url }
+              authorizations(types: [DISCORD]) { externalId }
+            }
+          }
+        }
+      }
+    }
+  `, { id: tournamentId, page, ...(filtered && { eventIds }) })).tournament?.participants));
+
+  // user and player are missing on people a TO added without an account
+  return pages.flatMap((page) => page.nodes).map((node) => ({
+    userId: node.user?.id,
+    playerId: node.player?.id,
+    slug: node.user?.slug,
+    tag: node.player?.gamerTag ?? node.gamerTag,
+    image: node.user?.images?.[0]?.url,
+    discordId: node.user?.authorizations?.[0]?.externalId,
+  }));
 }

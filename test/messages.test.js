@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { PermissionFlagsBits } from 'discord.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-messages-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
@@ -39,12 +39,13 @@ test('only managers can change settings', async () => {
   assert.deepEqual(state.messages, {});
 });
 
-test('message switches and recap schedule save immediately and return private settings', async () => {
+test('message switches and recap schedule save immediately and return private settings', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
   const reply = await configure({ sets: false, streams: false, recap_day: 0, recap_time: '18:30', timezone: 'America/Los_Angeles' });
   assert.ok(reply.flags);
   assert.match(reply.content, /Set results:\*\* off/);
-  assert.match(reply.content, /Sunday 18:30 PT/);
+  assert.match(reply.content, /Sunday 18:30 PST/);
   const saved = JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).messages;
   assert.equal(saved.sets, false);
   assert.equal(saved.results, undefined);
@@ -62,12 +63,25 @@ test('invalid schedules do not partially apply accompanying switches', async () 
   }
 });
 
-test('running messages without options shows defaults without writing settings', async () => {
+test('running messages without options shows defaults without writing settings', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
   const reply = await configure();
   assert.match(reply.content, /Set results:\*\* on/);
-  assert.match(reply.content, /Sunday 21:00 ET/);
+  assert.match(reply.content, /Sunday 21:00 EST/);
   assert.deepEqual(state.messages, {});
+});
+
+test('message timezone labels follow daylight saving', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-07-15T12:00:00Z') });
+  state.messages = {};
+  assert.match((await configure()).content, /Sunday 21:00 EDT/);
+  assert.match((await configure({ timezone: 'America/Los_Angeles' })).content, /Sunday 21:00 PDT/);
+});
+
+test('message timezone labels keep the IANA zone when there is no short abbreviation', async () => {
+  state.messages = {};
+  assert.match((await configure({ timezone: 'Asia/Tokyo' })).content, /Sunday 21:00 Asia\/Tokyo/);
 });
 
 test('re-enabling categories saves cutoffs even if no muted poll happened', async () => {

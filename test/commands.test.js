@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 // every command once against a fake start.gg, so a handler that throws shows up here
 const directory = mkdtempSync(join(tmpdir(), 'sama-commands-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
@@ -40,6 +40,8 @@ function respond(query, variables) {
   const each = (value) => Object.fromEntries(aliases.map((alias) => [alias, value]));
   if (query.includes('currentUser')) return { currentUser: { id: 1 } };
   if (query.includes('user(slug:')) {
+    // the matchup commands pair() something typed that isn't tracked or linked, so one slug resolves to nobody
+    if (variables.slug?.includes('nobody')) return { user: null };
     return { user: { id: 3, slug: 'user/opponent', images: [], player: { id: 30, gamerTag: 'Opponent' }, authorizations: [{ externalId: 'opponent-discord' }] } };
   }
   if (query.includes('registrationClosesAt')) {
@@ -152,13 +154,18 @@ const runs = [
   // the fake sets are all ultimate
   ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out/],
   ['h2h', { values: { opponent: '2', verbose: true, melee: true } }, /haven't played each other in Melee singles on start\.gg yet/],
+  // either player can be a start.gg link or ID instead of a tracked or linked pick
+  ['h2h', { values: { opponent: 'start.gg/user/opponent' } }, /Crew vs Opponent.*haven't played each other in singles on start\.gg yet/],
+  ['h2h', { values: { player: 'start.gg/user/opponent', opponent: '2' } }, /Opponent vs Rival.*haven't played each other in singles on start\.gg yet/],
+  ['h2h', { values: { opponent: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
   ['stats', {}, /Recent sets/], ['stats', { values: { verbose: true } }, /Lifetime stats/],
   ['stats', { values: { melee: true } }, /No Melee sets or events on start\.gg yet\./],
   ['stats', { values: { verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
   ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /How it adds up/],
-  ['predict', { values: { opponent: '2', melee: true } }, /haven't both played Melee singles/],
-  ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /haven't both played Melee singles/],
+  ['predict', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles on start\.gg\..*Leave out `melee` for Ultimate odds/],
+  ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
+  ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
   ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
   ['sets', { values: { player: 'all', results: 'off' } }, /Set results off for everyone/],
   ['set_reg_reminder', { values: { tournament: 'start.gg/tournament/soon' } }, /gets pinged 12 hours before registration for Soon ends/],

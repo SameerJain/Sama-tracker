@@ -6,13 +6,14 @@ import { join } from 'node:path';
 
 // the history cache every set and character lookup goes through, by way of the commands that use it
 const directory = mkdtempSync(join(tmpdir(), 'sama-history-'));
-process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 // start.gg requests go out 800ms apart, a fake clock gets through minutes of them right away
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
 const { state } = await import('../src/store.js');
 const { handleCommand } = await import('../src/commands/index.js');
+const { setHistory } = await import('../src/commands/history.js');
 const startgg = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -27,7 +28,7 @@ async function settle(promise) {
   return promise;
 }
 
-// a start.gg where player id has pages[id] pages of history, a set each against player 5. fail says which
+// a start.gg where player id has pages[id] pages of history, a set each against player 5 or opponentId. fail says which
 // requests error. asked lists 'sets 99 3' for the set history page 3 of player 99, and the like
 function fakeStartgg(pages, { fail = () => false, newest = () => 0 } = {}) {
   const asked = [];
@@ -47,7 +48,7 @@ function fakeStartgg(pages, { fail = () => false, newest = () => 0 } = {}) {
       const node = (id) => ({
         id, completedAt: 100_000 - index, fullRoundText: 'Winners Round 1', winnerId: variables.id,
         event: { slug: 'tournament/t/event/e', videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'T' } },
-        slots: [variables.id, 5].map((player) => ({ entrant: { id: player, name: `P${player}`, initialSeedNum: 1, participants: [{ player: { id: player } }] }, standing: { stats: { score: { value: 1 } } } })),
+        slots: [variables.id, variables.opponentId ?? 5].map((player) => ({ entrant: { id: player, name: `P${player}`, initialSeedNum: 1, participants: [{ player: { id: player } }] }, standing: { stats: { score: { value: 1 } } } })),
         games: [],
       });
       const nodes = [node(`${variables.id}-${variables.page}`)];
@@ -76,13 +77,13 @@ async function command(commandName, values = {}) {
 
 const sets = (asked, player) => asked.filter((each) => each.startsWith(`sets ${player} `)).map((each) => Number(each.split(' ')[2]));
 
-test('/h2h only reads the history with fewer sets when every meeting fits in it', async () => {
+test('/h2h reads all opponent pages without fetching the other player\'s history', async () => {
   state.players = { 1: { userId: 1, playerId: 10, tag: 'Me', slug: 'user/me', discordId: 'me' }, 3: { userId: 3, playerId: 30, tag: 'Busy', slug: 'user/busy' } };
   const asked = fakeStartgg({ 10: 3, 30: 40 });
-  await command('h2h', { opponent: '3', verbose: true });
+  const replies = await command('h2h', { opponent: '3', verbose: true });
   assert.deepEqual(sets(asked, 10), [1, 2, 3]);
-  // just its first page, to see it has more
-  assert.deepEqual(sets(asked, 30), [1]);
+  assert.deepEqual(sets(asked, 30), []);
+  assert.equal(replies.at(-1).embeds[0].toJSON().title, 'Me 3-0 Busy');
 });
 
 test('/scout verbose builds on the pages /scout already has, without asking for any again', async () => {
@@ -111,13 +112,12 @@ test('more pages failing keeps the copy it was adding to', async () => {
 });
 
 test('a first fetch that failed is not kept, so the next try asks again', async () => {
-  state.players[4] = { userId: 4, playerId: 40, tag: 'Flaky', slug: 'user/flaky' };
   let failed = false;
   const asked = fakeStartgg({ 40: 1 }, { fail: (request) => request === 'sets 40 1' && !failed && (failed = true) });
-  await assert.rejects(command('h2h', { opponent: '4' }), /HTTP 500/);
-  const replies = await command('h2h', { opponent: '4' });
+  await assert.rejects(settle(setHistory(40)), /HTTP 500/);
+  const history = await settle(setHistory(40));
   assert.deepEqual(sets(asked, 40), [1, 1]);
-  assert.match(replies.at(-1).embeds[0].toJSON().title, /Me .* Flaky/);
+  assert.deepEqual(history.map(({ id }) => id), ['40-1']);
 });
 
 test('after 10 minutes only their newest page gets asked for, and new sets show up', async () => {

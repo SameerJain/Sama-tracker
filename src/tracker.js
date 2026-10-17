@@ -1,6 +1,7 @@
 import * as startgg from './startgg.js';
 import * as embeds from './embeds/index.js';
 import { state, save } from './store.js';
+import { clearTrackRequest, readTrackRequest } from './track-request.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
 import { messageEnabled, messageSettings } from './message-settings.js';
 import { rememberAccounts } from './accounts.js';
@@ -60,11 +61,38 @@ export function startTracking(postChannel) {
   checkProfiles();
   checkRegReminders();
   checkWeeklyRecap();
+  importTrackRequest();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
   setInterval(checkWeeklyRecap, 60 * 1000);
+  // the tool at the other end waits on this, so it's checked more often than the tournaments
+  setInterval(importTrackRequest, 30 * 1000);
+}
+
+// players queued by tools/track-attendees.js, added the same way /track add does and saved
+// before the request is cleared. the requests are only made by that tool, so keep it simple
+export function importTrackRequest() {
+  try {
+    const request = readTrackRequest();
+    if (!request) return;
+
+    const adding = (request.players ?? []).filter((player) => player.userId && player.playerId && !state.players[player.userId]);
+    for (const player of adding) {
+      state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true, setResults: true };
+    }
+    if (adding.length) {
+      save();
+      console.log(`${adding.length} player${adding.length === 1 ? '' : 's'} from ${request.source ?? 'a track request'} added to the track`);
+      // don't wait 15 min for their tournaments to show up
+      checkTournaments();
+    }
+    // saved first, so a crash here just means it gets read again. adding is skipped when they're already tracked
+    clearTrackRequest();
+  } catch (err) {
+    console.error('adding queued players failed:', err.message);
+  }
 }
 
 // one run at a time so nothing posts twice. if a run is already waiting, extra calls
