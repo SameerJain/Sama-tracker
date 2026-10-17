@@ -205,11 +205,11 @@ export function linked(player, previous) {
   return embed;
 }
 
-// /profile. who they are here on top, their start.gg under it
+// /profile. who they are here on top, their start.gg under it. a list pick has no discord avatar
 export function profile(account, member) {
   const url = startggUrl(account.slug);
   const embed = baseEmbed(colors.brand)
-    .setAuthor({ name: member.name, iconURL: member.avatar })
+    .setAuthor({ name: member.name, ...(member.avatar ? { iconURL: member.avatar } : {}) })
     .setTitle(escapeMarkdown(account.tag))
     .setURL(url)
     .setDescription(`[${url.replace('https://www.', '')}](${url})\n-# Discord connected on start.gg`);

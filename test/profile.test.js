@@ -52,14 +52,14 @@ beforeEach(() => {
 
 const member = (name) => ({ displayName: name, displayAvatarURL: () => `https://cdn.example/${name}.png` });
 
-// picked is the user option, left out it's whoever ran it
-async function profile({ picked = null, pickedMember = picked && member('Herb') } = {}) {
+// picked is the user option, player is the tracked or linked pick. left out it's whoever ran it
+async function profile({ picked = null, pickedMember = picked && member('Herb'), player = null } = {}) {
   const calls = [];
   await handleCommand({
     commandName: 'profile',
     user: { id: ME, bot: false },
     member: member('Me'),
-    options: { getSubcommand: () => null, getUser: () => picked, getMember: () => pickedMember },
+    options: { getSubcommand: () => null, getUser: () => picked, getMember: () => pickedMember, getString: () => player },
     reply: async (result) => calls.push(['reply', result]),
     deferReply: async () => calls.push(['defer']),
     editReply: async (result) => calls.push(['edit', result]),
@@ -127,6 +127,41 @@ test('not finding yourself says how to fix it', async () => {
   assert.match(calls[1][1], /Connect it on your start\.gg profile if you haven't, then `\/link` it/);
   // nothing saved for them and no reg reminder tournaments to look through
   assert.deepEqual(asked, []);
+});
+
+test('a tracked player can be picked straight from the list, without asking start.gg', async () => {
+  globalThis.fetch = async () => assert.fail('no start.gg lookup for a list pick');
+  state.players = { 1: { userId: 1, playerId: 10, tag: 'Herbert', slug: 'user/herb', image: 'https://images.example/Herbert.png' } };
+  const calls = await profile({ player: '1' });
+  assert.deepEqual(calls.map(([kind]) => kind), ['defer', 'edit']);
+  const card = calls[1][1].embeds[0].data;
+  assert.equal(card.title, 'Herbert');
+  assert.equal(card.url, 'https://www.start.gg/user/herb');
+  assert.equal(card.author.name, 'Herbert');
+  assert.equal(card.thumbnail.url, 'https://images.example/Herbert.png');
+});
+
+test('picking nobody on the list says who can be picked', async () => {
+  globalThis.fetch = async () => assert.fail('no start.gg lookup for a miss');
+  state.players = {};
+  const calls = await profile({ player: 'nobody' });
+  assert.deepEqual(calls.map(([kind]) => kind), ['reply']);
+  assert.match(calls[0][1].content, /Only tracked or linked players can be picked/);
+  assert.equal(calls[0][1].flags, MessageFlags.Ephemeral);
+});
+
+test('profile autocompletes tracked and linked players', async () => {
+  const { handleAutocomplete } = await import('../src/commands/index.js');
+  state.players = { 1: { userId: 1, playerId: 10, tag: 'Herbert', slug: 'user/herb' } };
+  state.links = { 'me-discord': { userId: 7, playerId: 70, tag: 'Me', slug: 'user/me' } };
+  let choices;
+  await handleAutocomplete({
+    commandName: 'profile',
+    options: { getSubcommand: () => null, getFocused: () => '' },
+    respond: async (result) => { choices = result; },
+  });
+  assert.deepEqual(choices.map((choice) => choice.value).sort(), ['1', '7']);
+  assert.ok(choices.some((choice) => choice.name === 'Me (linked)'));
 });
 
 test('only server members, and no bots, without asking start.gg', async () => {

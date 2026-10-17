@@ -16,7 +16,7 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 
 ### Shared inputs and options
 
-- `profile` accepts a start.gg profile link or its final ID, such as `start.gg/user/f64a83c8` or `f64a83c8`.
+- `profile` accepts a start.gg profile link or its final ID, such as `start.gg/user/f64a83c8` or `f64a83c8`. `/scout` also accepts a tracked or linked player.
 - The `player` and `opponent` pickers include tracked and linked players. `/track remove`, `/stream`, and `/sets` accept tracked players only. Leave an optional `player` blank to look yourself up.
 - `player:all` works with `/upcoming`, `/recent`, `/stream`, and `/sets`, and includes everyone tracked.
 - `verbose:True` adds the details shown in the stats table below. Leave it out for the short report.
@@ -46,13 +46,13 @@ Anyone can change `/stream` and `/sets` for tracked players. Use `/messages` for
 | `/stats` | Recent record, placements, and biggest upset. | Lifetime results, opponents, and seed performance. |
 | `/h2h opponent:<name or link/ID>` | Overall record, last 10 meetings, and one-line predicted odds. | Every meeting, splits, streaks, and one-line predicted odds. |
 | `/predict opponent:<name or link/ID>` | Estimated odds of winning. | The same odds, with the reasoning behind them. |
-| `/scout profile:<link or ID>` | Any opponent's form, characters, toughest opponents and worst matchups, and your head-to-head. | More history, habits, toughest opponents and worst matchups, stages, and your odds. |
+| `/scout profile:<player or link/ID>` | Any opponent's form, characters, toughest opponents and worst matchups, and your head-to-head. | More history, habits, toughest opponents and worst matchups, stages, and your odds. |
 | `/progress` | Last 30 days against the previous 30, with changes in win rates and placements. | More detail on each period and a 6-month trend. |
 | `/characters` | Reported characters in Ultimate or Melee. | More history and other games with reported characters. |
 
 Add `player:<name or link/ID>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/h2h` odds run the same prediction as `/predict` but stay one line. `verbose:True` doesn't change them, use `/predict` for the reasoning. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
 
-These reports count singles and leave DQs out of set records. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters, and replies privately.
+These reports count singles and leave DQs out of set records. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
 
 ### Registration
 
@@ -78,13 +78,13 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 | --- | --- |
 | `/help` | Show the commands. |
 | `/status` | Show uptime, host, and the last start.gg checks. |
-| `/profile user:<@someone>` | Find a server member's start.gg profile. Leave `user` blank for yourself. |
+| `/profile` | Find a tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
 | `/messages` | Show or change automatic posts and the recap schedule. |
 | `/socials` | Show saved streams and social links. |
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional; links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |
 
-`/profile` checks the Discord connected on start.gg and searches accounts the bot has already seen: tracked players, people who used `/link` and people registered for a tournament the bot checks. If it cannot find you, connect Discord on start.gg and run `/link`. Someone else has to be on that list first, then `/profile @them` finds them.
+`/profile` checks the Discord connected on start.gg and searches accounts the bot has already seen: tracked players, people who used `/link` and people registered for a tournament the bot checks. If it cannot find you, connect Discord on start.gg and run `/link`. Someone else has to be on that list first, then `/profile @them` finds them. Or pick them straight from the tracked and linked list with `player:`, no Discord matching needed.
 
 `/messages` requires **Manage Server**. `/socials_edit` requires it by default; you can delegate that command under Server Settings > Integrations > Sama-tracker.
 

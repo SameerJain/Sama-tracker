@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
-import { MessageFlags } from 'discord.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -55,7 +54,7 @@ async function characters(sets, values = {}) {
     deferReply: async (options) => { deferred = options; },
     editReply: async (result) => { reply = result; },
   });
-  assert.equal(deferred?.flags, MessageFlags.Ephemeral, 'only the caller sees it');
+  assert.ok(!deferred?.flags, 'everyone in the channel sees it');
   return reply.embeds.map((embed) => ({ game: embed.data.footer.text.replace('Sama-tracker by Samatron · ', ''), text: embed.data.description }));
 }
 

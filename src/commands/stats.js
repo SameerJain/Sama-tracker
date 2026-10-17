@@ -76,7 +76,8 @@ async function scout(interaction) {
   if (!player) return interaction.editReply('/scout needs to know who you are on start.gg. Connect your Discord on your start.gg profile, then `/link` it.');
 
   const input = interaction.options.getString('profile', true);
-  const opponent = await findPlayer(interaction, input);
+  // a tracked or linked pick from autocomplete, otherwise a start.gg link or ID
+  const opponent = readPlayer(interaction, 'profile') ?? await findPlayer(interaction, input);
   if (!opponent) return;
   if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
 
@@ -141,7 +142,7 @@ async function characters(interaction) {
   const player = readPlayer(interaction);
   if (!player) return replyNoPlayer(interaction);
 
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply();
   const verbose = flag(interaction, 'verbose');
   const picked = interaction.options.getInteger('game');
   let sets = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s reported characters`, characterHistory(player.playerId));

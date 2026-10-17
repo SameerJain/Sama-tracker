@@ -53,6 +53,7 @@ test('registers run, scout, and progress with their required inputs', () => {
     assert.equal(command.options[0].autocomplete, true);
   }
   assert.equal(commands.find(c => c.name === 'scout')?.options[0].name, 'profile');
+  assert.equal(commands.find(c => c.name === 'scout').options[0].autocomplete, true);
 });
 
 test('scout refuses untracked Discord callers before fetching an opponent', async () => {
@@ -90,6 +91,27 @@ test('tracked callers can scout an untracked opponent without adding them', asyn
   assert.match(text, /Fox/);
   assert.match(text, /### You vs Target\n\*\*Ultimate:\*\* 1-0/);
   assert.deepEqual(Object.keys(state.players), ['1']);
+});
+
+test('scout takes a tracked player pick, with no start.gg link lookup', async () => {
+  state.players = { 1: { ...crewPlayer, discordId: 'allowed' }, 2: { userId: 2, playerId: 99, tag: 'Target', slug: 'user/target' } };
+  const set = node('scout-pick', 150);
+  mockApi(({ query }) => {
+    if (query.includes('user(slug:')) return assert.fail('a list pick needs no link lookup');
+    if (query.includes('authorizations')) return { u1: { player: { gamerTag: 'Active' }, authorizations: [{ externalId: 'allowed' }] } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [{ ...set,
+      games: [{ winnerId: 10, selections: [{ entrant: { id: 99 }, character: { name: 'Fox' } }] }],
+    }] } } };
+  });
+  let reply;
+  await handleCommand({
+    commandName: 'scout', user: { id: 'allowed' }, deferred: true,
+    options: { getSubcommand: () => null, getString: (name) => name === 'profile' ? '2' : null, getBoolean: () => null },
+    deferReply: async options => assert.ok(options.flags), editReply: async result => { reply = result; },
+  });
+  const cards = reply.embeds.map((e) => e.toJSON());
+  assert.match(cards[0].title, /Scouting Target/);
+  assert.match(cards.map((card) => card.description).join('\n'), /### You vs Target\n\*\*Ultimate:\*\* 1-0/);
 });
 
 test('scout quick shows toughest opponents without the caller, and worst matchups by game', async () => {

@@ -85,7 +85,10 @@ export const commands = [
   {
     name: 'profile',
     description: 'Someone\'s start.gg profile, once the bot has seen their account',
-    options: [{ type: Option.User, name: 'user', description: 'Server member, leave out for yourself' }],
+    options: [
+      { type: Option.User, name: 'user', description: 'Server member, leave out for yourself' },
+      playerOption('Tracked or linked player, instead of a server member', 'player', false),
+    ],
   },
   { name: 'upcoming', description: 'Upcoming tournaments', options: [playerOption(YOU_OR_ALL, 'player', false)] },
   { name: 'recent', description: 'Latest reported sets', options: [playerOption(YOU_OR_ALL, 'player', false)] },
@@ -102,7 +105,7 @@ export const commands = [
   {
     name: 'scout', description: 'Scout any start.gg opponent. Needs you tracked or linked, with Discord connected on start.gg',
     options: [
-      { type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true },
+      { type: Option.String, name: 'profile', description: 'Tracked or linked opponent, or a start.gg profile link or ID', required: true, autocomplete: true },
       verboseOption('More history, habits, toughest opponents and worst matchups, stages and your odds. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and your Melee odds' },
     ],

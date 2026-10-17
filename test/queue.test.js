@@ -86,6 +86,28 @@ test('429s push everything back 15 seconds, then every request still goes throug
   assert.ok(elapsed < 120_000, `${elapsed}ms`);
 });
 
+test('a timed-out request retries instead of failing the command', async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) throw new Error('The operation was aborted due to timeout');
+    return { ok: true, status: 200, json: async () => ({ data: {} }) };
+  };
+  await settle(startgg.asCommand(() => startgg.checkToken()));
+  assert.equal(calls, 2);
+  assert.equal(startgg.queueLength(), 0);
+
+  // retries run out after the first try and two more
+  calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error('The operation was aborted due to timeout');
+  };
+  await assert.rejects(settle(startgg.asCommand(() => startgg.checkToken())), /start\.gg didn't respond/);
+  assert.equal(calls, 3);
+  assert.equal(startgg.queueLength(), 0);
+});
+
 test("a command's requests go ahead of the background checks", async () => {
   const order = [];
   globalThis.fetch = async (_url, options) => {

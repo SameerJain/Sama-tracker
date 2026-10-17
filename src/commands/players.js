@@ -87,7 +87,14 @@ function unlink(interaction) {
 }
 
 // goes by the discord connected on start.gg, so nobody can claim someone else's
+// a tracked or linked pick beats the server member picker, and needs no start.gg lookup
 async function profile(interaction) {
+  if (interaction.options.getString('player')) {
+    const player = readPlayer(interaction);
+    if (!player) return replyNoPlayer(interaction);
+    await interaction.deferReply();
+    return interaction.editReply({ embeds: [embeds.profile(player, { name: player.tag })] });
+  }
   const picked = interaction.options.getUser('user');
   const user = picked ?? interaction.user;
   const member = picked ? interaction.options.getMember('user') : interaction.member;

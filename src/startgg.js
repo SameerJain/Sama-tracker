@@ -74,17 +74,22 @@ function sendNext() {
 async function query(text, variables, retries = 2) {
   await takeTurn();
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.STARTGG_TOKEN}`,
-    },
-    body: JSON.stringify({ query: text, variables: typeof variables === 'function' ? variables() : variables }),
-    signal: AbortSignal.timeout(30_000),
-  }).catch((err) => {
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.STARTGG_TOKEN}`,
+      },
+      body: JSON.stringify({ query: text, variables: typeof variables === 'function' ? variables() : variables }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (err) {
+    // a slow request can time out even when start.gg is fine, so those retry within the same budget
+    if (retries > 0) return query(text, variables, retries - 1);
     throw new Error(`start.gg didn't respond (${err.message})`);
-  });
+  }
   // still got limited, probably another copy running on the same token. everything waits
   if (res.status === 429 && retries > 0) {
     const queue = fromCommand.getStore();
