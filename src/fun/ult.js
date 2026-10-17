@@ -1,8 +1,8 @@
-import { makeJoke } from './joke.js';
+import { makeFun } from './generated.js';
 
 const PROMPT = `You are a competitive Super Smash Bros. Ultimate player posting in a Discord server of Smash players. You've played it almost every day since it came out in December 2018, you hate it, and you are never going to stop.
 Write a post complaining about the game, in the style given in the message. Build it around one or two of the talking points and gripe like a burnt-out tournament grinder: the meta, the characters, the top players, online, Nintendo.
-Be funny: bitter, exhausted, dramatic, petty. The joke is that you keep playing out of pure habit, so let that slip somewhere, a different way each time. Specific jokes beat generic complaining, and riff on the facts like someone who lives in this game instead of reciting them.
+Be funny: bitter, exhausted, dramatic, petty. The bit is that you keep playing out of pure habit, so let that slip somewhere, a different way each time. Specific humor beats generic complaining, and riff on the facts like someone who lives in this game instead of reciting them.
 Real players and scene moments are fair game, but this crowd notices mistakes, so for Ultimate facts stick to the talking points and never make up results, patch notes or quotes.`;
 
 const STYLES = [
@@ -34,7 +34,7 @@ const TALKING_POINTS = [
   'Steve mines blocks, crafts tools, drops anvils, minecart grabs people and blows them up with TNT',
   'three of the UltRank 2025 top 10 main Steve: acola 3rd, Syrup 7th, Carmelo 9th',
   'Steve camping the ledge with down tilt flames, blocks and TNT',
-  'Phantom MLG, a Steve block cancel found in 2023, got him banned at a bunch of tournaments',
+  'Phantom MLG, a Steve glitch found in February 2023, got him banned at some majors and whole regions, even though nobody has been documented pulling it off in a real match',
   'Steve\'s only real nerf ever was a small up smash change in 13.0.1',
   'the last balance patch was 13.0.1 in December 2021, so the meta has been frozen for years',
   'Sora in October 2021 was the last fighter ever added',
@@ -51,13 +51,14 @@ const TALKING_POINTS = [
   'six of the UltRank 2025 top 10 are from Japan',
   'online: Elite Smash, GSP, input delay, wifi players and Quickplay ignoring your preferred rules',
   'every character has had the same 3 frame jumpsquat since launch',
-  'Nintendo shut down Smash World Tour in 2022, and its 2023 tournament guidelines cap unlicensed events at 200 entrants in person and $5,000 in prizes',
+  'Nintendo wouldn\'t license the 2022 Smash World Tour Championships, so they got canceled, and its 2023 community tournament guidelines cap unlicensed events at 200 entrants in person or 300 online, with no prize over $5,000',
+  'acola, a Steve main, was ranked #1 on the UltRank Half Year 2026, with Doramigi 2nd',
   'Ganondorf and Sheik waiting on buffs that are never coming',
   'Pikachu, Wolf, Joker and Palutena players getting carried by their character',
   'Melee players still calling Ultimate a party game',
 ];
 
-export default makeJoke({
+export default makeFun({
   name: 'ult',
   line: 'I HATE SMASH BROS ULTIMATE',
   category: 'Screenshots (SSBU)',
@@ -67,10 +68,11 @@ export default makeJoke({
   focus: /Ultimate/,
   articles: [
     'Characters (SSBU)', 'Techniques (SSBU)', 'Stages (SSBU)', 'Items (SSBU)', 'Glitches (SSBU)', 'Final Smashes (SSBU)',
-    'Update lists (SSBU)', 'Major tournaments (SSBU)',
+    'Update lists (SSBU)', 'Major tournaments (SSBU)', 'UltRank',
   ],
   videos: [
     'smash ultimate grand finals', 'smash ultimate steve', 'smash ultimate patch notes', 'smash ultimate tier list', 'smash ultimate elite smash',
     'smash ultimate top 10 plays', 'smash ultimate competitive history', 'smash ultimate combo video', 'smash ultimate rant', 'smash ultimate kazuya',
+    'UltRank player rankings', 'smash ultimate major tournament recap', 'smash ultimate meta analysis', 'smash ultimate community retrospective',
   ],
 });

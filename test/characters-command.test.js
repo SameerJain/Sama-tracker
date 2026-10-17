@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-characters-'));
 process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
-// the jokes would call claude on import
+// the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleCommand } = await import('../src/commands/index.js');

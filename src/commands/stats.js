@@ -4,11 +4,11 @@ import * as embeds from '../embeds/index.js';
 import { state } from '../store.js';
 import { secondsNow } from '../tracker.js';
 import { predict as predictOdds } from '../predict.js';
-import { characterUsage } from '../characters.js';
+import { characterUsage, characterUsageByGame } from '../characters.js';
 import { periodSummary } from '../reports.js';
 import { PICKABLE_GAMES } from './definitions.js';
-import { HISTORY_PAGES, LIFETIME_PAGES, SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory } from './history.js';
-import { trackedCaller } from './players.js';
+import { HISTORY_PAGES, LIFETIME_PAGES, SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory } from './history.js';
+import { verifiedCaller } from '../accounts.js';
 import { profileSlug, readPlayer, replyNoPlayer, sendEmbeds, withCountdown } from './shared.js';
 
 // /characters verbose, so the cards fit in one message
@@ -30,7 +30,7 @@ async function progress(interaction) {
   const periods = Array.from({ length: verbose ? TREND_PERIODS : 2 }, (_, i) => ({ since: now - (i + 1) * span, until: now - i * span }));
   const [sets, events, characterSets] = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s sets`, Promise.all([
     startgg.getPeriodHistory(player.playerId, periods.at(-1).since, now),
-    startgg.getEventHistory(player.userId),
+    eventHistory(player.userId),
     // the rest still says plenty without characters, so start.gg failing here doesn't sink it
     verbose ? characterHistory(player.playerId).catch(() => null) : null,
   ]));
@@ -40,8 +40,8 @@ async function progress(interaction) {
 
 async function scout(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const player = await trackedCaller(interaction.user.id);
-  if (!player) return interaction.editReply('Only tracked players can use /scout. Connect your Discord on your tracked start.gg profile first.');
+  const player = await verifiedCaller(interaction.user.id);
+  if (!player) return interaction.editReply('/scout needs to know who you are on start.gg. Connect your Discord on your start.gg profile, then `/link` it.');
 
   const input = interaction.options.getString('profile', true).trim();
   const opponent = await startgg.getPlayer(profileSlug(input));
@@ -56,10 +56,11 @@ async function scout(interaction) {
 
   // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
   // meeting them and the odds, so the usual amount is plenty
-  const [deeper, characterSets, events] = await withCountdown(interaction, 'Full report on its way', Promise.all([
-    setHistories(opponent.playerId, SCOUT_PAGES), characterHistories(opponent.playerId, SCOUT_CHARACTER_PAGES), startgg.getEventHistory(opponent.userId),
+  const [deeper, characterSets, events, myEvents] = await withCountdown(interaction, 'Full report on its way', Promise.all([
+    setHistories(opponent.playerId, SCOUT_PAGES), characterHistories(opponent.playerId, SCOUT_CHARACTER_PAGES), eventHistory(opponent.userId),
+    eventHistory(player.userId).catch(() => null),
   ]), quick);
-  const odds = predictOdds(player, opponent, mine, deeper);
+  const odds = predictOdds(player, opponent, mine, deeper, { eventsA: myEvents, eventsB: events });
   return sendEmbeds(interaction, embeds.scoutReport(player, opponent, { mine, theirs: deeper, characterSets, events, odds, players: state.players }));
 }
 
@@ -75,12 +76,8 @@ const historiesOf = (players, pages) => Promise.all(players.map((player) => setH
 
 // their singles sets against each other, newest first, DQs left out
 function meetings(a, b, histories) {
-  const played = new Map();
-  for (const set of histories.flat()) {
-    const result = startgg.fromSide(set, a.playerId);
-    if (result?.them.playerIds.includes(b.playerId) && !result.dq) played.set(set.id, set);
-  }
-  return [...played.values()].sort((x, y) => y.completedAt - x.completedAt);
+  const played = startgg.singles(histories.flat(), a).filter(({ them }) => them.playerIds.includes(b.playerId));
+  return [...new Map(played.map(({ set }) => [set.id, set])).values()].sort((x, y) => y.completedAt - x.completedAt);
 }
 
 async function headToHead(interaction) {
@@ -118,7 +115,7 @@ async function stats(interaction) {
   if (!interaction.options.getBoolean('verbose')) return interaction.editReply({ embeds: [recent] });
   // one request for the recent card means there's something to look at while the lifetime one loads
   const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
-    Promise.all([startgg.getEventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
+    Promise.all([eventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
   return sendEmbeds(interaction, embeds.lifetimeStats(player, events, history, state.players));
 }
 
@@ -155,15 +152,14 @@ async function characters(interaction) {
 // a card for the picked game, or whichever has more reported. verbose adds one for each other game with
 // characters reported, and a note naming the ones without
 function characterCards(sets, verbose, picked) {
-  const usageIn = (game) => ({ game, usage: characterUsage(sets.filter((set) => set.videogame.id === game.id)) });
+  const games = characterUsageByGame(sets);
   const mostGames = (a, b) => b.usage.games - a.usage.games;
 
   // left out, it's the one with more reported games, then more sets. a tie goes to ultimate
-  const pickable = PICKABLE_GAMES.map(usageIn);
+  const pickable = PICKABLE_GAMES.map((game) => ({ game, usage: games.find((entry) => entry.game.id === game.id)?.usage ?? characterUsage([]) }));
   const top = pickable.find(({ game }) => game.id === picked) ?? pickable.reduce((a, b) => ((mostGames(a, b) || b.usage.scanned - a.usage.scanned) > 0 ? b : a));
   if (!verbose) return { cards: [top] };
 
-  const games = [...new Map(sets.map((set) => [set.videogame.id, set.videogame])).values()].map(usageIn);
   // picked goes first even with nothing reported, since it's what they asked about
   const first = picked || top.usage.reported ? [top] : [];
   // then a card for each other game with characters reported, most games first
@@ -186,9 +182,10 @@ async function predict(interaction) {
   if (a.userId === b.userId) return interaction.reply({ content: 'Pick two different players.', flags: MessageFlags.Ephemeral });
 
   await interaction.deferReply();
-  const [historyA, historyB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
-    Promise.all([setHistory(a.playerId), setHistory(b.playerId)]));
-  const odds = predictOdds(a, b, historyA, historyB);
+  // events say how big each bracket was, which helps seeding count. the odds still work without them
+  const [historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
+    Promise.all([setHistory(a.playerId), setHistory(b.playerId), eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null)]));
+  const odds = predictOdds(a, b, historyA, historyB, { eventsA, eventsB });
   if (!odds) return interaction.editReply(`${a.tag} and ${b.tag} haven't played singles in the same game on start.gg.`);
 
   await sendEmbeds(interaction, embeds.prediction(a, b, odds, interaction.options.getBoolean('verbose') ?? false));

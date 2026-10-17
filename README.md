@@ -74,7 +74,7 @@ Keep the `Reg Reminders` name because `/reg_role` looks it up by name. Message f
 /messages recap_day:Sunday recap_time:20:00 timezone:America/New_York
 ```
 
-The six switches are set results, stream alerts, tournament roll calls, tournament placements, registration reminders and the weekly recap. Whatever comes due while one is off gets skipped for good, so turning it back on doesn't dump what you missed. That holds even if the bot hadn't checked yet when you flipped it. Per-player `/stream` settings and personal `/reg_role` pings still apply on top.
+The six switches are set results, stream alerts, tournament roll calls, tournament placements, registration reminders and the weekly recap. Whatever comes due while one is off gets skipped for good, so turning it back on doesn't dump what you missed. That holds even if the bot hadn't checked yet when you flipped it. Per-player `/sets` and `/stream` settings and personal `/reg_role` pings still apply on top.
 
 Recap times are 24-hour `HH:MM` in a timezone like `America/New_York`, `America/Los_Angeles`, `Europe/London` or `UTC`. A new schedule starts with the next recap instead of sending one that's overdue. If daylight saving skips your time, the recap moves up by the jump, and a time that happens twice uses the first one.
 
@@ -88,20 +88,26 @@ Recap times are 24-hour `HH:MM` in a timezone like `America/New_York`, `America/
 /recent                                        your last 5 sets
 /run                                           your current run in every bracket, next opponents
 /stream player:<name or all> alerts:<on|off>   on-stream alerts on or off
+/sets player:<name or all> results:<on|off>    automatic set results on or off
 ```
 
-Only tracked players get their sets, streams and placements posted, and only tracked players can be picked as the `player` in a command. If someone isn't in the list, `/track add` them first. `/upcoming`, `/recent` and `/stream` also take `player:all`. For `/recent` that's the 20 newest sets, 3 per player at most.
+Only tracked players get their sets, streams and placements posted. The `player` and `opponent` pickers list tracked players, then anyone who linked themselves (below). `/track remove`, `/stream` and `/sets` only list tracked players, since they're about what gets posted. `/upcoming`, `/recent`, `/stream` and `/sets` also take `player:all`, which means everyone tracked. For `/recent` that's the 20 newest sets, 3 per player at most. Anyone can flip `/sets` and `/stream` for anyone tracked; sets that went out while one was off stay off, and turning results back on only posts sets from then on. `/track list` marks whoever has either one off.
 
-### Looking yourself up
+### Linking yourself
 
 ```
-/link profile:<link or ID>                     link your start.gg without getting tracked
+/link profile:<link or ID>                     tie your Discord to your own start.gg
 /unlink                                        undo it
 ```
 
-Leave the player out of `/upcoming`, `/recent`, `/run`, `/progress`, `/h2h`, `/stats`, `/characters` or `/predict` and it looks you up. If you're tracked and your start.gg has your Discord connected, that works with no setup, and `/link` says you don't need it instead of linking. Anyone else runs `/link` once. It checks that the start.gg profile has your Discord connected, so nobody can link as someone else. The reply lists the commands that work now.
+Tracking and linking are different things. Anyone can `/track add` anyone, and that posts their sets, streams and placements here. Linking is only for yourself. It checks that the start.gg profile has your Discord connected, so nobody can link as someone else. After that the bot knows who you are:
 
-Linking doesn't track you. You won't be in `/track list` or the player picker, so typing your own name won't find you; leave it blank. Nothing about you gets posted, `/stream` has nothing to turn off, and those commands look you up on start.gg each time instead.
+- leave `player` out of `/upcoming`, `/recent`, `/run`, `/progress`, `/h2h`, `/stats`, `/characters` or `/predict` to look yourself up
+- `/scout` works for you
+- you're in the player picker, marked linked, so others can pick you in those lookups too
+- `/profile` finds you
+
+Nothing about you gets posted, and you're not in `/track list`. Tracked players whose start.gg has their Discord connected get all of this already, and `/link` tells them so instead of linking.
 
 ### Player stats
 
@@ -116,7 +122,7 @@ Linking doesn't track you. You won't be in `/track list` or the player picker, s
 /characters verbose:True                       every game with characters reported
 /predict opponent:<name>                       your odds of beating them
 /predict opponent:<name> verbose:True          how each part of the prediction counts
-/scout profile:<link or ID>                    scout any opponent, for tracked players
+/scout profile:<link or ID>                    scout any opponent, if you're tracked or linked
 /scout profile:<link or ID> verbose:True       more history, habits, stages, your odds
 /progress                                      last 30 days against the 30 before, by game
 /progress verbose:True                         more on each period, plus 6 months of trend
@@ -150,12 +156,13 @@ Leaving out `player` looks up whoever ran the command. Add `player:<name>` for s
 /64                                            SMASH 64 DID IT FIRST
 /brawl                                         BRAWL WAS GOOD ACTUALLY
 /pplus                                         HAVE YOU HEARD ABOUT PROJECT+
-/pfp                                           the bot's profile picture, full size
+/bills                                         Bills Mafia photo and rally cry
+/view_pfp                                      the bot's profile picture, full size
 ```
 
 ### Command notes
 
-`profile` takes a link like `start.gg/user/f64a83c8` or just the ID at the end. `player` and `opponent` autocomplete from the tracked list. If nothing matches, the list says so instead of sitting there empty.
+`profile` takes a link like `start.gg/user/f64a83c8` or just the ID at the end. `player` and `opponent` autocomplete from tracked and linked players. If nothing matches, the list says so instead of sitting there empty.
 
 Reg reminders go out a week, 3 days and a day before registration closes, then a last call 12 hours before. If registration stays open after the tournament starts, the start counts as the deadline. Ones already past when you set it get skipped, except the last call, which goes out right away inside those 12 hours.
 
@@ -173,13 +180,21 @@ Pings go to whoever turned them on with `/reg_role`, which only ever changes you
 
 `melee:True` counts only Melee sets, and works with or without `verbose:True`. It filters the same sets, so it's no slower, and the reply says how many sets in other games it left out. Someone who mostly plays Ultimate can have older Melee sets past the 600, so add `verbose:True` if some are missing.
 
-`/predict` weighs head-to-head, results against common opponents, seeding at shared brackets and their last 40 sets. `verbose:True` gives the same odds and shows how much each part counted, what it says on its own, the common opponents and the shared brackets.
+`/predict` puts head-to-head, common opponents and seeding together into one estimate of how far apart two players are:
+
+- newer sets count more, and a set from a year ago counts half
+- common opponents count by how much better each of you did against them, not just who did better
+- seeding counts by how much higher one of you was seeded, at brackets you were both in, or by how high each of you is usually seeded for the size of the bracket if you never shared one
+- how much a seed gap is worth comes from your own seeded sets in that game, and it's adjusted for whoever has been beating their seeding over their last 40 sets
+- the less there is to go on, the closer the odds stay to 50%
+
+It's the same from either side, so if A gets 70%, B gets 30%. Backtested in October 2026 on 368 past sets between tracked players, predicting each from only what was known before that tournament, it picked the winner 83% of the time, and when it said 90% or more the favourite won 97% of those. `verbose:True` gives the same odds and shows how much each part counted, what it says on its own, the common opponents, the shared brackets and what a seed was worth.
 
 `/run` looks up the player's current tournaments directly, including ones that ended in the last 6 hours. It lists their finished sets and whether their placement is final. The next opponent shows up once start.gg has assigned one. It doesn't guess.
 
 Someone in several brackets at once, like Ultimate, Melee and 64 at the same tournament, gets a card up top listing every event with the one that needs them soonest first: playing now, then called, queued, ready, waiting on a set, waiting for an opponent, not started and finished. Each line has their record in that event and the opponent, linked to the set. Every event that started gets its own card under that.
 
-`/scout` answers privately, and only for tracked players whose start.gg has their Discord connected, checked on start.gg each time. It takes any opponent's profile without tracking them and shows their recent singles results, reported characters by game and your record against them. It looks at up to 600 sets each and 400 for characters, so older meetings and unreported characters can be missing.
+`/scout` answers privately, and only for tracked or linked players whose start.gg still has their Discord connected, checked on start.gg each time. It takes any opponent's profile without tracking them and shows their recent singles results, reported characters by game and your record against them. It looks at up to 600 sets each and 400 for characters, so older meetings and unreported characters can be missing.
 
 `/scout verbose:True` reads up to 1200 of their sets, 800 for characters and stages, and every event they placed in. The quick `/scout` card shows first while the rest loads, then the full report replaces it. Every card stays private. You get:
 
@@ -193,9 +208,13 @@ Someone in several brackets at once, like Ultimate, Melee and 64 at the same tou
 
 `/progress verbose:True` adds the game record, close sets, record against higher and lower seeds, best win and worst loss by seed, and the game record on each reported character to both periods. Under What changed it lists the change in win rate, games won and average finish, and anyone played in both periods with the record each time. Last is every 30 days for the past 180, newest first. If start.gg won't send the characters, it answers without them.
 
-With `ANTHROPIC_API_KEY` set, the joke commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game, or a stage for P+. Otherwise they just say the line.
+With `ANTHROPIC_API_KEY` set, the Smash fun commands get Claude Haiku to write a post as a Smash 4 superfan, a Melee purist, a burnt-out Ultimate player, a 64 old head, the last Brawl defender or a Project+ recruiter, with a random SmashWiki screenshot from that game, or a stage for P+. Otherwise they just say the line.
 
-Each post gets real facts to work from so Haiku doesn't make things up: two of the game's own talking points from its file in `src/jokes/`, a few paragraphs from a random SmashWiki article, and with `YOUTUBE_API_KEY` set, a YouTube video's title, channel, year, views and description. Articles come from that game's characters, techniques, stages, items, glitches, final smashes, trophies, event matches, modes and major tournaments, plus patch notes for Ultimate and Smash 4. That's about 700 to 1100 articles a game, 260 for 64 and 42 Project M character pages for P+. A category is picked first and then an article in it, so the big ones like trophies don't crowd out the rest. Each excerpt comes from a random spot in the article, starting at a paragraph about that game when it covers several. The Smash 4 and P+ posts skip tournament pages since they don't name players. Videos come from about ten searches a game, like grand finals, combo videos, tech tutorials and history, and only ones with 10,000+ views unless a search has none. A search's results get reused for a day, so it stays inside YouTube's free daily quota. YouTube only gives captions to a video's owner, so a video's title and description are all Haiku gets. If SmashWiki or YouTube is down, the post goes out without that part.
+Each post gets real facts to work from so Haiku doesn't make things up: two of the game's own talking points from its file in `src/fun/`, a few paragraphs from a random SmashWiki article, and, with `YOUTUBE_API_KEY` set, richer context from a YouTube video. SmashWiki sources now include major tournaments and each game's global power-ranking series alongside characters, techniques, stages, patches and other game material. YouTube searches also cover rankings, stats, major recaps, meta analysis and community retrospectives. Haiku gets the video's creator description and tags, likes, comment count and up to five top relevant viewer comments. It treats those comments as community opinion rather than facts.
+
+YouTube's official API does not let an API key download captions from someone else's video. Add the key to `.env` locally and to the Railway `YOUTUBE_API_KEY` variable; no OAuth setup is needed. Search results stay cached for a day, and only the selected video's comments are fetched. If SmashWiki or YouTube is down, the post goes out without that part.
+
+`/bills` does not use AI. It picks a short rally cry and a large image from the Bills Mafia, Bills players, team, stadium and mascot collections on Wikimedia Commons, with the source linked on the card.
 
 `/characters` shows one game, Ultimate or Melee. Pick it with `game`, or leave it out to get whichever of the two has more games with characters reported, or more sets if neither has any. `verbose:True` puts that game first, then a card for each other game they have characters reported in, up to 6 in all. A game you picked always gets its card, even with nothing reported. It looks at their last 400 singles sets in every game, or 1600 with verbose, and only sees games where the TO reported characters, which a lot of tournaments skip. The picture is their main's art from start.gg. With verbose, the usual card shows while the rest loads.
 
@@ -207,6 +226,6 @@ start.gg allows 80 requests a minute, and every page of someone's history is a r
 
 - `src/commands/`: command definitions, routing and handlers grouped by players, stats, registration and settings. `history.js` owns the shared history caches.
 - `src/embeds/`: Discord cards grouped by tournaments, stats, scouting, players and system messages. `shared.js` holds formatting and the footer.
-- `src/jokes/`: all six game joke commands, their reply handler and shared generator, plus SmashWiki and YouTube helpers.
+- `src/fun/`: the six Smash posts, `/bills`, their reply handler and shared SmashWiki, YouTube and Commons helpers.
 - `src/startgg.js`: start.gg requests, pagination and rate limiting.
 - `src/tracker.js`: background checks and scheduled posts. `src/store.js` saves their state.

@@ -1,15 +1,17 @@
 import { escapeMarkdown } from 'discord.js';
 import { colors, FOOTER, baseEmbed, withLines, playerLink, count } from './shared.js';
 
-export function trackedList(players) {
+// linked is how many people linked their own start.gg without being tracked
+export function trackedList(players, linked = 0) {
   const all = Object.values(players).sort((a, b) => a.tag.localeCompare(b.tag));
   const embed = baseEmbed(colors.brand).setTitle(`Tracking ${all.length}`);
-  if (!all.length) return [embed.setDescription('Nobody yet. Add someone with `/track add`.')];
   const lines = all.map((player) => {
-    if (player.streamAlerts === false) return `${playerLink(player)} · stream alerts off`;
-    return playerLink(player);
+    const off = [player.streamAlerts === false && 'stream alerts', player.setResults === false && 'set results'].filter(Boolean);
+    return off.length ? `${playerLink(player)} · ${off.join(' and ')} off` : playerLink(player);
   });
-  lines.push('', '-# Only these players can be picked in commands. Anyone else can `/link` their start.gg to look themselves up');
+  if (!all.length) lines.push('Nobody yet. Add someone with `/track add`.');
+  lines.push('', '-# Their sets, streams and placements get posted here. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
+  if (linked) lines.push(`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
   return withLines(embed, lines);
 }
 
@@ -59,12 +61,19 @@ export function status(info) {
   return baseEmbed(colors.brand).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
 
-export function joke(name, title, { text, screenshot, image }) {
+export function fun(name, title, { text, screenshot, image }) {
   return baseEmbed(colors[name], `${FOOTER} · ${screenshot.name}`)
     .setTitle(title)
     .setURL(screenshot.page)
     .setDescription(text.slice(0, 4096))
     .setImage(`attachment://${image.name}`);
+}
+
+export function funImage(title, image, page, name) {
+  return baseEmbed(colors.bills, `${FOOTER} · ${name} · Wikimedia Commons`)
+    .setTitle(title)
+    .setURL(page)
+    .setImage(image);
 }
 
 export function help() {
@@ -85,19 +94,20 @@ export function help() {
     '`/recent` latest sets',
     '`/run` current tournament run and next opponent in every bracket, the one that needs you soonest first',
     '`/stream` stream alerts on or off',
-    '-# Only tracked players can be picked as the player. upcoming, recent and stream also take `all`',
+    '`/sets` automatic set results on or off, one player at a time',
+    '-# upcoming, recent, sets and stream also take `all`, which is everyone tracked',
     '',
-    '**Looking yourself up**',
-    '`/link` link your start.gg, then leave the player out of a command to get yourself. It doesn\'t track you',
+    '**Linking yourself**',
+    '`/link` tie your Discord to your own start.gg. Then a blank player means you, `/scout` works, `/profile` finds you and others can pick you. Nothing gets posted',
     '`/unlink` undo that',
-    '-# Tracked players with Discord connected on start.gg don\'t need to link, and /link tells them so',
+    '-# Tracking posts someone\'s results here. Linking is just so commands know who you are. Tracked players with Discord connected on start.gg don\'t need it',
     '',
     '**Player stats**',
     '`/h2h` record against someone. `verbose:True` for every set, splits and streaks. `melee:True` for Melee sets only',
     '`/stats` set record, placements and best upset. `verbose:True` for a lifetime report',
     '`/characters` characters someone has reported and how they do on each. `game:` Ultimate or Melee, left out it\'s whichever has more reported. `verbose:True` adds every other game, picked one first',
     '`/predict` odds of beating someone. `verbose:True` shows how each part counts',
-    '`/scout profile:<link or ID>` scout any opponent. Only for tracked players with Discord connected on start.gg. `verbose:True` adds much more of their history, habits, matchups, stages and your odds',
+    '`/scout profile:<link or ID>` scout any opponent. Needs you tracked or linked. `verbose:True` adds much more of their history, habits, matchups, stages and your odds',
     '`/progress` last 30 days vs the previous 30, by game. `verbose:True` adds games, close sets, seeds, upsets, rematches and a 6 month trend',
     '',
     '**Registration**',
@@ -116,8 +126,9 @@ export function help() {
     '`/64` a 64 old head who says 64 did it first',
     '`/brawl` the last person still defending Brawl',
     '`/pplus` a Project+ player who wants you on netplay',
-    '-# Claude Haiku writes those from real facts: the game\'s talking points, a random SmashWiki article and a YouTube video',
-    '`/pfp` my profile picture, full size',
+    '`/bills` Bills Mafia, one big photo and one rally cry',
+    '-# Claude Haiku writes the Smash posts from real facts: the game\'s talking points, a random SmashWiki article and a YouTube video',
+    '`/view_pfp` my profile picture, full size',
     '',
     '**Posted here automatically**',
     '• finished sets, and a player\'s first DQ in an event',

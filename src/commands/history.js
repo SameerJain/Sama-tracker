@@ -105,4 +105,20 @@ const characterHistory = (playerId) => characterHistories(playerId, CHARACTER_PA
 const lifetimeHistory = (playerId) => setHistories(playerId, LIFETIME_PAGES);
 const lifetimeCharacterHistory = (playerId) => characterHistories(playerId, LIFETIME_CHARACTER_PAGES);
 
-export { HISTORY_PAGES, LIFETIME_PAGES, SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory };
+// event histories are a few pages at most, so they're kept whole for as long as set histories go
+// without a refresh. a failed lookup isn't kept
+const EVENT_CACHE_PLAYERS = 50;
+const eventHistories = new Map();
+function eventHistory(userId) {
+  const cached = eventHistories.get(userId);
+  if (cached && Date.now() - cached.at < HISTORY_CACHE_MINUTES * 60 * 1000) return cached.events;
+  const events = startgg.getEventHistory(userId);
+  eventHistories.delete(userId);
+  eventHistories.set(userId, { at: Date.now(), events });
+  events.catch(() => eventHistories.delete(userId));
+  // map order is oldest first
+  for (const id of [...eventHistories.keys()].slice(0, -EVENT_CACHE_PLAYERS)) eventHistories.delete(id);
+  return events;
+}
+
+export { HISTORY_PAGES, LIFETIME_PAGES, SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory };

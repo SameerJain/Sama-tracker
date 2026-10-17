@@ -7,7 +7,7 @@ import { join } from 'node:path';
 // the history cache every set and character lookup goes through, by way of the commands that use it
 const directory = mkdtempSync(join(tmpdir(), 'sama-history-'));
 process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
-// the jokes would call claude on import
+// the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 // start.gg requests go out 800ms apart, a fake clock gets through minutes of them right away
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });

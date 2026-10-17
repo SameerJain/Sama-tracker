@@ -1,4 +1,4 @@
-import { fromSide } from './startgg.js';
+import { singles } from './startgg.js';
 
 const DAY = 86400;
 export const DEFAULT_RECAP_SCHEDULE = { recapDay: 0, recapTime: '21:00', timezone: 'America/New_York' };
@@ -6,8 +6,7 @@ export const DEFAULT_RECAP_SCHEDULE = { recapDay: 0, recapTime: '21:00', timezon
 // since counts and until doesn't, so a set right on the line lands in one period, not both
 export function periodSummary(player, sets, events, since, until) {
   const inside = (at) => at >= since && at < until;
-  const played = sets.filter((set) => inside(set.completedAt))
-    .map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq && result.set.winnerId);
+  const played = singles(sets.filter((set) => inside(set.completedAt)), player).filter(({ set }) => set.winnerId);
   const finishes = events.filter(({ event, dq }) => !dq && inside(event.startAt));
   const games = new Map();
   function gameFor(event) {

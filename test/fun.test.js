@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import test, { after, beforeEach } from 'node:test';
 
-// the jokes would call claude on import
+// the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
-const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../src/jokes/smashwiki.js');
-const { searchVideos } = await import('../src/jokes/youtube.js');
-const { jokeMessage, makeJoke } = await import('../src/jokes/joke.js');
+const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../src/fun/smashwiki.js');
+const { addCommunity, searchVideos } = await import('../src/fun/youtube.js');
+const { billsImagePool } = await import('../src/fun/bills.js');
+const { funMessage, makeFun } = await import('../src/fun/generated.js');
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
 after(() => { globalThis.fetch = originalFetch; console.error = originalError; });
@@ -92,12 +93,12 @@ test('youtube search fills in each video\'s description and views, and keeps the
     asked.push([pathname.split('/').pop(), searchParams.get('key'), searchParams.get('q') ?? searchParams.get('id')]);
     if (pathname.endsWith('/search')) return json({ items: [{ id: { videoId: 'a' } }, { id: { videoId: 'b' } }, { id: { kind: 'youtube#channel' } }] });
     return json({ items: [
-      { snippet: { title: 'Armada vs Mango', channelTitle: 'VGBootCamp', publishedAt: '2014-06-01T00:00:00Z', description: 'Grand finals of Apex.\nhttps://twitter.com/vgbootcamp\n#melee #ssbm\n0:00 Game 1' }, statistics: { viewCount: '3200000' } },
+      { id: 'a', snippet: { title: 'Armada vs Mango', channelTitle: 'VGBootCamp', publishedAt: '2014-06-01T00:00:00Z', tags: ['melee', 'apex'], description: 'Grand finals of Apex.\nhttps://twitter.com/vgbootcamp\n#melee #ssbm\n0:00 Game 1' }, statistics: { viewCount: '3200000', likeCount: '120000', commentCount: '8400' } },
       { snippet: { title: 'my local', channelTitle: 'someone', publishedAt: '2024-01-01T00:00:00Z', description: '' }, statistics: { viewCount: '40' } },
     ] });
   };
   assert.deepEqual(await searchVideos('melee grand finals'), [
-    { title: 'Armada vs Mango', channel: 'VGBootCamp', year: '2014', views: 3200000, description: 'Grand finals of Apex. 0:00 Game 1' },
+    { id: 'a', title: 'Armada vs Mango', channel: 'VGBootCamp', year: '2014', views: 3200000, likes: 120000, commentCount: 8400, tags: ['melee', 'apex'], description: 'Grand finals of Apex. 0:00 Game 1' },
   ]);
   assert.deepEqual(asked, [['search', 'test-key', 'melee grand finals'], ['videos', 'test-key', 'a,b']]);
 
@@ -105,20 +106,55 @@ test('youtube search fills in each video\'s description and views, and keeps the
   await assert.rejects(searchVideos('melee'), /YouTube: The request cannot be completed/);
 });
 
+test('youtube adds top viewer reactions without treating them as video facts', async () => {
+  process.env.YOUTUBE_API_KEY = 'test-key';
+  globalThis.fetch = async (url) => {
+    const { pathname, searchParams } = new URL(url);
+    assert.ok(pathname.endsWith('/commentThreads'));
+    assert.equal(searchParams.get('videoId'), 'a');
+    assert.equal(searchParams.get('order'), 'relevance');
+    return json({ items: [
+      { snippet: { topLevelComment: { snippet: { textDisplay: 'The crowd pop here was unreal.' } } } },
+      { snippet: { topLevelComment: { snippet: { textDisplay: 'This set changed how people saw the matchup.' } } } },
+    ] });
+  };
+  const video = await addCommunity({ id: 'a', title: 'A set' });
+  assert.deepEqual(video.community, ['The crowd pop here was unreal.', 'This set changed how people saw the matchup.']);
+});
+
+test('bills images come from the fan, player, team, stadium and mascot Commons categories', async () => {
+  const asked = [];
+  globalThis.fetch = async (url) => {
+    const params = new URL(url).searchParams;
+    asked.push(params.get('gcmtitle'));
+    return json({ query: { pages: [
+      { title: 'File:Bills fan.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/fan.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg' }] },
+      { title: 'File:Bills logo.svg', imageinfo: [{ mime: 'image/svg+xml', thumburl: 'https://images.example/logo.png', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Bills_logo.svg' }] },
+    ] } });
+  };
+  assert.deepEqual(await billsImagePool(), [{
+    name: 'Bills fan', image: 'https://images.example/fan.jpg', page: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg',
+  }]);
+  assert.deepEqual(asked, ['Category:Bills Mafia', 'Category:Buffalo Bills players', 'Category:Buffalo Bills', 'Category:Highmark Stadium (Orchard Park, New York)', 'Category:New Highmark Stadium', 'Category:Billy Buffalo']);
+});
+
 test('the message lists the game\'s points, then the video and article as more of them', () => {
-  const message = jokeMessage({
+  const message = funMessage({
     style: 'a copypasta',
     points: ['one', 'two'],
-    video: { title: 'Armada vs Mango', channel: 'VGBootCamp', year: '2014', views: 3200000, description: 'Grand finals.' },
+    video: { title: 'Armada vs Mango', channel: 'VGBootCamp', year: '2014', views: 3200000, likes: 120000, commentCount: 8400, tags: ['melee', 'apex'], description: 'Grand finals.', community: ['The crowd was electric.'] },
     article: { about: 'the "Fox (SSBM)" article', text: 'Fox is fast.\nFox has a shine.' },
   });
   assert.equal(message, [
     'Style: a copypasta',
     'Talking points: one; two',
-    'A YouTube video: "Armada vs Mango" from VGBootCamp, 2014, 3.2M views. Description: Grand finals.',
+    'A YouTube video: "Armada vs Mango" from VGBootCamp, 2014, 3.2M views, 120K likes, 8.4K comments',
+    'Creator description: Grand finals.',
+    'Creator tags: melee, apex',
+    'What viewers highlight in top relevant comments:\n- The crowd was electric.',
     'From the "Fox (SSBM)" article on SmashWiki:\nFox is fast.\nFox has a shine.',
   ].join('\n'));
-  assert.equal(jokeMessage({ style: 's', points: ['one', 'two', 'three'] }), 'Style: s\nTalking points: one; two; three');
+  assert.equal(funMessage({ style: 's', points: ['one', 'two', 'three'] }), 'Style: s\nTalking points: one; two; three');
 });
 
 // taking a post starts on the next one, which has to finish before fetch goes back to the real one
@@ -126,13 +162,13 @@ async function nextPostWritten(sent) {
   while (sent.length < 2) await new Promise((resolve) => setImmediate(resolve));
 }
 
-// a joke with a fake claude, so what haiku would get can be checked
-function joke(sent) {
+// a fun post with a fake Claude, so what Haiku would get can be checked
+function funPost(sent) {
   const client = { messages: { create: async (request) => {
     sent.push(request.messages[0].content);
     return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'post' }] };
   } } };
-  return makeJoke({
+  return makeFun({
     name: 'melee', line: 'MELEE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], points: ['one', 'two', 'three'],
     articles: ['Techniques (SSBM)'], videos: ['melee combo video'], focus: /Melee/,
   }, client);
@@ -143,9 +179,9 @@ function fakeSites({ wikiDown = false } = {}) {
     const { hostname, searchParams, pathname } = new URL(url);
     if (hostname === 'images.example') return json({});
     if (hostname === 'www.googleapis.com') {
-      return pathname.endsWith('/search')
-        ? json({ items: [{ id: { videoId: 'a' } }] })
-        : json({ items: [{ snippet: { title: 'Combo video', channelTitle: 'Someone', publishedAt: '2015-01-01T00:00:00Z', description: '' }, statistics: { viewCount: '50000' } }] });
+      if (pathname.endsWith('/search')) return json({ items: [{ id: { videoId: 'a' } }] });
+      if (pathname.endsWith('/commentThreads')) return json({ items: [] });
+      return json({ items: [{ id: 'a', snippet: { title: 'Combo video', channelTitle: 'Someone', publishedAt: '2015-01-01T00:00:00Z', description: '' }, statistics: { viewCount: '50000' } }] });
     }
     if (searchParams.get('generator')) return json({ query: { pages: [{ title: 'File:Fox.png', imageinfo: [{ url: 'https://images.example/fox.png', descriptionurl: 'https://www.ssbwiki.com/File:Fox.png' }] }] } });
     if (wikiDown) return json({}, false);
@@ -158,7 +194,7 @@ test('a post gets a video and an article on top of two of the game\'s points', a
   process.env.YOUTUBE_API_KEY = 'test-key';
   fakeSites();
   const sent = [];
-  const post = await joke(sent).takePost();
+  const post = await funPost(sent).takePost();
   await nextPostWritten(sent);
   assert.equal(post.text, 'post');
   assert.equal(post.image.name, 'melee.png');
@@ -173,7 +209,7 @@ test('smashwiki articles down and no youtube key still makes a post, from three 
   const errors = [];
   console.error = (...args) => errors.push(args.join(' '));
   const sent = [];
-  const post = await joke(sent).takePost();
+  const post = await funPost(sent).takePost();
   await nextPostWritten(sent);
   console.error = originalError;
   assert.equal(post.text, 'post');

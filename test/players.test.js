@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-players-'));
 process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
-// the jokes would call claude on import
+// the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleAutocomplete, handleCommand } = await import('../src/commands/index.js');
@@ -20,11 +20,11 @@ function mockApi(respond) {
 }
 
 // a command run by discordId, values are its options. returns the last reply or edit
-async function run(commandName, discordId, values = {}) {
+async function run(commandName, discordId, values = {}, subcommand = null) {
   let reply;
   const interaction = {
     commandName, user: { id: discordId },
-    options: { getSubcommand: () => null, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null },
+    options: { getSubcommand: () => subcommand, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null },
     reply: async result => { reply = result; },
     deferReply: async () => { interaction.deferred = true; },
     editReply: async result => { reply = result; },
@@ -66,7 +66,7 @@ test('nobody linked, or an untracked pick, says what to do instead', async () =>
   const unlinked = await run('stats', 'stranger');
   assert.ok(unlinked.flags);
   assert.match(unlinked.content, /\/link/);
-  assert.match((await run('stats', 'stranger', { player: 'Someone' })).content, /Only tracked players.*\/track add/);
+  assert.match((await run('stats', 'stranger', { player: 'Someone' })).content, /Only tracked or linked players.*\/track add.*\/link/);
 });
 
 test('/link checks the discord on start.gg and does not track them', async () => {
@@ -77,9 +77,10 @@ test('/link checks the discord on start.gg and does not track them', async () =>
   mockApi(() => profile([{ externalId: 'me-discord' }]));
   const [linked] = (await run('link', 'me-discord', { profile: 'start.gg/user/me' })).embeds;
   assert.equal(linked.data.title, 'Linked to Me');
-  // says which commands work now, that typing your name won't, and that you aren't tracked
+  // says everything that works now, and that you aren't tracked
   assert.match(linked.data.description, /`\/stats` `\/recent`.*`\/predict`/);
-  assert.match(linked.data.description, /Typing your name won't find you/);
+  assert.match(linked.data.description, /`\/scout`\*\* any opponent/);
+  assert.match(linked.data.description, /Player list:\*\* you're in it, marked linked/);
   assert.match(linked.data.description, /Not tracked/);
   assert.equal(state.links['me-discord'].playerId, 70);
   assert.deepEqual(Object.keys(state.players), ['1']);
@@ -91,8 +92,46 @@ test('/link checks the discord on start.gg and does not track them', async () =>
   assert.match(await run('link', 'imposter', { profile: 'start.gg/user/me' }), /Connect your Discord/);
   assert.equal(state.links.imposter, undefined);
 
-  assert.match((await run('unlink', 'me-discord')).content, /Unlinked from Me/);
+  assert.match((await run('unlink', 'me-discord')).content, /^Unlinked from Me\. Leaving the player blank won't find you now/);
   assert.equal(state.links['me-discord'], undefined);
+});
+
+test('linked people can be picked in lookups, but not in the commands about what gets posted', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = { 'me-discord': me };
+  mockApi(noStats);
+  // by the id autocomplete sends, or typed out
+  assert.equal((await run('stats', 'crew-discord', { player: '7' })).embeds[0].data.title, 'Me');
+  assert.equal((await run('stats', 'crew-discord', { player: 'me' })).embeds[0].data.title, 'Me');
+  for (const [command, values] of [['stream', { alerts: 'off' }], ['sets', { results: 'off' }], ['track', {}]]) {
+    const reply = await run(command, 'crew-discord', { player: '7', ...values }, command === 'track' ? 'remove' : null);
+    assert.match(reply.content, /Only tracked players can be picked here/, command);
+  }
+  assert.equal(state.links['me-discord'].streamAlerts, undefined);
+});
+
+test('/scout works for someone linked, as long as start.gg still has their discord', async () => {
+  state.players = {};
+  state.links = { 'me-discord': me };
+  const replies = [];
+  const scout = (discordFor7) => {
+    mockApi(({ query }) => {
+      if (query.includes('user(slug:')) return { user: { id: 3, slug: 'user/them', player: { id: 30, gamerTag: 'Them' } } };
+      if (query.includes('authorizations')) return { u7: { player: { gamerTag: 'Me' }, authorizations: discordFor7 ? [{ externalId: discordFor7 }] : [] } };
+      return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    });
+    const interaction = {
+      commandName: 'scout', user: { id: 'me-discord' },
+      options: { getSubcommand: () => null, getString: () => 'start.gg/user/them', getBoolean: () => null },
+      deferReply: async () => { interaction.deferred = true; }, editReply: async (reply) => replies.push(reply),
+    };
+    return handleCommand(interaction);
+  };
+  await scout('me-discord');
+  assert.equal(replies.at(-1).embeds[0].data.title, 'Scouting Them');
+  // disconnected on start.gg since linking
+  await scout(null);
+  assert.match(replies.at(-1), /needs to know who you are.*\/link/);
 });
 
 test('/link refuses when commands already find you, and fixes a tracked discord that was out of date', async () => {
@@ -132,17 +171,33 @@ test('/stream for someone from /link says there are no alerts instead of pretend
   assert.equal(state.links['me-discord'].streamAlerts, undefined);
 });
 
+test('/sets for someone from /link says there are no results to change instead of pretending', async () => {
+  state.players = { 1: crew };
+  state.links = { 'me-discord': me };
+  const reply = await run('sets', 'me-discord', { results: 'off' });
+  assert.ok(reply.flags);
+  assert.match(reply.content, /aren't tracked/);
+  assert.equal(state.links['me-discord'].setResults, undefined);
+});
+
 test('autocomplete explains an empty list instead of showing nothing', async () => {
-  const choicesFor = async typed => {
+  const choicesFor = async (typed, commandName = 'stats') => {
     let choices;
-    await handleAutocomplete({ commandName: 'stats', options: { getSubcommand: () => null, getFocused: () => typed }, respond: async c => { choices = c; } });
+    await handleAutocomplete({ commandName, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async c => { choices = c; } });
     return choices;
   };
   state.players = {};
+  state.links = {};
   assert.deepEqual(await choicesFor('Leo'), [{ name: 'Nobody is tracked yet, /track add someone first', value: 'Leo' }]);
   state.players = { 1: crew };
-  assert.deepEqual(await choicesFor('Leo'), [{ name: 'Nobody tracked matches "Leo", /track add them first', value: 'Leo' }]);
+  assert.deepEqual(await choicesFor('Leo'), [{ name: 'Nobody tracked or linked matches "Leo", /track add them first', value: 'Leo' }]);
   assert.deepEqual(await choicesFor('cr'), [{ name: 'Crew', value: '1' }]);
+
+  // linked people come after the tracked ones, marked, and only where they can be picked
+  state.links = { 'me-discord': { ...me, tag: 'Crewmate' } };
+  assert.deepEqual(await choicesFor('cr'), [{ name: 'Crew', value: '1' }, { name: 'Crewmate (linked)', value: '7' }]);
+  assert.deepEqual(await choicesFor('cr', 'sets'), [{ name: 'Crew', value: '1' }]);
+  assert.deepEqual(await choicesFor('mate', 'stream'), [{ name: 'Nobody tracked matches "mate"', value: 'mate' }]);
 });
 
 // a won, b lost. seeds and rounds vary so every verbose line has something to show

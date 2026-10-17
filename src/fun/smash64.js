@@ -1,8 +1,8 @@
-import { makeJoke } from './joke.js';
+import { makeFun } from './generated.js';
 
 const PROMPT = `You are a Super Smash Bros. 64 lifer posting in a Discord server of Smash players. You've played the original on an N64 since 1999, and as far as you're concerned every Smash since is a knockoff that never gave it credit.
 Write a post about how Smash 64 did it first and did it better, in the style given in the message. Build it around one or two of the talking points, and whatever the topic, bring it back to 64 having done it first, a different way each time. Anything 64 doesn't have, it never needed.
-Be funny and over the top: grumpy, proud, wounded that Melee gets all the credit, sure the newer games are soft. Specific jokes beat generic old man yelling, and riff on the facts instead of reciting them.
+Be funny and over the top: grumpy, proud, wounded that Melee gets all the credit, sure the newer games are soft. Specific humor beats generic old man yelling, and riff on the facts instead of reciting them.
 Real players and scene moments are fair game, but this crowd notices mistakes, so for Smash 64 facts stick to the talking points and never make up frame data, results or quotes. 64 has no air dodge, so no wavedashing.`;
 
 const STYLES = [
@@ -31,12 +31,12 @@ const TALKING_POINTS = [
   'only 12 characters: Mario, Donkey Kong, Link, Samus, Yoshi, Kirby, Fox and Pikachu, plus unlockable Luigi, Captain Falcon, Ness and Jigglypuff',
   'hitstun is huge, so combos go on forever and zero-to-deaths are normal',
   'Z-canceling: press Z in the 11 frames before landing an aerial and the landing lag drops to 4 frames. Melee\'s L-cancel only halves it',
-  'shield break combos, like Yoshi and Ness double jump canceling Z-canceled aerials into a shield until it pops',
   'no air dodges, spot dodges, charged smash attacks, side specials, pummels, up throws or down throws. Melee added all of them',
-  'Dream Land is the only legal stage, so every tournament match is played on it',
-  'the September 2026 tier list: Pikachu and Yoshi on top, then Kirby and Captain Falcon, with Link and Luigi at the bottom',
+  'Dream Land has been the only legal stage since Hyrule Castle got banned around 2015, so every tournament match is played on it',
+  'the 64 League\'s September 2026 tier list: Pikachu and Yoshi on top, then Kirby and Captain Falcon, with Link and Luigi at the bottom. It\'s the first list since 2009 without Kirby in 2nd',
   'Isai, a Pikachu main who can play the whole cast at the top level, widely called the greatest 64 player ever. He was so far ahead that "Isai is too good" became a meme',
-  'Ness was 3rd on the first tier list for his double jump cancel combos, then dropped once people realized his range was too short. He\'s 8th now',
+  'only three players have ever beaten Isai in a twelve character battle: Jousuke, kysk and Kurabba',
+  'Ness was 3rd on the first tier list in 2008, then fell to 8th once people learned to exploit his terrible recovery. The September 2026 list is the first time he ever went up',
   'Donkey Kong is 9th on the tier list but still shows up at tournaments all the time',
   'the Hori Mini Pad, a small N64 controller that only came out in Japan, so rare that 64 players pay collector prices for one',
   'Smash Remix, a fan mod that adds 18 characters like Falco, Ganondorf, Marth and Mewtwo and leaves the original 12 untouched',
@@ -48,7 +48,7 @@ const TALKING_POINTS = [
   'Melee players calling 64 a prototype for Melee',
 ];
 
-export default makeJoke({
+export default makeFun({
   name: '64',
   line: 'SMASH 64 DID IT FIRST',
   category: 'Screenshots (SSB)',
@@ -59,10 +59,11 @@ export default makeJoke({
   focus: /Smash 64|original Super Smash Bros|SSB64|N64/,
   articles: [
     'Characters (SSB)', 'Techniques (SSB)', 'Stages (SSB)', 'Items (SSB)', 'Pokémon (SSB)', 'Glitches (SSB)', 'Modes (SSB)',
-    'Major tournaments (SSB)',
+    'Major tournaments (SSB)', 'SSB64UPR',
   ],
   videos: [
     'smash 64 combo video', 'smash 64 grand finals', 'smash 64 history', 'smash 64 tech tutorial', 'super smash bros 64 retrospective',
     'smash remix', 'smash 64 zero to death', 'smash 64 pikachu', 'smash 64 tier list',
+    'smash 64 power rankings', 'smash 64 major tournament recap', 'smash 64 community history',
   ],
 });

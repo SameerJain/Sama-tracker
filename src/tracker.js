@@ -86,7 +86,8 @@ function queued(check) {
 // fewest messages that fit discord's limits. the switch gets checked before each one in case it's turned off partway
 async function post(list, type, dueAt, postChannel = channel) {
   for (const batch of embeds.messages(list)) {
-    if (messageEnabled(type, dueAt)) await postChannel.send({ embeds: batch });
+    // roll calls and placements name people but never ping them
+    if (messageEnabled(type, dueAt)) await postChannel.send({ embeds: batch, allowedMentions: { parse: [] } });
   }
 }
 
@@ -136,7 +137,7 @@ export async function postWeeklyRecap(postChannel = channel, now = secondsNow())
   }
   for (let i = state.weeklyRecap.sent; i < state.weeklyRecap.batches.length; i++) {
     if (!canPost()) return;
-    await postChannel.send({ embeds: state.weeklyRecap.batches[i] });
+    await postChannel.send({ embeds: state.weeklyRecap.batches[i], allowedMentions: { parse: [] } });
     state.weeklyRecap.sent = i + 1;
     save();
   }
@@ -166,6 +167,7 @@ async function updateProfiles() {
 export async function postNewSets(postChannel = channel) {
   const players = Object.values(state.players);
   const playerIds = players.map((player) => player.playerId);
+  const showingIds = new Set(players.filter(resultsOn).map((player) => player.playerId));
   const checkedAt = secondsNow();
   // one request for everyone, so go from the oldest lastCheck
   const lastCheck = Math.min(checkedAt, ...players.map((player) => player.lastCheck));
@@ -190,7 +192,10 @@ export async function postNewSets(postChannel = channel) {
       const dqed = set.sides.find((side) => side.score === -1);
       if (dqed && (!dqed.playerIds.some((id) => playerIds.includes(id)) || state.dqs.includes(dqed.id))) continue;
 
-      if (messageEnabled('sets', set.completedAt)) await postChannel.send({ embeds: [embeds.setResult(set, state.players)] });
+      // everyone tracked in this set has results off, so it stays out of the channel.
+      // it still counts as posted so turning results back on only posts sets from then on
+      const showing = set.sides.some((side) => side.playerIds.some((id) => showingIds.has(id)));
+      if (showing && messageEnabled('sets', set.completedAt)) await postChannel.send({ embeds: [embeds.setResult(set, state.players)] });
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
     }
@@ -209,13 +214,16 @@ export async function postNewSets(postChannel = channel) {
 }
 
 export async function postStreamAlerts(postChannel = channel) {
-  try {
-    const playerIds = Object.values(state.players).filter(alertsOn).map((player) => player.playerId);
-    for (const set of await startgg.getStreamedSets(playerIds)) {
-      if (state.streamed.includes(set.id)) continue;
+  const announce = async (sets, eligible = () => true) => {
+    for (const set of sets) {
+      if (state.streamed.includes(set.id) || !eligible(set)) continue;
       if (messageEnabled('streams', wentLiveAt(set))) await postChannel.send({ embeds: [embeds.onStream(set, state.players)] });
       state.streamed.push(set.id);
     }
+  };
+  try {
+    const playerIds = Object.values(state.players).filter(alertsOn).map((player) => player.playerId);
+    await announce(await startgg.getStreamedSets(playerIds));
   } catch (err) {
     console.error('checking streams failed:', err.message);
   }
@@ -224,11 +232,7 @@ export async function postStreamAlerts(postChannel = channel) {
   for (const tournament of liveTournaments()) {
     try {
       for (const queue of await startgg.getStreamQueues(tournament.id)) {
-        for (const set of setsToAnnounce(queue.sets)) {
-          if (state.streamed.includes(set.id) || !hasPlayerWithAlerts(set)) continue;
-          if (messageEnabled('streams', wentLiveAt(set))) await postChannel.send({ embeds: [embeds.onStream(set, state.players)] });
-          state.streamed.push(set.id);
-        }
+        await announce(setsToAnnounce(queue.sets), hasPlayerWithAlerts);
       }
     } catch (err) {
       console.error(`checking stream queue at ${tournament.name} failed:`, err.message);
@@ -270,6 +274,11 @@ function hasPlayerWithAlerts(set) {
 
 function alertsOn(player) {
   return Boolean(player) && player.streamAlerts !== false;
+}
+
+// /sets turns a player's automatic set results off
+function resultsOn(player) {
+  return Boolean(player) && player.setResults !== false;
 }
 
 async function updateTournaments() {

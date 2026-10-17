@@ -4,14 +4,19 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state } from '../store.js';
 import { health } from '../tracker.js';
-import { jokes, tell } from '../jokes/index.js';
+import { funCommands, post } from '../fun/index.js';
 import { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run } from './players.js';
 import { progress, scout, headToHead, stats, characters, predict } from './stats.js';
 import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn } from './registration.js';
-import { configureMessages, socialsAdd, socialsRemove, streamAlerts } from './settings.js';
-import { sendEmbeds } from './shared.js';
+import { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults } from './settings.js';
+import { pickable, sendEmbeds } from './shared.js';
 
 export { commands } from './definitions.js';
+
+// these change what gets posted, so only tracked players can be picked. the rest are lookups, where linked people can be too
+const TRACKED_ONLY = ['track remove', 'stream', 'sets'];
+// all means everyone tracked
+const TAKES_ALL = ['upcoming', 'recent', 'stream', 'sets'];
 
 // "track add", or just the command for the ones without subcommands
 function commandName(interaction) {
@@ -19,82 +24,45 @@ function commandName(interaction) {
   return subcommand ? `${interaction.commandName} ${subcommand}` : interaction.commandName;
 }
 
-export async function handleCommand(interaction) {
-  const name = commandName(interaction);
+const handlers = new Map([
+  ['help', (interaction) => interaction.reply({ embeds: [embeds.help()] })],
+  ['messages', configureMessages],
+  ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],
+  ['socials_edit add', socialsAdd],
+  ['socials_edit remove', socialsRemove],
+  ['track add', trackAdd],
+  ['track remove', trackRemove],
+  ['track list', (interaction) => sendEmbeds(interaction, embeds.trackedList(state.players, Object.keys(pickable()).length - Object.keys(state.players).length))],
+  ['link', link],
+  ['unlink', unlink],
+  ['profile', profile],
+  ['upcoming', upcoming],
+  ['recent', recent],
+  ['run', run],
+  ['progress', progress],
+  ['scout', scout],
+  ['h2h', headToHead],
+  ['stats', stats],
+  ['characters', characters],
+  ['predict', predict],
+  ['stream', streamAlerts],
+  ['sets', setResults],
+  ['status', status],
+  ['set_reg_reminder', setRegReminder],
+  ['delete_reg_reminder', deleteRegReminder],
+  ['reg_admin add', regAdminAdd],
+  ['reg_admin remove', regAdminRemove],
+  ['reg_admin list', (interaction) => interaction.reply({ embeds: [embeds.regAdmins(state.regAdmins)] })],
+  ['bracket', bracket],
+  ['reg_role', regRole],
+  ['registered', registered],
+  ['reg_warn', regWarn],
+  ['view_pfp', viewPfp],
+  ...Object.values(funCommands).map((fun) => [fun.name, (interaction) => post(interaction, fun)]),
+]);
 
-  switch (name) {
-    case 'help':
-      return interaction.reply({ embeds: [embeds.help()] });
-    case 'messages':
-      return configureMessages(interaction);
-    case 'socials':
-      return sendEmbeds(interaction, embeds.socials(state.socials));
-    case 'socials_edit add':
-      return socialsAdd(interaction);
-    case 'socials_edit remove':
-      return socialsRemove(interaction);
-    case 'track add':
-      return trackAdd(interaction);
-    case 'track remove':
-      return trackRemove(interaction);
-    case 'track list':
-      return sendEmbeds(interaction, embeds.trackedList(state.players));
-    case 'link':
-      return link(interaction);
-    case 'unlink':
-      return unlink(interaction);
-    case 'profile':
-      return profile(interaction);
-    case 'upcoming':
-      return upcoming(interaction);
-    case 'recent':
-      return recent(interaction);
-    case 'run':
-      return run(interaction);
-    case 'progress':
-      return progress(interaction);
-    case 'scout':
-      return scout(interaction);
-    case 'h2h':
-      return headToHead(interaction);
-    case 'stats':
-      return stats(interaction);
-    case 'characters':
-      return characters(interaction);
-    case 'predict':
-      return predict(interaction);
-    case 'stream':
-      return streamAlerts(interaction);
-    case 'status':
-      return status(interaction);
-    case 'set_reg_reminder':
-      return setRegReminder(interaction);
-    case 'delete_reg_reminder':
-      return deleteRegReminder(interaction);
-    case 'reg_admin add':
-      return regAdminAdd(interaction);
-    case 'reg_admin remove':
-      return regAdminRemove(interaction);
-    case 'reg_admin list':
-      return interaction.reply({ embeds: [embeds.regAdmins(state.regAdmins)] });
-    case 'bracket':
-      return bracket(interaction);
-    case 'reg_role':
-      return regRole(interaction);
-    case 'registered':
-      return registered(interaction);
-    case 'reg_warn':
-      return regWarn(interaction);
-    case 'sm4sh':
-    case 'melee':
-    case 'ult':
-    case '64':
-    case 'brawl':
-    case 'pplus':
-      return tell(interaction, jokes[name]);
-    case 'pfp':
-      return pfp(interaction);
-  }
+export async function handleCommand(interaction) {
+  return handlers.get(commandName(interaction))?.(interaction);
 }
 
 export async function handleAutocomplete(interaction) {
@@ -125,19 +93,19 @@ export async function handleAutocomplete(interaction) {
     return interaction.respond(choices.slice(0, 25));
   }
 
-  // no "all" for the ones that need a single player
-  if (!['track remove', 'h2h', 'stats', 'characters', 'predict', 'run', 'progress'].includes(name) && 'all'.startsWith(typed)) {
-    choices.push({ name: 'all', value: 'all' });
-  }
-  // only 25 fit, so tags that start with what's typed go first
-  const matches = Object.values(state.players).filter((player) => player.tag.toLowerCase().includes(typed));
+  const trackedOnly = TRACKED_ONLY.includes(name);
+  if (TAKES_ALL.includes(name) && 'all'.startsWith(typed)) choices.push({ name: 'all', value: 'all' });
+  // tracked players, then people who linked themselves. only 25 fit, so tags that start with what's typed go first
+  const people = trackedOnly ? Object.values(state.players) : Object.values(pickable()).sort((a, b) => !state.players[a.userId] - !state.players[b.userId]);
+  const matches = people.filter((player) => player.tag.toLowerCase().includes(typed));
   const starts = (player) => player.tag.toLowerCase().startsWith(typed);
   matches.sort((a, b) => starts(b) - starts(a));
-  for (const player of matches) choices.push({ name: player.tag, value: String(player.userId) });
+  for (const player of matches) choices.push({ name: state.players[player.userId] ? player.tag : `${player.tag} (linked)`, value: String(player.userId) });
 
-  // an empty list looks broken, so say why. picking it gets the not tracked reply
+  // an empty list looks broken, so say why. picking it gets the not found reply
   if (!choices.length) {
-    const why = Object.keys(state.players).length ? `Nobody tracked matches "${focused}", /track add them first` : 'Nobody is tracked yet, /track add someone first';
+    let why = trackedOnly ? `Nobody tracked matches "${focused}"` : `Nobody tracked or linked matches "${focused}", /track add them first`;
+    if (!people.length) why = 'Nobody is tracked yet, /track add someone first';
     choices.push({ name: why.slice(0, 100), value: focused.slice(0, 100) || 'nobody' });
   }
 
@@ -159,7 +127,7 @@ function status(interaction) {
 }
 
 // just the picture, as big as discord has it
-async function pfp(interaction) {
+async function viewPfp(interaction) {
   const url = interaction.client.user.displayAvatarURL({ extension: 'png', size: 4096 });
   await interaction.deferReply();
   await interaction.editReply({ files: [{ attachment: url, name: `pfp.${new URL(url).pathname.split('.').pop()}` }] });

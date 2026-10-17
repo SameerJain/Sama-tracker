@@ -1,9 +1,9 @@
 import { escapeMarkdown } from 'discord.js';
-import { startggUrl } from '../startgg.js';
-import { characterUsage, leans } from '../characters.js';
+import { singles, startggUrl } from '../startgg.js';
+import { characterUsageByGame, leans } from '../characters.js';
 import { lifetimeStats } from './stats.js';
 import { chancePercent, commonOpponentLines } from './players.js';
-import { colors, baseEmbed, withLines, count, singles, gameName, recordOf, section, bold, scoreText, setLink, closeLine, seedLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine } from './shared.js';
+import { colors, baseEmbed, withLines, count, gameName, recordOf, section, bold, scoreText, setLink, closeLine, seedLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine } from './shared.js';
 
 // /scout's form line per game, and how many sets it lists
 const RECENT_SETS = 20;
@@ -49,10 +49,8 @@ export function scout(player, opponent, mine, theirs, characterSets) {
   const lines = [];
   section(lines, 'Recent form', played.length ? formLines(played) : ['No recent singles sets.']);
   section(lines, 'Latest sets', played.slice(0, LATEST_SETS).map((result) => latestSetLine(result)));
-  const characterGames = [...new Map(characterSets.map((set) => [set.videogame.id, set.videogame])).values()];
   const characterLines = [];
-  for (const game of characterGames.slice(0, GAMES_SHOWN)) {
-    const usage = characterUsage(characterSets.filter((set) => set.videogame.id === game.id));
+  for (const { game, usage } of characterUsageByGame(characterSets).slice(0, GAMES_SHOWN)) {
     if (!usage.reported) continue;
     characterLines.push(`**${escapeMarkdown(game.displayName)}:** ${usage.characters.slice(0, 3).map((c) => `${escapeMarkdown(c.name)} (${count(c.games, 'game')})`).join(', ')}`);
   }
@@ -107,8 +105,7 @@ function habitLines(played) {
 // /scout verbose, each game's characters with the matchups and stages they win and lose. focus game first
 function scoutCharacters(characterSets, focus) {
   const embed = baseEmbed(colors.brand).setTitle('Characters and stages');
-  const games = [...new Map(characterSets.map((set) => [set.videogame.id, set.videogame])).values()]
-    .map((game) => ({ game, usage: characterUsage(characterSets.filter((set) => set.videogame.id === game.id)) }))
+  const games = characterUsageByGame(characterSets)
     .filter(({ usage }) => usage.reported)
     .sort((a, b) => (b.game.displayName === focus) - (a.game.displayName === focus) || b.usage.games - a.usage.games);
   if (!games.length) {

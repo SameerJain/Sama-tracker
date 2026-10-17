@@ -1,8 +1,9 @@
-// youtube data api, for the joke posts. needs a key, and searches cost 100 of the 10,000 a day it allows,
-// so each search's results get reused for a day
+// YouTube Data API for the fun posts. Search is the expensive call, so its results are reused for a day.
 const API = 'https://www.googleapis.com/youtube/v3';
 // links, sponsors and socials are most of a description, so only the start is worth sending
 const DESCRIPTION_CHARS = 500;
+const COMMENT_CHARS = 280;
+const COMMENTS_SHOWN = 5;
 // anything under this is usually someone's upload of their own set, which nobody else would know
 const MIN_VIEWS = 10_000;
 
@@ -23,20 +24,44 @@ export async function searchVideos(q) {
   const ids = (found.items ?? []).map((item) => item.id?.videoId).filter(Boolean);
   if (!ids.length) return [];
   const { items = [] } = await get('videos', { part: 'snippet,statistics', id: ids.join(',') });
-  const videos = items.map(({ snippet, statistics }) => ({
+  const videos = items.map(({ id, snippet, statistics }) => ({
+    id,
     title: snippet.title,
     channel: snippet.channelTitle,
     year: snippet.publishedAt.slice(0, 4),
     views: Number(statistics?.viewCount ?? 0),
+    likes: Number(statistics?.likeCount ?? 0),
+    commentCount: Number(statistics?.commentCount ?? 0),
+    tags: (snippet.tags ?? []).slice(0, 10),
     description: description(snippet.description ?? ''),
   }));
   const known = videos.filter((video) => video.views >= MIN_VIEWS);
   return known.length ? known : videos;
 }
 
+// Viewer reactions give the post some community context that titles and view counts miss.
+// YouTube ranks these by relevance; names are deliberately left out.
+export async function addCommunity(video) {
+  const { items = [] } = await get('commentThreads', {
+    part: 'snippet', videoId: video.id, maxResults: String(COMMENTS_SHOWN), order: 'relevance', textFormat: 'plainText',
+  });
+  const community = items.map((item) => comment(item.snippet?.topLevelComment?.snippet?.textDisplay)).filter(Boolean);
+  return { ...video, community };
+}
+
 // without the link and hashtag lines. timestamps stay, they say what's in it
 function description(text) {
   const kept = text.split('\n').map((line) => line.trim()).filter((line) => line && !/https?:\/\/|www\./.test(line) && !/^(#\S+\s*)+$/.test(line));
-  const joined = kept.join(' ');
-  return joined.length > DESCRIPTION_CHARS ? `${joined.slice(0, joined.lastIndexOf(' ', DESCRIPTION_CHARS))}…` : joined;
+  return clip(kept.join(' '), DESCRIPTION_CHARS);
+}
+
+function comment(text = '') {
+  const clean = text.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+  return clip(clean, COMMENT_CHARS);
+}
+
+function clip(text, max) {
+  if (text.length <= max) return text;
+  const space = text.lastIndexOf(' ', max);
+  return `${text.slice(0, space > 0 ? space : max)}…`;
 }

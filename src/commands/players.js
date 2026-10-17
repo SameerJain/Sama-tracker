@@ -21,7 +21,7 @@ async function trackAdd(interaction) {
     return interaction.editReply(`Already tracking ${player.tag}.`);
   }
 
-  state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true };
+  state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true, setResults: true };
   save();
   await interaction.editReply({ embeds: [embeds.added(player)] });
 
@@ -30,8 +30,8 @@ async function trackAdd(interaction) {
 }
 
 async function trackRemove(interaction) {
-  const player = readPlayer(interaction);
-  if (!player) return replyNoPlayer(interaction);
+  const player = readPlayer(interaction, 'player', { trackedOnly: true });
+  if (!player) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
 
   delete state.players[player.userId];
   save();
@@ -86,6 +86,7 @@ function unlink(interaction) {
   // tracked with discord connected still counts
   const still = linkedPlayer(interaction.user.id);
   if (still) content += ` Commands still find you as ${still.tag}, since you're tracked with this Discord on your start.gg.`;
+  else if (linked) content += ' Leaving the player blank won\'t find you now, you\'re off the player list and `/scout` needs a link.';
   return interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }
 
@@ -206,15 +207,4 @@ async function run(interaction) {
   return sendEmbeds(interaction, cards);
 }
 
-// the tracked player with this discord connected on start.gg. checked live, so disconnecting it there
-// takes /scout away right away. whoever it was last time goes first, so it's usually one lookup
-async function trackedCaller(discordId) {
-  const saved = Object.values(state.players).filter((player) => player.discordId === discordId).map((player) => String(player.userId));
-  for (const userIds of [saved, Object.keys(state.players)]) {
-    if (!userIds.length) continue;
-    const match = (await startgg.getProfiles(userIds)).find(([, profile]) => profile?.discordId === discordId);
-    if (match) return state.players[match[0]];
-  }
-}
-
-export { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run, trackedCaller };
+export { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run };

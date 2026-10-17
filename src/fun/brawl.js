@@ -1,8 +1,8 @@
-import { makeJoke } from './joke.js';
+import { makeFun } from './generated.js';
 
 const PROMPT = `You are a Super Smash Bros. Brawl player posting in a Discord server of Smash players, and the last person alive still defending Brawl. You've loved it since it came out on the Wii in 2008 and you won't hear a word against it.
 Write a post defending Brawl, in the style given in the message. Build it around one or two of the talking points. Take whatever people hate about it and argue, completely sincerely, that it was actually a strength, with the argument getting shakier as it goes.
-Be funny: defensive, delusional, a little wounded, sure everyone else just didn't get it. Specific jokes beat generic coping, and riff on the facts instead of reciting them.
+Be funny: defensive, delusional, a little wounded, sure everyone else just didn't get it. Specific humor beats generic coping, and riff on the facts instead of reciting them.
 Real players and scene moments are fair game, but this crowd notices mistakes, so for Brawl facts stick to the talking points and never make up frame data, results or quotes.`;
 
 const STYLES = [
@@ -32,7 +32,7 @@ const TALKING_POINTS = [
   'Meta Knight won $42,394 of 2011 US tournament prize money when it was split by character. Snake was next with $12,125',
   'at KTAR 6, five of the top eight used Meta Knight',
   'the Unity Ruleset Committee banned Meta Knight starting January 2012, disbanded that April, and most tournaments went back to allowing him',
-  'after the Meta Knight ban, the Melee Back Room jokingly banned Meta Knight from Melee too',
+  'the Smash Back Room polled a full Meta Knight ban in 2009, and pro-ban won but missed the two-thirds supermajority it needed',
   'Ice Climbers 2nd on the tier list, with chain grabs that turn one grab into a stock',
   'Diddy Kong and his banana peels, 4th on the tier list',
   'Snake and Sonic were the first third-party fighters in Smash, and tapping down taunt on Shadow Moses Island starts one of Snake\'s codec calls',
@@ -51,7 +51,7 @@ const TALKING_POINTS = [
   'Project M started as a Brawl mod, so Brawl technically gets credit for it',
 ];
 
-export default makeJoke({
+export default makeFun({
   name: 'brawl',
   line: 'BRAWL WAS GOOD ACTUALLY',
   category: 'Screenshots (SSBB)',
@@ -61,10 +61,11 @@ export default makeJoke({
   focus: /Brawl\b/,
   articles: [
     'Characters (SSBB)', 'Techniques (SSBB)', 'Stages (SSBB)', 'Items (SSBB)', 'Pokémon (SSBB)', 'Glitches (SSBB)',
-    'Final Smashes (SSBB)', 'Event Matches (SSBB)', 'Trophies (SSBB)', 'Modes (SSBB)', 'Major tournaments (SSBB)',
+    'Final Smashes (SSBB)', 'Event Matches (SSBB)', 'Trophies (SSBB)', 'Modes (SSBB)', 'Major tournaments (SSBB)', 'SSBBRank',
   ],
   videos: [
     'super smash bros brawl retrospective', 'brawl meta knight', 'brawl grand finals', 'brawl tripping', 'subspace emissary',
     'brawl combo video', 'brawl tier list', 'brawl planking', 'brawl glitches', 'brawl competitive history',
+    'SSBBRank player rankings', 'brawl major tournament recap', 'brawl community retrospective',
   ],
 });

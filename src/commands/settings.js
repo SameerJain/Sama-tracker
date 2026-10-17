@@ -96,8 +96,8 @@ function socialsRemove(interaction) {
 }
 
 function streamAlerts(interaction) {
-  const choice = readChoice(interaction);
-  if (!choice) return replyNoPlayer(interaction);
+  const choice = readChoice(interaction, 'player', { trackedOnly: true });
+  if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
   // someone from /link, their streams never get posted
   if (choice !== 'all' && !state.players[choice.userId]) {
     return interaction.reply({ content: 'You aren\'t tracked, so there are no stream alerts to change.', flags: MessageFlags.Ephemeral });
@@ -112,4 +112,21 @@ function streamAlerts(interaction) {
   return interaction.reply(`Stream alerts ${on ? 'on' : 'off'} for ${who}.`);
 }
 
-export { configureMessages, socialsAdd, socialsRemove, streamAlerts };
+function setResults(interaction) {
+  const choice = readChoice(interaction, 'player', { trackedOnly: true });
+  if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
+  // someone from /link, their sets never get posted
+  if (choice !== 'all' && !state.players[choice.userId]) {
+    return interaction.reply({ content: 'You aren\'t tracked, so there are no set results to change.', flags: MessageFlags.Ephemeral });
+  }
+
+  const on = interaction.options.getString('results', true) === 'on';
+  const players = choice === 'all' ? Object.values(state.players) : [choice];
+  for (const player of players) player.setResults = on;
+  save();
+
+  const who = choice === 'all' ? 'everyone' : choice.tag;
+  return interaction.reply(`Set results ${on ? 'on' : 'off'} for ${who}.`);
+}
+
+export { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults };

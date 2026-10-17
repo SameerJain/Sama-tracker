@@ -1,4 +1,4 @@
-// ssbwiki.com, for the joke posts: screenshots to go with them, and article excerpts for haiku to riff on
+// ssbwiki.com, for the fun posts: screenshots to go with them, and article excerpts for Haiku to riff on
 const API = 'https://www.ssbwiki.com/api.php';
 // a couple of paragraphs, enough real facts for a post without it wandering off topic
 const EXCERPT_CHARS = 1200;

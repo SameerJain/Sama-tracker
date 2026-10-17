@@ -1,7 +1,7 @@
 import { escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
 import { FORM_SETS } from '../predict.js';
-import { colors, FOOTER, baseEmbed, withLines, percent, count, gameName, gameCount, recordOf, GRAND_FINALS, bold, setLink, winLoss, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
+import { colors, FOOTER, baseEmbed, withLines, percent, topText, count, gameName, gameCount, recordOf, GRAND_FINALS, bold, setLink, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
 
 // sets is newest first. verbose lists every set and adds splits, streaks and when they first played.
 // melee means sets is only their melee ones, and otherGames is how many got left out
@@ -72,7 +72,14 @@ function rivalry(a, b, results) {
   return lines;
 }
 
-const FACTORS = { h2h: 'Head-to-head', common: 'Common opponents', seeding: 'Seeding', form: 'Form' };
+const FACTORS = { h2h: 'Head-to-head', common: 'Common opponents', seeding: 'Seeding and form' };
+
+// 28-12, seeding said 24-16. just the record if none of their sets were seeded
+function formText(tag, { wins, total, seededWins, seeded, expected }) {
+  if (!seeded) return `${tag} ${wins}-${total - wins}`;
+  const said = Math.round(expected);
+  return `${tag} ${seededWins}-${seeded - seededWins}, seeding said ${said}-${seeded - said}`;
+}
 
 // a's odds as a whole percent. never 0 or 100, nothing's certain
 export function chancePercent(odds) {
@@ -96,7 +103,7 @@ export function prediction(a, b, odds, verbose) {
 
   const tagA = bold(a.tag);
   const tagB = bold(b.tag);
-  const { h2h, common, seeding, form } = odds;
+  const { h2h, common, seeding, level, form } = odds;
   const lines = [];
 
   const losses = h2h.total - h2h.wins;
@@ -108,24 +115,31 @@ export function prediction(a, b, odds, verbose) {
     lines.push(`**Common opponents:** ${common.total} shared. ${tagA} did better against ${common.better}, ${tagB} against ${common.worse}`);
   }
   if (seeding.total) {
-    const higher = seeding.higher >= seeding.total - seeding.higher ? [tagA, seeding.higher] : [tagB, seeding.total - seeding.higher];
-    lines.push(`**Seeding:** ${higher[0]} seeded higher in ${higher[1]} of ${seeding.total} shared brackets`);
+    const [leader, times, higher] = seeding.ratio >= 1 ? [tagA, seeding.ratio, seeding.higher] : [tagB, 1 / seeding.ratio, seeding.lower];
+    const by = times < 1.15 ? 'about even on average' : `about ${times.toFixed(1)}x higher on average`;
+    lines.push(`**Seeding:** ${leader} seeded higher in ${higher} of ${seeding.total} shared brackets, ${by}`);
+  } else if (level.a && level.b) {
+    lines.push(`**Usual seed:** ${tagA} ${topText(level.a.share)} of their brackets · ${tagB} ${topText(level.b.share)}`);
   }
-  const record = ({ wins, total }) => winLoss(wins, total - wins);
-  lines.push(`**Form:** ${tagA} ${record(form.a)} · ${tagB} ${record(form.b)}, last ${FORM_SETS} sets each`);
+  lines.push(`**Form, last ${FORM_SETS} sets:** ${formText(tagA, form.a)} · ${formText(tagB, form.b)}`);
   if (!verbose) return [embed.setDescription(lines.join('\n'))];
 
-  section(lines, 'How it adds up', odds.factors.map(({ key, n, share, chance }) => {
-    if (!n) return `**${FACTORS[key]}:** nothing to go on, so it doesn't count`;
-    const lean = Math.round(chance * 100);
-    let says = 'even';
-    if (lean > 50) says = `${tagA} ${lean}%`;
-    if (lean < 50) says = `${tagB} ${100 - lean}%`;
-    return `**${FACTORS[key]}:** counts for ${percent(share, 1)} · on its own, ${says}`;
-  }));
+  section(lines, 'How it adds up', [
+    ...odds.factors.map(({ key, n, share, chance }) => {
+      if (!n) return `**${FACTORS[key]}:** nothing to go on, so it doesn't count`;
+      const lean = Math.round(chance * 100);
+      let says = 'even';
+      if (lean > 50) says = `${tagA} ${lean}%`;
+      if (lean < 50) says = `${tagB} ${100 - lean}%`;
+      return `**${FACTORS[key]}:** counts for ${percent(share, 1)} · on its own, ${says}`;
+    }),
+    `**Starting from even:** counts for ${percent(odds.prior, 1)}, so the less there is to go on, the closer it stays to 50%`,
+  ]);
   section(lines, 'Common opponents', commonOpponentLines(odds, tagA, tagB));
   section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
-    .map(({ set, a: x, b: y }) => `[${escapeMarkdown(set.event.tournament.name)}](${startggUrl(set.event.slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
+    .map(({ slug, name, a: x, b: y }) => `[${escapeMarkdown(name)}](${startggUrl(slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
+  lines.push(`-# Newer sets count more, a year old counts half. In ${escapeMarkdown(odds.game)}, across the ${count(odds.seededSets, 'seeded set')} `
+    + `the two of them played, the seed twice as high won ${percent(odds.seedEdge, 1)} of the time, which is how much seeding counts`);
   return withLines(embed, lines);
 }
 
@@ -161,15 +175,16 @@ export function characters(player, usage, { game, file, note, searched = 0 } = {
 // the commands where a blank player falls back to whoever ran it
 const LOOKUP_COMMANDS = ['/stats', '/recent', '/upcoming', '/run', '/progress', '/characters', '/h2h', '/predict'];
 
-// /link worked. says what a blank player does now, and what linking doesn't do
+// /link worked. says everything it opened up, and what linking doesn't do
 export function linked(player, previous) {
   const lines = [
-    'Leave the player blank in these and they look you up:',
+    '**Leave the player blank to look yourself up**',
     LOOKUP_COMMANDS.map((name) => `\`${name}\``).join(' '),
+    '**`/scout`** any opponent, with your record and odds against them',
+    '**Player list:** you\'re in it, marked linked, so anyone can pick you in those lookups',
+    '**`/profile`** finds your start.gg from your Discord',
     '',
-    'Try `/stats` with nothing filled in. Typing your name won\'t find you, since only tracked players can be picked.',
-    '',
-    '**Not tracked:** nothing about you gets posted, and you won\'t be in `/track list`.',
+    '**Not tracked:** nothing about you gets posted and you\'re not in `/track list`. That\'s what `/track add` is for.',
   ];
   if (previous) lines.push(`-# Replaced your link to ${escapeMarkdown(previous.tag)}`);
   lines.push('-# `/unlink` to undo');

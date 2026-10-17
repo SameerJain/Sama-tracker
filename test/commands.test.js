@@ -8,7 +8,7 @@ import { join } from 'node:path';
 // every command once against a fake start.gg, so a handler that throws shows up here
 const directory = mkdtempSync(join(tmpdir(), 'sama-commands-'));
 process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
-// the jokes would call claude on import
+// the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleCommand } = await import('../src/commands/index.js');
@@ -83,6 +83,13 @@ let lastFetch = Date.now();
 globalThis.fetch = async (url, options) => {
   beforeAnswer(runningCommand.getStore(), 'start.gg');
   lastFetch = Date.now();
+  if (String(url).includes('commons.wikimedia.org')) return {
+    ok: true,
+    json: async () => ({ query: { pages: [{
+      title: 'File:Bills Mafia.jpg',
+      imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/bills.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Bills_Mafia.jpg' }],
+    }] } }),
+  };
   // character art
   if (!String(url).includes('api.start.gg')) return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
   const { query, variables } = JSON.parse(options.body);
@@ -122,7 +129,7 @@ function interaction(commandName, { subcommand = null, values = {}, user = 'crew
 
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
-  ['help', {}, /Looking yourself up/], ['status', {}, /Status/], ['messages', {}, /Set results: off/], ['socials', {}, /Nothing yet/],
+  ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results: off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
   ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\]/],
@@ -144,6 +151,7 @@ const runs = [
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
   ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /How it adds up/],
   ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
+  ['sets', { values: { player: 'all', results: 'off' } }, /Set results off for everyone/],
   ['set_reg_reminder', { values: { tournament: 'start.gg/tournament/soon' } }, /gets pinged 12 hours before registration for Soon ends/],
   ['delete_reg_reminder', { values: { tournament: 'soon' } }, /Deleted the reminder for Soon/],
   ['reg_admin', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Opponent is an admin of/],
@@ -153,7 +161,7 @@ const runs = [
   ['reg_role', { values: { ping: 'on' } }, /pinged for reg reminders/],
   ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /Registered from this server · 1/],
   ['reg_warn', { values: { tournament: 'start.gg/tournament/soon', user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /"content":"<@someone>"/],
-  ['sm4sh'], ['melee'], ['ult'], ['64'], ['brawl'], ['pplus'], ['pfp', {}, /pfp\.png/],
+  ['sm4sh'], ['melee'], ['ult'], ['64'], ['brawl'], ['pplus'], ['bills', {}, /Wikimedia Commons/], ['view_pfp', {}, /pfp\.png/],
 ];
 
 test('every command and subcommand answers without throwing', async () => {

@@ -53,6 +53,12 @@ export function characterUsage(sets) {
   };
 }
 
+// one summary per game, in the order each game first appeared
+export function characterUsageByGame(sets) {
+  return [...Map.groupBy(sets, (set) => set.videogame.id).values()]
+    .map((group) => ({ game: group.at(-1).videogame, usage: characterUsage(group) }));
+}
+
 // records with enough games to mean something, split into the ones they win and lose most.
 // a coin flip goes in neither
 export function leans(records) {

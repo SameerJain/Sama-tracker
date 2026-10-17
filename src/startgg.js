@@ -169,6 +169,13 @@ export async function getProfiles(userIds) {
   });
 }
 
+const SET_SLOTS = `
+  slots {
+    entrant { id name initialSeedNum participants { player { id } } }
+    standing { stats { score { value } } }
+  }
+`;
+
 const SET_FIELDS = `
   id
   state
@@ -183,10 +190,7 @@ const SET_FIELDS = `
     videogame { displayName }
     tournament { name slug images(type: "profile") { url } }
   }
-  slots {
-    entrant { id name initialSeedNum participants { player { id } } }
-    standing { stats { score { value } } }
-  }
+  ${SET_SLOTS}
   games {
     selections { entrant { id } character { name } }
   }
@@ -228,6 +232,11 @@ export function fromSide(set, playerId) {
   return { set, me, them, won: me.id === set.winnerId, dq: me.score === -1 || them.score === -1 };
 }
 
+// singles results from the player's side, DQs left out
+export function singles(sets, player) {
+  return sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
+}
+
 // set states: 1 waiting, 2 in progress, 3 done, 6 called
 export async function getSets(playerIds, { since, perPage = 10, states = [3] } = {}) {
   const data = await lookupMany(playerIds, (group) => `
@@ -246,7 +255,8 @@ export async function getSets(playerIds, { since, perPage = 10, states = [3] } =
   return [...setsById.values()];
 }
 
-// for h2h/predict. no games or characters, so a set is ~22 objects and 40 fit under the limit.
+// for h2h/predict. no games or characters, so 40 sets come to about 960 objects. that's close: adding
+// numEntrants to event put a page at 1003, over the limit, so bracket sizes come from getEventHistory.
 // pages can come back short or empty in the middle, so totalPages is the only way to know it's the end
 export async function getSetHistory(playerId, page, filters = {}) {
   const data = await query(`
@@ -260,10 +270,7 @@ export async function getSetHistory(playerId, page, filters = {}) {
             fullRoundText
             winnerId
             event { slug videogame { id displayName } tournament { name } }
-            slots {
-              entrant { id name initialSeedNum participants { player { id } } }
-              standing { stats { score { value } } }
-            }
+            ${SET_SLOTS}
           }
         }
       }
@@ -299,10 +306,7 @@ export async function getRunSets(eventId, playerId) {
           nodes {
             id state completedAt fullRoundText winnerId
             event { slug }
-            slots {
-              entrant { id name initialSeedNum participants { player { id } } }
-              standing { stats { score { value } } }
-            }
+            ${SET_SLOTS}
           }
         }
       }
@@ -363,10 +367,7 @@ export async function getStats(playerId) {
             completedAt
             winnerId
             event { slug videogame { displayName } tournament { name } }
-            slots {
-              entrant { id name initialSeedNum participants { player { id } } }
-              standing { stats { score { value } } }
-            }
+            ${SET_SLOTS}
           }
         }
       }

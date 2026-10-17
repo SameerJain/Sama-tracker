@@ -42,10 +42,22 @@ export async function findAccount(discordId) {
   return connected(discordId, participants.filter((participant) => participant.discordId === discordId).map((participant) => participant.userId));
 }
 
+// for /scout: the tracked or linked account of whoever ran it, as long as start.gg still has their discord
+// connected to it, so disconnecting it there takes /scout away right away. the saved ones go first, so
+// it's usually one lookup. the rest of the tracked list catches someone who connected it since the last refresh
+export async function verifiedCaller(discordId) {
+  const link = state.links[discordId];
+  const tracked = Object.values(state.players);
+  const saved = [...tracked.filter((player) => player.discordId === discordId).map((player) => player.userId), link?.userId];
+  const found = await connected(discordId, saved) ?? await connected(discordId, tracked.map((player) => player.userId));
+  if (!found) return null;
+  return state.players[found.userId] ?? (String(link?.userId) === found.userId ? link : null);
+}
+
 // the first of these start.gg users with this discord connected, checked live
 async function connected(discordId, userIds) {
   const ids = [...new Set(userIds.filter(Boolean).map(String))];
   if (!ids.length) return null;
   const match = (await startgg.getProfiles(ids)).find(([, profile]) => profile?.discordId === discordId);
-  return match?.[1] ?? null;
+  return match ? { userId: match[0], ...match[1] } : null;
 }

@@ -1,9 +1,9 @@
-import { makeJoke } from './joke.js';
+import { makeFun } from './generated.js';
 
 const PROMPT = `You are a Project+ player posting in a Discord server of Smash players. Project+ is the fan mod of Brawl that picked up where Project M left off, and you can't go five minutes without trying to get someone to play it.
 Write a post about Project+, in the style given in the message. Build it around one or two of the talking points. Whatever the topic, it turns into a pitch: the reader is a prospect and you want them in a netplay lobby tonight, with a different angle each time.
-Be funny: relentless, overly friendly, a little culty, never taking no for an answer. Specific jokes beat generic hype, and riff on the facts instead of reciting them.
-This crowd notices mistakes, so for Project+ specifics stick to the talking points and never make up patch notes, results or quotes. Never name real players.
+Be funny: relentless, overly friendly, a little culty, never taking no for an answer. Specific humor beats generic hype, and riff on the facts instead of reciting them.
+This crowd notices mistakes, so for Project+ specifics stick to the talking points and never make up patch notes, results or quotes. Real players and scene moments are fair game when the source material names them.
 A SmashWiki article about Project M can be out of date for Project+, so say it was that way in Project M unless it says Project+ too.`;
 
 const STYLES = [
@@ -39,8 +39,8 @@ const TALKING_POINTS = [
   'Project+ 3.0 came out on June 24, 2024',
   'Lucario took the top spot on the March 2025 tier list from Meta Knight, who had held it since Project M 3.6',
   'Ice Climbers fell almost 20 spots on the March 2025 tier list after nerfs to their hand-off combos',
-  'Mewtwo got a perfect 10 out of 10 on a 2014 Project M tier list, a God Tier all to itself, and has since fallen to its lowest placement ever',
-  'Captain Falcon went from Brawl\'s bottom tier to S tier in Project+',
+  'Mewtwo got a perfect 10 out of 10 on a 2014 Project M tier list, a God Tier all to itself, and the March 2025 Project+ list dropped it 12 spots to its lowest Project M or Project+ placement yet',
+  'Captain Falcon went from 34th of 38 in Brawl to 4th in Project+, in S tier',
   'every character got rebalanced with input from the competitive community, buffing the low tiers and nerfing the high ones',
   'Brawl characters like Snake, Sonic and Lucario with Melee movement',
   'over 500 songs, including "New Age Retro Hippie" from EarthBound, which was sitting unused in Brawl\'s files',
@@ -50,7 +50,7 @@ const TALKING_POINTS = [
   'it runs on a Wii off an SD card with a Brawl disc, or on Dolphin for netplay',
 ];
 
-export default makeJoke({
+export default makeFun({
   name: 'pplus',
   line: 'HAVE YOU HEARD ABOUT PROJECT+',
   // smashwiki has no project+ screenshot category, these are all stages
@@ -59,10 +59,11 @@ export default makeJoke({
   styles: STYLES,
   points: TALKING_POINTS,
   focus: /Project M|Project\+/,
-  // smashwiki covers project m, but not much past its characters. no tournaments, they're mostly who won
-  articles: ['Characters (PM)'],
+  // smashwiki covers project m more thoroughly than project+
+  articles: ['Characters (PM)', 'Major tournaments (PM)', 'PMRank'],
   videos: [
     'project+ combo video', 'project plus netplay', 'project+ grand finals', 'project m history', 'project+ 3.0',
     'project+ tech tutorial', 'project+ tier list', 'project m documentary', 'project+ trailer',
+    'PMRank player rankings', 'project+ major tournament recap', 'project m community retrospective',
   ],
 });

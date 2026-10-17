@@ -36,15 +36,9 @@ function findTracked(side, players) {
 }
 
 function groupByEvent(tournament, players) {
-  const groups = new Map();
-  for (const entry of tournament.entries) {
-    const player = players[entry.userId];
-    if (!player) continue;
-
-    if (!groups.has(entry.eventSlug)) groups.set(entry.eventSlug, []);
-    groups.get(entry.eventSlug).push({ ...entry, player });
-  }
-  return [...groups.values()];
+  const entries = tournament.entries.filter((entry) => players[entry.userId])
+    .map((entry) => ({ ...entry, player: players[entry.userId] }));
+  return [...Map.groupBy(entries, (entry) => entry.eventSlug).values()];
 }
 
 function setEmbed(set, color, player) {

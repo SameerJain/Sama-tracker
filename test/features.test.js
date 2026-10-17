@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-features-'));
 process.env.RAILWAY_VOLUME_MOUNT_PATH = directory;
-// the jokes would call claude on import
+// the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleCommand } = await import('../src/commands/index.js');
@@ -67,7 +67,7 @@ test('scout refuses untracked Discord callers before fetching an opponent', asyn
     options: { getSubcommand: () => null, getString: () => 'target' },
     deferReply: async () => {}, editReply: async r => replies.push(r),
   });
-  assert.match(replies.at(-1), /tracked/i);
+  assert.match(replies.at(-1), /\/link/);
 });
 
 test('tracked callers can scout an untracked opponent without adding them', async () => {
@@ -173,12 +173,12 @@ test('scout verbose says so when nothing is reported, and skips what it has noth
 test('scout verbose goes through their whole history and every event, and stays private', async () => {
   state.players = { 1: { ...crewPlayer, playerId: 11 } };
   const pages = [];
-  let eventsFor;
+  const eventsFor = new Set();
   mockApi(({ query, variables }) => {
     if (query.includes('user(slug:')) return { user: { id: 2, slug: 'user/deep', player: { id: 98, gamerTag: 'Deep' } } };
     if (query.includes('authorizations')) return { u1: { player: { gamerTag: 'Active' }, authorizations: [{ externalId: 'allowed' }] } };
     if (query.includes('events(query:')) {
-      eventsFor = variables.id;
+      eventsFor.add(variables.id);
       return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [{ ...event, state: 'COMPLETED', userEntrant: { initialSeedNum: 3, isDisqualified: false, standing: { placement: 2 } } }] } } };
     }
     const sets = variables.id === 98 && !query.includes('selections');
@@ -198,7 +198,8 @@ test('scout verbose goes through their whole history and every event, and stays 
   };
   await handleCommand(interaction);
   assert.deepEqual(pages.toSorted((a, b) => a - b), Array.from({ length: 16 }, (_, i) => i + 1));
-  assert.equal(eventsFor, 2);
+  // theirs for the report, and yours too so the odds know how big your brackets were
+  assert.deepEqual([...eventsFor].sort(), [1, 2]);
   const titles = replies.flatMap(r => r.embeds.map(e => e.toJSON().title));
   assert.deepEqual(titles.filter(Boolean), ['Deep', 'Form and tendencies', 'Characters and stages', 'Active vs Deep']);
 });
@@ -418,6 +419,7 @@ test('recap includes spanning-week finishes, excludes inactive players, and pers
   const channel = { send: async r => sent.push(r) };
   await postWeeklyRecap(channel, until);
   assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].allowedMentions, { parse: [] });
   const text = sent.flatMap(r => r.embeds.map(e => (e.data ?? e).description)).join('\n');
   assert.match(text, /Active/);
   assert.match(text, /Next local/);
@@ -469,6 +471,25 @@ test('a week with no activity posts nothing', async () => {
   assert.equal(state.weeklyRecap.done, true);
 });
 
+test('tournament roll calls and placements disable mentions', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.messages = { rollcall: true, results: true };
+  state.players = Object.fromEntries([1, 2, 3].map((userId) => [userId, {
+    userId, playerId: userId * 10, tag: `Player ${userId}`, slug: `user/player-${userId}`,
+  }]));
+  const entries = [1, 2, 3].map((userId) => ({
+    userId, event: 'Singles', eventSlug: event.slug, entrants: 32, started: true, placement: userId, final: true,
+  }));
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+
+  await tracker.postRollCall({ name: 'Local', slug: 'tournament/local', startAt: now + 1800, entries }, channel);
+  await tracker.postResults({ name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600, entries }, channel);
+
+  assert.equal(sent.length, 2);
+  assert.deepEqual(sent.map(({ allowedMentions }) => allowedMentions), [{ parse: [] }, { parse: [] }]);
+});
+
 test('muted automatic messages are consumed without posting or replaying them later', async () => {
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
@@ -510,6 +531,32 @@ test('muted automatic messages are consumed without posting or replaying them la
     registrationClosesAt: now + 3600, isRegistrationOpen: true, events: [] } }));
   await tracker.postRegReminders(channel);
   assert.equal(state.regReminders[1].next, 4);
+  assert.equal(sent.length, 1);
+});
+
+test('set results off keeps a player\'s sets out and coming back on doesn\'t dump the backlog', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async payload => sent.push(payload) };
+  state.messages = {};
+  state.players = {
+    1: { ...crewPlayer, lastCheck: now - 120, setResults: false },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastCheck: now - 120 },
+  };
+  state.posted = [];
+  state.dqs = [];
+  mockApi(() => ({
+    p10: { sets: { nodes: [{ ...node('muted-set', now - 60), state: 3 }] } },
+    p20: { sets: { nodes: [{ ...node('shown-set', now - 60, 20), state: 3 }] } },
+  }));
+
+  await tracker.postNewSets(channel);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].embeds[0].data.author.name, 'Rival');
+
+  // the fetch window covers the muted set again, but it stays skipped
+  state.players[1].setResults = true;
+  await tracker.postNewSets(channel);
   assert.equal(sent.length, 1);
 });
 

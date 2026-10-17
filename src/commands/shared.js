@@ -10,14 +10,21 @@ const WAIT_PREVIEW_SECONDS = 5;
 const WAIT_FIRST_SECONDS = 5;
 const WAIT_UPDATE_SECONDS = 15;
 
-// a tracked player picked from the list, 'all', or whoever ran it if it's left out.
-// undefined when it's none of those
-function readChoice(interaction, name = 'player') {
+// everyone a lookup can be about, keyed by start.gg user id: tracked players, then whoever ran /link
+// for themselves. linked people never get anything posted
+function pickable() {
+  const linked = Object.values(state.links).filter((link) => !state.players[link.userId]);
+  return { ...Object.fromEntries(linked.map((link) => [link.userId, link])), ...state.players };
+}
+
+// someone picked from the list, 'all', or whoever ran it if it's left out. trackedOnly is for the
+// commands about what gets posted. undefined when it's none of those
+function readChoice(interaction, name = 'player', { trackedOnly = false } = {}) {
   const value = interaction.options.getString(name)?.toLowerCase();
   if (value === undefined) return linkedPlayer(interaction.user.id);
   if (value === 'all') return 'all';
 
-  return lookup(state.players, value, 'tag');
+  return lookup(trackedOnly ? state.players : pickable(), value, 'tag');
 }
 
 // from /link, or the tracked player whose start.gg has this discord connected
@@ -34,8 +41,8 @@ function lookup(records, value, name) {
   return Object.values(records).find((record) => record[name].toLowerCase() === value);
 }
 
-function readPlayer(interaction, name = 'player') {
-  const choice = readChoice(interaction, name);
+function readPlayer(interaction, name = 'player', options = {}) {
+  const choice = readChoice(interaction, name, options);
   return choice === 'all' ? undefined : choice;
 }
 
@@ -89,11 +96,11 @@ async function withCountdown(interaction, doing, work, preview) {
   }
 }
 
-// left out with no start.gg linked, or someone picked who isn't tracked
-function replyNoPlayer(interaction, name = 'player') {
-  const content = interaction.options.getString(name) === null
-    ? 'Pick a player, or `/link` your start.gg so leaving it out looks you up.'
-    : 'Only tracked players can be picked. `/track add` them first, `/track list` shows who\'s tracked.';
+// left out with no start.gg linked, or someone picked who isn't on the list
+function replyNoPlayer(interaction, name = 'player', { trackedOnly = false } = {}) {
+  let content = 'Only tracked or linked players can be picked. `/track add` them, or they can `/link` their own start.gg.';
+  if (trackedOnly) content = 'Only tracked players can be picked here. `/track list` shows who\'s tracked.';
+  if (interaction.options.getString(name) === null) content = 'Pick a player, or `/link` your start.gg so leaving it out looks you up.';
   return interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }
 
@@ -102,4 +109,4 @@ function profileSlug(input) {
   return input.match(/user\/([\w-]+)/)?.[1] ?? input;
 }
 
-export { readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, profileSlug };
+export { pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, profileSlug };

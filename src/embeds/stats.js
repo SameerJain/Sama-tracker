@@ -1,7 +1,7 @@
 import { escapeMarkdown } from 'discord.js';
-import { fromSide, startggUrl } from '../startgg.js';
+import { singles, startggUrl } from '../startgg.js';
 import { characterUsage } from '../characters.js';
-import { colors, FOOTER, baseEmbed, split, withLines, percent, step, upsetFactor, count, winLoss, singles, gameName, gameCount, closeLine, seedLine, section, bold, shortRecord, playerLink, setLink, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
+import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, section, bold, shortRecord, playerLink, setLink, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
 
 const RECENT_EVENTS = 4;
 
@@ -19,18 +19,13 @@ export function stats(player, standings, sets) {
     .setURL(startggUrl(player.slug));
   if (player.image) embed.setThumbnail(player.image);
 
-  const played = sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
+  const played = singles(sets, player);
   if (!played.length && !standings.length) return embed.setDescription('Nothing on start.gg yet.');
 
   const lines = [];
   if (played.length) {
-    const records = new Map();
-    for (const { set, won } of played) {
-      const game = gameName(set.event);
-      if (!records.has(game)) records.set(game, { wins: 0, losses: 0 });
-      records.get(game)[won ? 'wins' : 'losses']++;
-    }
-    const recordText = [...records].map(([game, { wins, losses }]) => `${game} ${wins}-${losses} (${percent(wins, wins + losses)})`);
+    const recordText = [...Map.groupBy(played, ({ set }) => gameName(set.event))]
+      .map(([game, results]) => `${game} ${recordOf(results)}`);
     lines.push(`**Recent sets:** ${recordText.join(' · ')}`);
   }
 
@@ -41,16 +36,14 @@ export function stats(player, standings, sets) {
   if (best) lines.push(`**Best finish:** ${placementLine(best)}`);
 
   // sets are newest first, so ties go to the latest one
-  const upset = played
-    .filter(({ me, them, won }) => won && upsetFactor(me, them) > 0)
-    .sort((x, y) => upsetFactor(y.me, y.them) - upsetFactor(x.me, x.them))[0];
+  const upset = biggestUpsets(played).win;
   if (upset) lines.push(`**Biggest upset:** ${upsetLine(upset)}`);
 
   section(lines, 'Latest events', standings.slice(0, RECENT_EVENTS).map(placementLine));
 
   const from = [];
-  if (played.length) from.push(played.length === 1 ? '1 singles set' : `${played.length} singles sets`);
-  if (standings.length) from.push(standings.length === 1 ? '1 event' : `${standings.length} events`);
+  if (played.length) from.push(count(played.length, 'singles set'));
+  if (standings.length) from.push(count(standings.length, 'event'));
   lines.push(`-# From their last ${from.join(' and ')} on start.gg`);
 
   return embed.setDescription(lines.join('\n'));
@@ -236,7 +229,6 @@ function averageFinish(events) {
   return sized.length ? sized.reduce((total, entry) => total + finish(entry), 0) / sized.length : null;
 }
 
-const topText = (share) => `top ${Math.ceil(share * 100)}%`;
 
 // events entered and set record, grouped by game or year
 function breakdown(entered, played, eventKey, setKey) {
@@ -286,10 +278,7 @@ export function lifetimeStats(player, events, sets, players, label = 'Lifetime s
   const stat = (name, value) => overview.addFields({ name, value: String(value), inline: true });
 
   if (entered.length) stat('Events', entered.length);
-  if (played.length) {
-    const wins = played.filter((result) => result.won).length;
-    stat('Sets', winLoss(wins, played.length - wins));
-  }
+  if (played.length) stat('Sets', recordOf(played));
   const games = gameCount(played);
   if (games.won + games.lost) stat('Games', winLoss(games.won, games.lost));
 

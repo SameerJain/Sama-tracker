@@ -1,5 +1,5 @@
 import { EmbedBuilder, embedLength, escapeMarkdown } from 'discord.js';
-import { fromSide, startggUrl } from '../startgg.js';
+import { startggUrl } from '../startgg.js';
 
 export const colors = {
   brand: 0x5b21b6,
@@ -15,6 +15,7 @@ export const colors = {
   64: 0x009e49,
   brawl: 0xc9a227,
   pplus: 0x14b8a6,
+  bills: 0x00338d,
   reg: 0xdc2626,
   regEarly: 0xf59e0b,
 };
@@ -96,6 +97,9 @@ export function percent(part, whole) {
   return `${Math.round((part / whole) * 100)}%`;
 }
 
+// 0.05 -> top 5%. rounded up so nobody's ever the top 0%
+export const topText = (share) => `top ${Math.ceil(share * 100)}%`;
+
 export function ordinal(n) {
   const lastTwo = n % 100;
   if (lastTwo >= 11 && lastTwo <= 13) return `${n}th`;
@@ -139,11 +143,6 @@ export function recordOf(list) {
 export function shortRecord(list) {
   const wins = list.filter(({ won }) => won).length;
   return `${wins}-${list.length - wins}`;
-}
-
-// singles results from the player's side, DQs left out
-export function singles(sets, player) {
-  return sets.map((set) => fromSide(set, player.playerId)).filter((result) => result && !result.dq);
 }
 
 export function gameName(event) {
@@ -199,6 +198,6 @@ export function characterRank(usage, character, i) {
   return `${i + 1}\\. ${bold(character.name)}${share} · ${won}`;
 }
 
-export function count(n, word) {
-  return `${n} ${word}${n === 1 ? '' : 's'}`;
+export function count(n, word, plural = `${word}s`) {
+  return `${n} ${n === 1 ? word : plural}`;
 }

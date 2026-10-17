@@ -1,7 +1,7 @@
 import { ApplicationCommandOptionType as Option, PermissionFlagsBits } from 'discord.js';
 import * as startgg from '../startgg.js';
 import { MESSAGE_TYPES, WEEKDAYS } from '../message-settings.js';
-import { jokes } from '../jokes/index.js';
+import { funCommands } from '../fun/index.js';
 
 // /characters game choices. left out, it goes with whichever has more reported
 const PICKABLE_GAMES = [{ id: startgg.ULTIMATE, displayName: 'Ultimate' }, { id: startgg.MELEE, displayName: 'Melee' }];
@@ -11,8 +11,8 @@ function playerOption(description, name = 'player', required = true) {
   return { type: Option.String, name, description, required, autocomplete: true };
 }
 
-const YOU = 'Tracked player, leave out for yourself';
-const YOU_OR_ALL = 'Tracked player or all, leave out for yourself';
+const YOU = 'Tracked or linked player, leave out for yourself';
+const YOU_OR_ALL = 'Tracked or linked player, or all for everyone tracked. Leave out for yourself';
 
 function verboseOption(description) {
   return { type: Option.Boolean, name: 'verbose', description };
@@ -56,12 +56,12 @@ export const commands = [
   },
   {
     name: 'track',
-    description: 'Manage tracked players',
+    description: 'Players whose sets, streams and placements get posted here',
     options: [
       {
         type: Option.Subcommand,
         name: 'add',
-        description: 'Track a start.gg player',
+        description: 'Post a start.gg player\'s sets, streams and placements here',
         options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
       },
       {
@@ -75,10 +75,10 @@ export const commands = [
   },
   {
     name: 'link',
-    description: 'Link your start.gg so leaving the player out of a command looks you up',
-    options: [{ type: Option.String, name: 'profile', description: 'Your start.gg profile link or ID', required: true }],
+    description: 'Link your own start.gg so commands know who you are. Unlike /track, nothing gets posted',
+    options: [{ type: Option.String, name: 'profile', description: 'Your start.gg profile link or ID. It needs your Discord connected', required: true }],
   },
-  { name: 'unlink', description: 'Unlink the start.gg you linked with /link' },
+  { name: 'unlink', description: 'Undo /link. Doesn\'t change whether you\'re tracked' },
   {
     name: 'profile',
     description: 'Someone\'s start.gg profile, if their start.gg has their Discord connected',
@@ -93,7 +93,7 @@ export const commands = [
     options: [playerOption(YOU, 'player', false), verboseOption('Games, close sets, seeds, upsets, rematches and characters, plus a 6 month trend. Slower')],
   },
   {
-    name: 'scout', description: 'Scout any start.gg opponent, for tracked players with Discord connected on start.gg',
+    name: 'scout', description: 'Scout any start.gg opponent. Needs you tracked or linked, with Discord connected on start.gg',
     options: [
       { type: Option.String, name: 'profile', description: 'Opponent start.gg profile link or ID', required: true },
       verboseOption('Much more of their history, habits, matchups, stages and your odds against them. Slower'),
@@ -104,7 +104,7 @@ export const commands = [
     name: 'h2h',
     description: 'Head-to-head record against another player',
     options: [
-      playerOption('Tracked player to compare with', 'opponent'), playerOption(YOU, 'player', false),
+      playerOption('Tracked or linked player to compare with', 'opponent'), playerOption(YOU, 'player', false),
       verboseOption('Every set they\'ve played, plus splits and streaks. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets' },
     ],
@@ -129,7 +129,7 @@ export const commands = [
   {
     name: 'predict',
     description: 'Odds of beating another player',
-    options: [playerOption('Tracked player to go up against', 'opponent'), playerOption(YOU, 'player', false), verboseOption('Show how each part of the prediction counts')],
+    options: [playerOption('Tracked or linked player to go up against', 'opponent'), playerOption(YOU, 'player', false), verboseOption('Show how each part of the prediction counts')],
   },
   {
     name: 'stream',
@@ -139,6 +139,20 @@ export const commands = [
       {
         type: Option.String,
         name: 'alerts',
+        description: 'on or off',
+        required: true,
+        choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
+      },
+    ],
+  },
+  {
+    name: 'sets',
+    description: 'Turn automatic set results on or off for a player',
+    options: [
+      playerOption('Tracked player, or all'),
+      {
+        type: Option.String,
+        name: 'results',
         description: 'on or off',
         required: true,
         choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
@@ -203,8 +217,8 @@ export const commands = [
       { type: Option.User, name: 'user', description: 'Who to check', required: true },
     ],
   },
-  ...Object.values(jokes).map((joke) => ({ name: joke.name, description: joke.line })),
-  { name: 'pfp', description: 'My profile picture, full size' },
+  ...Object.values(funCommands).map((fun) => ({ name: fun.name, description: fun.line })),
+  { name: 'view_pfp', description: 'My profile picture, full size' },
 ];
 
 export { PICKABLE_GAMES };
