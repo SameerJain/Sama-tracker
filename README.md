@@ -44,13 +44,13 @@ Anyone can change `/stream` and `/sets` for tracked players. Use `/messages` for
 | Command | Short report | With `verbose:True` |
 | --- | --- | --- |
 | `/stats` | Recent record, placements, and biggest upset. | Lifetime results, opponents, and seed performance. |
-| `/h2h opponent:<name or link/ID>` | Overall record and last 10 meetings. | Every meeting, splits, and streaks. |
+| `/h2h opponent:<name or link/ID>` | Overall record, last 10 meetings, and one-line predicted odds. | Every meeting, splits, streaks, and one-line predicted odds. |
 | `/predict opponent:<name or link/ID>` | Estimated odds of winning. | The same odds, with the reasoning behind them. |
 | `/scout profile:<link or ID>` | Any opponent's form, characters, and your head-to-head. | More history, habits, matchups, stages, and your odds. |
 | `/progress` | Last 30 days against the previous 30, with changes in win rates and placements. | More detail on each period and a 6-month trend. |
 | `/characters` | Reported characters in Ultimate or Melee. | More history and other games with reported characters. |
 
-Add `player:<name>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
+Add `player:<name or link/ID>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/h2h` odds run the same prediction as `/predict` but stay one line. `verbose:True` doesn't change them, use `/predict` for the reasoning. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
 
 These reports count singles and leave DQs out of set records. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
 
@@ -58,7 +58,7 @@ These reports count singles and leave DQs out of set records. Characters and sta
 
 | Command | What it does |
 | --- | --- |
-| `/set_reg_reminder tournament:<link>` | Set registration reminders. |
+| `/set_reg_reminder tournament:<link>` | Set registration reminders and track everyone registered. |
 | `/delete_reg_reminder tournament:<name>` | Cancel reminders for a tournament, including ones added automatically. |
 | `/reg_admin add profile:<link or ID>` | Automatically set reminders for tournaments this start.gg user admins. |
 | `/reg_admin remove admin:<name>` | Stop adding reminders for that admin. |
@@ -68,7 +68,7 @@ These reports count singles and leave DQs out of set records. Characters and sta
 | `/registered tournament:<link>` | List registered server members. Add `by_event:True` to group them by event. |
 | `/reg_warn tournament:<link> user:<@someone>` | Ping someone with a registration link if they have not registered. |
 
-Reminders go out 7 days, 3 days, 1 day, and 12 hours before registration closes. If registration extends past the tournament start, the start is the deadline. Past reminders are skipped; a last call set within 12 hours goes out immediately.
+Reminders go out 7 days, 3 days, 1 day, and 12 hours before registration closes. If registration extends past the tournament start, the start is the deadline. Past reminders are skipped; a last call set within 12 hours goes out immediately. Setting a reminder also tracks everyone registered for the tournament, so their sets post.
 
 Connect Discord on start.gg so the bot can recognize your registration and skip your reminder pings. Hidden entrant lists can prevent these checks. `/reg_warn` sends no ping if registration is closed, the person is registered, or the list is hidden. `/registered` lists names without pinging anyone.
 
@@ -182,7 +182,7 @@ First lookups can take tens of seconds or about a minute for a large report. sta
 | --- | --- |
 | `/stats` | Latest 15 standings and 30 singles sets. With `melee:True`, standings are game-filtered and older pages are read for 30 Melee sets, or all available if fewer. |
 | `/stats verbose:True` | Every finished singles event and up to 3,000 sets. |
-| `/h2h` | All available meetings against the selected opponent, in either report length. |
+| `/h2h` | All available meetings against the selected opponent, plus up to 600 sets per player for one-line predicted odds, in either report length. |
 | `/predict` | Up to 600 sets per player. Verbose explains the same prediction. |
 | `/scout` | Up to 600 sets per player and 400 sets for the opponent's characters. |
 | `/scout verbose:True` | Up to 1,200 opponent sets, 800 for characters and stages, every finished event, and 600 of your sets. |

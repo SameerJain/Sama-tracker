@@ -4,8 +4,9 @@ import { FORM_SETS } from '../predict.js';
 import { colors, FOOTER, baseEmbed, withLines, percent, topText, count, gameName, gameCount, recordOf, winsOf, GRAND_FINALS, bold, setLink, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
 
 // sets is newest first. verbose lists every set and adds splits, streaks and when they first played.
-// melee means sets is only their melee ones, and otherGames is how many got left out
-export function headToHead(a, b, sets, { verbose = false, melee = false, otherGames = 0 } = {}) {
+// melee means sets is only their melee ones, and otherGames is how many got left out. odds is a
+// predict result, shown as one line in both report lengths. verbose never expands it, use /predict for why
+export function headToHead(a, b, sets, { verbose = false, melee = false, otherGames = 0, odds = null } = {}) {
   const results = sets.map((set) => fromSide(set, a.playerId));
   const wins = winsOf(results);
   const losses = results.length - wins;
@@ -16,8 +17,11 @@ export function headToHead(a, b, sets, { verbose = false, melee = false, otherGa
   if (b.image) embed.setThumbnail(b.image);
   const leftOut = otherGames ? `${count(otherGames, 'set')} in other games left out` : null;
 
+  const oddsLine = odds ? `**Predicted:** ${bold(a.tag)} ${chancePercent(odds)}% · ${100 - chancePercent(odds)}% ${bold(b.tag)} in ${escapeMarkdown(odds.game)}` : null;
+
   if (!results.length) {
     const none = [`They haven't played each other in ${melee ? 'Melee ' : ''}singles on start.gg yet.`];
+    if (oddsLine) none.push(oddsLine);
     if (leftOut) none.push(`-# ${leftOut}, leave out \`melee\` to count them`);
     return [embed.setTitle(`${escapeMarkdown(a.tag)} vs ${escapeMarkdown(b.tag)}`).setDescription(none.join('\n'))];
   }
@@ -33,6 +37,7 @@ export function headToHead(a, b, sets, { verbose = false, melee = false, otherGa
     const leader = wins > losses ? a : b;
     lines.push(`**${escapeMarkdown(leader.tag)} leads ${Math.max(wins, losses)}-${Math.min(wins, losses)}**`);
   }
+  if (oddsLine) lines.push(oddsLine);
   if (verbose) lines.push(...rivalry(a, b, results));
   if (lines.length) lines.push('');
 

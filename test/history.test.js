@@ -77,13 +77,18 @@ async function command(commandName, values = {}) {
 
 const sets = (asked, player) => asked.filter((each) => each.startsWith(`sets ${player} `)).map((each) => Number(each.split(' ')[2]));
 
-test('/h2h reads all opponent pages without fetching the other player\'s history', async () => {
+test('/h2h reads all opponent pages plus both histories for its predicted odds', async () => {
   state.players = { 1: { userId: 1, playerId: 10, tag: 'Me', slug: 'user/me', discordId: 'me' }, 3: { userId: 3, playerId: 30, tag: 'Busy', slug: 'user/busy' } };
   const asked = fakeStartgg({ 10: 3, 30: 40 });
   const replies = await command('h2h', { opponent: '3', verbose: true });
-  assert.deepEqual(sets(asked, 10), [1, 2, 3]);
-  assert.deepEqual(sets(asked, 30), []);
-  assert.equal(replies.at(-1).embeds[0].toJSON().title, 'Me 3-0 Busy');
+  // opponent-filtered meetings and the full history share the same request shape here, so page 1
+  // shows up twice for player 10: once for the meetings, once for the odds
+  assert.deepEqual(sets(asked, 10).toSorted(), [1, 1, 2, 2, 3, 3]);
+  // the other player's history is only for the odds, 15 pages like /predict
+  assert.deepEqual(sets(asked, 30), Array.from({ length: 15 }, (_, i) => i + 1));
+  const card = replies.at(-1).embeds[0].toJSON();
+  assert.equal(card.title, 'Me 3-0 Busy');
+  assert.match(card.description, /\*\*Predicted:\*\*/);
 });
 
 test('/scout verbose builds on the pages /scout already has, without asking for any again', async () => {

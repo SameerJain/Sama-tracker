@@ -141,6 +141,10 @@ test('h2h and predict take a start.gg link or ID for either player', async () =>
   assert.equal(requests[0].variables.slug, 'user/f64a83c8');
   assert.equal(requests[1].variables.id, 300);
   assert.equal(requests[1].variables.opponentId, 20);
+
+  // /predict takes them the same way, even for someone with nothing linked
+  const odds = await run('predict', 'stranger', { player: 'start.gg/user/other', opponent: 'start.gg/user/opponent' });
+  assert.match(odds, /Other and Opponent haven't played singles in the same game/);
 });
 
 test('/link checks the discord on start.gg and does not track them', async () => {
@@ -375,6 +379,77 @@ test('h2h melee and verbose combine: splits and streaks come from the Melee sets
   assert.doesNotMatch(card.data.description, /By game/);
 });
 
+test('h2h shows one-line predicted odds in both report lengths, never the breakdown', () => {
+  const vs = (i, me, opponent, won) => ({
+    id: `${me}-${i}`, completedAt: 1000 - i, winnerId: won ? me : opponent,
+    event: { slug: `tournament/t${i}/event/singles`, videogame: { displayName: 'Ultimate' }, tournament: { name: `T${i}` } },
+    sides: [{ id: me, name: `P${me}`, playerIds: [me], score: 2, seed: 2 }, { id: opponent, name: `P${opponent}`, playerIds: [opponent], score: 1, seed: 4 }],
+  });
+  const historyA = [vs(0, 10, 20, true), vs(1, 10, 30, true)];
+  const historyB = [vs(0, 20, 10, false), vs(1, 20, 30, false)];
+  const odds = predict(a, b, historyA, historyB);
+  const sets = [meeting(0, true), meeting(1, false)];
+
+  const short = embeds.headToHead(a, b, sets, { odds })[0].data.description;
+  const full = embeds.headToHead(a, b, sets, { verbose: true, odds })[0].data.description;
+  for (const text of [short, full]) {
+    assert.match(text, /\*\*Predicted:\*\* \*\*A\*\* \d+% · \d+% \*\*B\*\* in Ultimate/);
+    // only the raw percentage, one line
+    assert.equal(text.match(/Predicted/g).length, 1);
+    assert.doesNotMatch(text, /How it adds up/);
+    assert.doesNotMatch(text, /Starting from even/);
+  }
+  // verbose still lists everything, the odds line just comes first
+  assert.match(full, /First played/);
+  // no odds means no line, the way it looked before
+  assert.doesNotMatch(embeds.headToHead(a, b, sets)[0].data.description, /Predicted/);
+  // even with no meetings the odds still show
+  assert.match(embeds.headToHead(a, b, [], { odds })[0].data.description, /haven't played each other.*\n\*\*Predicted:\*\*/);
+});
+
+test('h2h melee shows Melee odds, and none when there is no shared Melee game', () => {
+  const meleeOdds = { game: 'Melee', chance: 0.7 };
+  const [card] = embeds.headToHead(a, b, [meeting(0, true, { game: 'Melee' })], { melee: true, otherGames: 2, odds: meleeOdds });
+  assert.match(card.data.description, /\*\*Predicted:\*\* \*\*A\*\* 70% · 30% \*\*B\*\* in Melee/);
+  assert.match(card.data.description, /Melee only, 2 sets in other games left out/);
+  const [verbose] = embeds.headToHead(a, b, [meeting(0, true, { game: 'Melee' })], { verbose: true, melee: true, otherGames: 2, odds: meleeOdds });
+  assert.match(verbose.data.description, /\*\*Predicted:\*\* \*\*A\*\* 70% · 30% \*\*B\*\* in Melee/);
+  assert.doesNotMatch(verbose.data.description, /How it adds up/);
+  // null odds, like melee with only Ultimate histories, adds no line
+  assert.doesNotMatch(embeds.headToHead(a, b, [meeting(0, true)], { melee: true, otherGames: 1 })[0].data.description, /Predicted/);
+});
+
+test('h2h runs predict behind the scenes for both report lengths and both games', async () => {
+  // fresh ids so the cached histories from earlier tests don't leak in
+  const playerA = { userId: 80, playerId: 80, tag: 'Alpha', slug: 'user/alpha' };
+  const playerB = { userId: 81, playerId: 81, tag: 'Beta', slug: 'user/beta' };
+  state.players = { 80: { ...playerA, discordId: 'alpha-discord' }, 81: playerB };
+  state.links = {};
+  const node = (id, videogame, players) => ({
+    id, completedAt: 1000 - id, fullRoundText: 'Winners Final', winnerId: 1,
+    event: { slug: `tournament/t${id}/event/singles`, videogame, tournament: { name: `T${id}` } },
+    slots: players.map((player, i) => ({ entrant: { id: i + 1, name: `P${player}`, initialSeedNum: i + 1, participants: [{ player: { id: player } }] }, standing: null })),
+  });
+  mockApi(({ query, variables }) => {
+    if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    // meetings and histories are all Ultimate here, so non-melee has odds and melee has none
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node(1, ULTIMATE, [80, 81]), node(2, ULTIMATE, [80, 82])] } } };
+  });
+  const short = (await run('h2h', 'alpha-discord', { opponent: '81' })).embeds[0].data;
+  assert.match(short.title, /Alpha.*Beta/);
+  assert.match(short.description, /\*\*Predicted:\*\* \*\*Alpha\*\* \d+% · \d+% \*\*Beta\*\* in Ultimate/);
+  assert.doesNotMatch(short.description, /How it adds up/);
+
+  const full = (await run('h2h', 'alpha-discord', { opponent: '81', verbose: true })).embeds[0].data;
+  assert.match(full.description, /\*\*Predicted:\*\* \*\*Alpha\*\* \d+% · \d+% \*\*Beta\*\* in Ultimate/);
+  assert.match(full.description, /First played/);
+  assert.doesNotMatch(full.description, /How it adds up/);
+
+  const melee = (await run('h2h', 'alpha-discord', { opponent: '81', melee: true })).embeds[0].data;
+  assert.doesNotMatch(melee.description, /Predicted/);
+  assert.match(melee.description, /haven't played each other in Melee singles/);
+});
+
 test('predict verbose explains the same odds the short version shows', () => {
   const vs = (i, me, opponent, won) => ({
     id: `${me}-${i}`, completedAt: 1000 - i, winnerId: won ? me : opponent,
@@ -404,18 +479,21 @@ const ULTIMATE = { id: 1386, displayName: 'Ultimate' };
 const MELEE = { id: 1, displayName: 'Melee' };
 
 test('predict melee names whoever has never played it, and the game the odds do work for', async () => {
-  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival' } };
+  // fresh ids since the history caches outlive the test and earlier h2h runs used 10 and 20
+  const freshCrew = { userId: 61, playerId: 61, tag: 'Crew', slug: 'user/crew' };
+  const freshRival = { userId: 62, playerId: 62, tag: 'Rival', slug: 'user/rival' };
+  state.players = { 61: { ...freshCrew, discordId: 'crew-discord' }, 62: freshRival };
   state.links = {};
   // crew has a melee set and rival has never played it, so melee has no odds, but they have an ultimate set together
   mockApi(({ query, variables }) => {
     if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
-    const crewSets = [predictNode(1, ULTIMATE, [10, 20]), predictNode(2, MELEE, [10, 30])];
-    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: variables.id === 10 ? crewSets : [predictNode(1, ULTIMATE, [10, 20])] } } };
+    const crewSets = [predictNode(1, ULTIMATE, [61, 62]), predictNode(2, MELEE, [61, 30])];
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: variables.id === 61 ? crewSets : [predictNode(1, ULTIMATE, [61, 62])] } } };
   });
-  assert.equal(await run('predict', 'crew-discord', { opponent: '2', melee: true }),
+  assert.equal(await run('predict', 'crew-discord', { opponent: '62', melee: true }),
     'Rival hasn\'t played Melee singles on start.gg.\n-# Leave out `melee` for Ultimate odds');
   // the wording is only about the reply, the odds without melee are the same as ever
-  assert.match((await run('predict', 'crew-discord', { opponent: '2' })).embeds[0].data.title, /Crew \d+% · \d+% Rival/);
+  assert.match((await run('predict', 'crew-discord', { opponent: '62' })).embeds[0].data.title, /Crew \d+% · \d+% Rival/);
 });
 
 test('predict melee gives no such hint when the shared game is all DQs for one of them', async () => {

@@ -10,6 +10,7 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleCommand } = await import('../src/commands/index.js');
+const { queueLength } = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
@@ -19,20 +20,25 @@ const tournament = (closesAt = now + 3600) => ({
   registrationClosesAt: closesAt, isRegistrationOpen: true, images: [], events: [],
 });
 const participants = [
-  { gamerTag: 'Here', user: { id: 1, authorizations: [{ externalId: 'in-server' }] } },
-  { gamerTag: 'Elsewhere', user: { id: 2, authorizations: [{ externalId: 'not-in-server' }] } },
-  { gamerTag: 'No Discord', user: { id: 3, authorizations: [] } },
-  { gamerTag: 'Added by the TO', user: null },
+  { gamerTag: 'Here', player: { id: 10, gamerTag: 'Here' }, user: { id: 1, slug: 'user/here', images: [], authorizations: [{ externalId: 'in-server' }] } },
+  { gamerTag: 'Elsewhere', player: { id: 20, gamerTag: 'Elsewhere' }, user: { id: 2, slug: 'user/elsewhere', images: [], authorizations: [{ externalId: 'not-in-server' }] } },
+  { gamerTag: 'No Discord', player: { id: 30, gamerTag: 'No Discord' }, user: { id: 3, slug: 'user/no-discord', images: [], authorizations: [] } },
+  { gamerTag: 'Added by the TO', player: null, user: null },
 ];
 
 // hidden is a TO hiding who's registered: no participants and no count
+let lastFetch = 0;
 function mockStartgg(closesAt, { hidden = false } = {}) {
   globalThis.fetch = async (_url, options) => {
+    lastFetch = Date.now();
     const { query } = JSON.parse(options.body);
     let data;
     if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(closesAt), numAttendees: hidden ? null : participants.length } };
     else if (query.includes('participants(')) {
       data = { tournament: { participants: hidden ? { pageInfo: { totalPages: 0 }, nodes: [] } : { pageInfo: { totalPages: 1 }, nodes: participants } } };
+    }
+    else if (query.includes('tournaments(query:')) {
+      data = Object.fromEntries([...query.matchAll(/\bu(\d+): user/g)].map(([, id]) => [`u${id}`, { tournaments: { nodes: [] } }]));
     }
     else if (query.includes('userEntrant')) {
       data = { tournament: { ...tournament(closesAt), events: [
@@ -213,4 +219,43 @@ test('reg_warn does not ping once registration closed, or for bots', async () =>
   const bot = interaction('reg_warn', { tournament: 'local' }, { id: 'bot', bot: true });
   await handleCommand(bot);
   assert.deepEqual(bot.calls.map(([kind]) => kind), ['reply']);
+});
+
+test('set_reg_reminder tracks everyone registered for the tournament', async () => {
+  state.players = {};
+  state.regReminders = {};
+  // the reminder's own send is covered elsewhere, here it would post to no channel
+  state.messages = { registration: false };
+  mockStartgg();
+  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
+  await handleCommand(run);
+  // the TO-added entry has no account, so there's nothing to track
+  assert.deepEqual(Object.keys(state.players).sort(), ['1', '2', '3']);
+  assert.equal(state.players[1].playerId, 10);
+  assert.equal(state.players[1].streamAlerts, true);
+  assert.equal(state.players[1].setResults, true);
+  assert.ok(state.players[1].lastCheck >= now);
+  assert.ok(state.regReminders[5]);
+  // the reminder's own channel send can land anywhere around the reply
+  const edit = run.calls.find(([kind]) => kind === 'edit');
+  assert.match(edit[1], /sending the last call now\. 3 players from Local are now tracked\./);
+});
+
+test('set_reg_reminder still sets the reminder when the list is hidden, tracking nobody', async () => {
+  state.players = {};
+  state.regReminders = {};
+  state.messages = { registration: false };
+  mockStartgg(undefined, { hidden: true });
+  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
+  await handleCommand(run);
+  assert.deepEqual(state.players, {});
+  assert.ok(state.regReminders[5]);
+  const edit = run.calls.find(([kind]) => kind === 'edit');
+  assert.doesNotMatch(edit[1], /now tracked/);
+});
+
+// the reminder and tournament checks above run in the background, let them finish
+// while the fake is still answering so nothing reaches the real start.gg
+test('background checks finish before the fake goes away', async () => {
+  while (queueLength() || Date.now() - lastFetch < 2000) await new Promise((resolve) => setTimeout(resolve, 200));
 });

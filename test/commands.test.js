@@ -150,7 +150,7 @@ const runs = [
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
   ['scout', { values: { profile: 'start.gg/user/opponent', melee: true } }, /No recent Melee singles sets\./],
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
-  ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival/], ['h2h', { values: { opponent: '2', verbose: true } }, /First played/],
+  ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival.*Predicted.*Ultimate/], ['h2h', { values: { opponent: '2', verbose: true } }, /Predicted.*Ultimate.*First played/],
   // the fake sets are all ultimate
   ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out/],
   ['h2h', { values: { opponent: '2', verbose: true, melee: true } }, /haven't played each other in Melee singles on start\.gg yet/],

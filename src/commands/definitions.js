@@ -110,11 +110,11 @@ export const commands = [
   // discord wants required options before optional ones, so the opponent goes first
   {
     name: 'h2h',
-    description: 'Head-to-head record against another player',
+    description: 'Head-to-head record with one-line predicted odds',
     options: [
       playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
-      verboseOption('Every set they\'ve played, plus splits and streaks. Slower'),
-      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets' },
+      verboseOption('Every set, splits and streaks. Odds stay one line. Slower'),
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and Melee odds' },
     ],
   },
   {
@@ -177,7 +177,7 @@ export const commands = [
   { name: 'status', description: 'Uptime and the last start.gg checks' },
   {
     name: 'set_reg_reminder',
-    description: 'Ping people with reg pings on as a tournament\'s registration deadline gets close',
+    description: 'Set a registration reminder and track everyone registered',
     options: [{ type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true }],
   },
   {

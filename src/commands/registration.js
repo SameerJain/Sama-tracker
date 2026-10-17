@@ -2,7 +2,7 @@ import { MessageFlags, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, endTime, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
+import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts } from '../accounts.js';
 import { findPlayer, lookup, replyEphemeral, sendEmbeds, flag } from './shared.js';
 
@@ -49,12 +49,34 @@ async function setRegReminder(interaction) {
   // inside the last call window it goes out now
   checkRegReminders();
 
+  // everyone registered gets tracked too, so their sets post like anyone else's
+  let added = 0;
+  try {
+    const adding = (await startgg.getAttendees(tournament.id))
+      .filter((attendee) => attendee.userId && attendee.playerId && !state.players[attendee.userId]);
+    for (const player of adding) {
+      state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true, setResults: true };
+    }
+    if (adding.length) {
+      save();
+      // don't wait 15 min for their tournaments to show up
+      checkTournaments();
+    }
+    added = adding.length;
+  } catch (err) {
+    // the reminder is already saved, tracking just missed this one
+    console.error(`tracking registrants for ${tournament.name} failed:`, err.message);
+  }
+  const tracked = added === 1
+    ? ` 1 player from ${tournament.name} is now tracked.`
+    : added ? ` ${added} players from ${tournament.name} are now tracked.` : '';
+
   if (firstAt <= secondsNow()) {
-    return interaction.editReply(`Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.`);
+    return interaction.editReply(`Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`);
   }
   const duration = (hours) => (hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`);
   const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(duration));
-  return interaction.editReply(`Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/reg_role\` to turn yours on.`);
+  return interaction.editReply(`Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/reg_role\` to turn yours on.${tracked}`);
 }
 
 function deleteRegReminder(interaction) {

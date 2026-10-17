@@ -110,10 +110,16 @@ async function headToHead(interaction) {
   if (!interaction.deferred) await interaction.deferReply();
   const verbose = flag(interaction, 'verbose');
   const { melee, only } = meleeOption(interaction);
-  const sets = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings`,
-    startgg.getHeadToHead(a.playerId, b.playerId));
+  // meetings for the record, histories and events for one line of /predict odds
+  const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
+    Promise.all([
+      startgg.getHeadToHead(a.playerId, b.playerId),
+      setHistory(a.playerId), setHistory(b.playerId),
+      eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
+    ]));
   const shown = only(sets);
-  return sendEmbeds(interaction, embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - shown.length }));
+  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB });
+  return sendEmbeds(interaction, embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - shown.length, odds }));
 }
 
 async function stats(interaction) {
