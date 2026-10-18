@@ -51,9 +51,11 @@ async function slippiAdd(interaction) {
   save();
 
   const name = escapeMarkdown(profile.name);
+  const { files, characterFile } = await slippi.slippiArt(profile);
   await interaction.editReply({
     content: existing ? `${name} is already on the Slippi watchlist.` : `Added ${name} to the Slippi watchlist. Their rank changes get posted here.`,
-    embeds: embeds.slippiRank(profile, { entry, players: state.players }),
+    embeds: embeds.slippiRank(profile, { entry, players: state.players, characterFile }),
+    files,
     allowedMentions: { parse: [] },
   });
 }
@@ -92,10 +94,48 @@ async function slippiRank(interaction) {
     // on the watchlist under a code they've since changed
     entry = state.slippi[profile.uid] ?? null;
   }
-  return sendEmbeds(interaction, embeds.slippiRank(profile, { entry, players: state.players }));
+  const { files, characterFile } = await slippi.slippiArt(profile);
+  return sendEmbeds(interaction, embeds.slippiRank(profile, { entry, players: state.players, characterFile }), [], files);
 }
 
-const slippiLeaderboard = (interaction) => sendEmbeds(interaction, embeds.slippiLeaderboard(state.slippi, state.players));
+// the leader's rank badge goes with it, or the slippi logo when the watchlist is empty
+function slippiLeaderboard(interaction) {
+  const [leader] = embeds.leaderboardOrder(state.slippi);
+  return sendEmbeds(interaction, embeds.slippiLeaderboard(state.slippi, state.players), [], [leader ? slippi.rankImage(leader.rank) : slippi.LOGO]);
+}
+
+// for the melee reports: the slippi profile of someone on the watchlist, tied to their start.gg. anyone else
+// gets null without a single request, so their reports go exactly the way they did before slippi. the live
+// profile has past seasons, and slippi gets a few seconds before the last rank check's numbers stand in.
+// kept a while so a report and its Full report button ask once. nothing here throws
+const SLIPPI_KEPT_MINUTES = 30;
+const SLIPPI_WAIT_MS = 3000;
+const looked = new Map();
+
+async function slippiFor(player) {
+  const entry = Object.values(state.slippi).find((each) => String(each.userId) === String(player.userId));
+  if (!entry) return null;
+  const kept = looked.get(entry.uid);
+  if (kept && Date.now() - kept.at < SLIPPI_KEPT_MINUTES * 60 * 1000) return kept.profile;
+
+  const live = slippi.getProfiles([entry.uid]).then((found) => {
+    const profile = found.get(entry.uid);
+    if (profile) looked.set(entry.uid, { at: Date.now(), profile });
+    return profile ?? entry;
+  }, (err) => {
+    console.error(`slippi lookup for ${player.tag} failed:`, err.message);
+    return entry;
+  });
+  return Promise.race([live, new Promise((resolve) => setTimeout(resolve, SLIPPI_WAIT_MS, entry))]);
+}
+
+// a report's slippi profiles, one per player. melee:True starts asking right away, next to the start.gg requests.
+// otherwise it waits to see whether everything the report found was melee anyway. null when nobody's on the watchlist
+function slippiLookup(players, melee) {
+  const any = () => players.some((player) => Object.values(state.slippi).some((entry) => String(entry.userId) === String(player.userId)));
+  let started = melee && any() ? Promise.all(players.map(slippiFor)) : null;
+  return async (show) => (show && any() ? (started ??= Promise.all(players.map(slippiFor))) : null);
+}
 
 // watchlist picks for remove and rank, matching names, codes and start.gg tags. rank also takes a typed code
 function slippiChoices(focused, { anyCode = false } = {}) {
@@ -119,4 +159,4 @@ function slippiChoices(focused, { anyCode = false } = {}) {
   return choices.slice(0, 25);
 }
 
-export { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices };
+export { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices, slippiFor, slippiLookup };

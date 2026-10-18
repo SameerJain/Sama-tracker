@@ -29,7 +29,7 @@ test('message controls are registered for server managers', () => {
   const command = commands.find(c => c.name === 'messages');
   assert.equal(command?.default_member_permissions, PermissionFlagsBits.ManageGuild.toString());
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'rollcall', 'results', 'registration', 'slippi', 'recap']);
+    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'slippi', 'recap', 'threads']);
 });
 
 test('only managers can change settings', async () => {
@@ -69,6 +69,7 @@ test('running messages without options shows defaults without writing settings',
   const reply = await configure();
   assert.match(reply.content, /Set results:\*\* on/);
   assert.match(reply.content, /Match call pings:\*\* off/);
+  assert.match(reply.content, /Top 8s:\*\* off/);
   assert.match(reply.content, /Sunday 21:00 EST/);
   assert.deepEqual(state.messages, {});
 });

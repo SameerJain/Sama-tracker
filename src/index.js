@@ -1,7 +1,9 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { buttonFailed, commands, handleAutocomplete, handleButton, handleCommand } from './commands/index.js';
 import { asCommand, checkToken, commandProgress } from './startgg.js';
-import { startTracking } from './tracker.js';
+import { missingThreadPermissions, startTracking } from './tracker.js';
+import { messageSettings } from './message-settings.js';
+import { setFallbackImage } from './embeds/index.js';
 
 // commands that ask start.gg this much get a line in the logs, so a slow one shows what it spent its time on
 const LOGGED_REQUESTS = 20;
@@ -41,7 +43,14 @@ client.once(Events.ClientReady, async () => {
   if (missing.length) quit(`missing permissions in #${channel.name}: ${missing.join(', ')}`);
 
   console.log(`logged in as ${client.user.tag}, posting in #${channel.name}`);
+  // not worth quitting over, those posts go in the channel until it's fixed
+  const threadsMissing = missingThreadPermissions(channel);
+  if (messageSettings().threads && threadsMissing?.length !== 0) {
+    console.error(`tournament threads are on but can't be started in #${channel.name}${threadsMissing ? `, missing ${threadsMissing.join(' and ')}` : ''}`);
+  }
 
+  // before anything posts, so a message with no picture of its own gets this one
+  setFallbackImage(client.user.displayAvatarURL({ extension: 'png', size: 256 }));
   startTracking(channel);
 });
 
@@ -53,9 +62,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await handleAutocomplete(interaction).catch(console.error);
     return;
   }
-  // a report's buttons run it again, so they wait their turn like commands
+  // a report's buttons run it again, so they wait their turn like commands. so do the Apps menu ones on a member
   const button = interaction.isButton();
-  if (!interaction.isChatInputCommand() && !button) return;
+  if (!interaction.isChatInputCommand() && !interaction.isUserContextMenuCommand() && !button) return;
 
   const userId = interaction.user.id;
   if (busy.has(userId)) {

@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
-import { state } from '../store.js';
+import { state, save } from '../store.js';
 
 // a slow lookup's reply says how far along start.gg is once there's at least this long left, or this long
 // with a quick answer to show meanwhile. the first check waits for the first pages, since those say how many more there are
@@ -9,6 +9,10 @@ const WAIT_SHOWN_SECONDS = 20;
 const WAIT_PREVIEW_SECONDS = 5;
 const WAIT_FIRST_SECONDS = 5;
 const WAIT_UPDATE_SECONDS = 15;
+
+// players each person picked last, so autocomplete can put them first before anything's typed
+const RECENT_PICKS = 5;
+const RECENT_PICKERS = 500;
 
 // everyone a lookup can be about, keyed by start.gg user id: tracked players, then whoever ran /link
 // for themselves. linked people never get anything posted
@@ -24,7 +28,33 @@ function readChoice(interaction, name = 'player', { trackedOnly = false } = {}) 
   if (value === undefined) return linkedPlayer(interaction.user.id);
   if (value === 'all') return 'all';
 
-  return lookup(trackedOnly ? state.players : pickable(), value, 'tag');
+  const picked = lookup(trackedOnly ? state.players : pickable(), value, 'tag');
+  if (picked) rememberPick(interaction.user.id, picked.userId);
+  return picked;
+}
+
+// newest first. leaving the player out means yourself, so you don't need to be on your own list
+function rememberPick(discordId, userId) {
+  const id = String(userId);
+  const picks = state.recentPicks[discordId] ?? [];
+  if (picks[0] === id || String(linkedPlayer(discordId)?.userId) === id) return;
+  delete state.recentPicks[discordId];
+  state.recentPicks[discordId] = [id, ...picks.filter((each) => each !== id)].slice(0, RECENT_PICKS);
+  // key order is the order they last picked someone
+  const pickers = Object.keys(state.recentPicks);
+  for (const each of pickers.slice(0, Math.max(0, pickers.length - RECENT_PICKERS))) delete state.recentPicks[each];
+  save();
+}
+
+// what someone picked lately, as start.gg user ids, newest first
+const recentPicks = (discordId) => state.recentPicks[discordId] ?? [];
+
+// "Tea | Leo", "tea leo" and "TeaLeo" all come out "tealeo". typing nothing but symbols matches them as typed
+const squash = (text) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+function nameMatches(name, typed, { start = false } = {}) {
+  const [have, want] = squash(typed) ? [squash(name), squash(typed)] : [name.toLowerCase(), typed.toLowerCase()];
+  return start ? have.startsWith(want) : have.includes(want);
 }
 
 // from /link, or the tracked player whose start.gg has this discord connected
@@ -34,11 +64,13 @@ function linkedPlayer(discordId) {
   return Object.values(state.players).find((player) => player.discordId === discordId);
 }
 
-// autocomplete sends the id, typing it out sends the name.
+// autocomplete sends the id, typing it out sends the name, spelled close enough.
 // hasOwn so typing "constructor" doesn't match Object.prototype
 function lookup(records, value, name) {
   if (Object.hasOwn(records, value)) return records[value];
-  return Object.values(records).find((record) => record[name].toLowerCase() === value);
+  const all = Object.values(records);
+  return all.find((record) => record[name].toLowerCase() === value)
+    ?? (squash(value) ? all.find((record) => squash(record[name]) === squash(value)) : undefined);
 }
 
 function readPlayer(interaction, name = 'player', options = {}) {
@@ -52,22 +84,23 @@ function isEphemeral(interaction) {
 }
 
 // whatever doesn't fit in the reply goes in follow-ups, which are only ephemeral when the reply is.
-// buttons go under the reply, and leaving them out clears the ones a pressed button's message had
-async function sendEmbeds(interaction, list, components = []) {
+// buttons and files go with the reply, and leaving buttons out clears the ones a pressed button's message had
+async function sendEmbeds(interaction, list, components = [], files = []) {
   for (const [i, batch] of embeds.messages(list).entries()) {
     if (i > 0) await interaction.followUp({ embeds: batch, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
     // null clears a countdown from withCountdown
-    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components });
-    else await interaction.reply({ embeds: batch, components });
+    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components, files });
+    else await interaction.reply({ embeds: batch, components, files });
   }
 }
 
 // a button that runs a report again. discord keeps nothing but its id, so that holds everything:
 // action:command:player:opponent:melee:game, with players as profile slugs so anyone start.gg has still
-// works after a restart. more swaps the message for the full report, new answers with another report.
+// works after a restart, or #playerId for someone only known from a set. more swaps the message for the
+// full report, new answers with another report, and private answers just whoever pressed it.
 // null when it won't fit in discord's 100 characters
 function reportButton(label, action, command, { player = null, opponent = null, melee = false, game = null } = {}) {
-  const slug = (who) => who?.slug?.replace(/^user\//, '') ?? '';
+  const slug = (who) => who?.slug?.replace(/^user\//, '') ?? (who?.playerId ? `#${who.playerId}` : '');
   if ((player && !slug(player)) || (opponent && !slug(opponent))) return null;
   const id = [action, command, slug(player), slug(opponent), melee ? 'melee' : '', game ?? ''].join(':');
   if (id.length > 100) return null;
@@ -76,6 +109,14 @@ function reportButton(label, action, command, { player = null, opponent = null, 
 
 // under a short report, the same as running it with verbose:True
 const fullReport = (command, options) => reportButton('Full report', 'more', command, options);
+
+// /h2h between a player and whoever they played or play next in a set. singles only, like /h2h.
+// discord caps labels at 80
+function h2hButton(set, player, { label, action = 'new' } = {}) {
+  const them = startgg.fromSide(set, player.playerId)?.them;
+  if (!them || set.sides.some((side) => side.playerIds.length !== 1)) return null;
+  return reportButton((label ?? `H2H vs ${them.name}`).slice(0, 80), action, 'h2h', { player, opponent: { playerId: them.playerIds[0] } });
+}
 
 // the row the buttons go in, or none when there aren't any
 function buttonRow(...buttons) {
@@ -90,7 +131,12 @@ function readButton(customId) {
 
 // a player from a button: someone tracked or linked, or anyone start.gg still has
 async function playerBySlug(slug) {
-  return Object.values(pickable()).find((player) => player.slug === `user/${slug}`) ?? startgg.getPlayer(slug);
+  const known = Object.values(pickable());
+  if (slug.startsWith('#')) {
+    const playerId = slug.slice(1);
+    return known.find((player) => String(player.playerId) === playerId) ?? startgg.getPlayerById(playerId);
+  }
+  return known.find((player) => player.slug === `user/${slug}`) ?? startgg.getPlayer(slug);
 }
 
 // about 40 seconds, about 3 minutes
@@ -182,5 +228,5 @@ const flag = (interaction, name) => interaction.options.getBoolean(name) ?? fals
 
 export {
   pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag,
-  reportButton, fullReport, buttonRow, readButton, playerBySlug,
+  reportButton, fullReport, h2hButton, buttonRow, readButton, playerBySlug, recentPicks, rememberPick, nameMatches,
 };

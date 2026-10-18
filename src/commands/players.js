@@ -4,7 +4,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { RUNS_LATE_HOURS, checkTournaments, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
 import { findAccount } from '../accounts.js';
-import { findPlayer, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
+import { buttonRow, findPlayer, h2hButton, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
 
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
@@ -21,7 +21,7 @@ async function trackAdd(interaction) {
 
   state.players[player.userId] = newTracked(player);
   save();
-  await interaction.editReply({ embeds: [embeds.added(player)] });
+  await interaction.editReply({ embeds: embeds.withImage([embeds.added(player)]) });
 
   // don't wait 15 min for their tournaments to show up
   checkTournaments();
@@ -67,7 +67,7 @@ async function link(interaction) {
   if (previous?.userId === player.userId) {
     return interaction.editReply(`Already linked to ${player.tag}. Leave the player out of a command like \`/stats\` to look yourself up.`);
   }
-  return interaction.editReply({ embeds: [embeds.linked(player, previous)] });
+  return interaction.editReply({ embeds: embeds.withImage([embeds.linked(player, previous)]) });
 }
 
 // /link with the profile left out, so nobody has to copy a link over. start.gg can't be searched by
@@ -105,7 +105,7 @@ async function profile(interaction) {
     const player = readPlayer(interaction);
     if (!player) return replyNoPlayer(interaction);
     await interaction.deferReply();
-    return interaction.editReply({ embeds: [embeds.profile(player, { name: player.tag })] });
+    return interaction.editReply({ embeds: embeds.withImage([embeds.profile(player, { name: player.tag })]) });
   }
   const picked = interaction.options.getUser('user');
   const user = picked ?? interaction.user;
@@ -115,7 +115,7 @@ async function profile(interaction) {
 
   await interaction.deferReply();
   const account = await findAccount(user.id);
-  if (account) return interaction.editReply({ embeds: [embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })] });
+  if (account) return interaction.editReply({ embeds: embeds.withImage([embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })]) });
   if (user.id === interaction.user.id) {
     return interaction.editReply('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.');
   }
@@ -191,7 +191,23 @@ async function recent(interaction) {
   // sort is stable, so each player's sets stay newest first
   if (choice === 'all') cards.sort((a, b) => (a.data.author?.name ?? '').localeCompare(b.data.author?.name ?? ''));
 
-  await sendEmbeds(interaction, cards);
+  // a message's buttons aren't tied to one card, so they only go on one player's sets, named for who it's against
+  await sendEmbeds(interaction, cards, choice === 'all' ? [] : h2hButtons(choice, latest));
+}
+
+// /h2h buttons for the first few different opponents in these sets. discord fits 5 in a row
+function h2hButtons(player, sets) {
+  const seen = new Set();
+  const buttons = [];
+  for (const set of sets) {
+    const them = startgg.fromSide(set, player.playerId)?.them;
+    const button = them && !seen.has(String(them.playerIds[0])) && h2hButton(set, player);
+    if (!button) continue;
+    seen.add(String(them.playerIds[0]));
+    buttons.push(button);
+    if (buttons.length === 5) break;
+  }
+  return buttonRow(...buttons);
 }
 
 async function run(interaction) {
@@ -211,6 +227,7 @@ async function run(interaction) {
     .sort((a, b) => b.startAt - a.startAt);
 
   const cards = [];
+  const nextSets = [];
   for (const found of current) {
     const tournament = await startgg.getTournament(found.id, [player.userId]);
     // no entries means they only admin it
@@ -219,10 +236,12 @@ async function run(interaction) {
     const runs = await Promise.all(tournament.entries.map(async (entry) => ({
       entry, sets: entry.started ? await startgg.getRunSets(entry.eventId, player.playerId) : [],
     })));
-    cards.push(...embeds.run(player, tournament, runs));
+    cards.push(...embeds.run(player, tournament, runs, now));
+    nextSets.push(...embeds.nextOpponents(player, runs).map(({ set }) => set));
   }
   if (!cards.length) return interaction.editReply(`${player.tag} has no current tournament run on start.gg.`);
-  return sendEmbeds(interaction, cards);
+  // the record against whoever's next is one tap away
+  return sendEmbeds(interaction, cards, h2hButtons(player, nextSets));
 }
 
 export { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run };

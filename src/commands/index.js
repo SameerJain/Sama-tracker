@@ -7,11 +7,13 @@ import { deployedAt, health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run } from './players.js';
-import { progress, scout, headToHead, stats, characters, predict, reports, NOT_LINKED } from './stats.js';
+import { progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
 import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn, tournamentChoices } from './registration.js';
-import { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults, matchCalls } from './settings.js';
+import { configureMessages, socialsAdd, socialsRemove, streamAlerts, streamPings, setResults, matchCalls } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
-import { pickable, sendEmbeds, readButton, playerBySlug, replyEphemeralAfterDefer } from './shared.js';
+import { pickable, sendEmbeds, readButton, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
+
+import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
 export { commands } from './definitions.js';
 
@@ -47,9 +49,11 @@ const handlers = new Map([
   ['scout', scout],
   ['h2h', headToHead],
   ['stats', stats],
+  ['doubles', doubles],
   ['characters', characters],
   ['predict', predict],
   ['stream', streamAlerts],
+  ['stream_pings', streamPings],
   ['sets', setResults],
   ['calls', matchCalls],
   ['slippi add', slippiAdd],
@@ -61,12 +65,14 @@ const handlers = new Map([
   ['delete_reg_reminder', deleteRegReminder],
   ['reg_admin add', regAdminAdd],
   ['reg_admin remove', regAdminRemove],
-  ['reg_admin list', (interaction) => interaction.reply({ embeds: [embeds.regAdmins(state.regAdmins)] })],
+  ['reg_admin list', (interaction) => interaction.reply({ embeds: embeds.withImage([embeds.regAdmins(state.regAdmins)]) })],
   ['bracket', bracket],
   ['reg_role', regRole],
   ['registered', registered],
   ['reg_warn', regWarn],
   ['view_pfp', viewPfp],
+  [MEMBER_H2H, memberHeadToHead],
+  [MEMBER_SCOUT, memberScout],
   ...Object.values(funCommands).map((fun) => [fun.name, (interaction) => post(interaction, fun)]),
 ]);
 
@@ -75,23 +81,24 @@ export async function handleCommand(interaction) {
 }
 
 // a report's button. more greys out the buttons and swaps the message for the full report, new answers with
-// another report. the button only has profile slugs, so the players get looked up again
+// another report, and private does too but only for whoever pressed it, so buttons on the automatic posts
+// don't fill the channel. the button only has profile slugs or player ids, so the players get looked up again
 export async function handleButton(interaction) {
   const { action, command, player, opponent, melee, game } = readButton(interaction.customId);
   if (action === 'more') {
     await interaction.deferUpdate();
     await interaction.editReply({ components: disabled(interaction.message) });
   } else {
-    await interaction.deferReply();
+    await interaction.deferReply(action === 'private' ? { flags: MessageFlags.Ephemeral } : {});
   }
   const report = reports[command];
-  if (!report || !['more', 'new'].includes(action)) return buttonFailed(interaction, 'That button doesn\'t work anymore, run the command again.');
+  if (!report || !['more', 'new', 'private'].includes(action)) return buttonFailed(interaction, 'That button doesn\'t work anymore, run the command again.');
 
   // /scout compares with whoever ran it, and nobody else can see its buttons
   const who = command === 'scout' ? await verifiedCaller(interaction.user.id) : player && await playerBySlug(player);
   if (!who && command === 'scout') return buttonFailed(interaction, NOT_LINKED);
   const against = opponent ? await playerBySlug(opponent) : null;
-  if (!who || (opponent && !against)) return buttonFailed(interaction, `Couldn't find that player on start.gg anymore. Run \`/${command}\` again.`);
+  if (!who || (opponent && !against)) return buttonFailed(interaction, `Couldn't find a start.gg account for that player. Run \`/${command}\` again.`);
   return report(interaction, { player: who, opponent: against, verbose: action === 'more', melee, game });
 }
 
@@ -130,7 +137,7 @@ export async function handleAutocomplete(interaction) {
 
   if (name === 'reg_admin remove') {
     for (const admin of Object.values(state.regAdmins)) {
-      if (admin.tag.toLowerCase().includes(typed)) choices.push({ name: admin.tag, value: String(admin.userId) });
+      if (nameMatches(admin.tag, focused)) choices.push({ name: admin.tag, value: String(admin.userId) });
     }
     return interaction.respond(choices.slice(0, 25));
   }
@@ -145,11 +152,17 @@ export async function handleAutocomplete(interaction) {
 
   const trackedOnly = TRACKED_ONLY.includes(name);
   if (TAKES_ALL.includes(name) && 'all'.startsWith(typed)) choices.push({ name: 'all', value: 'all' });
-  // tracked players, then people who linked themselves. only 25 fit, so tags that start with what's typed go first
+  // tracked players, then people who linked themselves. only 25 fit, so tags that start with what's typed go
+  // first, and among those whoever this person picked lately. with nothing typed yet that's the whole list
   const people = trackedOnly ? Object.values(state.players) : Object.values(pickable()).sort((a, b) => !state.players[a.userId] - !state.players[b.userId]);
-  const matches = people.filter((player) => player.tag.toLowerCase().includes(typed));
-  const starts = (player) => player.tag.toLowerCase().startsWith(typed);
-  matches.sort((a, b) => starts(b) - starts(a));
+  const recent = recentPicks(interaction.user.id);
+  const recency = (player) => {
+    const at = recent.indexOf(String(player.userId));
+    return at === -1 ? recent.length : at;
+  };
+  const matches = people.filter((player) => nameMatches(player.tag, focused));
+  const starts = (player) => nameMatches(player.tag, focused, { start: true });
+  matches.sort((a, b) => starts(b) - starts(a) || recency(a) - recency(b));
   for (const player of matches) choices.push({ name: state.players[player.userId] ? player.tag : `${player.tag} (linked)`, value: String(player.userId) });
 
   // an empty list looks broken, so say why. picking it gets the not found reply

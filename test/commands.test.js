@@ -32,6 +32,15 @@ const setNode = (id, completedAt, setState = 3) => ({
   games: [{ winnerId: 1, selections: [{ entrant: { id: 1 }, character: { name: 'Fox' } }, { entrant: { id: 2 }, character: { name: 'Falco' } }] }],
 });
 const sets = [setNode('s1', now - 600), setNode('s2', now - 7200)];
+// crew and partner (players 10 and 11, entrant 3) against rival and ally (players 20 and 21, entrant 4)
+const doublesEvent = { ...event, id: 60, name: 'Ultimate Doubles', slug: 'tournament/local/event/doubles' };
+const doublesNode = (id, completedAt) => ({
+  id, completedAt, fullRoundText: 'Winners Final', winnerId: 3, event: doublesEvent,
+  slots: [[3, [[10, 'Crew'], [11, 'Partner']], 'Crew / Partner'], [4, [[20, 'Rival'], [21, 'Ally']], 'Rival / Ally']].map(([entrantId, players, name], i) => ({
+    entrant: { id: entrantId, name, initialSeedNum: i + 1, participants: players.map(([playerId, gamerTag]) => ({ player: { id: playerId, gamerTag } })) },
+    standing: { stats: { score: { value: 2 - i } } },
+  })),
+});
 // crew's slippi account. any other code or id has nobody
 const slippiUser = {
   fbUid: 'crew-uid', displayName: 'Crew', connectCode: { code: 'CREW#1' },
@@ -48,6 +57,14 @@ function respond(query, variables) {
   const aliases = [...query.matchAll(/\b([pu])(\d+): /g)].map(([, kind, id]) => `${kind}${id}`);
   const each = (value) => Object.fromEntries(aliases.map((alias) => [alias, value]));
   if (query.includes('currentUser')) return { currentUser: { id: 1 } };
+  // /doubles: 2v2 sets, then the events they were in with crew's team
+  if (query.includes('entrantSize: [2]')) return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [doublesNode('d1', now - 900), doublesNode('d2', now - 8000)] } } };
+  if (/\be\d+: event\(id: \d+\)/.test(query) && query.includes('userEntrant')) {
+    const participants = [{ player: { id: 10, gamerTag: 'Crew' } }, { player: { id: 11, gamerTag: 'Partner' } }];
+    return Object.fromEntries([...query.matchAll(/\be(\d+): event/g)].map(([, id]) => [`e${id}`, {
+      ...doublesEvent, state: 'COMPLETED', userEntrant: { initialSeedNum: 3, isDisqualified: false, standing: { placement: 1 }, participants },
+    }]));
+  }
   if (query.includes('user(slug:')) {
     // the matchup commands pair() something typed that isn't tracked or linked, so one slug resolves to nobody
     if (variables.slug?.includes('nobody')) return { user: null };
@@ -165,40 +182,52 @@ const runs = [
   ['upcoming', {}, /Live · Crew/], ['upcoming', { values: { player: 'all' } }, /Live · everyone/],
   ['recent', {}, /W · Crew 2-1 Rival/], ['recent', { values: { player: 'all' } }, /Crew 2-1 Rival/],
   ['run', {}, /Crew's run/], ['progress', {}, /Crew's progress/], ['progress', { values: { verbose: true } }, /Every 30 days, newest first/],
-  ['progress', { values: { melee: true } }, /No Melee singles results in the last 60 days/],
+  // crew is on the slippi watchlist, rival and opponent aren't, so only crew shows up
+  ['progress', { values: { melee: true } }, /No Melee singles results in the last 60 days.*Slippi ranked.*CREW#1.*Gold 2\*\* · 1600\.0 · 12-8 this season.*Since Season 4:\*\* 1500\.0 to 1600\.0 \(\+100\.0\)/],
   ['progress', { values: { verbose: true, melee: true } }, /No Melee singles results in the last 180 days/],
   ['scout', { values: { profile: 'start.gg/user/opponent' } }, /Scouting Opponent/],
   ['scout', { values: { profile: '2' } }, /Scouting Rival/],
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
-  ['scout', { values: { profile: 'start.gg/user/opponent', melee: true } }, /No recent Melee singles sets\./],
+  ['scout', { values: { profile: 'start.gg/user/opponent', melee: true } }, /No recent Melee singles sets\..*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
   ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival.*Predicted.*Ultimate/], ['h2h', { values: { opponent: '2', verbose: true } }, /Predicted.*Ultimate.*First played/],
   // the fake sets are all ultimate
-  ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out/],
+  ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out.*Slippi ranked.*\*\*Crew\*\*: \[CREW#1\]/],
+  // ultimate, so no slippi
+  ['h2h', { values: { opponent: '2' } }, /^(?!.*Slippi ranked)/],
   ['h2h', { values: { opponent: '2', verbose: true, melee: true } }, /haven't played each other in Melee singles on start\.gg yet/],
   // either player can be a start.gg link or ID instead of a tracked or linked pick
   ['h2h', { values: { opponent: 'start.gg/user/opponent' } }, /Crew vs Opponent.*haven't played each other in singles on start\.gg yet/],
   ['h2h', { values: { player: 'start.gg/user/opponent', opponent: '2' } }, /Opponent vs Rival.*haven't played each other in singles on start\.gg yet/],
   ['h2h', { values: { opponent: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
   ['stats', {}, /Recent sets/], ['stats', { values: { verbose: true } }, /Lifetime stats/],
-  ['stats', { values: { melee: true } }, /No Melee sets or events on start\.gg yet\./],
-  ['stats', { values: { verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
+  // a netplay player can have a rank with nothing on start.gg
+  ['stats', { values: { melee: true } }, /No Melee sets or events on start\.gg yet\..*Slippi ranked.*CREW#1.*Gold 2.*Characters:\*\* Fox 30 games/],
+  ['stats', { values: { verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\..*Slippi ranked/],
+  ['doubles', {}, /Doubles stats.*Ultimate 2-0 \(100%\).*Best finish:\*\* 🥇 \*\*1st\*\* of 32.*with \*\*Partner\*\*.*### Partners\\n\*\*Partner\*\* · 2-0 \(100%\) · 1 event.*From their last 2 doubles sets and 1 event/],
+  ['doubles', { values: { verbose: true } }, /Full doubles stats.*"name":"Partners","value":"1".*best 1st of 32.*Most played teams","value":"\*\*Rival \/ Ally\*\* 2-0/],
+  // the fake doubles sets are all ultimate, and slippi ranked is singles, so no slippi either
+  ['doubles', { values: { melee: true } }, /^(?!.*Slippi ranked).*No Melee doubles sets on start\.gg yet\./],
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
+  ['characters', { values: { game: 1 } }, /Slippi ranked.*Fox\*\* · 30 games.*CREW#1/],
   ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /How it adds up/],
-  ['predict', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles on start\.gg\..*Leave out `melee` for Ultimate odds/],
+  ['predict', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles on start\.gg\..*Leave out `melee` for Ultimate odds.*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
   ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
   ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
+  ['stream_pings', { values: { ping: 'on' } }, /pinged for every stream alert/],
   ['sets', { values: { player: 'all', results: 'off' } }, /Set results off for everyone/],
   ['calls', { values: { player: 'all', pings: 'off' } }, /Match call pings off for everyone/],
-  ['slippi', { subcommand: 'leaderboard' }, /Nobody on the watchlist yet/],
+  ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1","thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}/],
   // left out, it's the code on crew's start.gg netplay registrations
-  ['slippi', { subcommand: 'add' }, /Added Crew to the Slippi watchlist.*Crew · CREW#1.*Gold 2/],
+  ['slippi', { subcommand: 'add' }, /Crew is already on the Slippi watchlist.*Crew · CREW#1.*Gold 2/],
   ['slippi', { subcommand: 'add', values: { code: 'not a code' } }, /isn't a connect code/],
-  ['slippi', { subcommand: 'rank' }, /Crew · CREW#1.*Gold 2\*\* · 1600\.0.*Fox 30 games.*start\.gg:.*Crew.*Past seasons.*Season 4 · 1500\.0 · 30-20/],
+  ['slippi', { subcommand: 'rank' }, /"thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}.*"author":\{"name":"Fox","icon_url":"attachment:\/\/character-1\.png"\}.*Crew · CREW#1.*Gold 2\*\* · 1600\.0.*Fox 30 games.*start\.gg:.*Crew.*Past seasons.*Season 4 · 1500\.0 · 30-20/],
   ['slippi', { subcommand: 'rank', values: { player: 'gone-1' } }, /Slippi has nobody with the code GONE#1/],
-  ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1.*Crew.*Gold 2\*\* · 1600\.0 · 12-8/],
+  ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1.*Crew.*Gold 2\*\* · 1600\.0 · 12-8 · Fox/],
   ['slippi', { subcommand: 'remove', values: { player: 'crew-uid' } }, /Took Crew \(CREW#1\) off the Slippi watchlist/],
+  ['slippi', { subcommand: 'leaderboard' }, /"thumbnail":\{"url":"attachment:\/\/slippi\.png"\}.*Nobody on the watchlist yet.*"files":\[\{"attachment":"[^"]+slippi\.png","name":"slippi\.png"\}\]/],
+  ['slippi', { subcommand: 'add', values: { code: 'crew-1' } }, /Added Crew to the Slippi watchlist/],
   ['set_reg_reminder', { values: { tournament: 'start.gg/tournament/soon' } }, /gets pinged 12 hours before registration for Soon ends/],
   ['delete_reg_reminder', { values: { tournament: 'soon' } }, /Deleted the reminder for Soon/],
   ['reg_admin', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Opponent is an admin of/],
@@ -219,10 +248,15 @@ test('every command and subcommand answers without throwing', async () => {
   state.tournaments = { 5: { ...live, entries: [{ userId: 1, event: event.name, eventSlug: event.slug, eventId: 50, started: true }], userIds: [1] } };
   state.links = {};
   state.socials = [];
-  state.slippi = {};
+  state.slippi = {
+    'crew-uid': {
+      uid: 'crew-uid', code: 'CREW#1', name: 'Crew', userId: 1, rank: 'Gold 2', rating: 1600, updates: 20, wins: 12, losses: 8,
+      characters: [{ name: 'Fox', games: 30 }], season: 'RANKED_SINGLES-crew-uid-season-5',
+    },
+  };
   state.slippiSkipped = [];
   // checks that commands kick off run in the background, and shouldn't try to post here
-  state.messages = Object.fromEntries(['sets', 'streams', 'calls', 'rollcall', 'results', 'registration', 'slippi', 'recap'].map((type) => [type, false]));
+  state.messages = Object.fromEntries(['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'slippi', 'recap'].map((type) => [type, false]));
 
   const covered = new Set();
   for (const [name, options = {}, expected] of runs) {
@@ -267,6 +301,7 @@ function press(message, label) {
 // [command, options, button, what pressing it should show]
 const presses = [
   ['stats', {}, 'Full report', /Lifetime stats/],
+  ['doubles', {}, 'Full report', /Full doubles stats/],
   ['progress', {}, 'Full report', /Every 30 days, newest first/],
   ['characters', {}, 'Full report', /Fox/],
   ['scout', { values: { profile: '2' } }, 'Full report', /Crew vs Rival/],

@@ -7,14 +7,23 @@ import { predict as predictOdds, gameSets, sharedGame } from '../predict.js';
 import { characterUsage, characterUsageByGame } from '../characters.js';
 import { periodSummary } from '../reports.js';
 import { PICKABLE_GAMES } from './definitions.js';
-import { SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory } from './history.js';
-import { verifiedCaller } from '../accounts.js';
+import {
+  SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory,
+  doublesHistory, doublesEvents,
+} from './history.js';
+import { findAccount, verifiedCaller } from '../accounts.js';
+import { slippiFor, slippiLookup } from './slippi.js';
+import { LOGO as slippiLogo } from '../slippi.js';
 import {
   fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, reportButton, fullReport, buttonRow,
+  linkedPlayer, rememberPick,
 } from './shared.js';
 
 // /characters verbose, so the cards fit in one message
 const CHARACTER_GAMES = 6;
+
+// the short /doubles window, the same as /stats
+const DOUBLES_SETS = 30;
 
 // /progress compares the last two of these, verbose lists this many as a trend
 const PROGRESS_DAYS = 30;
@@ -24,6 +33,10 @@ const NOT_LINKED = '/scout needs to know who you are on start.gg. Connect your D
 
 // the melee option's filter, the same for sets, standings, events and character sets
 const onlyMelee = (melee) => (list) => (melee ? list.filter(startgg.isMelee) : list);
+
+// melee:True, or everything the report found was melee anyway. those reports get a Slippi ranked field
+const allMelee = (melee, ...lists) => melee
+  || (lists.some((list) => list?.length) && lists.every((list) => !list?.length || list.every(startgg.isMelee)));
 
 // each report runs after its command's checks and the defer, so a button can run it again with the same
 // players. these are the options it takes from the command
@@ -65,6 +78,7 @@ async function progressReport(interaction, { player, verbose, melee }) {
   const only = onlyMelee(melee);
   const now = secondsNow();
   const span = PROGRESS_DAYS * 24 * 60 * 60;
+  const ranked = slippiLookup([player], melee);
   // newest first, the first two get compared
   const periods = Array.from({ length: verbose ? TREND_PERIODS : 2 }, (_, i) => ({ since: now - (i + 1) * span, until: now - i * span }));
   const [sets, events, characterSets] = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s sets`, Promise.all([
@@ -78,7 +92,8 @@ async function progressReport(interaction, { player, verbose, melee }) {
   for (const period of periods) period.summary = periodSummary(player, played, finishes, period.since, period.until);
   // the full report looks back 180 days, so it's worth a look even when the last 60 had nothing
   const more = verbose ? [] : buttonRow(fullReport('progress', { player, melee }));
-  return sendEmbeds(interaction, embeds.progress(player, periods, { verbose, characterSets: characterSets && only(characterSets), melee }), more);
+  const cards = embeds.progress(player, periods, { verbose, characterSets: characterSets && only(characterSets), melee });
+  return sendEmbeds(interaction, embeds.withSlippi(cards, [player], await ranked(allMelee(melee, sets, events)), { seasons: true }), more);
 }
 
 async function scout(interaction) {
@@ -98,11 +113,13 @@ async function scout(interaction) {
 // player is always whoever ran it, so its button only carries the opponent
 async function scoutReport(interaction, { player, opponent, verbose, melee }) {
   const only = onlyMelee(melee);
+  const ranked = slippiLookup([player, opponent], melee);
   const [mine, theirs, characters] = await withCountdown(interaction, `Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
     setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
   ]));
   const mySets = only(mine);
-  const quick = embeds.scout(player, opponent, mySets, only(theirs), only(characters), { melee });
+  const profiles = await ranked(allMelee(melee, theirs, characters));
+  const quick = embeds.withSlippi(embeds.scout(player, opponent, mySets, only(theirs), only(characters), { melee }), [player, opponent], profiles);
   if (!verbose) return sendEmbeds(interaction, quick, buttonRow(fullReport('scout', { opponent, melee })));
 
   // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
@@ -113,9 +130,10 @@ async function scoutReport(interaction, { player, opponent, verbose, melee }) {
   ]), quick);
   const theirSets = only(deeper);
   const odds = predictOdds(player, opponent, mySets, theirSets, { game: melee ? 'Melee' : undefined, eventsA: myEvents && only(myEvents), eventsB: only(events) });
-  return sendEmbeds(interaction, embeds.scoutReport(player, opponent, {
+  const report = embeds.scoutReport(player, opponent, {
     mine: mySets, theirs: theirSets, characterSets: only(characterSets), events: only(events), odds, players: state.players, melee,
-  }));
+  });
+  return sendEmbeds(interaction, embeds.withSlippi(report, [player, opponent], profiles, { odds: Boolean(odds) }));
 }
 
 async function headToHead(interaction) {
@@ -130,6 +148,7 @@ async function headToHead(interaction) {
 
 async function headToHeadReport(interaction, { player: a, opponent: b, verbose, melee }) {
   const only = onlyMelee(melee);
+  const ranked = slippiLookup([a, b], melee);
   // meetings for the record, histories and events for one line of /predict odds
   const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
     Promise.all([
@@ -146,7 +165,10 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
     !verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee }),
     odds && reportButton('Why these odds', 'new', 'predict', { player: a, opponent: b, melee }),
   );
-  return sendEmbeds(interaction, embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - shown.length, odds }), buttons);
+  const cards = embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - shown.length, odds });
+  // the odds went with melee as the game they share, so it's a melee matchup even without the option
+  const profiles = await ranked(allMelee(melee, shown) || odds?.game === 'Melee');
+  return sendEmbeds(interaction, embeds.withSlippi(cards, [a, b], profiles, { odds: Boolean(odds) }), buttons);
 }
 
 async function stats(interaction) {
@@ -159,17 +181,51 @@ async function stats(interaction) {
 
 async function statsReport(interaction, { player, verbose, melee }) {
   const only = onlyMelee(melee);
+  const ranked = slippiLookup([player], melee);
   const { standings, sets } = await startgg.getStats(player.playerId, { videogameId: melee ? startgg.MELEE : undefined });
-  const recent = embeds.stats(player, only(standings), only(sets), { melee });
+  const profiles = await ranked(allMelee(melee, standings, sets));
+  const [recent] = embeds.withSlippi([embeds.stats(player, only(standings), only(sets), { melee })], [player], profiles);
   if (!verbose) {
     // nothing recent on start.gg means nothing older either
     const more = only(standings).length || only(sets).length ? buttonRow(fullReport('stats', { player, melee })) : [];
-    return interaction.editReply({ embeds: [recent], components: more });
+    return interaction.editReply({ embeds: embeds.withImage([recent]), components: more });
   }
   // show the recent card while the lifetime report loads
   const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
     Promise.all([eventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
-  return sendEmbeds(interaction, embeds.lifetimeStats(player, only(events), only(history), state.players, { melee }));
+  return sendEmbeds(interaction, embeds.withSlippi(embeds.lifetimeStats(player, only(events), only(history), state.players, { melee }), [player], profiles));
+}
+
+async function doubles(interaction) {
+  const player = readPlayer(interaction);
+  if (!player) return replyNoPlayer(interaction);
+
+  await interaction.deferReply();
+  return doublesReport(interaction, { player, ...reportOptions(interaction) });
+}
+
+// the short window's sets, then the events they came from, which is how doubles placements get found.
+// Slippi ranked is singles, so melee only filters
+async function doublesLookup(player, { verbose, melee }) {
+  const only = onlyMelee(melee);
+  const all = only(await doublesHistory(player.playerId, { verbose, melee }));
+  const sets = verbose ? all : all.slice(0, DOUBLES_SETS);
+  const events = await doublesEvents(player, [...new Set(sets.map((set) => set.event.id).filter(Boolean))]);
+  return { sets, events };
+}
+
+async function doublesReport(interaction, { player, verbose, melee }) {
+  const doing = `Going through ${escapeMarkdown(player.tag)}'s doubles`;
+  const recent = await withCountdown(interaction, doing, doublesLookup(player, { verbose: false, melee }));
+  const quick = embeds.doubles(player, recent.sets, recent.events, { melee });
+  if (!verbose) {
+    // nothing recent on start.gg means nothing older either
+    const more = recent.sets.length || recent.events.length ? buttonRow(fullReport('doubles', { player, melee })) : [];
+    return sendEmbeds(interaction, [quick], more);
+  }
+  // the short card shows while the rest loads
+  const full = await withCountdown(interaction, 'Full doubles report on its way', doublesLookup(player, { verbose, melee }), [quick]);
+  return sendEmbeds(interaction, embeds.doublesReport(player, full.sets, full.events, { melee }));
 }
 
 async function characters(interaction) {
@@ -191,6 +247,8 @@ async function charactersReport(interaction, { player, verbose, game: picked }) 
   }
   const { cards, note } = characterCards(sets, verbose, picked);
 
+  // ranked characters go on the melee card, which can have them when TOs reported nothing
+  const ranked = cards.some(({ game }) => game?.id === startgg.MELEE) ? await slippiFor(player) : null;
   // no picture beats no reply
   const art = await Promise.all(cards.map(({ game, usage }) => (game && usage.characters.length
     ? startgg.getCharacterArt(usage.characters[0].name, game.id).catch(() => null)
@@ -198,8 +256,9 @@ async function charactersReport(interaction, { player, verbose, game: picked }) 
   await interaction.editReply({
     // clears a countdown
     content: null,
-    embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, {
-      game: game?.displayName, file: art[i]?.name, note: i === cards.length - 1 ? note : undefined, searched: sets.length,
+    embeds: embeds.withImage(cards.map(({ game, usage }, i) => {
+      const card = embeds.characters(player, usage, { game: game?.displayName, file: art[i]?.name, note: i === cards.length - 1 ? note : undefined, searched: sets.length });
+      return game?.id === startgg.MELEE ? embeds.withRankedCharacters(card, ranked) : card;
     })),
     // replaces the art when a button swaps in the full report
     files: art.filter(Boolean),
@@ -257,6 +316,7 @@ async function predict(interaction) {
 }
 
 async function predictReport(interaction, { player: a, opponent: b, verbose, melee }) {
+  const ranked = slippiLookup([a, b], melee);
   // meetings go back past the histories, usually in one request, so head-to-head matches /h2h. events say how
   // big each bracket was, which helps seeding count. the histories have the recent meetings and the odds still
   // work without events, so either failing doesn't sink it
@@ -266,15 +326,70 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
   const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB, meetings });
-  if (!odds) return interaction.editReply(noOdds(a, b, historyA, historyB, melee));
+  const profiles = await ranked(melee || odds?.game === 'Melee');
+  // netplay players can have a rank without a melee set on start.gg, which is when it says the most
+  if (!odds) {
+    const ranks = embeds.slippiMatchup([a, b], profiles);
+    return interaction.editReply(ranks.length ? { content: noOdds(a, b, historyA, historyB, melee), embeds: ranks, files: [slippiLogo] } : noOdds(a, b, historyA, historyB, melee));
+  }
 
   const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee }));
-  await sendEmbeds(interaction, embeds.prediction(a, b, odds, verbose), more);
+  await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose), [a, b], profiles, { odds: true }), more);
+}
+
+// long-press someone in the server, then Apps. nothing to type, which is the point on a phone. checks the
+// member before deferring, and goes by the start.gg with their discord connected. null when it answered
+async function memberPlayer(interaction, { defer }) {
+  const target = interaction.targetUser;
+  if (target.bot) {
+    await replyEphemeral(interaction, 'Bots don\'t have start.gg accounts.');
+    return null;
+  }
+  if (target.id === interaction.user.id) {
+    await replyEphemeral(interaction, 'Pick someone else. `/stats` is the one about you.');
+    return null;
+  }
+  await defer();
+  const known = linkedPlayer(target.id);
+  // findAccount checks start.gg still has their discord connected, but has no player id
+  const account = known ? null : await findAccount(target.id);
+  const player = known ?? (account && await startgg.getPlayer(account.slug));
+  if (player) {
+    rememberPick(interaction.user.id, player.userId);
+    return player;
+  }
+  const name = escapeMarkdown(interaction.targetMember?.displayName ?? target.displayName);
+  // a name can spell out a role mention, so mentions are off
+  await interaction.editReply({
+    content: `Couldn't find a start.gg with ${name}'s Discord connected.\n-# Ask them to run \`/link\` with their start.gg link once, or to register for a tournament the bot checks. start.gg can't be searched by Discord`,
+    allowedMentions: { parse: [] },
+  });
+  return null;
+}
+
+// Apps > H2H with me, the same as /h2h with them as the opponent
+async function memberHeadToHead(interaction) {
+  const player = linkedPlayer(interaction.user.id);
+  if (!player) return replyEphemeral(interaction, 'Run `/link` with your start.gg first, so the bot knows which one is yours.');
+  const opponent = await memberPlayer(interaction, { defer: () => interaction.deferReply() });
+  if (!opponent) return;
+  if (opponent.userId === player.userId) return interaction.editReply('That\'s your own start.gg.');
+  return headToHeadReport(interaction, { player, opponent, verbose: false, melee: false });
+}
+
+// Apps > Scout them, the same as /scout on them. just for whoever asked, like /scout
+async function memberScout(interaction) {
+  const opponent = await memberPlayer(interaction, { defer: () => interaction.deferReply({ flags: MessageFlags.Ephemeral }) });
+  if (!opponent) return;
+  const player = await verifiedCaller(interaction.user.id);
+  if (!player) return interaction.editReply(NOT_LINKED);
+  if (player.playerId === opponent.playerId) return interaction.editReply('That\'s your own start.gg.');
+  return scoutReport(interaction, { player, opponent, verbose: false, melee: false });
 }
 
 // what each report button runs
 const reports = {
-  progress: progressReport, scout: scoutReport, h2h: headToHeadReport, stats: statsReport, characters: charactersReport, predict: predictReport,
+  progress: progressReport, scout: scoutReport, h2h: headToHeadReport, stats: statsReport, doubles: doublesReport, characters: charactersReport, predict: predictReport,
 };
 
-export { progress, scout, headToHead, stats, characters, predict, reports, NOT_LINKED };
+export { progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED };

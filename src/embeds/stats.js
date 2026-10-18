@@ -366,3 +366,6 @@ function placementLine({ placement, seed, dq, event }) {
   const link = `[${escapeMarkdown(event.tournament.name)}](${startggUrl(event.slug)})`;
   return `${text} · ${escapeMarkdown(event.name)} · ${link} · <t:${event.startAt}:d>`;
 }
+
+// the doubles cards build on these
+export { placementLine, upsetLine, upsetSize, biggestUpsets, finish, byFinish, breakdown, breakdownLine };

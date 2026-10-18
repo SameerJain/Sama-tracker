@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after, beforeEach } from 'node:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,7 +33,12 @@ function user({ uid, code, rating, updates = 20, wins = 10, losses = 5, season =
 }
 
 globalThis.fetch = async (url, options) => {
+  // character art
+  if (String(url).includes('images.example')) return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
   const { query, variables } = JSON.parse(options.body);
+  if (query.includes('videogame(id:')) {
+    return { ok: true, json: async () => ({ data: { videogame: { characters: [{ name: 'Fox', images: [{ url: 'https://images.example/fox.png' }] }] } } }) };
+  }
   if (String(url).includes('internal.slippi.gg')) {
     const all = Object.values(users);
     const found = (value) => all.find((each) => each.fbUid === value || each.connectCode.code === value) ?? null;
@@ -103,6 +108,9 @@ test('a rank change posts once, up or down, with the rating change and no pings'
   const [up] = posts.sent;
   assert.deepEqual(up.allowedMentions, { parse: [] });
   assert.match(JSON.stringify(up.embeds), /"title":"AAA ranked up to Gold 2".*\+110\.0.*Was Gold 1.*10-5/);
+  // the new rank's badge, and start.gg's icon for the character they've played most in ranked
+  assert.match(JSON.stringify(up.embeds), /"thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}.*"author":\{"name":"Fox","icon_url":"attachment:\/\/character-1\.png"\}/);
+  assert.deepEqual(up.files.map((file) => file.name), ['rank-gold-2.png', 'character-1.png']);
   assert.equal(state.slippi.a.rank, 'Gold 2');
 
   await postRankChanges(posts);
@@ -210,4 +218,95 @@ test('the leaderboard goes by rank then rating, with pending last and start.gg t
   assert.match(lines[1], /^2\\\. \[MThree\].*\*\*Master 3\*\* · 2400\.0/);
   assert.match(lines[2], /^3\\\. \[Crew\]\(https:\/\/slippi\.gg\/user\/GOLD-1\).*Gold 1/);
   assert.match(lines[3], /^4\\\. \[Pend\].*\*\*Pending\*\* · 2-1$/);
+  // the leader's badge
+  assert.equal(card.data.thumbnail.url, 'attachment://rank-grandmaster.png');
+});
+
+test('every rank has a badge to upload', () => {
+  for (const name of slippi.RANKS) assert.ok(existsSync(slippi.rankImage(name).attachment), name);
+  assert.equal(slippi.rankImage('Platinum 3').name, 'rank-platinum-3.png');
+});
+
+test('slippi cards with no rank badge carry the slippi logo', () => {
+  assert.ok(existsSync(slippi.LOGO.attachment));
+  const logo = `attachment://${slippi.LOGO.name}`;
+  assert.equal(embeds.slippiLeaderboard({}, {})[0].data.thumbnail.url, logo);
+  const profile = { code: 'CREW#1', name: 'Crew', rating: 1600, updates: 20, wins: 12, losses: 8, characters: [] };
+  assert.equal(embeds.slippiMatchup([{ tag: 'Crew' }], [profile])[0].data.thumbnail.url, logo);
+});
+
+test('melee reports get a Slippi ranked field for whoever has a connect code', () => {
+  const profile = (code, rating) => ({
+    code, name: code, rating, updates: 20, wins: 12, losses: 8, regional: null, global: null, region: 'Europe',
+    characters: [{ name: 'Fox', games: 30 }, { name: 'Marth', games: 10 }], seasons: [{ name: 'Season 4', rating: 1500, wins: 30, losses: 20 }],
+  });
+  const card = () => embeds.slippiLeaderboard({}, {});
+  const crew = { tag: 'Crew' };
+  const rival = { tag: 'Rival' };
+
+  const [pair] = embeds.withSlippi(card(), [crew, rival], [profile('CREW#1', 1600), null], { odds: true });
+  const pairText = pair.data.fields[0].value;
+  assert.match(pairText, /\*\*Crew\*\*: \[CREW#1\]\(https:\/\/slippi\.gg\/user\/CREW-1\) · \*\*Gold 2\*\* · 1600\.0 · 12-8/);
+  // not on the watchlist, so not mentioned
+  assert.doesNotMatch(pairText, /Rival/);
+  assert.match(pairText, /not part of the odds/);
+
+  const [one] = embeds.withSlippi(card(), [crew], [profile('CREW#1', 1600)], { seasons: true });
+  assert.match(one.data.fields[0].value, /Gold 2\*\* · 1600\.0 · 12-8 this season\n\*\*Characters:\*\* Fox 30 games · Marth 10 games\n\*\*Since Season 4:\*\* 1500\.0 to 1600\.0 \(\+100\.0\)/);
+
+  // nobody with a code leaves the report alone
+  const [untouched] = embeds.withSlippi(card(), [crew, rival], [null, null]);
+  assert.equal(untouched.data.fields, undefined);
+  assert.deepEqual(embeds.slippiMatchup([crew], [null]), []);
+  assert.equal(embeds.slippiMatchup([crew], [profile('CREW#1', 1600)]).length, 1);
+
+  const [ranked] = card();
+  embeds.withRankedCharacters(ranked, profile('CREW#1', 1600));
+  assert.match(ranked.data.fields[0].value, /1\\\. \*\*Fox\*\* · 30 games · 75%\n2\\\. \*\*Marth\*\* · 10 games · 25%/);
+});
+
+test('someone not on the watchlist costs no requests, so their reports go the way they did before slippi', async () => {
+  const { slippiFor, slippiLookup } = await import('../src/commands/slippi.js');
+  let requests = 0;
+  const fake = globalThis.fetch;
+  globalThis.fetch = async (...args) => { requests++; return fake(...args); };
+  try {
+    const rival = { userId: 2, playerId: 20, tag: 'Rival' };
+    assert.equal(await slippiFor(rival), null);
+    assert.equal(await slippiLookup([rival, { userId: 3, playerId: 30, tag: 'Other' }], true)(true), null);
+    assert.equal(requests, 0);
+  } finally {
+    globalThis.fetch = fake;
+  }
+});
+
+test('a slippi that hangs or fails gets the last rank check\'s numbers instead of holding up the report', async (t) => {
+  const { slippiFor } = await import('../src/commands/slippi.js');
+  watching('slow', 'SLOW#1', 'Gold 1', 1450);
+  state.slippi.slow.userId = 5;
+  t.mock.method(globalThis, 'fetch', () => new Promise(() => {}));
+  const started = Date.now();
+  const profile = await slippiFor({ userId: 5, playerId: 50, tag: 'Slow' });
+  assert.equal(profile.rank, 'Gold 1');
+  assert.ok(Date.now() - started < 4000);
+
+  watching('down', 'DOWN#1', 'Silver 2', 1200);
+  state.slippi.down.userId = 6;
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('ECONNRESET'); });
+  assert.equal((await slippiFor({ userId: 6, playerId: 60, tag: 'Down' })).rank, 'Silver 2');
+});
+
+test('a report card with no room left goes out without the Slippi field instead of getting rejected', () => {
+  const crew = { tag: 'Crew' };
+  const profile = { code: 'CREW#1', name: 'Crew', rating: 1600, updates: 20, wins: 12, losses: 8, characters: [] };
+  const [full] = embeds.slippiLeaderboard({}, {});
+  full.setDescription('x'.repeat(4096));
+  for (let i = 0; i < 2; i++) full.addFields({ name: 'Stat', value: 'y'.repeat(900) });
+  embeds.withSlippi([full], [crew], [profile]);
+  assert.equal(full.data.fields.length, 2);
+
+  const [crowded] = embeds.slippiLeaderboard({}, {});
+  for (let i = 0; i < 25; i++) crowded.addFields({ name: 'Stat', value: '1', inline: true });
+  embeds.withSlippi([crowded], [crew], [profile]);
+  assert.equal(crowded.data.fields.length, 25);
 });

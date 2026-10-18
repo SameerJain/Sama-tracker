@@ -50,9 +50,16 @@ function setEmbed(set, color, player) {
 
   if (player) embed.setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) });
 
-  const image = tournament.images?.[0]?.url;
+  // the player's picture big when the tournament has none
+  const image = tournament.images?.[0]?.url ?? player?.image;
   if (image) embed.setThumbnail(image);
   return embed;
+}
+
+// heads a /messages threads thread in the channel. tournament is the one sets carry under event
+export function tournamentThread(tournament) {
+  return tournamentEmbed(colors.brand, 'Tournament thread', tournament)
+    .setDescription('Set results and stream alerts from this tournament go in the thread.');
 }
 
 export function onStream(set, players) {
@@ -233,6 +240,22 @@ export function results(tournament, players) {
   });
 }
 
+// the event's own top 8, everyone in it whether they're tracked or not. one card per event
+export function topEight(tournament, events) {
+  return events.map((event) => {
+    const lines = event.standings.map((standing) => {
+      const name = escapeMarkdown(standing.name);
+      if (!event.done && !standing.final) return `${ordinal(standing.placement)} ${name} (projected)`;
+      return `${medal(standing.placement)}${ordinal(standing.placement)} ${name}`;
+    });
+    if (!lines.length) lines.push('No placements reported on start.gg.');
+    else if (!event.done) lines.push('-# The bracket wasn\'t finished on start.gg, so unfinished placements are projected');
+    return tournamentEmbed(colors.results, `Top 8 · ${eventTitle(event)}`, tournament)
+      .setURL(startggUrl(`${event.eventSlug}/standings`))
+      .setDescription(lines.join('\n'));
+  });
+}
+
 // a link to each event's bracket
 export function bracket(tournament) {
   const now = Math.floor(Date.now() / 1000);
@@ -309,10 +332,14 @@ function runStatus(player, { entry, sets }) {
   return { entry, played, finished, next, rank };
 }
 
-// called vs **Foo** · Winners Round 2, linked
-function nextText({ set, them }) {
+// called vs **Foo** · Winners Round 2 · **Station 4**, linked. start.gg fills startAt from the round's
+// schedule when the set has none, so a time already gone by is the pool's start and gets left out.
+// discord shows the time in each viewer's own timezone
+function nextText({ set, them }, now) {
   const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
-  return `${NEXT_TEXT[set.state]} **${escapeMarkdown(them.name)}**${round}`;
+  const station = set.station ? ` · **Station ${set.station}**` : '';
+  const time = set.state !== 2 && set.startAt > now ? ` · <t:${set.startAt}:t>` : '';
+  return `${NEXT_TEXT[set.state]} **${escapeMarkdown(them.name)}**${round}${station}${time}`;
 }
 
 function statusText({ entry, finished }) {
@@ -323,35 +350,35 @@ function statusText({ entry, finished }) {
 }
 
 // the overview says what's next for the ones still going
-function overviewText(status) {
+function overviewText(status, now) {
   if (status.finished || !status.entry.started) return statusText(status).replace(/^./, (letter) => letter.toLowerCase());
-  return status.next ? nextText(status.next) : 'waiting for the next opponent';
+  return status.next ? nextText(status.next, now) : 'waiting for the next opponent';
 }
 
 // one event's sets so far and what's next
-function runLines(status) {
+function runLines(status, now) {
   const lines = status.played.map(({ set, me, them, won }) => {
     const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
     return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}**${round}`;
   });
   if (!lines.length && status.entry.started) lines.push('No completed sets reported yet.');
   if (status.finished || !status.entry.started) return lines;
-  return [...lines, '', status.next ? `**Next:** ${nextText(status.next)}` : 'Next opponent has not been assigned yet.'];
+  return [...lines, '', status.next ? `**Next:** ${nextText(status.next, now)}` : 'Next opponent has not been assigned yet.'];
 }
 
 // runs is { entry, sets } for each event they're in at the tournament. someone in several brackets goes back
 // and forth between them, so those get a card up top with the one that needs them soonest first
-export function run(player, tournament, runs) {
-  const statuses = runs.map((each) => runStatus(player, each)).sort((a, b) => a.rank - b.rank);
+export function run(player, tournament, runs, now = Math.floor(Date.now() / 1000)) {
+  const statuses = runStatuses(player, runs);
   if (statuses.length === 1) {
     const [status] = statuses;
-    const lines = [`**${escapeMarkdown(eventTitle(status.entry))}**`, statusText(status), '', ...runLines(status)];
+    const lines = [`**${escapeMarkdown(eventTitle(status.entry))}**`, statusText(status), '', ...runLines(status, now)];
     return withLines(tournamentEmbed(colors.live, `${player.tag}'s run`, tournament), lines);
   }
 
   const overview = statuses.map((status) => {
     const record = status.played.length ? ` (${shortRecord(status.played)})` : '';
-    return `**${escapeMarkdown(status.entry.event)}**${record} · ${overviewText(status)}`;
+    return `**${escapeMarkdown(status.entry.event)}**${record} · ${overviewText(status, now)}`;
   });
   overview.push('-# The one that needs you soonest is first');
   const cards = withLines(tournamentEmbed(colors.live, `${player.tag}'s run · ${count(statuses.length, 'bracket')}`, tournament), overview);
@@ -359,7 +386,15 @@ export function run(player, tournament, runs) {
     const card = baseEmbed(colors.live).setTitle(escapeMarkdown(eventTitle(status.entry))).setURL(startggUrl(status.entry.eventSlug));
     const image = tournament.images?.[0]?.url;
     if (image) card.setThumbnail(image);
-    cards.push(...withLines(card, [statusText(status), '', ...runLines(status)]));
+    cards.push(...withLines(card, [statusText(status), '', ...runLines(status, now)]));
   }
   return cards;
+}
+
+const runStatuses = (player, runs) => runs.map((each) => runStatus(player, each)).sort((a, b) => a.rank - b.rank);
+
+// who they play next in each bracket, soonest first, for /run's head-to-head buttons. singles only
+export function nextOpponents(player, runs) {
+  return runStatuses(player, runs).map((status) => status.next)
+    .filter((next) => next && next.set.sides.every((side) => side.playerIds.length === 1));
 }

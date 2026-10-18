@@ -75,6 +75,21 @@ export function withSections(embed, sections) {
   return continued(embed, split(blocks).map((group) => group.join('\n').trimEnd()));
 }
 
+// the bot's own avatar, set once discord says who it is. every message gets some picture, so one with
+// none of its own wears this on its first card. a picture per message, not per card, so a long report
+// doesn't repeat it down the side
+let fallbackImage = null;
+export function setFallbackImage(url) {
+  fallbackImage = url;
+}
+
+const hasImage = (embed) => Boolean(embed.data.thumbnail?.url || embed.data.image?.url);
+
+export function withImage(batch) {
+  if (fallbackImage && batch.length && !batch.some(hasImage)) batch[0].setThumbnail(fallbackImage);
+  return batch;
+}
+
 // a message fits 10 embeds and 6000 chars between them, the rest go in more messages
 export function messages(list) {
   const batches = [];
@@ -88,7 +103,8 @@ export function messages(list) {
     batches.at(-1).push(embed);
     size += length;
   }
-  return batches;
+  // a picture's url doesn't count toward the 6000, so this can't push a message over
+  return batches.map(withImage);
 }
 
 export function playerLink(player) {

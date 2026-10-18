@@ -391,7 +391,7 @@ test('/track list only notes what differs from a new player', () => {
 test('autocomplete explains an empty list instead of showing nothing', async () => {
   const choicesFor = async (typed, commandName = 'stats') => {
     let choices;
-    await handleAutocomplete({ commandName, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async c => { choices = c; } });
+    await handleAutocomplete({ commandName, user: { id: 'anyone' }, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async c => { choices = c; } });
     return choices;
   };
   state.players = {};

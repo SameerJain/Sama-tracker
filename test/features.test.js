@@ -3,6 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { EmbedBuilder } from 'discord.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-features-'));
 process.env.STATE_DIR = directory;
@@ -347,6 +348,22 @@ test('a run in one bracket shows the sets so far, the final standing and what is
   assert.doesNotMatch(ended, /Next/);
 });
 
+test('/run shows the station and a scheduled time still to come', () => {
+  const now = 1_000_000;
+  const run = runIn('Singles', { sets: [['2', 6, 'Rival', 'Winners round 2']] });
+  const next = (set) => descriptions(embeds.run(runPlayer, runTournament, [{ ...run, sets: [{ ...run.sets[0], ...set }] }], now));
+  assert.match(next({ station: 4 }), /\*\*Next:\*\* called vs \*\*Rival\*\* · \[Winners round 2\]\([^)]+\) · \*\*Station 4\*\*$/m);
+  assert.match(next({ state: 1, startAt: now + 900 }), /\*\*Next:\*\* next vs \*\*Rival\*\* · \[Winners round 2\]\([^)]+\) · <t:1000900:t>$/m);
+  // a time already gone by is the pool's start, from the round's schedule, so it's left out
+  assert.doesNotMatch(next({ state: 1, startAt: now - 900 }), /<t:|Station/);
+  // already playing, the time doesn't matter anymore
+  assert.match(next({ state: 2, startAt: now + 900, station: 2 }), /playing vs \*\*Rival\*\* · \[Winners round 2\]\([^)]+\) · \*\*Station 2\*\*$/m);
+  // who /run's buttons are about: the next opponent in each bracket, singles only
+  const doubles = runIn('Doubles', { sets: [['3', 6, 'Team', 'Winners round 1']] });
+  doubles.sets[0].sides[0].playerIds.push(11);
+  assert.deepEqual(embeds.nextOpponents(runPlayer, [run, doubles]).map(({ them }) => them.name), ['Rival']);
+});
+
 test('a run in several brackets at once puts the one that needs them soonest first', () => {
   const cards = embeds.run(runPlayer, runTournament, [
     runIn('Melee Singles', { sets: [['1', 3, 'Fox Main', 'Winners round 1', true], ['5', 1, 'Marth Main', 'Winners round 2']] }),
@@ -636,6 +653,108 @@ test('tournament roll calls and placements disable mentions', async () => {
   assert.deepEqual(sent.map(({ allowedMentions }) => allowedMentions), [{ parse: [] }, { parse: [] }]);
 });
 
+test('top 8s start off, then post every event the crew entered with everyone in it', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...crewPlayer }, 2: { userId: 2, playerId: 20, tag: 'Second', slug: 'user/second' } };
+  const doubles = { eventId: 502, event: 'Doubles', eventSlug: 'tournament/local/event/doubles', entrants: 12, started: true, placement: 4, final: true };
+  const entries = [
+    { userId: 1, eventId: 501, event: 'Singles', eventSlug: event.slug, entrants: 32, started: true, placement: 5, final: true },
+    { userId: 2, eventId: 501, event: 'Singles', eventSlug: event.slug, entrants: 32, started: true, placement: 9, final: true },
+    { userId: 1, ...doubles },
+  ];
+  const finished = () => ({ name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600, entries });
+  const standing = (placement, name, isFinal = true) => ({ placement, isFinal, entrant: { name } });
+  const asked = [];
+  mockApi(({ query }) => {
+    asked.push(query);
+    return {
+      e501: { state: 'COMPLETED', standings: { nodes: [standing(1, 'Champ'), standing(2, 'Runner'), standing(3, 'Third'), standing(4, 'Fourth'),
+        standing(5, 'Active'), standing(5, 'Stranger'), standing(7, 'Seventh'), standing(7, 'Also_Seventh')] } },
+      e502: { state: 'ACTIVE', standings: { nodes: [standing(1, 'Team A'), standing(2, 'Team B', false)] } },
+    };
+  });
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+
+  state.messages = {};
+  const quiet = finished();
+  await tracker.postResults(quiet, channel);
+  assert.equal(asked.length, 0);
+  assert.equal(sent.length, 1);
+  assert.equal(quiet.resultsPosted, true);
+
+  state.messages = { top8: true };
+  sent.length = 0;
+  const posted = finished();
+  await tracker.postResults(posted, channel);
+  // one lookup for both events, and the singles event only once even with two of the crew in it
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].match(/e501: event/g).length, 1);
+  assert.equal(sent.length, 2);
+  const cards = sent[1].embeds.map((card) => card.toJSON());
+  assert.deepEqual(cards.map((card) => card.author.name), ['Top 8 · Singles · 32 entrants', 'Top 8 · Doubles · 12 entrants']);
+  assert.equal(cards[0].url, 'https://www.start.gg/tournament/local/event/singles/standings');
+  assert.equal(cards[0].description, ['🥇 1st Champ', '🥈 2nd Runner', '🥉 3rd Third', '4th Fourth', '5th Active', '5th Stranger', '7th Seventh', '7th Also\\_Seventh'].join('\n'));
+  assert.match(cards[1].description, /^🥇 1st Team A\n2nd Team B \(projected\)\n-# The bracket wasn't finished/);
+  assert.deepEqual(sent[1].allowedMentions, { parse: [] });
+  assert.equal(posted.resultsPosted, true);
+
+  // start.gg failing posts nothing, so the next check sends both instead of repeating the placements
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({ message: 'down' }) });
+  sent.length = 0;
+  const failed = finished();
+  await assert.rejects(tracker.postResults(failed, channel), /start\.gg: down/);
+  assert.equal(sent.length, 0);
+  assert.equal(failed.resultsPosted, undefined);
+
+  // 12 hours of that and the placements stop waiting on it
+  const stuck = { ...finished(), startAt: now - 27 * 3600, endAt: now - 26 * 3600 };
+  await tracker.postResults(stuck, channel);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Results · /);
+  assert.equal(stuck.resultsPosted, true);
+
+  // discord turning down the top 8 doesn't put the placements up a second time
+  mockApi(() => ({ e501: { state: 'COMPLETED', standings: { nodes: [standing(1, 'Champ')] } } }));
+  const picky = { send: async (payload) => {
+    if (payload.embeds.some((card) => card.toJSON().author.name.startsWith('Top 8'))) throw new Error('Missing Permissions');
+    sent.push(payload);
+  } };
+  sent.length = 0;
+  const rejected = finished();
+  await tracker.postResults(rejected, picky);
+  assert.equal(sent.length, 1);
+  assert.equal(rejected.resultsPosted, true);
+});
+
+test('every message gets a picture, the bot avatar on its first card when nothing in it has one', () => {
+  const avatar = 'https://cdn.discordapp.com/avatars/bot/avatar.png';
+  const plain = (n) => new EmbedBuilder().setTitle(`Card ${n}`).setDescription('text');
+  // before discord says who the bot is there's nothing to fall back on
+  assert.equal(embeds.messages([plain(0)])[0][0].data.thumbnail, undefined);
+
+  embeds.setFallbackImage(avatar);
+  try {
+    // one per message, not one per card
+    const batches = embeds.messages(Array.from({ length: 12 }, (_, i) => plain(i)));
+    assert.deepEqual(batches.map((batch) => batch.map((card) => card.data.thumbnail?.url ?? null)),
+      [[avatar, ...Array(9).fill(null)], [avatar, null]]);
+    // a picture anywhere in the message is enough
+    const [[first, pictured]] = embeds.messages([plain(1), plain(2).setImage('https://example.com/banner.png')]);
+    assert.equal(first.data.thumbnail, undefined);
+    assert.equal(pictured.data.image.url, 'https://example.com/banner.png');
+    assert.equal(embeds.withImage([plain(3)])[0].data.thumbnail.url, avatar);
+
+    // a set card at a tournament with no picture shows the tracked player's, bigger than the bot's
+    const players = { 1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active', image: 'https://images.start.gg/active.png' } };
+    const parsed = result('no-art', 100, [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 1]);
+    const set = { ...parsed, event: { ...parsed.event, name: 'Singles' }, sides: parsed.sides.map((side) => ({ ...side, characters: [] })) };
+    assert.equal(embeds.setResult(set, players).data.thumbnail.url, 'https://images.start.gg/active.png');
+  } finally {
+    embeds.setFallbackImage(null);
+  }
+});
+
 test('muted automatic messages are consumed without posting or replaying them later', async () => {
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
@@ -726,6 +845,9 @@ test('set results off keeps a player out of the set check and /sets on doesn\'t 
   await tracker.postNewSets(channel);
   assert.deepEqual(asked, [['p20']]);
   assert.deepEqual(sent.map(({ embeds: [card] }) => card.data.author.name), ['Rival']);
+  // against someone only known from the set, by player id, answered just to whoever presses it
+  const [button] = sent[0].components[0].toJSON().components;
+  assert.deepEqual([button.label, button.custom_id], ['Head to head', 'private:h2h:rival:#99::']);
 
   assert.equal(await setsCommand({ player: '1', results: 'on' }), 'Set results on for Active.');
   assert.ok(state.players[1].setResultsOnAt >= now);
@@ -845,6 +967,54 @@ test('a set only waiting at the front of a stream queue still posts after stream
   assert.equal(sent.length, 1);
 });
 
+test('stream alerts ping everyone with /stream_pings on, 80 to a message', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async payload => sent.push(payload) };
+  state.messages = {};
+  state.players = { 1: { ...crewPlayer, lastCheck: now } };
+  state.streamed = [];
+  state.tournaments = {};
+  state.streamPings = [];
+  let current;
+  mockApi(() => ({ p10: { sets: { nodes: [current] } } }));
+  const streamed = id => ({ ...node(id, null), state: 2, updatedAt: now, stream: { streamName: 'local', streamSource: 'TWITCH' } });
+
+  const fromInteraction = (id, ping) => ({ user: { id }, options: { getString: () => ping }, reply: async () => {} });
+  const { streamPings } = await import('../src/commands/settings.js');
+  await streamPings(fromInteraction('fan', 'on'));
+  await streamPings(fromInteraction('fan', 'on'));
+  await streamPings(fromInteraction('quit', 'on'));
+  await streamPings(fromInteraction('quit', 'off'));
+  assert.deepEqual(state.streamPings, ['fan']);
+
+  current = streamed('one-fan');
+  await tracker.postStreamAlerts(channel);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].content, '<@fan> on stream');
+  assert.deepEqual(sent[0].allowedMentions, { users: ['fan'] });
+  assert.equal(sent[0].embeds.length, 1);
+
+  // nobody opted in still posts the card, pinging no one
+  state.streamPings = [];
+  current = streamed('no-fans');
+  await tracker.postStreamAlerts(channel);
+  assert.equal(sent[1].content, undefined);
+  assert.deepEqual(sent[1].allowedMentions, { users: [] });
+
+  state.streamPings = Array.from({ length: 85 }, (_, i) => `fan${i}`);
+  current = streamed('many-fans');
+  await tracker.postStreamAlerts(channel);
+  const [first, rest] = sent.slice(2);
+  assert.equal(sent.length, 4);
+  assert.equal(first.allowedMentions.users.length, 80);
+  assert.equal(first.embeds.length, 1);
+  assert.deepEqual(rest.allowedMentions.users, ['fan80', 'fan81', 'fan82', 'fan83', 'fan84']);
+  assert.equal(rest.embeds.length, 0);
+  assert.ok(first.content.length <= 2000);
+  state.streamPings = [];
+});
+
 test('/help lists every command, and each card starts at a section', () => {
   const cards = embeds.help();
   assert.equal(cards[0].data.title, 'Sama-tracker');
@@ -853,7 +1023,10 @@ test('/help lists every command, and each card starts at a section', () => {
     assert.match(card.data.description, /^\*\*/);
   }
   const text = cards.map(card => card.data.description).join('\n');
-  for (const { name } of commands) assert.match(text, new RegExp(`\`/${name}[\` ]`), name);
+  for (const { name, type } of commands) {
+    // the Apps menu ones on a member go by their menu name, not a slash
+    assert.match(text, type === 2 ? new RegExp(`\\*\\*${name}\\*\\*`) : new RegExp(`\`/${name}[\` ]`), name);
+  }
 });
 
 test('sections past discord\'s 4096 carry on in another card, cut only between sections', () => {
@@ -987,6 +1160,9 @@ test('match call pings mention connected discords, one message per set', async (
   assert.equal(sent[1].content, undefined);
   assert.deepEqual(sent[1].allowedMentions, { users: [] });
   assert.deepEqual([...state.called].sort(), ['both-called', 'solo-called']);
+  // both tracked, it's about whoever's first on the list, and the other is only known from the set by player id
+  assert.equal(sent[0].components[0].toJSON().components[0].custom_id, 'private:h2h:active:#20::');
+  assert.equal(sent[1].components[0].toJSON().components[0].custom_id, 'private:h2h:quiet:#99::');
 
   // a second check sends nothing new
   await tracker.postMatchCalls(channel);
@@ -1031,6 +1207,8 @@ test('match call pings put all four doubles players in one message', async () =>
   assert.match(sent[0].embeds[0].data.title, /Match call · /);
   // the untracked stranger adds no ping, still one message
   assert.deepEqual(sent[1].allowedMentions, { users: ['crew-discord', 'rival-discord'] });
+  // /h2h is singles, so no button
+  assert.deepEqual(sent.map((each) => each.components), [[], []]);
   assert.deepEqual([...state.called].sort(), ['doubles-called', 'mixed-called']);
 
   // a second check sends nothing new

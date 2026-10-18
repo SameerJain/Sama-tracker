@@ -61,6 +61,7 @@ export function status(info) {
     if (info.slippiError) slippiCheck += `, last try failed (${escapeMarkdown(info.slippiError)})`;
     lines.push(`**Slippi ranks checked:** ${slippiCheck} · ${count(info.slippi, 'player')} on the watchlist`);
   }
+  if (info.threadError) lines.push(`**Tournament threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
   if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
@@ -92,7 +93,7 @@ export function help() {
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
-      '`/messages` automatic posts on or off and the recap schedule. Needs Manage Server',
+      '`/messages` automatic posts on or off, tournament threads and the recap schedule. Needs Manage Server',
     ],
     [
       '**Tracking players**',
@@ -101,10 +102,11 @@ export function help() {
       '`/track list` everyone tracked',
       '`/sets` automatic set results on or off',
       '`/stream` stream alerts on or off',
+      '`/stream_pings` get pinged for every stream alert, on or off. Just for you, no tracking needed',
       '`/calls` match call pings on or off',
       '`/upcoming` live and upcoming tournaments',
       '`/recent` latest sets',
-      '`/run` your run and next opponent in each bracket, soonest first',
+      '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
       '-# New players start with set results, stream alerts and match call pings off. `player:all` works with sets, stream, calls, upcoming and recent',
     ],
     [
@@ -116,13 +118,16 @@ export function help() {
     [
       '**Player stats**',
       '`/stats` set record, placements and best upset',
+      '`/doubles` one player\'s 2v2 record, partners and placements',
       '`/h2h` record against someone, with one-line odds',
       '`/predict` odds of beating someone, and why',
       '`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked',
       '`/progress` last 30 days vs the 30 before, by game',
       '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more',
-      '-# `verbose:True` shows more, same as the Full report button on short reports. `melee:True` sticks to Melee',
+      '-# `verbose:True` shows more, same as the Full report button on short reports. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out',
       '-# `/h2h`, `/predict` and `/scout` also take a start.gg link or ID, for players nobody tracks',
+      '-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, `/recent`, set results and match calls have head-to-head buttons',
+      '-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation',
     ],
     [
       '**Slippi ranked**',
@@ -130,7 +135,7 @@ export function help() {
       '`/slippi remove` take someone off the watchlist',
       '`/slippi rank` rank, rating, record, characters and past seasons. Takes any connect code',
       '`/slippi leaderboard` everyone on the watchlist, best rank first',
-      '-# Tracked and linked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it',
+      '-# Cards show the rank badge and their most played character. Tracked and linked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it',
     ],
     [
       '**Registration**',
@@ -158,13 +163,15 @@ export function help() {
     [
       '**Posted here automatically**',
       '• finished sets of players with `/sets` on, and their first DQ in an event',
-      '• sets on stream or up next in the stream queue, for players with `/stream` on',
+      '• sets on stream or up next in the stream queue, for players with `/stream` on, pinging everyone with `/stream_pings` on',
       '• called sets, pinging players with `/calls` on whose Discord is on start.gg, all four in one message for doubles',
       '• a roll call an hour before a tournament with 3+ of the crew',
       '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
       '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting',
+      '• with `/messages top8` on, the full top 8 of each event the crew played in, at the same time',
       '• Slippi rank changes for the watchlist, checked every 30 minutes',
       '• a weekly recap of players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
+      '-# With `/messages threads` on, set results and stream alerts go in a thread per tournament. If the thread can\'t be used, they post here',
     ],
   ];
   return withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections);

@@ -157,6 +157,7 @@ test('profile autocompletes tracked and linked players', async () => {
   let choices;
   await handleAutocomplete({
     commandName: 'profile',
+    user: { id: 'anyone' },
     options: { getSubcommand: () => null, getFocused: () => '' },
     respond: async (result) => { choices = result; },
   });

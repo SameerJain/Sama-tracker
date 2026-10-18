@@ -1,3 +1,4 @@
+import { PermissionFlagsBits, RESTJSONErrorCodes, ThreadAutoArchiveDuration } from 'discord.js';
 import * as startgg from './startgg.js';
 import * as slippi from './slippi.js';
 import * as embeds from './embeds/index.js';
@@ -6,6 +7,7 @@ import { clearTrackRequest, readTrackRequest } from './track-request.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
 import { messageEnabled, messageSettings } from './message-settings.js';
 import { rememberAccounts } from './accounts.js';
+import { buttonRow, h2hButton } from './commands/shared.js';
 
 const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
@@ -16,6 +18,8 @@ const ROLL_CALL_MIN_PLAYERS = 3;
 const RESULTS_WAIT_HOURS = 12;
 // then this long if something's still missing, after that they go out with projected placements
 const RESULTS_GIVE_UP_HOURS = 24;
+// a top 8 start.gg keeps erroring on holds the placements back this long, then they go without it
+const TOP8_RETRY_HOURS = 12;
 // after downtime, don't post sets older than this
 const CATCH_UP_HOURS = 3;
 // some TOs set the end date years out by mistake
@@ -33,6 +37,10 @@ const SLIPPI_CHECK_MINUTES = 30;
 // players with no connect code on start.gg get looked at again this often, in case they play a netplay tournament since
 const SLIPPI_SEARCH_DAYS = 7;
 const SLIPPI_SKIPPED_KEPT = 1000;
+// /messages threads needs these in the channel, named the way discord's settings show them
+const THREAD_PERMISSIONS = { CreatePublicThreads: 'Create Public Threads', SendMessagesInThreads: 'Send Messages in Threads' };
+// longer than any tournament runs, then the thread is forgotten
+const THREAD_KEPT_DAYS = 14;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -43,7 +51,7 @@ export function secondsNow() {
 
 // for /status
 export const health = {
-  startedAt: secondsNow(), downSince: null, skippedBefore: null, setCheck: null, setError: null, tournamentCheck: null, slippiCheck: null, slippiError: null,
+  startedAt: secondsNow(), downSince: null, skippedBefore: null, setCheck: null, setError: null, tournamentCheck: null, slippiCheck: null, slippiError: null, threadError: null,
 };
 
 let channel;
@@ -269,7 +277,8 @@ export async function postRankChanges(postChannel = channel) {
       if (!before.rank || before.season !== entry.season || before.rank === entry.rank) continue;
       if (slippi.RANKS.indexOf(entry.rank) <= slippi.RANKS.indexOf('Pending')) continue;
       if (messageEnabled('slippi', checkedAt)) {
-        await postChannel.send({ embeds: [embeds.rankChange(entry, before, state.players)], allowedMentions: { parse: [] } });
+        const { files, characterFile } = await slippi.slippiArt(entry);
+        await postChannel.send({ embeds: [embeds.rankChange(entry, before, state.players, { characterFile })], files, allowedMentions: { parse: [] } });
       }
     }
     health.slippiCheck = checkedAt;
@@ -332,7 +341,9 @@ export async function postNewSets(postChannel = channel) {
       // finished before /sets turned results on for everyone tracked in it, so it stays out of the channel.
       // it still counts as posted so the next check doesn't look at it again
       const showing = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
-      if (showing && messageEnabled('sets', set.completedAt)) await postChannel.send({ embeds: [embeds.setResult(set, state.players)] });
+      if (showing && messageEnabled('sets', set.completedAt)) {
+        await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players)]), components: h2hRow(set) });
+      }
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
     }
@@ -354,7 +365,10 @@ export async function postStreamAlerts(postChannel = channel) {
   const announce = async (sets, eligible = () => true) => {
     for (const set of sets) {
       if (state.streamed.includes(set.id) || !eligible(set)) continue;
-      if (messageEnabled('streams', wentLiveAt(set))) await postChannel.send({ embeds: [embeds.onStream(set, state.players)] });
+      // everyone with /stream_pings on, for every alert whoever is on stream
+      if (messageEnabled('streams', wentLiveAt(set))) {
+        await sendPinging(tournamentPosts(set, postChannel), 'streams', state.streamPings, 'on stream', embeds.onStream(set, state.players));
+      }
       state.streamed.push(set.id);
     }
   };
@@ -380,6 +394,75 @@ export async function postStreamAlerts(postChannel = channel) {
   save();
 }
 
+// the card goes with the first batch of pings, or alone if there's nobody to ping. the rest
+// stop if /messages turns the type off partway through
+async function sendPinging(postChannel, type, ids, text, embed) {
+  for (let i = 0; i === 0 || i < ids.length; i += MENTIONS_PER_MESSAGE) {
+    if (i > 0 && !messageEnabled(type)) break;
+    const users = ids.slice(i, i + MENTIONS_PER_MESSAGE);
+    await postChannel.send({
+      content: users.length ? `${users.map((id) => `<@${id}>`).join(' ')} ${text}` : undefined,
+      embeds: i === 0 ? embeds.withImage([embed]) : [],
+      allowedMentions: { users },
+    });
+  }
+}
+
+// the thread permissions the bot is missing in the channel, or null when it can't have threads at all,
+// like a voice channel's chat
+export function missingThreadPermissions(postChannel = channel) {
+  if (!postChannel?.threads || postChannel.isThread?.()) return null;
+  const has = postChannel.permissionsFor(postChannel.client.user);
+  return Object.keys(THREAD_PERMISSIONS).filter((name) => !has?.has(PermissionFlagsBits[name])).map((name) => THREAD_PERMISSIONS[name]);
+}
+
+// stands in for the channel when posting a set. with /messages threads on it sends to the tournament's thread,
+// and to the channel when the thread can't be used, so a permission change never loses a post
+function tournamentPosts(set, postChannel) {
+  const send = async (message) => {
+    if (!messageSettings().threads) return postChannel.send(message);
+    const { tournament } = set.event;
+    try {
+      const sent = await (await tournamentThread(tournament, postChannel)).send(message);
+      health.threadError = null;
+      return sent;
+    } catch (err) {
+      console.error(`posting in the thread for ${tournament.name} failed, posting in the channel:`, err.message);
+      health.threadError = err.message;
+      return postChannel.send(message);
+    }
+  };
+  return { send };
+}
+
+// the first post for a tournament puts a card with its name in the channel and starts the thread on it.
+// saved by slug, since sets don't come with the tournament id, so a restart keeps using the same one
+async function tournamentThread(tournament, postChannel) {
+  const saved = state.threads[tournament.slug];
+  if (saved) {
+    // an archived thread opens back up when something's sent in it. a deleted one gets replaced
+    const thread = await postChannel.threads.fetch(saved.id).catch((err) => {
+      if (err.code === RESTJSONErrorCodes.UnknownChannel) return null;
+      throw err;
+    });
+    if (thread) return thread;
+  }
+
+  // checked before the card goes out, or every set would leave another card with no thread on it
+  const missing = missingThreadPermissions(postChannel);
+  if (!missing) throw new Error('threads can\'t be started in this channel');
+  if (missing.length) throw new Error(`missing ${missing.join(' and ')}`);
+
+  const card = await postChannel.send({ embeds: embeds.withImage([embeds.tournamentThread(tournament)]), allowedMentions: { parse: [] } });
+  // discord caps thread names at 100
+  const thread = await card.startThread({ name: tournament.name.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
+  const now = secondsNow();
+  state.threads = Object.fromEntries(Object.entries(state.threads).filter(([, each]) => each.at > now - THREAD_KEPT_DAYS * DAY));
+  state.threads[tournament.slug] = { id: thread.id, at: now };
+  save();
+  return thread;
+}
+
 export async function postMatchCalls(postChannel = channel) {
   try {
     const players = Object.values(state.players).filter(callsOn);
@@ -395,7 +478,8 @@ export async function postMatchCalls(postChannel = channel) {
         const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(Boolean))];
         await postChannel.send({
           content: discordIds.length ? `${discordIds.map((id) => `<@${id}>`).join(' ')} your match was called` : undefined,
-          embeds: [embeds.matchCall(set, state.players)],
+          embeds: embeds.withImage([embeds.matchCall(set, state.players)]),
+          components: h2hRow(set),
           allowedMentions: { users: discordIds },
         });
       }
@@ -441,6 +525,15 @@ function hasPlayerWithAlerts(set) {
 // /stream turns a player's stream alerts on. players saved before they started off have no field
 function alertsOn(player) {
   return Boolean(player) && player.streamAlerts !== false;
+}
+
+// a Head to head button under a set card, about the tracked player in it, the winner if both are. it answers
+// only whoever pressed it, so the channel doesn't fill up with reports
+function h2hRow(set) {
+  const tracked = Object.values(state.players).filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
+  const winner = set.sides.find((side) => side.id === set.winnerId);
+  const player = tracked.find((each) => winner?.playerIds.includes(each.playerId)) ?? tracked[0];
+  return player ? buttonRow(h2hButton(set, player, { label: 'Head to head', action: 'private' })) : [];
 }
 
 // /sets turns a player's automatic set results on. players saved before they started off have no field
@@ -539,8 +632,32 @@ export async function postResults(tournament, postChannel = channel) {
   if (!allIn && waited < RESULTS_GIVE_UP_HOURS * HOUR) return;
 
   const dueAt = overAt(tournament) + (allIn ? RESULTS_WAIT_HOURS : RESULTS_GIVE_UP_HOURS) * HOUR;
+  // fetched before anything posts, so a start.gg error retries both next hour instead of repeating placements
+  let topEight = [];
+  if (messageEnabled('top8', dueAt)) {
+    try {
+      topEight = await topEightCards(tournament, entries);
+    } catch (err) {
+      if (now < dueAt + TOP8_RETRY_HOURS * HOUR) throw err;
+      console.error(`top 8 for ${tournament.name ?? tournament.id} failed, posting placements without it:`, err.message);
+    }
+  }
   if (messageEnabled('results', dueAt)) await post(embeds.results({ ...tournament, entries }, state.players), 'results', dueAt, postChannel);
+  // marked before the top 8 goes, so discord failing on it can't post the placements again
   tournament.resultsPosted = true;
+  if (topEight.length) {
+    await post(topEight, 'top8', dueAt, postChannel)
+      .catch((err) => console.error(`posting the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message));
+  }
+}
+
+// every event the crew played in, with the whole top 8 and not just them
+async function topEightCards(tournament, entries) {
+  const events = [...new Map(entries.filter((entry) => entry.eventId).map((entry) => [entry.eventId, entry])).values()];
+  if (!events.length) return [];
+  const standings = await startgg.getTopEight(events.map((entry) => entry.eventId));
+  const found = events.filter((entry) => standings.has(entry.eventId)).map((entry) => ({ ...entry, ...standings.get(entry.eventId) }));
+  return embeds.topEight(tournament, found);
 }
 
 export function endTime(tournament) {
@@ -615,16 +732,7 @@ export async function postRegReminders(postChannel = channel) {
         rememberAccounts(participants);
         const registered = new Set(participants.map((participant) => participant.discordId));
         const ping = state.regPings.filter((id) => !registered.has(id));
-        // the embed goes with the first batch of pings, or alone if there's nobody to ping
-        for (let i = 0; i === 0 || i < ping.length; i += MENTIONS_PER_MESSAGE) {
-          if (!messageEnabled('registration')) break;
-          const users = ping.slice(i, i + MENTIONS_PER_MESSAGE);
-          await postChannel.send({
-            content: users.length ? `${users.map((id) => `<@${id}>`).join(' ')} ${lastCall ? 'last call' : 'registration reminder'}` : undefined,
-            embeds: i === 0 ? [embeds.regReminder(tournament, deadline, lastCall)] : [],
-            allowedMentions: { users },
-          });
-        }
+        await sendPinging(postChannel, 'registration', ping, lastCall ? 'last call' : 'registration reminder', embeds.regReminder(tournament, deadline, lastCall));
       }
       // past the last call means none are left
       reminder.next = due + 1;

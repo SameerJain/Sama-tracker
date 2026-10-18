@@ -9,6 +9,11 @@ const SCOUT_PAGES = 30;
 const CHARACTER_PAGES = 10;
 const SCOUT_CHARACTER_PAGES = 20;
 const LIFETIME_CHARACTER_PAGES = 40;
+// /doubles, 30 sets a page. one page is the short report, melee reads back up to 10 to fill it, and
+// verbose goes to 600 sets
+const DOUBLES_PAGES = 1;
+const MELEE_DOUBLES_PAGES = 10;
+const FULL_DOUBLES_PAGES = 20;
 const HISTORY_CACHE_MINUTES = 10;
 // after that only their newest page gets fetched, and everything again this often to pick up edits to old sets
 const HISTORY_REFRESH_HOURS = 6;
@@ -16,6 +21,8 @@ const HISTORY_REFRESH_HOURS = 6;
 // ~5MB for someone with 2500 sets, so this is about 25 players' usual history and 5 lifetimes
 const HISTORY_CACHE_PAGES = 25 * HISTORY_PAGES + 5 * LIFETIME_PAGES;
 const CHARACTER_CACHE_PAGES = 25 * CHARACTER_PAGES + 5 * LIFETIME_CHARACTER_PAGES;
+// most people have far less doubles than singles, so this is room for about 10 full reports
+const DOUBLES_CACHE_PAGES = 10 * FULL_DOUBLES_PAGES;
 
 // a player's history of one kind, newest first, shared by every command that reads it. each asks for so many
 // pages: a deeper copy already here gets cut down to that, and a shallower one gets the rest added on, so
@@ -118,4 +125,35 @@ function eventHistory(userId) {
   return events;
 }
 
-export { SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory };
+const doublesHistories = historyCache(startgg.getDoublesHistory, DOUBLES_CACHE_PAGES);
+const doublesHistory = (playerId, { verbose = false, melee = false } = {}) => {
+  if (verbose) return doublesHistories(playerId, FULL_DOUBLES_PAGES);
+  return doublesHistories(playerId, melee ? MELEE_DOUBLES_PAGES : DOUBLES_PAGES);
+};
+
+// doubles placements by event, kept per player as long as event histories. each event is looked up once,
+// as a promise so two reports at once share it, and the full report only asks about events the short one didn't
+const doublesEventHistories = new Map();
+async function doublesEvents(player, eventIds) {
+  let cached = doublesEventHistories.get(player.userId);
+  if (!cached || Date.now() - cached.at > HISTORY_CACHE_MINUTES * 60 * 1000) cached = { at: Date.now(), events: new Map() };
+  doublesEventHistories.delete(player.userId);
+  doublesEventHistories.set(player.userId, cached);
+  for (const id of [...doublesEventHistories.keys()].slice(0, -EVENT_CACHE_PLAYERS)) doublesEventHistories.delete(id);
+
+  const missing = eventIds.filter((id) => !cached.events.has(id));
+  if (missing.length) {
+    const lookup = startgg.getDoublesEvents(player, missing);
+    const each = new Map(missing.map((id) => [id, lookup.then((found) => found.get(id) ?? null)]));
+    for (const [id, event] of each) cached.events.set(id, event);
+    // a failed lookup isn't kept
+    lookup.catch(() => { for (const [id, event] of each) if (cached.events.get(id) === event) cached.events.delete(id); });
+  }
+  const events = (await Promise.all(eventIds.map((id) => cached.events.get(id)))).filter(Boolean);
+  return events.sort((a, b) => b.event.startAt - a.event.startAt);
+}
+
+export {
+  SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory,
+  doublesHistory, doublesEvents,
+};

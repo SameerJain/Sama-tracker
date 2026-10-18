@@ -6,16 +6,18 @@ export const stateDir = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUN
 const FILE = `${stateDir}/state.json`;
 
 // players and regAdmins are keyed by start.gg user id, regReminders by tournament id. posted/streamed/called/dqs are ids already announced.
-// regPings are discord ids that turned reg pings on. regSkipped are tournament ids whose reminder got deleted, so admins' don't come back.
+// regPings and streamPings are discord ids that turned reg pings or stream alert pings on. regSkipped are tournament ids whose reminder got deleted, so admins' don't come back.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
 // accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.
 // messages holds the /messages switches and recap schedule. weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
 // deploy is the railway deployment that last started: { id, at }, with at the first time it started.
 // slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from the last check and
-// userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back
+// userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back.
+// threads are the tournament threads from /messages threads, keyed by tournament slug: { id, at }, with at when it was started.
+// recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
 const empty = {
-  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], regAdmins: {}, regSkipped: [],
-  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [],
+  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], streamPings: [], regAdmins: {}, regSkipped: [],
+  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {},
 };
 
 function load() {

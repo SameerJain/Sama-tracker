@@ -1,6 +1,6 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { state, save } from '../store.js';
-import { secondsNow } from '../tracker.js';
+import { missingThreadPermissions, secondsNow } from '../tracker.js';
 import { MESSAGE_TYPES, WEEKDAYS, messageSettings } from '../message-settings.js';
 import { readChoice, replyEphemeral, replyNoPlayer } from './shared.js';
 
@@ -38,6 +38,17 @@ function configureMessages(interaction) {
       return reply('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
     }
   }
+  const threads = interaction.options.getBoolean('threads');
+  if (threads !== null) {
+    // checked when it's turned on so it doesn't wait for the next tournament to find out
+    if (threads) {
+      const channelId = process.env.CHANNEL_ID;
+      const missing = missingThreadPermissions(interaction.client.channels.cache.get(channelId));
+      if (!missing) return reply(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
+      if (missing.length) return reply(`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
+    }
+    changes.threads = threads;
+  }
 
   if (Object.keys(changes).length) {
     const now = secondsNow();
@@ -57,6 +68,7 @@ function configureMessages(interaction) {
     if (key === 'recap') continue;
     lines.push(`**${label}:** ${settings[key] ? 'on' : 'off'}`);
   }
+  lines.push(`**Tournament threads:** ${settings.threads ? 'on, set results and stream alerts go in a thread per tournament' : 'off'}`);
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.');
@@ -135,4 +147,17 @@ const setResults = toggles({ option: 'results', field: 'setResults', label: 'Set
 // match call pings go out while the set is still called, so there's no cutoff like /sets has
 const matchCalls = toggles({ option: 'pings', field: 'callPings', label: 'Match call pings' });
 
-export { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults, matchCalls };
+// only ever changes the person who ran it, who doesn't have to be tracked or linked. pings go
+// out with every stream alert, so /stream on each player still decides what gets posted
+function streamPings(interaction) {
+  const on = interaction.options.getString('ping', true) === 'on';
+  const { id } = interaction.user;
+  state.streamPings = state.streamPings.filter((each) => each !== id);
+  if (on) state.streamPings.push(id);
+  save();
+  return replyEphemeral(interaction, on
+    ? 'You\'ll get pinged for every stream alert posted here. Alerts go out for tracked players with `/stream` on.'
+    : 'No more stream alert pings.');
+}
+
+export { configureMessages, socialsAdd, socialsRemove, streamAlerts, streamPings, setResults, matchCalls };

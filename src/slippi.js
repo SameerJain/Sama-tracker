@@ -1,4 +1,5 @@
-import { isBackground } from './startgg.js';
+import { fileURLToPath } from 'node:url';
+import { MELEE, getCharacterArt, isBackground } from './startgg.js';
 
 // slippi.gg's own API. there's no public one: no docs, introspection off, and the host is called
 // internal. it already moved once, from gql-gateway-dot-slippi.uc.r.appspot.com, which now answers
@@ -33,6 +34,25 @@ export function rankOf({ rating, updates, global, regional }) {
   if (updates < SETS_TO_RANK) return PENDING;
   if (rating >= GRANDMASTER.min && (global || regional)) return GRANDMASTER;
   return TIERS.findLast((tier) => rating >= tier.min);
+}
+
+// slippi.gg's rank badges are svgs, which discord won't show, so src/assets/ranks has them as 256px pngs.
+// Gold 2 is gold-2.png. each rank gets its own name so a message can carry more than one
+export function rankImage(rankName) {
+  const file = `${rankName.toLowerCase().replace(' ', '-')}.png`;
+  return { attachment: fileURLToPath(new URL(`assets/ranks/${file}`, import.meta.url)), name: `rank-${file}` };
+}
+
+// slippi.gg's frog logo, recolored from white to their green so it shows in light mode too. for slippi
+// cards with no rank badge to show
+export const LOGO = { attachment: fileURLToPath(new URL('assets/slippi.png', import.meta.url)), name: 'slippi.png' };
+
+// the files a card from embeds/slippi.js goes out with: the rank badge, and start.gg's icon for their most
+// played character. characterFile is that icon's name, null when there isn't one. no picture beats no post
+export async function slippiArt(profile) {
+  const main = profile.characters?.[0];
+  const character = main ? await getCharacterArt(main.name, MELEE).catch(() => null) : null;
+  return { files: [rankImage(rankOf(profile).name), character].filter(Boolean), characterFile: character?.name ?? null };
 }
 
 const CHARACTERS = {

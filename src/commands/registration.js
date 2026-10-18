@@ -252,7 +252,7 @@ async function regWarn(interaction) {
   // once the thinking reply is gone, so the warning goes in the channel as its own message
   const warning = {
     content: `<@${user.id}>`,
-    embeds: [embeds.regWarning(tournament, deadline)],
+    embeds: embeds.withImage([embeds.regWarning(tournament, deadline)]),
     allowedMentions: { users: [user.id] },
   };
   const sent = await interaction.channel?.send(warning).catch(() => null);

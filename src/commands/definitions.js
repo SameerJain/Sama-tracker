@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType as Option, PermissionFlagsBits } from 'discord.js';
+import { ApplicationCommandOptionType as Option, ApplicationCommandType, PermissionFlagsBits } from 'discord.js';
 import * as startgg from '../startgg.js';
 import { MESSAGE_TYPES, WEEKDAYS } from '../message-settings.js';
 import { funCommands } from '../fun/index.js';
@@ -21,6 +21,10 @@ const MATCHUP_YOU = 'Tracked or linked player, or a start.gg profile link or ID.
 const KNOWN_TOURNAMENT = 'start.gg tournament link, or pick one with a reminder or tracked players in it';
 const UPCOMING_TOURNAMENT = 'start.gg tournament link, or pick an upcoming one tracked players are in';
 
+// long-press a member, then Apps. these names are what the menu shows, so they can have capitals and spaces
+const MEMBER_H2H = 'H2H with me';
+const MEMBER_SCOUT = 'Scout them';
+
 function verboseOption(description) {
   return { type: Option.Boolean, name: 'verbose', description };
 }
@@ -32,6 +36,7 @@ export const commands = [
     default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
     options: [
       ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
+      { type: Option.Boolean, name: 'threads', description: 'Put set results and stream alerts in a thread per tournament' },
       { type: Option.Integer, name: 'recap_day', description: 'Day of the weekly recap', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
       { type: Option.String, name: 'recap_time', description: 'Weekly recap time in 24-hour HH:MM, like 21:00' },
       { type: Option.String, name: 'timezone', description: 'Recap timezone, like America/New_York or Europe/London' },
@@ -103,7 +108,7 @@ export const commands = [
     options: [
       playerOption(YOU, 'player', false),
       verboseOption('Streaks, close sets, seeds, upsets, rematches and characters, plus a 6 month trend. Slower'),
-      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets, placements and characters' },
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets, placements and characters, plus Slippi rank vs last season' },
     ],
   },
   {
@@ -111,7 +116,7 @@ export const commands = [
     options: [
       { type: Option.String, name: 'profile', description: 'Tracked or linked opponent, or a start.gg profile link or ID', required: true, autocomplete: true },
       verboseOption('More history, habits, toughest opponents and worst matchups, stages and your odds. Slower'),
-      { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and your Melee odds' },
+      { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and your Melee odds, plus Slippi ranks' },
     ],
   },
   // discord wants required options before optional ones, so the opponent goes first
@@ -121,7 +126,7 @@ export const commands = [
     options: [
       playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
       verboseOption('Every set, splits and streaks. Odds stay one line. Slower'),
-      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and Melee odds' },
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and Melee odds, plus Slippi ranks' },
     ],
   },
   {
@@ -129,7 +134,16 @@ export const commands = [
     description: 'Recent placements and set record',
     options: [
       playerOption(YOU, 'player', false), verboseOption('Full lifetime report, slower'),
-      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and placements' },
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and placements, plus their Slippi rank' },
+    ],
+  },
+  {
+    name: 'doubles',
+    description: 'One player\'s 2v2 doubles: record, partners and placements',
+    options: [
+      playerOption(YOU, 'player', false),
+      verboseOption('Up to 600 doubles sets: every partner, teams played, seeds and best finishes. Slower'),
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee doubles sets and placements' },
     ],
   },
   {
@@ -138,7 +152,7 @@ export const commands = [
     options: [
       playerOption(YOU, 'player', false),
       {
-        type: Option.Integer, name: 'game', description: 'Ultimate or Melee, leave out for whichever has more reported',
+        type: Option.Integer, name: 'game', description: 'Ultimate or Melee, leave out for whichever has more reported. Melee adds Slippi ranked picks',
         choices: PICKABLE_GAMES.map((game) => ({ name: game.displayName, value: game.id })),
       },
       verboseOption('Every other game they have characters reported in too, going further back. Slower'),
@@ -150,7 +164,7 @@ export const commands = [
     options: [
       playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
       verboseOption('Show how each part of the prediction counts'),
-      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more' },
+      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks' },
     ],
   },
   {
@@ -166,6 +180,17 @@ export const commands = [
         choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
       },
     ],
+  },
+  {
+    name: 'stream_pings',
+    description: 'Get pinged for every stream alert, whoever is on stream. On or off, for yourself',
+    options: [{
+      type: Option.String,
+      name: 'ping',
+      description: 'on or off',
+      required: true,
+      choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
+    }],
   },
   {
     name: 'sets',
@@ -280,6 +305,9 @@ export const commands = [
   },
   ...Object.values(funCommands).map((fun) => ({ name: fun.name, description: fun.description ?? fun.line })),
   { name: 'view_pfp', description: 'My profile picture, full size' },
+  // these don't count toward the 100, discord allows 5 more of them
+  { type: ApplicationCommandType.User, name: MEMBER_H2H },
+  { type: ApplicationCommandType.User, name: MEMBER_SCOUT },
 ];
 
-export { PICKABLE_GAMES };
+export { PICKABLE_GAMES, MEMBER_H2H, MEMBER_SCOUT };

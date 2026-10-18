@@ -137,6 +137,32 @@ export async function checkToken() {
 }
 
 // id is f64a83c8 or user/f64a83c8
+// a set only has the player id, so a button about someone from a set looks them up by it.
+// null when there's no start.gg account behind them, which TOs can add people without
+export async function getPlayerById(id) {
+  const data = await query(`
+    query ($id: ID!) {
+      player(id: $id) {
+        id
+        gamerTag
+        user { id slug images(type: "profile") { url } authorizations(types: [DISCORD]) { externalId } }
+      }
+    }
+  `, { id });
+
+  const { player } = data;
+  if (!player?.user) return null;
+
+  return {
+    userId: player.user.id,
+    slug: player.user.slug,
+    playerId: player.id,
+    tag: player.gamerTag,
+    image: player.user.images?.[0]?.url,
+    discordId: player.user.authorizations?.[0]?.externalId,
+  };
+}
+
 export async function getPlayer(id) {
   const slug = id.startsWith('user/') ? id : `user/${id}`;
   const data = await query(`
@@ -214,6 +240,8 @@ function toSet(node) {
     name: slot.entrant.name,
     seed: slot.entrant.initialSeedNum,
     playerIds: (slot.entrant.participants ?? []).map((participant) => participant.player?.id),
+    // only the doubles history asks for tags, to name partners
+    tags: (slot.entrant.participants ?? []).map((participant) => participant.player?.gamerTag ?? null),
     score: slot.standing?.stats?.score?.value ?? null,
     characters: charactersPlayed(node.games, slot.entrant.id),
   }));
@@ -226,6 +254,9 @@ function toSet(node) {
     round: node.fullRoundText,
     winnerId: node.winnerId,
     stream: node.stream,
+    // only /run asks for these
+    station: node.station?.number ?? null,
+    startAt: node.startAt ?? null,
     event: node.event,
     sides,
   };
@@ -302,6 +333,60 @@ export async function getHeadToHead(playerId, opponentId) {
   return [...new Map(played.map(({ set }) => [set.id, set])).values()].sort((a, b) => b.completedAt - a.completedAt);
 }
 
+// for /doubles, 2v2 sets only. a team's slot has 2 more participant objects than singles, the same
+// room opponent lookups leave for teams, so 30 a page. gamerTag isn't an object, so naming partners
+// costs nothing. event id is for getDoublesEvents
+export async function getDoublesHistory(playerId, page) {
+  const data = await query(`
+    query ($id: ID!, $page: Int!) {
+      player(id: $id) {
+        sets(perPage: 30, page: $page, filters: { state: [3], entrantSize: [2] }) {
+          pageInfo { totalPages }
+          nodes {
+            id
+            completedAt
+            fullRoundText
+            winnerId
+            event { id slug videogame { id displayName } tournament { name } }
+            slots {
+              entrant { id name initialSeedNum participants { player { id gamerTag } } }
+              standing { stats { score { value } } }
+            }
+          }
+        }
+      }
+    }
+  `, { id: playerId, page });
+
+  const connection = data.player?.sets;
+  return { totalPages: connection?.pageInfo?.totalPages ?? 0, sets: (connection?.nodes ?? []).map(toSet).filter(Boolean) };
+}
+
+// Map of event id to { placement, seed, dq, event, partners } for the doubles events their sets came
+// from. a set doesn't say where the team finished, and user.events has no documented doubles filter,
+// so each event gets looked up with their entrant. ~9 objects an event, so 40 a request
+export async function getDoublesEvents(player, eventIds) {
+  const data = await lookupMany(eventIds, (group) => `{
+    ${group.map((id) => `e${id}: event(id: ${id}) {
+      id name slug startAt numEntrants state videogame { id displayName } tournament { name }
+      userEntrant(userId: ${player.userId}) { initialSeedNum isDisqualified standing { placement } participants { player { id gamerTag } } }
+    }`).join('\n')}
+  }`, undefined, 40);
+
+  const events = new Map();
+  for (const id of eventIds) {
+    const { userEntrant: entrant, state, ...event } = data[`e${id}`] ?? {};
+    const placement = entrant?.standing?.placement;
+    // placement lines link the tournament
+    if (state !== 'COMPLETED' || !placement || !event.tournament) continue;
+    const partners = (entrant.participants ?? []).map((participant) => participant.player)
+      .filter((each) => each && String(each.id) !== String(player.playerId))
+      .map((each) => ({ id: each.id, tag: each.gamerTag }));
+    events.set(id, { placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event, partners });
+  }
+  return events;
+}
+
 // sets completed in [since, until), newest first. updatedAfter also brings back old sets that got
 // edited, so every page gets read before going by completion time
 export async function getPeriodHistory(playerId, since, until) {
@@ -318,6 +403,7 @@ function connectionPage(connection) {
   return { totalPages: connection?.pageInfo?.totalPages ?? 0, nodes: connection?.nodes ?? [] };
 }
 
+// a set is about 16 objects, 17 with its station, so 30 a page comes to about 510
 export async function getRunSets(eventId, playerId) {
   const pages = await allPages(async (page) => connectionPage((await query(`
     query ($id: ID!, $player: ID!, $page: Int!) {
@@ -325,8 +411,9 @@ export async function getRunSets(eventId, playerId) {
         sets(page: $page, perPage: 30, sortType: STANDARD, filters: { playerIds: [$player], showByes: false }) {
           pageInfo { totalPages }
           nodes {
-            id state completedAt fullRoundText winnerId
+            id state completedAt fullRoundText winnerId startAt
             event { slug }
+            station { number }
             ${SET_SLOTS}
           }
         }
@@ -663,6 +750,19 @@ async function lookupEntries(tournamentId, userIds) {
   `, { id: tournamentId });
 
   return data.tournament;
+}
+
+// for the top 8 post: Map of eventId to { done, standings } with everyone, tracked or not.
+// double elimination ties fill 8 exactly (5th and 7th go two each). an event is ~17 objects here
+export async function getTopEight(eventIds) {
+  const data = await lookupMany(eventIds, (group) => `{
+    ${group.map((id) => `e${id}: event(id: ${id}) { state standings(query: { page: 1, perPage: 8 }) { nodes { placement isFinal entrant { name } } } }`).join('\n')}
+  }`);
+  return new Map(eventIds.filter((id) => data[`e${id}`]).map((id) => {
+    const event = data[`e${id}`];
+    const standings = (event.standings?.nodes ?? []).map((node) => ({ placement: node.placement, final: node.isFinal ?? false, name: node.entrant?.name ?? 'Unknown' }));
+    return [id, { done: event.state === 'COMPLETED', standings }];
+  }));
 }
 
 // slug is genesis-x, tournament/genesis-x or a short link name
