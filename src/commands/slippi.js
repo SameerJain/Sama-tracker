@@ -4,7 +4,7 @@ import * as slippi from '../slippi.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { slippiEntry } from '../tracker.js';
-import { linkedPlayer, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds } from './shared.js';
+import { didYouMean, linkedPlayer, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds } from './shared.js';
 
 const NOT_A_CODE = 'That isn\'t a connect code. Use the one Slippi Launcher shows, like ABCD#123.';
 
@@ -20,6 +20,13 @@ function watched(value) {
 async function codeOnStartgg(player) {
   const code = (await startgg.getConnectCodes([player.playerId])).get(player.playerId);
   return code ? slippi.readCode(code) : null;
+}
+
+// " Did you mean Name (CODE)?" for a name or code that's on nobody, closest by name, then by code
+function nearestWatched(typed) {
+  const entries = Object.values(state.slippi);
+  const describe = (entry) => `${entry.name} (${entry.code})`;
+  return didYouMean(entries, typed, 'name', describe) || didYouMean(entries, typed, 'code', describe);
 }
 
 function noCodeOnStartgg(player) {
@@ -62,8 +69,9 @@ async function slippiAdd(interaction) {
 
 // the daily search skips them after this, /slippi add brings them back
 function slippiRemove(interaction) {
-  const entry = watched(interaction.options.getString('player', true));
-  if (!entry) return replyEphemeral(interaction, 'They aren\'t on the Slippi watchlist. `/slippi leaderboard` shows who is.');
+  const typed = interaction.options.getString('player', true);
+  const entry = watched(typed);
+  if (!entry) return replyEphemeral(interaction, `They aren't on the Slippi watchlist.${nearestWatched(typed) || ' `/slippi leaderboard` shows who is.'}`);
   delete state.slippi[entry.uid];
   state.slippiSkipped.push(entry.uid);
   save();
@@ -78,7 +86,7 @@ async function slippiRank(interaction) {
     ? watched(typed)
     : me && Object.values(state.slippi).find((each) => String(each.userId) === String(me.userId));
   const code = typed && !entry ? slippi.readCode(typed) : null;
-  if (typed && !entry && !code) return replyEphemeral(interaction, 'Pick someone from the watchlist, or type a connect code like ABCD#123.');
+  if (typed && !entry && !code) return replyEphemeral(interaction, `Nobody on the watchlist goes by that.${nearestWatched(typed) || ' Pick someone from the list, or type a connect code like ABCD#123.'}`);
   if (!typed && !entry && !me) return replyEphemeral(interaction, 'Pick someone, or `/link` your start.gg so leaving it out finds your connect code.');
 
   await interaction.deferReply();
@@ -90,7 +98,7 @@ async function slippiRank(interaction) {
     const found = code ?? await codeOnStartgg(me);
     if (!found) return replyEphemeralAfterDefer(interaction, noCodeOnStartgg(me));
     profile = await slippi.getProfileByCode(found);
-    if (!profile) return replyEphemeralAfterDefer(interaction, `Slippi has nobody with the code ${found}.`);
+    if (!profile) return replyEphemeralAfterDefer(interaction, `Slippi has nobody with the code ${found}.${typed ? nearestWatched(found) : ''}`);
     // on the watchlist under a code they've since changed
     entry = state.slippi[profile.uid] ?? null;
   }

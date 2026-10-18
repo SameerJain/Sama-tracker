@@ -4,10 +4,14 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, newTracked, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts } from '../accounts.js';
-import { findPlayer, lookup, replyEphemeral, sendEmbeds, flag } from './shared.js';
+import { findPlayer, lookup, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag } from './shared.js';
+import { askFirst, confirmable } from './confirm.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
+
+// /reg_warn pings someone once per tournament in this long
+const REG_WARN_COOLDOWN_HOURS = 12;
 
 // discord takes this many ids a request when checking who's in the server
 const MEMBERS_PER_FETCH = 100;
@@ -102,17 +106,27 @@ async function setRegReminder(interaction) {
   return interaction.editReply({ content: `Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/reg_role\` to turn yours on.${tracked}`, allowedMentions: { parse: [] } });
 }
 
+// asks first, there's no undo and a reg admin's reminder doesn't come back
 function deleteRegReminder(interaction) {
   const value = interaction.options.getString('tournament', true).toLowerCase();
   const reminder = lookup(state.regReminders, value, 'name');
   if (!reminder) return replyEphemeral(interaction, 'No reminder set for that.');
-
-  delete state.regReminders[reminder.id];
-  // so a reg admin's doesn't get added back
-  state.regSkipped = [...state.regSkipped, reminder.id].slice(-200);
-  save();
-  return interaction.reply({ content: `Deleted the reminder for ${reminder.name}.`, allowedMentions: { parse: [] } });
+  return askFirst(interaction, 'unremind', reminder.id, `Delete the reg reminders for ${reminder.name}? Nobody gets pinged for it after this, and \`/set_reg_reminder\` is the only way to bring them back.`, 'Delete');
 }
+
+confirmable('unremind', {
+  command: '/delete_reg_reminder',
+  run: (id) => {
+    const reminder = state.regReminders[id];
+    if (!reminder) return { content: 'That reminder is already gone.' };
+    delete state.regReminders[id];
+    // so a reg admin's doesn't get added back
+    state.regSkipped = [...state.regSkipped, reminder.id].slice(-200);
+    save();
+    return { content: `Deleted the reminder for ${reminder.name}.` };
+  },
+  cancel: (id) => (state.regReminders[id] ? `Kept the reminder for ${state.regReminders[id].name}.` : 'That reminder is already gone.'),
+});
 
 async function regAdminAdd(interaction) {
   const input = interaction.options.getString('profile', true);
@@ -269,9 +283,9 @@ async function regWarn(interaction) {
 
   const participants = await startgg.getParticipants(tournament.id);
   rememberAccounts(participants);
+  const name = escapeMarkdown(interaction.options.getMember('user')?.displayName ?? user.displayName);
   if (participants.some((participant) => participant.discordId === user.id)) {
-    const name = interaction.options.getMember('user')?.displayName ?? user.displayName;
-    return interaction.editReply({ content: `Already registered.\n-# ${escapeMarkdown(name)} · ${escapeMarkdown(tournament.name)}`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: `Already registered.\n-# ${name} · ${escapeMarkdown(tournament.name)}`, allowedMentions: { parse: [] } });
   }
   const deadline = regDeadline(tournament);
   if (deadline <= secondsNow()) return interaction.editReply({ content: `Registration for ${tournament.name} already closed.`, allowedMentions: { parse: [] } });
@@ -280,6 +294,16 @@ async function regWarn(interaction) {
   if (startgg.attendeesHidden(tournament, participants)) {
     return interaction.editReply({ content: `start.gg hides who's registered for ${escapeMarkdown(tournament.name)}, so there's no telling if they are. No warning sent.`, allowedMentions: { parse: [] } });
   }
+  // two people warning the same person about the same tournament is one too many. checked last, with nothing
+  // awaited before it's saved, so two at once can't both get through
+  const now = secondsNow();
+  state.regWarned = state.regWarned.filter((each) => each.at > now - REG_WARN_COOLDOWN_HOURS * 60 * 60);
+  const earlier = state.regWarned.find((each) => String(each.tournamentId) === String(tournament.id) && each.discordId === user.id);
+  if (earlier) {
+    return replyEphemeralAfterDefer(interaction, `${name} was already warned about ${escapeMarkdown(tournament.name)} <t:${earlier.at}:R>. They can be warned again <t:${earlier.at + REG_WARN_COOLDOWN_HOURS * 60 * 60}:R>.`);
+  }
+  state.regWarned = [...state.regWarned, { tournamentId: tournament.id, discordId: user.id, at: now }].slice(-200);
+  save();
 
   // editing the reply wouldn't ping them, and a follow-up shows "Original message was deleted"
   // once the thinking reply is gone, so the warning goes in the channel as its own message

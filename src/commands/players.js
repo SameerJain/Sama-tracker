@@ -5,6 +5,7 @@ import { state, save } from '../store.js';
 import { RUNS_LATE_HOURS, checkTournaments, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
 import { findAccount } from '../accounts.js';
 import { buttonRow, findPlayer, h2hButton, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
+import { askFirst, confirmable, undoRow } from './confirm.js';
 
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
@@ -27,14 +28,31 @@ async function trackAdd(interaction) {
   checkTournaments();
 }
 
-async function trackRemove(interaction) {
+// asks first, then has an Undo button for a minute that puts them back with every setting they had
+function trackRemove(interaction) {
   const player = readPlayer(interaction, 'player', { trackedOnly: true });
   if (!player) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
-
-  delete state.players[player.userId];
-  save();
-  await interaction.reply({ content: `Stopped tracking ${player.tag}.`, allowedMentions: { parse: [] } });
+  return askFirst(interaction, 'untrack', player.userId, `Stop tracking ${player.tag}? Their set result, stream alert and match call settings go with them.`, 'Stop tracking');
 }
+
+confirmable('untrack', {
+  command: '/track remove',
+  run: (userId) => {
+    const player = state.players[userId];
+    if (!player) return { content: 'They aren\'t tracked anymore.' };
+    delete state.players[userId];
+    save();
+    return { content: `Stopped tracking ${player.tag}.`, undo: player };
+  },
+  cancel: (userId) => (state.players[userId] ? `Still tracking ${state.players[userId].tag}.` : 'They aren\'t tracked anymore.'),
+  undo: (player) => {
+    if (state.players[player.userId]) return `${player.tag} is already tracked again.`;
+    state.players[player.userId] = player;
+    save();
+    return `Tracking ${player.tag} again, with the same settings as before.`;
+  },
+  tooLate: 'Too late to undo. `/track add` them again, with set results, stream alerts and match call pings starting off.',
+});
 
 // only lets commands default to them, they don't get tracked.
 // their start.gg has to have this discord connected so nobody can link as someone else
@@ -86,17 +104,30 @@ function noLinkNeeded(player) {
   return `No need to link. You're tracked as ${player.tag} with this Discord on your start.gg, so leaving the player out of a command already looks you up.`;
 }
 
+// an Undo button puts the link back for a minute after
 function unlink(interaction) {
   const linked = state.links[interaction.user.id];
+  if (!linked) return replyEphemeral(interaction, 'You weren\'t linked.');
   delete state.links[interaction.user.id];
-  if (linked) save();
-  let content = linked ? `Unlinked from ${linked.tag}.` : 'You weren\'t linked.';
+  save();
+  let content = `Unlinked from ${linked.tag}.`;
   // tracked with discord connected still counts
   const still = linkedPlayer(interaction.user.id);
   if (still) content += ` Commands still find you as ${still.tag}, since you're tracked with this Discord on your start.gg.`;
-  else if (linked) content += ' Leaving the player blank won\'t find you now, you\'re off the player list and `/scout` needs a link.';
-  return replyEphemeral(interaction, content);
+  else content += ' Leaving the player blank won\'t find you now, you\'re off the player list and `/scout` needs a link.';
+  return interaction.reply({ content, components: undoRow(interaction, 'unlink', linked.userId, linked), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 }
+
+confirmable('unlink', {
+  command: '/unlink',
+  undo: (linked, discordId) => {
+    if (state.links[discordId]) return `You've linked ${state.links[discordId].tag} since, so that stays.`;
+    state.links[discordId] = linked;
+    save();
+    return `Linked to ${linked.tag} again.`;
+  },
+  tooLate: 'Too late to undo. `/link` again with your start.gg profile link.',
+});
 
 // goes by the discord connected on start.gg, so nobody can claim someone else's
 // a tracked or linked pick beats the server member picker, and needs no start.gg lookup

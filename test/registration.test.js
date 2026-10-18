@@ -174,6 +174,7 @@ test('reg_warn says already registered without a mention or a ping', async () =>
 
 test('reg_warn pings someone who is not registered in a channel message, not a follow-up', async () => {
   mockStartgg();
+  state.regWarned = [];
   const run = interaction('reg_warn', { tournament: 'start.gg/tournament/local' }, { id: 'slacker', displayName: 'Slacker' });
   await handleCommand(run);
   // a follow-up would show "Original message was deleted" above it
@@ -210,8 +211,33 @@ test('reg_warn sends nothing when start.gg hides who is registered', async () =>
   assert.doesNotMatch(content, /<@/);
 });
 
+test('a second reg_warn for the same person and tournament within 12 hours sends nothing, and tells only whoever ran it', async () => {
+  mockStartgg();
+  state.regWarned = [];
+  const first = interaction('reg_warn', { tournament: 'local' }, { id: 'slacker', displayName: 'Slacker' });
+  await handleCommand(first);
+  assert.ok(first.calls.some(([kind]) => kind === 'send'));
+
+  const again = interaction('reg_warn', { tournament: 'local' }, { id: 'slacker', displayName: 'Slacker' });
+  await handleCommand(again);
+  assert.ok(!again.calls.some(([kind]) => kind === 'send'), 'warned twice');
+  const [, told] = again.calls.at(-1);
+  assert.match(told.content, /^Slacker was already warned about Local <t:\d+:R>\. They can be warned again <t:\d+:R>\.$/);
+  assert.ok(told.flags, 'the cooldown reply is ephemeral');
+
+  // someone else, or the same person 12 hours on, still gets warned
+  const other = interaction('reg_warn', { tournament: 'local' }, { id: 'other', displayName: 'Other' });
+  await handleCommand(other);
+  assert.ok(other.calls.some(([kind]) => kind === 'send'));
+  state.regWarned = state.regWarned.map((each) => ({ ...each, at: each.at - 12 * 3600 - 1 }));
+  const later = interaction('reg_warn', { tournament: 'local' }, { id: 'slacker', displayName: 'Slacker' });
+  await handleCommand(later);
+  assert.ok(later.calls.some(([kind]) => kind === 'send'));
+});
+
 test('reg_warn falls back to a follow-up when it cannot post in the channel', async () => {
   mockStartgg();
+  state.regWarned = [];
   const missingAccess = async () => { throw new Error('Missing Permissions'); };
   const run = interaction('reg_warn', { tournament: 'local' }, { id: 'slacker', displayName: 'Slacker' }, missingAccess);
   await handleCommand(run);
@@ -223,6 +249,7 @@ test('reg_warn falls back to a follow-up when it cannot post in the channel', as
 
 test('reg_warn does not ping once registration closed, or for bots', async () => {
   mockStartgg(now - 60);
+  state.regWarned = [];
   const closed = interaction('reg_warn', { tournament: 'local' }, { id: 'slacker', displayName: 'Slacker' });
   await handleCommand(closed);
   assert.deepEqual(closed.calls.map(([kind]) => kind), ['defer', 'edit']);

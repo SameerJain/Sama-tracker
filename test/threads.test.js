@@ -51,10 +51,10 @@ function fakeChannel({ allowed = BOTH, threads = new Map() } = {}) {
 }
 
 const tournament = (name) => ({ name, slug: `tournament/${name.toLowerCase()}`, images: [] });
-const node = (id, at, inTournament, state = 3) => ({
+const node = (id, at, inTournament, state = 3, eventName = 'Singles') => ({
   id, state, completedAt: at, updatedAt: at, winnerId: 10, fullRoundText: 'Winners round 1',
   stream: state === 3 ? null : { streamName: 'example', streamSource: 'TWITCH' },
-  event: { name: 'Singles', slug: `${inTournament.slug}/event/singles`, videogame: { displayName: 'Ultimate' }, tournament: inTournament },
+  event: { name: eventName, slug: `${inTournament.slug}/event/${eventName.toLowerCase()}`, videogame: { displayName: 'Ultimate' }, tournament: inTournament },
   slots: [10, 99].map((id, i) => ({
     entrant: { id, name: i ? 'Opponent' : 'Active', initialSeedNum: i + 1, participants: [{ player: { id } }] },
     standing: { stats: { score: { value: i ? 1 : 2 } } },
@@ -67,7 +67,7 @@ globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { 
 const now = () => Math.floor(Date.now() / 1000);
 beforeEach(() => {
   state.players = { 1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active', lastCheck: now() - 120, setResults: true, streamAlerts: true } };
-  state.messages = { threads: true };
+  state.messages = { threads: 'tournament' };
   Object.assign(state, { posted: [], dqs: [], streamed: [], called: [], tournaments: {}, threads: {}, streamPings: [] });
   tracker.health.threadError = null;
 });
@@ -98,6 +98,55 @@ test('one thread per tournament, started by a card in the channel and reused by 
   const saved = JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).threads;
   assert.equal(saved['tournament/local'].id, local.id);
   assert.equal(saved['tournament/weekly'].id, weekly.id);
+});
+
+test('one thread per event, named for the tournament and event, apart from the per-tournament threads', async () => {
+  state.messages = { threads: 'event' };
+  const channel = fakeChannel();
+  sets = [
+    node('s1', now() - 40, tournament('Local')), node('d1', now() - 30, tournament('Local'), 3, 'Doubles'),
+    node('s2', now() - 20, tournament('Local')), node('w1', now() - 10, tournament('Weekly')),
+  ];
+  await tracker.postNewSets(channel);
+
+  assert.deepEqual(channel.sent.map(message => message.embeds[0].data.author.name), ['Event thread', 'Event thread', 'Event thread']);
+  assert.deepEqual(channel.sent.map(message => message.embeds[0].data.title), ['Local', 'Local', 'Weekly']);
+  assert.match(channel.sent[1].embeds[0].data.description, /^\*\*Doubles\*\* · Ultimate\n/);
+  const [singles, doubles, weekly] = channel.threads.all.values();
+  assert.deepEqual([singles.name, doubles.name, weekly.name], ['Local · Singles', 'Local · Doubles', 'Weekly · Singles']);
+  assert.deepEqual([singles.sent.length, doubles.sent.length, weekly.sent.length], [2, 1, 1]);
+  assert.deepEqual(Object.keys(state.threads), ['tournament/local/event/singles', 'tournament/local/event/doubles', 'tournament/weekly/event/singles']);
+
+  // the per-tournament thread is its own, and both stay saved for switching back
+  state.messages = { threads: 'tournament' };
+  sets = [node('s3', now(), tournament('Local'))];
+  await tracker.postNewSets(channel);
+  assert.equal(channel.sent.at(-1).embeds[0].data.author.name, 'Tournament thread');
+  assert.equal(channel.threads.all.size, 4);
+  assert.equal(Object.keys(state.threads).length, 4);
+});
+
+test('a long tournament name is cut so the event name still fits in 100 characters', async () => {
+  state.messages = { threads: 'event' };
+  const channel = fakeChannel();
+  sets = [node('long', now(), tournament('X'.repeat(120)), 3, 'Ultimate Singles')];
+  await tracker.postNewSets(channel);
+  const [thread] = channel.threads.all.values();
+  assert.equal(thread.name.length, 100);
+  assert.ok(thread.name.endsWith('X · Ultimate Singles'));
+});
+
+test('threads saved as true before the three modes mean one per tournament', async () => {
+  const { messageSettings } = await import('../src/message-settings.js');
+  for (const [saved, mode] of [[true, 'tournament'], [false, 'off'], [undefined, 'off'], ['event', 'event'], ['nonsense', 'off']]) {
+    state.messages = { threads: saved };
+    assert.equal(messageSettings().threads, mode, `saved ${saved}`);
+  }
+  state.messages = { threads: true };
+  const channel = fakeChannel();
+  sets = [node('legacy', now(), tournament('Local'))];
+  await tracker.postNewSets(channel);
+  assert.equal(channel.sent[0].embeds[0].data.author.name, 'Tournament thread');
 });
 
 test('after a restart the saved thread is used again, and a deleted one is replaced', async () => {
@@ -176,7 +225,7 @@ async function configure(values, channel) {
   await handleCommand({
     commandName: 'messages', memberPermissions: { has: permission => permission === PermissionFlagsBits.ManageGuild },
     client: { channels: { cache: new Map(channel ? [['posts', channel]] : []) } },
-    options: { getSubcommand: () => null, getBoolean: name => values[name] ?? null, getString: () => null, getInteger: () => null },
+    options: { getSubcommand: () => null, getBoolean: name => values[name] ?? null, getString: name => values[name] ?? null, getInteger: () => null },
     reply: async result => { reply = result; },
   });
   return reply.content;
@@ -184,26 +233,31 @@ async function configure(values, channel) {
 
 test('/messages threads checks the bot can start threads before turning them on', async () => {
   state.messages = {};
-  let reply = await configure({ threads: true, sets: false }, fakeChannel({ allowed: ['CreatePublicThreads'] }));
+  let reply = await configure({ threads: 'tournament', sets: false }, fakeChannel({ allowed: ['CreatePublicThreads'] }));
   assert.equal(reply, 'I need Send Messages in Threads in <#posts> to start threads. Add them to my role or the channel, then try again.');
   assert.deepEqual(state.messages, {}, 'nothing else changes either');
 
-  reply = await configure({ threads: true }, fakeChannel({ allowed: [] }));
+  reply = await configure({ threads: 'event' }, fakeChannel({ allowed: [] }));
   assert.match(reply, /Create Public Threads and Send Messages in Threads/);
 
   // a voice channel's chat has no threads
   const voiceChat = { ...fakeChannel(), threads: undefined };
-  reply = await configure({ threads: true }, voiceChat);
+  reply = await configure({ threads: 'tournament' }, voiceChat);
   assert.equal(reply, 'Threads can\'t be started in <#posts>, so posts stay in the channel.');
 
-  reply = await configure({ threads: true }, fakeChannel());
-  assert.match(reply, /Tournament threads:\*\* on/);
-  assert.equal(state.messages.threads, true);
+  reply = await configure({ threads: 'tournament' }, fakeChannel());
+  assert.match(reply, /\*\*Threads:\*\* One thread per tournament\n/);
+  assert.match(reply, /`threads` has three modes/);
+  assert.equal(state.messages.threads, 'tournament');
+
+  reply = await configure({ threads: 'event' }, fakeChannel());
+  assert.match(reply, /\*\*Threads:\*\* One thread per event\n/);
+  assert.equal(state.messages.threads, 'event');
 
   // turning it off needs no permissions
-  reply = await configure({ threads: false });
-  assert.match(reply, /Tournament threads:\*\* off/);
-  assert.equal(state.messages.threads, false);
+  reply = await configure({ threads: 'off' });
+  assert.match(reply, /\*\*Threads:\*\* Off, post in the channel\n/);
+  assert.equal(state.messages.threads, 'off');
 });
 
 test('missingThreadPermissions names what the channel lacks', () => {

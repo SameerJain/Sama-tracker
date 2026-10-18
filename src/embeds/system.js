@@ -61,7 +61,7 @@ export function status(info) {
     if (info.slippiError) slippiCheck += `, last try failed (${escapeMarkdown(info.slippiError)})`;
     lines.push(`**Slippi ranks checked:** ${slippiCheck} · ${count(info.slippi, 'player')} on the watchlist`);
   }
-  if (info.threadError) lines.push(`**Tournament threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
+  if (info.threadError) lines.push(`**Threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
   if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
@@ -93,14 +93,14 @@ export function help() {
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
-      '`/messages` automatic posts on or off, tournament threads and the recap schedule. Needs Manage Server',
+      '`/messages` automatic posts on or off, threads and the recap schedule. Needs Manage Server',
     ],
     [
       '**Tracking players**',
       '`/track add` track someone by start.gg link or ID',
-      '`/track remove` stop tracking someone',
+      '`/track remove` stop tracking someone. Asks first, then Undo puts them back with their settings for a minute',
       '`/track list` everyone tracked',
-      '`/sets` automatic set results on or off',
+      '`/sets` automatic set results on or off. Off for everyone asks first',
       '`/stream` stream alerts on or off',
       '`/stream_pings` get pinged for every stream alert, on or off. Just for you, no tracking needed',
       '`/calls` match call pings on or off',
@@ -112,7 +112,7 @@ export function help() {
     [
       '**Linking yourself**',
       '`/link` tie your Discord to your start.gg. Leave out the link and it finds yours',
-      '`/unlink` undo that',
+      '`/unlink` undo that, with an Undo button for a minute',
       '-# Tracking posts someone\'s results here. Linking posts nothing, it just tells commands who you are: a blank player means you, `/scout` works and others can pick you. Tracked players with Discord on start.gg don\'t need it',
     ],
     [
@@ -129,7 +129,8 @@ export function help() {
       '-# `/h2h`, `/predict` and `/scout` also take a start.gg link or ID, for players nobody tracks',
       '-# Your commands take start.gg turns one at a time. One sent while another loads says Queued and starts after it, up to 3 waiting. A public report done over a minute after you asked comes in a new message that pings you',
       '-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, match calls and stream alerts have head-to-head buttons for the set coming up, which come off when it ends',
-      '-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation',
+      '-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation. A name that matches nobody gets the closest one suggested',
+      '-# An event named for Melee but tagged on start.gg as Ultimate counts as Melee, and the other way around',
     ],
     [
       '**Slippi ranked**',
@@ -142,11 +143,11 @@ export function help() {
     [
       '**Registration**',
       '`/set_reg_reminder` remind people to register, and track everyone registered',
-      '`/delete_reg_reminder` cancel one',
+      '`/delete_reg_reminder` cancel one. Asks first',
       '`/reg_admin` TOs whose start.gg tournaments get reminders automatically',
       '`/reg_role` reminder pings on or off. Skipped once you\'re registered, if start.gg has your Discord',
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
-      '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so',
+      '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours',
       '`/bracket` bracket links for reminder tournaments that are live or start within 30 min',
       '`/stream_link` stream links for tracked and reminder tournaments that are live or start within 30 min',
       '-# `tournament:` takes a link or one the bot knows',
@@ -165,16 +166,16 @@ export function help() {
     ],
     [
       '**Posted here automatically**',
-      '• finished sets of players with `/sets` on, and their first DQ in an event',
+      '• finished sets of players with `/sets` on, and their first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked',
       '• sets on stream or up next in the stream queue for 30 seconds, for players with `/stream` on, pinging everyone with `/stream_pings` on',
-      '• called sets, pinging players with `/calls` on whose Discord is on start.gg, all four in one message for doubles',
+      '• called sets, pinging players with `/calls` on whose Discord is on start.gg, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
       '• a roll call an hour before a tournament with 3+ of the crew',
       '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
-      '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting',
+      '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting. Projected placements get edited once start.gg has them final',
       '• with `/messages top8` on, the full top 8 of each event the crew played in, at the same time',
       '• Slippi rank changes for the watchlist, checked every 30 minutes',
       '• a weekly recap of players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
-      '-# With `/messages threads` on, set results and stream alerts go in a thread per tournament. If the thread can\'t be used, they post here',
+      '-# `/messages threads` has three modes for set results and stream alerts: off, one thread per tournament, or one thread per event. If a thread can\'t be used, they post here',
     ],
   ];
   return withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections);

@@ -180,11 +180,12 @@ const runs = [
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
   ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results, stream alerts and match call pings start off/],
   ['track', { subcommand: 'list' }, /Tracking 3/],
-  ['track', { subcommand: 'remove', values: { player: '3' } }, /Stopped tracking Opponent/],
+  // press answers the Are you sure the command asked
+  ['track', { subcommand: 'remove', values: { player: '3' }, press: 'Stop tracking' }, /Stop tracking Opponent\?.*"update",\{"content":"Stopped tracking Opponent\.".*"label":"Undo"/],
   ['link', { values: { profile: 'start.gg/user/opponent' }, user: 'opponent-discord' }, /Linked to Opponent/],
   // left out, it searches the accounts the bot has seen, and nobody has this discord
   ['link', { user: 'stranger-discord' }, /Couldn't find a start\.gg with this Discord connected/],
-  ['unlink', { user: 'opponent-discord' }, /Unlinked from Opponent/],
+  ['unlink', { user: 'opponent-discord' }, /Unlinked from Opponent.*"label":"Undo"/],
   ['profile', {}, /"title":"Crew","url":"https:\/\/www\.start\.gg\/user\/crew"/],
   ['profile', { values: { player: '2' } }, /"title":"Rival","url":"https:\/\/www\.start\.gg\/user\/rival"/],
   ['profile', { values: { user: { id: 'stranger', bot: false, displayName: 'Stranger' } } }, /Couldn't find a start\.gg with Stranger's Discord connected/],
@@ -240,7 +241,7 @@ const runs = [
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
   ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
   ['stream_pings', { values: { ping: 'on' } }, /pinged for every stream alert/],
-  ['sets', { values: { player: 'all', results: 'off' } }, /Set results off for everyone/],
+  ['sets', { values: { player: 'all', results: 'off' }, press: 'Turn off' }, /Turn set results off for all 2 tracked players\?.*"update",\{"content":"Set results off for everyone\."/],
   ['calls', { values: { player: 'all', pings: 'off' } }, /Match call pings off for everyone/],
   ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1","thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}/],
   // left out, it's the code on crew's start.gg netplay registrations
@@ -253,7 +254,7 @@ const runs = [
   ['slippi', { subcommand: 'leaderboard' }, /"thumbnail":\{"url":"attachment:\/\/slippi\.png"\}.*Nobody on the watchlist yet.*"files":\[\{"attachment":"[^"]+slippi\.png","name":"slippi\.png"\}\]/],
   ['slippi', { subcommand: 'add', values: { code: 'crew-1' } }, /Added Crew to the Slippi watchlist/],
   ['set_reg_reminder', { values: { tournament: 'start.gg/tournament/soon' } }, /gets pinged 12 hours before registration for Soon ends/],
-  ['delete_reg_reminder', { values: { tournament: 'soon' } }, /Deleted the reminder for Soon/],
+  ['delete_reg_reminder', { values: { tournament: 'soon' }, press: 'Delete' }, /Delete the reg reminders for Soon\?.*"update",\{"content":"Deleted the reminder for Soon\."/],
   ['reg_admin', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Opponent is an admin of/],
   ['reg_admin', { subcommand: 'list' }, /Reg admins · 1/],
   ['reg_admin', { subcommand: 'remove', values: { admin: '3' } }, /No more automatic reminders/],
@@ -287,6 +288,12 @@ test('every command and subcommand answers without throwing', async () => {
     const label = `/${name} ${options.subcommand ?? ''}`;
     const run = interaction(name, options);
     await runningCommand.run(run, () => handleCommand(run));
+    if (options.press) {
+      const asked = run.calls.find(([kind]) => kind === 'reply')?.[1];
+      const button = asked?.components?.flatMap((row) => row.toJSON().components).find((each) => each.label === options.press);
+      assert.ok(button, `${label} has no ${options.press} button`);
+      await handleButton({ customId: button.custom_id, user: run.user, update: async (result) => run.calls.push(['update', result]), editReply: async () => {} });
+    }
     covered.add(options.subcommand ? `${name} ${options.subcommand}` : name);
     assert.deepEqual(run.waitedOn, [], `${label} waits on ${run.waitedOn.join(', ')} before answering, so discord can give up on it`);
     const answers = run.calls.filter(([kind]) => kind !== 'defer');
@@ -311,7 +318,7 @@ test('command replies naming a player never ping, even for a tag like @everyone'
   const remove = interaction('track', { subcommand: 'remove', values: { player: '9' } });
   await runningCommand.run(remove, () => handleCommand(remove));
   const said = remove.calls.find(([kind]) => kind === 'reply')?.[1];
-  assert.match(said.content, /Stopped tracking/);
+  assert.match(said.content, /Stop tracking @everyone\?/);
   assert.deepEqual(said.allowedMentions, { parse: [] });
 
   state.players = { 9: { userId: 9, playerId: 90, tag: '@everyone', slug: 'user/evil' } };

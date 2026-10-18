@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
-import { getActivePlayers, getCharacterSets, getEventHistory, getHeadToHead, getSetHistory, getStats } from '../src/startgg.js';
+import { getActivePlayers, getCharacterSets, getEventHistory, getHeadToHead, getSetHistory, getStats, queueLength } from '../src/startgg.js';
 import { predict } from '../src/predict.js';
 
 const originalFetch = globalThis.fetch;
@@ -121,6 +121,72 @@ test('head-to-head pages stay below the object limit when opponent results inclu
     return { ok: true, json: async () => body };
   };
   assert.deepEqual((await settle(getHeadToHead(10, 20))).map((set) => set.id), ['singles']);
+});
+
+// a top player's history page came back at 1003 objects from an h2h button on a stream alert
+test('a history page over the object limit gets asked for again as two halves covering the same sets', async () => {
+  const nodes = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, completedAt: 1000 - i, winnerId: 10, event, slots }));
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const { variables: { page, perPage } } = JSON.parse(options.body);
+    calls.push([page, perPage]);
+    const selected = nodes.slice((page - 1) * perPage, page * perPage);
+    const body = selected.length * 26 + 4 > 1000
+      ? { errors: [{ message: 'Your query complexity is too high. A maximum of 1000 objects may be returned by each request. (actual: 1003)' }] }
+      : { data: { player: { sets: { pageInfo: { totalPages: Math.ceil(nodes.length / perPage) }, nodes: selected } } } };
+    return { ok: true, json: async () => body };
+  };
+
+  const { totalPages, sets } = await settle(getSetHistory(10, 2));
+  assert.deepEqual(calls, [[2, 40], [3, 20], [4, 20]]);
+  assert.equal(totalPages, 3);
+  assert.deepEqual(sets.map((set) => set.id), Array.from({ length: 40 }, (_, i) => String(i + 41)));
+});
+
+test('stats keep their standings when the first page gets split', async () => {
+  const nodes = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, completedAt: 100 - i, winnerId: 10, event, slots }));
+  const standings = [{ placement: 2, isFinal: true, entrant: { initialSeedNum: 3, isDisqualified: false, event } }];
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const { variables: { page, perPage, standings: withStandings } } = JSON.parse(options.body);
+    calls.push([page, perPage, withStandings]);
+    const selected = nodes.slice((page - 1) * perPage, page * perPage);
+    const body = selected.length * 34 > 1000
+      ? { errors: [{ message: 'Query complexity exceeds 1000 objects' }] }
+      : { data: { player: { recentStandings: withStandings ? standings : undefined, sets: { pageInfo: { totalPages: Math.ceil(nodes.length / perPage) }, nodes: selected } } } };
+    return { ok: true, json: async () => body };
+  };
+
+  const stats = await settle(getStats(10));
+  assert.deepEqual(calls, [[1, 30, true], [1, 15, true], [2, 15, false]]);
+  assert.equal(stats.standings.length, 1);
+  assert.equal(stats.sets.length, 30);
+});
+
+test('a page still over the limit at 5 sets fails with start.gg’s error instead of splitting forever', async () => {
+  const sizes = [];
+  // other errors don't split
+  globalThis.fetch = async (_url, options) => {
+    sizes.push(JSON.parse(options.body).variables.perPage);
+    return { ok: true, json: async () => ({ errors: [{ message: 'Player not found' }] }) };
+  };
+  await assert.rejects(settle(getSetHistory(10, 1)), /Player not found/);
+  assert.deepEqual(sizes, [40]);
+
+  sizes.length = 0;
+  globalThis.fetch = async (_url, options) => {
+    sizes.push(JSON.parse(options.body).variables.perPage);
+    return { ok: true, json: async () => ({ errors: [{ message: 'Query complexity exceeds 1000 objects' }] }) };
+  };
+  await assert.rejects(settle(getHeadToHead(10, 20)), /complexity/);
+  // 30, then two 15s, then 15s as three 5s, and the first 5 that goes over ends it
+  assert.deepEqual(sizes.slice(0, 3), [30, 15, 15]);
+  assert.deepEqual([...new Set(sizes)], [30, 15, 5]);
+  // the other 5s were already queued, so they go out before the next test's fake goes in
+  while (queueLength()) {
+    mock.timers.tick(100);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 });
 
 // old sets far back in someone's history can have their event deleted. /scout verbose crashed on one in predict

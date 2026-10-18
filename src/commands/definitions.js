@@ -1,6 +1,6 @@
 import { ApplicationCommandOptionType as Option, ApplicationCommandType, PermissionFlagsBits } from 'discord.js';
 import * as startgg from '../startgg.js';
-import { MESSAGE_TYPES, WEEKDAYS } from '../message-settings.js';
+import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS } from '../message-settings.js';
 import { funCommands } from '../fun/index.js';
 
 // /characters game choices. left out, it goes with whichever has more reported
@@ -44,11 +44,14 @@ function venueOption() {
 export const commands = [
   { name: 'help', description: 'Show commands' },
   {
-    name: 'messages', description: 'Show or change automatic posts and the weekly recap schedule',
+    name: 'messages', description: 'Show or change automatic posts, threads and the weekly recap schedule',
     default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
     options: [
       ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
-      { type: Option.Boolean, name: 'threads', description: 'Put set results and stream alerts in a thread per tournament' },
+      {
+        type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
+        choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
+      },
       { type: Option.Integer, name: 'recap_day', description: 'Day of the weekly recap', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
       { type: Option.String, name: 'recap_time', description: 'Weekly recap time in 24-hour HH:MM, like 21:00' },
       { type: Option.String, name: 'timezone', description: 'Recap timezone, like America/New_York or Europe/London' },
@@ -91,7 +94,7 @@ export const commands = [
       {
         type: Option.Subcommand,
         name: 'remove',
-        description: 'Stop tracking a player',
+        description: 'Stop tracking a player. Asks first, then Undo puts them back for a minute',
         options: [playerOption('Tracked player')],
       },
       { type: Option.Subcommand, name: 'list', description: 'List tracked players' },
@@ -102,7 +105,7 @@ export const commands = [
     description: 'Link your own start.gg so commands know who you are. Unlike /track, nothing gets posted',
     options: [{ type: Option.String, name: 'profile', description: 'Your start.gg profile link or ID. Leave out to find it by the Discord connected on start.gg' }],
   },
-  { name: 'unlink', description: 'Undo /link. Doesn\'t change whether you\'re tracked' },
+  { name: 'unlink', description: 'Remove your /link, with an Undo button for a minute. Doesn\'t change whether you\'re tracked' },
   {
     name: 'profile',
     description: 'Someone\'s start.gg profile, once the bot has seen their account',
@@ -210,7 +213,7 @@ export const commands = [
   },
   {
     name: 'sets',
-    description: 'Turn automatic set results on or off. Newly tracked players start with them off',
+    description: 'Turn automatic set results on or off. Newly tracked players start off. All off asks first',
     options: [
       playerOption('Tracked player, or all'),
       {
@@ -269,7 +272,7 @@ export const commands = [
   },
   {
     name: 'delete_reg_reminder',
-    description: 'Cancel a registration reminder',
+    description: 'Cancel a registration reminder. Asks first',
     options: [{ type: Option.String, name: 'tournament', description: 'Tournament with a reminder', required: true, autocomplete: true }],
   },
   {
@@ -292,7 +295,7 @@ export const commands = [
     ],
   },
   { name: 'bracket', description: 'Bracket links for reg reminder tournaments that are live or start within 30 min' },
-  { name: 'stream_link', description: 'Stream links for tracked tournaments that are live or start within 30 min' },
+  { name: 'stream_link', description: 'Stream links for tracked and reminder tournaments that are live or start within 30 min' },
   {
     name: 'reg_role',
     description: 'Reg reminder pings for yourself, on or off',
@@ -314,7 +317,7 @@ export const commands = [
   },
   {
     name: 'reg_warn',
-    description: 'Warn someone who isn\'t registered for a tournament yet. No ping if they are',
+    description: 'Warn someone who isn\'t registered for a tournament yet. No ping if they are, or got one in 12h',
     options: [
       { type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true },
       { type: Option.User, name: 'user', description: 'Who to check', required: true },

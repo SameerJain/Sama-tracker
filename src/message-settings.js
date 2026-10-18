@@ -6,6 +6,8 @@ export const MESSAGE_TYPES = {
   results: 'Tournament placements', top8: 'Top 8s', registration: 'Registration reminders', slippi: 'Slippi rank changes',
   recap: 'Weekly crew recap',
 };
+// where set results and stream alerts go, named the way /messages lists them
+export const THREAD_MODES = { off: 'Off, post in the channel', tournament: 'One thread per tournament', event: 'One thread per event' };
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 // only an explicit on counts for these, everything else starts on
 const OFF_BY_DEFAULT = ['calls', 'top8'];
@@ -20,5 +22,8 @@ export function messageEnabled(type, dueAt) {
 
 export function messageSettings() {
   const defaults = Object.fromEntries(Object.keys(MESSAGE_TYPES).map((type) => [type, !OFF_BY_DEFAULT.includes(type)]));
-  return { ...defaults, ...DEFAULT_RECAP_SCHEDULE, ...state.messages };
+  const saved = state.messages?.threads;
+  // saved as true or false before there were three modes
+  const threads = saved === true ? 'tournament' : Object.hasOwn(THREAD_MODES, saved ?? '') ? saved : 'off';
+  return { ...defaults, ...DEFAULT_RECAP_SCHEDULE, ...state.messages, threads };
 }

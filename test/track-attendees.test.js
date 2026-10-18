@@ -54,15 +54,15 @@ test('attendees come back with the account behind each one, and the filter goes 
 
   const attendees = await getAttendees(9, { eventIds: ['1682422'] });
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0].variables, { id: 9, page: 1, eventIds: ['1682422'] });
-  assert.match(calls[0].query, /participants\(query: \{ page: \$page, perPage: 100, filter: \{ eventIds: \$eventIds \} \}\)/);
+  assert.deepEqual(calls[0].variables, { id: 9, page: 1, perPage: 100, eventIds: ['1682422'] });
+  assert.match(calls[0].query, /participants\(query: \{ page: \$page, perPage: \$perPage, filter: \{ eventIds: \$eventIds \} \}\)/);
   assert.deepEqual(attendees[0], { userId: '1', playerId: 10, slug: 'user/crew', tag: 'Crew', image: 'https://images.example/crew.png', discordId: 'crew-discord' });
   // a TO can add people who never made an account
   assert.equal(attendees[1].userId, undefined);
   assert.equal(attendees[1].tag, 'Walk Up');
 
   await getAttendees(9);
-  assert.deepEqual(calls[1].variables, { id: 9, page: 1 });
+  assert.deepEqual(calls[1].variables, { id: 9, page: 1, perPage: 100 });
   assert.ok(!calls[1].query.includes('$eventIds'));
 });
 

@@ -18,6 +18,7 @@ export const colors = {
   bills: 0x00338d,
   reg: 0xdc2626,
   regEarly: 0xf59e0b,
+  reset: 0x6b7280, // a result the TO took back
 };
 
 // double elim placements: 1, 2, 3, 4, 5, 7, 9, 13, 17, 25...

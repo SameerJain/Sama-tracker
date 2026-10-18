@@ -1,8 +1,9 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { state, save } from '../store.js';
 import { missingThreadPermissions, secondsNow } from '../tracker.js';
-import { MESSAGE_TYPES, WEEKDAYS, messageSettings } from '../message-settings.js';
+import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS, messageSettings } from '../message-settings.js';
 import { readChoice, replyEphemeral, replyNoPlayer } from './shared.js';
+import { askFirst, confirmable } from './confirm.js';
 
 // remove autocompletes with the link as the value, which discord caps at 100
 const SOCIAL_URL_LENGTH = 100;
@@ -38,10 +39,10 @@ function configureMessages(interaction) {
       return reply('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
     }
   }
-  const threads = interaction.options.getBoolean('threads');
+  const threads = interaction.options.getString('threads');
   if (threads !== null) {
     // checked when it's turned on so it doesn't wait for the next tournament to find out
-    if (threads) {
+    if (threads !== 'off') {
       const channelId = process.env.CHANNEL_ID;
       const missing = missingThreadPermissions(interaction.client.channels.cache.get(channelId));
       if (!missing) return reply(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
@@ -68,10 +69,11 @@ function configureMessages(interaction) {
     if (key === 'recap') continue;
     lines.push(`**${label}:** ${settings[key] ? 'on' : 'off'}`);
   }
-  lines.push(`**Tournament threads:** ${settings.threads ? 'on, set results and stream alerts go in a thread per tournament' : 'off'}`);
+  lines.push(`**Threads:** ${THREAD_MODES[settings.threads]}`);
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
-    '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.');
+    '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
+    '-# `threads` has three modes for set results and stream alerts. Off posts them here, one per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles.');
   return reply(lines.join('\n'));
 }
 
@@ -119,8 +121,28 @@ function socialsRemove(interaction) {
   return replyEphemeral(interaction, `Removed ${social.url} from ${social.name}.`);
 }
 
-// /stream, /sets and /calls: the same switch on a different field. onAt saves when it went from off to on
-function toggles({ option, field, label, onAt }) {
+// /stream, /sets and /calls: the same switch on a different field. onAt saves when it went from off to on.
+// confirmAllOff asks first before turning it off for everyone
+function toggles({ option, field, label, onAt, confirmAllOff }) {
+  // returns what to reply
+  const flip = (choice, on) => {
+    const now = secondsNow();
+    for (const player of choice === 'all' ? Object.values(state.players) : [choice]) {
+      if (on && onAt && player[field] === false) player[onAt] = now;
+      player[field] = on;
+    }
+    save();
+    return `${label} ${on ? 'on' : 'off'} for ${choice === 'all' ? 'everyone' : choice.tag}.`;
+  };
+
+  if (confirmAllOff) {
+    confirmable(confirmAllOff.kind, {
+      command: `/${confirmAllOff.command}`,
+      run: () => ({ content: flip('all', false) }),
+      cancel: () => `${label} stay the way they were.`,
+    });
+  }
+
   return (interaction) => {
     const choice = readChoice(interaction, 'player', { trackedOnly: true });
     if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
@@ -130,20 +152,25 @@ function toggles({ option, field, label, onAt }) {
     }
 
     const on = interaction.options.getString(option, true) === 'on';
-    const now = secondsNow();
-    for (const player of choice === 'all' ? Object.values(state.players) : [choice]) {
-      if (on && onAt && player[field] === false) player[onAt] = now;
-      player[field] = on;
+    // nothing to lose when it's already off for everyone
+    const players = Object.values(state.players);
+    if (choice === 'all' && !on && confirmAllOff && players.some((player) => player[field] !== false)) {
+      return askFirst(interaction, confirmAllOff.kind, 'all', confirmAllOff.question(players.length), 'Turn off');
     }
-    save();
-
-    return interaction.reply({ content: `${label} ${on ? 'on' : 'off'} for ${choice === 'all' ? 'everyone' : choice.tag}.`, allowedMentions: { parse: [] } });
+    return interaction.reply({ content: flip(choice, on), allowedMentions: { parse: [] } });
   };
 }
 
 const streamAlerts = toggles({ option: 'alerts', field: 'streamAlerts', label: 'Stream alerts' });
-// the set check doesn't ask about players with results off, so this is how their older sets stay out
-const setResults = toggles({ option: 'results', field: 'setResults', label: 'Set results', onAt: 'setResultsOnAt' });
+// the set check doesn't ask about players with results off, so this is how their older sets stay out.
+// turning them back on skips everything finished while they were off, so everyone at once asks first
+const setResults = toggles({
+  option: 'results', field: 'setResults', label: 'Set results', onAt: 'setResultsOnAt',
+  confirmAllOff: {
+    kind: 'sets_off', command: 'sets player:all results:off',
+    question: (count) => `Turn set results off for all ${count} tracked players? Sets they finish while it's off never get posted, even after it's back on.`,
+  },
+});
 // match call pings go out while the set is still called, so there's no cutoff like /sets has
 const matchCalls = toggles({ option: 'pings', field: 'callPings', label: 'Match call pings' });
 

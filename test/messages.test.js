@@ -29,7 +29,12 @@ test('message controls are registered for server managers', () => {
   const command = commands.find(c => c.name === 'messages');
   assert.equal(command?.default_member_permissions, PermissionFlagsBits.ManageGuild.toString());
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'slippi', 'recap', 'threads']);
+    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'slippi', 'recap']);
+  // three modes, picked by name
+  const threads = command.options.find(o => o.name === 'threads');
+  assert.equal(threads.type, 3);
+  assert.deepEqual(threads.choices.map(c => c.value), ['off', 'tournament', 'event']);
+  assert.ok([threads.description, ...threads.choices.map(c => c.name)].every(text => text.length <= 100));
 });
 
 test('only managers can change settings', async () => {

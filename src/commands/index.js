@@ -12,6 +12,7 @@ import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket
 import { configureMessages, socialsAdd, socialsRemove, streamAlerts, streamPings, setResults, matchCalls } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
+import { handleChoice, isChoice } from './confirm.js';
 
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
@@ -85,6 +86,8 @@ export async function handleCommand(interaction) {
 // another report, and private does too but only for whoever pressed it, so buttons on the automatic posts
 // don't fill the channel. the button only has profile slugs or player ids, so the players get looked up again
 export async function handleButton(interaction) {
+  // Are you sure and Undo answer by changing the message they're on, see confirm.js
+  if (isChoice(interaction.customId)) return handleChoice(interaction);
   const { action, command, player, opponent, melee, game, since: sinceText, venue } = readButton(interaction.customId);
   // buttons only ever hold dates the command accepted, so a bad one just means no filter
   const { since } = parseSince(sinceText);

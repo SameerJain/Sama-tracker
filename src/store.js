@@ -13,12 +13,17 @@ const FILE = `${stateDir}/state.json`;
 // deploy is the railway deployment that last started: { id, at }, with at the first time it started.
 // slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from the last check and
 // userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back.
-// threads are the tournament threads from /messages threads, keyed by tournament slug: { id, at }, with at when it was started.
+// threads are the threads from /messages threads, keyed by tournament slug, or event slug for one per event: { id, at }, with at when it was started.
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
 // buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }, with at when it was sent
+// resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
+// callPosts are match calls still watched for the set going back to waiting or not starting: { setId, channelId, messageId, calledAt, discordIds, warned }.
+// a tournament with projected: { at, checkedAt, results, top8 } had placements go out projected, each list being the { channelId, messageId } posts to edit once they're final.
+// regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
 const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], streamPings: [], regAdmins: {}, regSkipped: [],
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
+  resultPosts: [], callPosts: [], regWarned: [],
 };
 
 function load() {

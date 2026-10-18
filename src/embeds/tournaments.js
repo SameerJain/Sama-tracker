@@ -1,4 +1,4 @@
-import { escapeMarkdown } from 'discord.js';
+import { EmbedBuilder, escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
 import { colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, shortRecord, count } from './shared.js';
 
@@ -60,6 +60,13 @@ function setEmbed(set, color, player) {
 export function tournamentThread(tournament) {
   return tournamentEmbed(colors.brand, 'Tournament thread', tournament)
     .setDescription('Set results and stream alerts from this tournament go in the thread.');
+}
+
+// heads one event's thread with /messages threads set to one per event
+export function eventThread(event) {
+  const game = event.videogame?.displayName;
+  return tournamentEmbed(colors.brand, 'Event thread', event.tournament)
+    .setDescription(`**${escapeMarkdown(event.name)}**${game ? ` · ${game}` : ''}\nSet results and stream alerts from this event go in the thread.`);
 }
 
 export function onStream(set, players) {
@@ -127,6 +134,20 @@ export function setResult(set, players) {
   if (set.vod) embed.addFields({ name: 'VOD', value: `[Watch the VOD](${set.vod.replaceAll('(', '%28').replaceAll(')', '%29')})` });
 
   return embed;
+}
+
+// a set result card edited in after the TO changed the winner or score, or reported a reset set again
+export function correctedResult(set, players) {
+  const embed = setResult(set, players);
+  return embed.setDescription(`**Corrected by TO**\n${embed.data.description}`);
+}
+
+// a set result card the TO reset or deleted after it went out. posted is the card as discord has it, kept
+// as it was with the result marked, since start.gg no longer has the result to build it from
+export function resetResult(posted) {
+  const embed = EmbedBuilder.from(posted).setColor(colors.reset);
+  if (posted.title && !posted.title.startsWith('Reset by TO')) embed.setTitle(`Reset by TO · ${posted.title}`.slice(0, 256));
+  return embed.setDescription(`${posted.description ?? ''}\n-# The TO reset this set on start.gg. This card changes if it's reported again within an hour of the first result`.trim());
 }
 
 export function rollCall(tournament, players) {

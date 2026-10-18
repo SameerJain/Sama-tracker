@@ -977,7 +977,10 @@ test('/sets on only marks when results came on for players switching from off', 
   assert.equal(state.players[3].setResultsOnAt, undefined);
   assert.ok(Object.values(state.players).every(player => player.setResults === true));
 
-  assert.equal((await setsCommand({ player: 'all', results: 'off' })).content, 'Set results off for everyone.');
+  // everyone at once asks first, confirm.test.js presses the buttons
+  assert.match((await setsCommand({ player: 'all', results: 'off' })).content, /^Turn set results off for all 3 tracked players\?/);
+  assert.equal(state.players[1].setResults, true);
+  assert.equal((await setsCommand({ player: '1', results: 'off' })).content, 'Set results off for Active.');
   assert.equal(state.players[1].setResults, false);
 });
 

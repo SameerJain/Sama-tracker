@@ -44,6 +44,17 @@ const THREAD_PERMISSIONS = { CreatePublicThreads: 'Create Public Threads', SendM
 const THREAD_KEPT_DAYS = 14;
 // a Head to head button comes off when its set is over, or this long after the post if start.gg never says so
 const BUTTON_KEPT_HOURS = 12;
+// TOs report the wrong winner or score and fix it, or reset the set, so set results get looked at again this long
+const RESULT_WATCH_MINUTES = 60;
+// a match call still called after this long pings again, since TOs usually DQ at 10
+const CALL_WARN_MINUTES = 5;
+const CALL_DQ_MINUTES = 10;
+// and calls get looked at this long for going back to waiting
+const CALL_WATCH_MINUTES = 15;
+// a set back to waiting, ready or queued isn't called anymore
+const UNCALLED_STATES = [1, 4, 7];
+// placements that went out projected get edited once they're final, for this long after
+const PROJECTED_KEPT_DAYS = 3;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -154,18 +165,41 @@ function queued(check) {
   };
 }
 
-// fewest messages that fit discord's limits. the switch gets checked before each one in case it's turned off partway
+// fewest messages that fit discord's limits. the switch gets checked before each one in case it's turned off partway.
+// returns the messages that went out
 async function post(list, type, dueAt, postChannel = channel) {
+  const sent = [];
   for (const batch of embeds.messages(list)) {
     // roll calls and placements name people but never ping them
-    if (messageEnabled(type, dueAt)) await postChannel.send({ embeds: batch, allowedMentions: { parse: [] } });
+    if (messageEnabled(type, dueAt)) sent.push(await postChannel.send({ embeds: batch, allowedMentions: { parse: [] } }));
+  }
+  return sent;
+}
+
+// what a post gets saved as to edit later. a message object can't outlast a restart
+const postRefs = (messages) => messages.filter((message) => message?.id).map((message) => ({ channelId: message.channelId, messageId: message.id }));
+
+// edits a saved post, payload or a function that makes it from the message as discord has it now.
+// false when someone deleted the post or its thread, which is fine
+async function editPost(postChannel, { channelId, messageId }, payload) {
+  try {
+    const { messages } = await postChannel.client.channels.fetch(channelId);
+    await messages.edit(messageId, typeof payload === 'function' ? payload(await messages.fetch(messageId)) : payload);
+    return true;
+  } catch (err) {
+    if ([RESTJSONErrorCodes.UnknownMessage, RESTJSONErrorCodes.UnknownChannel].includes(err.code)) return false;
+    throw err;
   }
 }
 
+const mentions = (discordIds) => discordIds.map((id) => `<@${id}>`).join(' ');
+
 const checkSets = queued(async () => {
   await postNewSets();
+  await fixCorrectedResults();
   await postStreamAlerts();
   await postMatchCalls();
+  await followCalls();
   await clearFinishedButtons();
 });
 export const checkTournaments = queued(updateTournaments);
@@ -351,7 +385,8 @@ export async function postNewSets(postChannel = channel) {
       const showing = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
       if (showing && messageEnabled('sets', set.completedAt)) {
         // no head to head button, the set's over
-        await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players)]) });
+        const sent = await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players)]) });
+        watchResult(sent, set);
       }
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
@@ -367,6 +402,51 @@ export async function postNewSets(postChannel = channel) {
 
   state.posted = state.posted.slice(-1000);
   state.dqs = state.dqs.slice(-200);
+  save();
+}
+
+// saved so fixCorrectedResults can find the card again. start.gg's preview sets have ids like preview_1_2
+// that can't be looked up
+function watchResult(message, set) {
+  if (!message?.id || !/^\d+$/.test(set.id)) return;
+  const [ref] = postRefs([message]);
+  state.resultPosts.push({ setId: set.id, ...ref, at: secondsNow(), outcome: startgg.outcomeOf(set), reset: false });
+  state.resultPosts = state.resultPosts.slice(-200);
+}
+
+// set results from the last hour whose winner or score the TO changed get the corrected card, and ones the TO
+// reset or deleted get marked. one small request covers all of them, and only a changed set is asked for in full
+export async function fixCorrectedResults(postChannel = channel) {
+  const now = secondsNow();
+  state.resultPosts = state.resultPosts.filter((each) => each.at > now - RESULT_WATCH_MINUTES * 60);
+  const watching = state.resultPosts;
+  if (!watching.length) return;
+  try {
+    const outcomes = await startgg.getSetOutcomes([...new Set(watching.map((each) => each.setId))]);
+    // a reset set reported again with the same result still needs its card put back
+    const changed = watching.filter((each) => {
+      const latest = outcomes.get(each.setId);
+      return latest?.state === 3 && (each.reset || latest.outcome !== each.outcome);
+    });
+    const sets = changed.length ? await startgg.getSetsById([...new Set(changed.map((each) => each.setId))]) : new Map();
+    for (const each of watching) {
+      let kept = true;
+      if (changed.includes(each)) {
+        const set = sets.get(each.setId);
+        // reset again between the two requests, the next check sorts it out
+        if (set?.state !== 3) continue;
+        kept = await editPost(postChannel, each, { embeds: embeds.withImage([embeds.correctedResult(set, state.players)]) });
+        Object.assign(each, { outcome: startgg.outcomeOf(set), reset: false });
+      } else if (outcomes.get(each.setId)?.state !== 3 && !each.reset) {
+        // start.gg doesn't have the result anymore, so the card stays as it was with the result marked
+        kept = await editPost(postChannel, each, (message) => ({ embeds: message.embeds.slice(0, 1).map(embeds.resetResult) }));
+        each.reset = true;
+      }
+      if (!kept) state.resultPosts = state.resultPosts.filter((other) => other !== each);
+    }
+  } catch (err) {
+    console.error('checking posted set results for fixes failed:', err.message);
+  }
   save();
 }
 
@@ -428,7 +508,7 @@ async function sendPinging(postChannel, type, ids, text, embed, components = [])
     if (i > 0 && !messageEnabled(type)) break;
     const users = ids.slice(i, i + MENTIONS_PER_MESSAGE);
     const sent = await postChannel.send({
-      content: users.length ? `${users.map((id) => `<@${id}>`).join(' ')} ${text}` : undefined,
+      content: users.length ? `${mentions(users)} ${text}` : undefined,
       embeds: i === 0 ? embeds.withImage([embed]) : [],
       components: i === 0 ? components : [],
       allowedMentions: { users },
@@ -446,14 +526,15 @@ export function missingThreadPermissions(postChannel = channel) {
   return Object.keys(THREAD_PERMISSIONS).filter((name) => !has?.has(PermissionFlagsBits[name])).map((name) => THREAD_PERMISSIONS[name]);
 }
 
-// stands in for the channel when posting a set. with /messages threads on it sends to the tournament's thread,
-// and to the channel when the thread can't be used, so a permission change never loses a post
+// stands in for the channel when posting a set. with /messages threads on it sends to the tournament's
+// or the event's thread, and to the channel when the thread can't be used, so a permission change never loses a post
 function tournamentPosts(set, postChannel) {
   const send = async (message) => {
-    if (!messageSettings().threads) return postChannel.send(message);
+    const mode = messageSettings().threads;
+    if (mode === 'off') return postChannel.send(message);
     const { tournament } = set.event;
     try {
-      const sent = await (await tournamentThread(tournament, postChannel)).send(message);
+      const sent = await (await tournamentThread(set.event, mode === 'event', postChannel)).send(message);
       health.threadError = null;
       return sent;
     } catch (err) {
@@ -465,10 +546,13 @@ function tournamentPosts(set, postChannel) {
   return { send };
 }
 
-// the first post for a tournament puts a card with its name in the channel and starts the thread on it.
-// saved by slug, since sets don't come with the tournament id, so a restart keeps using the same one
-async function tournamentThread(tournament, postChannel) {
-  const saved = state.threads[tournament.slug];
+// the first post for a tournament, or for an event when byEvent, puts a card with its name in the channel and
+// starts the thread on it. saved by slug, since sets don't come with the tournament id, so a restart keeps using
+// the same one. event slugs start with their tournament's, so both kinds share state.threads without clashing
+async function tournamentThread(event, byEvent, postChannel) {
+  const { tournament } = event;
+  const slug = byEvent ? event.slug : tournament.slug;
+  const saved = state.threads[slug];
   if (saved) {
     // an archived thread opens back up when something's sent in it. a deleted one gets replaced
     const thread = await postChannel.threads.fetch(saved.id).catch((err) => {
@@ -483,14 +567,23 @@ async function tournamentThread(tournament, postChannel) {
   if (!missing) throw new Error('threads can\'t be started in this channel');
   if (missing.length) throw new Error(`missing ${missing.join(' and ')}`);
 
-  const card = await postChannel.send({ embeds: embeds.withImage([embeds.tournamentThread(tournament)]), allowedMentions: { parse: [] } });
-  // discord caps thread names at 100
-  const thread = await card.startThread({ name: tournament.name.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
+  const card = await postChannel.send({
+    embeds: embeds.withImage([byEvent ? embeds.eventThread(event) : embeds.tournamentThread(tournament)]), allowedMentions: { parse: [] },
+  });
+  const thread = await card.startThread({ name: threadName(event, byEvent), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
   const now = secondsNow();
   state.threads = Object.fromEntries(Object.entries(state.threads).filter(([, each]) => each.at > now - THREAD_KEPT_DAYS * DAY));
-  state.threads[tournament.slug] = { id: thread.id, at: now };
+  state.threads[slug] = { id: thread.id, at: now };
   save();
   return thread;
+}
+
+// discord caps thread names at 100. a long tournament name gets cut before the event's, which tells the threads apart
+function threadName(event, byEvent) {
+  const { name } = event.tournament;
+  if (!byEvent) return name.slice(0, 100);
+  const suffix = ` · ${event.name}`.slice(0, 100);
+  return `${name.slice(0, 100 - suffix.length)}${suffix}`;
 }
 
 export async function postMatchCalls(postChannel = channel) {
@@ -508,12 +601,13 @@ export async function postMatchCalls(postChannel = channel) {
         const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(Boolean))];
         const components = h2hRow(set);
         const sent = await postChannel.send({
-          content: discordIds.length ? `${discordIds.map((id) => `<@${id}>`).join(' ')} your match was called` : undefined,
+          content: discordIds.length ? `${mentions(discordIds)} your match was called` : undefined,
           embeds: embeds.withImage([embeds.matchCall(set, state.players)]),
           components,
           allowedMentions: { users: discordIds },
         });
         rememberButton(sent, set, components);
+        watchCall(sent, set, discordIds);
       }
       state.called.push(set.id);
     }
@@ -522,6 +616,55 @@ export async function postMatchCalls(postChannel = channel) {
   }
 
   state.called = (state.called ?? []).slice(-200);
+  save();
+}
+
+// saved so followCalls can find the call again. a called set was last updated when it got called
+function watchCall(message, set, discordIds) {
+  if (!message?.id || !/^\d+$/.test(set.id)) return;
+  const [ref] = postRefs([message]);
+  state.callPosts.push({ setId: set.id, ...ref, calledAt: Math.min(set.updatedAt ?? Infinity, secondsNow()), discordIds, warned: false });
+  state.callPosts = state.callPosts.slice(-200);
+}
+
+// match calls from the last 15 minutes, in one request. a call usually means go now, so there's no wait
+// before it goes out like stream alerts have. instead one whose set goes back to waiting gets edited to say
+// it was uncalled, and the next call pings again. one still called 5 minutes in pings its players once more
+export async function followCalls(postChannel = channel) {
+  const now = secondsNow();
+  state.callPosts = state.callPosts.filter((each) => each.calledAt > now - CALL_WATCH_MINUTES * 60);
+  const watching = state.callPosts;
+  if (!watching.length) return;
+  try {
+    const states = await startgg.getSetStates([...new Set(watching.map((each) => each.setId))]);
+    for (const each of watching) {
+      const setState = states.get(each.setId);
+      if (setState === 6) {
+        const minutes = Math.floor((now - each.calledAt) / 60);
+        if (each.warned || !each.discordIds.length || minutes < CALL_WARN_MINUTES) continue;
+        // marked first, two of these would be worse than none
+        each.warned = true;
+        save();
+        if (messageEnabled('calls', each.calledAt + CALL_WARN_MINUTES * 60)) {
+          await postChannel.send({
+            content: `${mentions(each.discordIds)} called ${minutes} min ago, TOs usually DQ at ${CALL_DQ_MINUTES}`,
+            reply: { messageReference: each.messageId, failIfNotExists: false },
+            allowedMentions: { users: each.discordIds },
+          });
+        }
+        continue;
+      }
+      // started, finished, deleted or uncalled, so there's nothing more to watch for
+      state.callPosts = state.callPosts.filter((other) => other !== each);
+      if (!UNCALLED_STATES.includes(setState)) continue;
+      state.called = state.called.filter((id) => id !== each.setId);
+      // an edit never pings, the mentions just stay so they can see it was theirs
+      const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~your match was called~~ Uncalled by the TO, wait for the next call` : 'Uncalled by the TO, wait for the next call';
+      await editPost(postChannel, each, { content, allowedMentions: { parse: [] } });
+    }
+  } catch (err) {
+    console.error('following up match calls failed:', err.message);
+  }
   save();
 }
 
@@ -592,15 +735,8 @@ export async function clearFinishedButtons(postChannel = channel) {
   const over = (each) => !recent.includes(each) || [3, null].includes(states.get(each.setId));
 
   for (const each of saved.filter(over)) {
-    try {
-      const where = await postChannel.client.channels.fetch(each.channelId);
-      await where.messages.edit(each.messageId, { components: [] });
-    } catch (err) {
-      // someone deleted the post, or its thread, which is fine
-      if (![RESTJSONErrorCodes.UnknownMessage, RESTJSONErrorCodes.UnknownChannel].includes(err.code)) {
-        console.error(`taking the button off message ${each.messageId} failed:`, err.message);
-      }
-    }
+    await editPost(postChannel, each, { components: [] })
+      .catch((err) => console.error(`taking the button off message ${each.messageId} failed:`, err.message));
   }
   state.buttons = saved.filter((each) => !over(each));
   save();
@@ -640,6 +776,10 @@ async function updateTournaments() {
     if (tournament.resultsPosted) {
       // keep it a week, otherwise it gets re-added and the results post again
       if (secondsNow() > endTime(tournament) + 7 * DAY) delete state.tournaments[tournament.id];
+      else if (tournament.projected) {
+        await correctPlacements(tournament)
+          .catch((err) => console.error(`correcting placements for ${tournament.name ?? tournament.id} failed:`, err.message));
+      }
       continue;
     }
     const farOff = tournament.startAt - secondsNow() > DAY;
@@ -698,36 +838,88 @@ export async function postResults(tournament, postChannel = channel) {
   // events that never started have nothing to wait for or show
   const entries = tournament.entries.filter((entry) => entry.started);
   // anyone still in when the TO stopped reporting only has a projected placement
-  const allIn = entries.every((entry) => entry.placement && (entry.done || entry.final));
+  const allIn = entries.every(placed);
   if (!allIn && waited < RESULTS_GIVE_UP_HOURS * HOUR) return;
 
   const dueAt = overAt(tournament) + (allIn ? RESULTS_WAIT_HOURS : RESULTS_GIVE_UP_HOURS) * HOUR;
   // fetched before anything posts, so a start.gg error retries both next hour instead of repeating placements
-  let topEight = [];
+  let events = [];
   if (messageEnabled('top8', dueAt)) {
     try {
-      topEight = await topEightCards(tournament, entries);
+      events = await topEightEvents(entries);
     } catch (err) {
       if (now < dueAt + TOP8_RETRY_HOURS * HOUR) throw err;
       console.error(`top 8 for ${tournament.name ?? tournament.id} failed, posting placements without it:`, err.message);
     }
   }
-  if (messageEnabled('results', dueAt)) await post(embeds.results({ ...tournament, entries }, state.players), 'results', dueAt, postChannel);
+  const results = messageEnabled('results', dueAt) ? await post(embeds.results({ ...tournament, entries }, state.players), 'results', dueAt, postChannel) : [];
   // marked before the top 8 goes, so discord failing on it can't post the placements again
   tournament.resultsPosted = true;
-  if (topEight.length) {
-    await post(topEight, 'top8', dueAt, postChannel)
-      .catch((err) => console.error(`posting the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message));
+  let topEight = [];
+  if (events.length) {
+    topEight = await post(embeds.topEight(tournament, events), 'top8', dueAt, postChannel).catch((err) => {
+      console.error(`posting the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+      return [];
+    });
+  }
+  // projected ones get edited once start.gg has them final, see correctPlacements
+  const projected = { at: now, results: allIn ? [] : postRefs(results), top8: events.every((event) => event.done) ? [] : postRefs(topEight) };
+  if (projected.results.length || projected.top8.length) tournament.projected = projected;
+}
+
+// a placement that won't change: the event's over, or they're out of it
+const placed = (entry) => Boolean(entry.placement && (entry.done || entry.final));
+
+// placements that went out projected because the TO stopped reporting get edited once start.gg has every
+// one final, looked at hourly for 3 days. the top 8 the same, once its events are finished
+export async function correctPlacements(tournament, postChannel = channel) {
+  const { projected } = tournament;
+  const now = secondsNow();
+  if (now > projected.at + PROJECTED_KEPT_DAYS * DAY) {
+    delete tournament.projected;
+    return;
+  }
+  if (now - (projected.checkedAt ?? projected.at) < HOUR) return;
+  projected.checkedAt = now;
+
+  if (projected.results.length) {
+    const latest = await startgg.getTournament(tournament.id, tournament.userIds.filter((id) => state.players[id]));
+    const entries = latest?.entries.filter((entry) => entry.started) ?? [];
+    if (entries.length && entries.every(placed)) {
+      tournament.entries = latest.entries;
+      await editPosts(postChannel, projected.results, embeds.results({ ...tournament, entries }, state.players), 'results', 'Final placements, the ones above were projected');
+      projected.results = [];
+    }
+  }
+  if (projected.top8.length) {
+    const events = await topEightEvents(tournament.entries.filter((entry) => entry.started));
+    if (events.length && events.every((event) => event.done)) {
+      await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', 'Final top 8, the one above was projected');
+      projected.top8 = [];
+    }
+  }
+  if (!projected.results.length && !projected.top8.length) delete tournament.projected;
+}
+
+// the final version goes over the projected one. one that no longer splits into the same number of
+// messages can't, so it goes out on its own under a line saying what it is
+async function editPosts(postChannel, refs, list, type, label) {
+  const batches = embeds.messages(list);
+  if (batches.length === refs.length) {
+    for (const [i, ref] of refs.entries()) await editPost(postChannel, ref, { embeds: batches[i] });
+    return;
+  }
+  for (const [i, batch] of batches.entries()) {
+    if (messageEnabled(type)) await postChannel.send({ content: i ? undefined : label, embeds: batch, allowedMentions: { parse: [] } });
   }
 }
 
 // every event the crew played in, with the whole top 8 and not just them
-async function topEightCards(tournament, entries) {
+async function topEightEvents(entries) {
   const events = [...new Map(entries.filter((entry) => entry.eventId).map((entry) => [entry.eventId, entry])).values()];
   if (!events.length) return [];
   const standings = await startgg.getTopEight(events.map((entry) => entry.eventId));
-  const found = events.filter((entry) => standings.has(entry.eventId)).map((entry) => ({ ...entry, ...standings.get(entry.eventId) }));
-  return embeds.topEight(tournament, found);
+  return events.filter((entry) => standings.has(entry.eventId)).map((entry) => ({ ...entry, ...standings.get(entry.eventId) }));
 }
 
 export function endTime(tournament) {

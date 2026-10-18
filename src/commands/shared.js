@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
@@ -233,11 +233,47 @@ async function withCountdown(interaction, doing, work, preview) {
 // start.gg tag or typed link can't ping anyone
 const replyEphemeral = (interaction, content) => interaction.reply({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 
+// letters to add, drop or change to get from one to the other
+function distance(a, b) {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next.push(Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
+    row = next;
+  }
+  return row[b.length];
+}
+
+// for a name typed that matched nobody: the record with it somewhere in its name, or else the one a typo or
+// two away, a letter for every three typed. null when nothing's that close. ids from a list that's changed
+// since aren't names
+function closest(records, typed, name) {
+  const want = squash(typed ?? '');
+  if (want.length < 2 || /^\d+$/.test(want)) return null;
+  const containing = records.find((record) => squash(record[name]).includes(want));
+  if (containing) return containing;
+  let best = null;
+  for (const record of records) {
+    const apart = distance(squash(record[name]), want);
+    if (apart <= Math.max(1, Math.floor(want.length / 3)) && (!best || apart < best.apart)) best = { record, apart };
+  }
+  return best?.record ?? null;
+}
+
+// " Did you mean Leo?" for a typed name, or nothing. escaped and in bold, mentions are off where it goes
+function didYouMean(records, typed, name = 'tag', describe = (record) => record[name]) {
+  const near = closest(records, typed, name);
+  return near ? ` Did you mean **${escapeMarkdown(describe(near))}**?` : '';
+}
+
 // left out with no start.gg linked, or someone picked who isn't on the list
 function replyNoPlayer(interaction, name = 'player', { trackedOnly = false } = {}) {
+  const typed = interaction.options.getString(name);
   let content = 'Only tracked or linked players can be picked. `/track add` them, or they can `/link` their own start.gg.';
   if (trackedOnly) content = 'Only tracked players can be picked here. `/track list` shows who\'s tracked.';
-  if (interaction.options.getString(name) === null) content = 'Pick a player, or `/link` your start.gg so leaving it out looks you up.';
+  if (typed === null) content = 'Pick a player, or `/link` your start.gg so leaving it out looks you up.';
+  const near = didYouMean(Object.values(trackedOnly ? state.players : pickable()), typed);
+  if (near) content = `Nobody ${trackedOnly ? 'tracked' : 'tracked or linked'} goes by \`${typed.replaceAll('`', '')}\`.${near}`;
   return replyEphemeral(interaction, content);
 }
 
@@ -261,7 +297,8 @@ async function fetchPlayer(interaction, input) {
   const text = input.trim();
   const player = await startgg.getPlayer(profileSlug(text));
   if (!player) {
-    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${text}\`. Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.`);
+    const near = didYouMean(Object.values(pickable()), text);
+    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${text}\`.${near || ' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.'}`);
   }
   return player;
 }
@@ -279,6 +316,6 @@ const flag = (interaction, name) => interaction.options.getBoolean(name) ?? fals
 
 export {
   pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag,
-  reportButton, fullReport, h2hButton, buttonRow, readButton, parseSince, playerBySlug, recentPicks, rememberPick, nameMatches,
+  reportButton, fullReport, h2hButton, buttonRow, readButton, parseSince, playerBySlug, recentPicks, rememberPick, nameMatches, didYouMean,
   commandLabel, roughly, LATE_SECONDS,
 };
