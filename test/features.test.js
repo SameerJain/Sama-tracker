@@ -743,6 +743,34 @@ test('the set check sends nothing to start.gg when nobody has set results on', a
   assert.ok(state.players[1].lastCheck >= now);
 });
 
+test('a new deploy saves when it first started, and a restart of the same one keeps that time', (t) => {
+  state.deploy = null;
+  t.mock.timers.enable({ apis: ['Date'], now: 1_000_000_000 });
+  tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd1' });
+  assert.deepEqual(state.deploy, { id: 'd1', at: 1_000_000 });
+  assert.equal(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).deploy.id, 'd1');
+
+  t.mock.timers.tick(60_000);
+  tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd1' });
+  assert.equal(state.deploy.at, 1_000_000);
+  tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd2' });
+  assert.deepEqual(state.deploy, { id: 'd2', at: 1_000_060 });
+
+  // a local run has no deploy id, so it leaves the server's alone and doesn't show it
+  tracker.recordDeploy({});
+  assert.equal(state.deploy.id, 'd2');
+  assert.equal(tracker.deployedAt({}), null);
+  assert.equal(tracker.deployedAt({ RAILWAY_DEPLOYMENT_ID: 'd1' }), null);
+  assert.equal(tracker.deployedAt({ RAILWAY_DEPLOYMENT_ID: 'd2' }), 1_000_060);
+});
+
+test('/status shows when the latest version was deployed, and a local run shows its computer instead', () => {
+  const info = { startedAt: 100, setCheck: 200, tournamentCheck: 300, players: 2, tournaments: 1, queued: 0 };
+  const lines = (more) => embeds.status({ ...info, ...more }).data.description.split('\n');
+  assert.deepEqual(lines({ host: null, deployedAt: 90 }).slice(0, 2), ['**Started:** <t:100:R>', '**Latest version deployed:** <t:90:R>']);
+  assert.deepEqual(lines({ host: 'DESKTOP-1', deployedAt: null }).slice(0, 2), ['**Started:** <t:100:R> on DESKTOP-1', '**Last set check:** <t:200:R>']);
+});
+
 test('/sets on only marks when results came on for players switching from off', async () => {
   state.players = {
     1: { ...crewPlayer, setResults: false },

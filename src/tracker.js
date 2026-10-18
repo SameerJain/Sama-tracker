@@ -40,8 +40,23 @@ export const health = { startedAt: secondsNow(), downSince: null, skippedBefore:
 
 let channel;
 
+// railway gives each deploy an id but no time, so the first start under a new id is when it went live.
+// railway restarting the same deploy keeps that time
+export function recordDeploy(env = process.env) {
+  const id = env.RAILWAY_DEPLOYMENT_ID;
+  if (!id || state.deploy?.id === id) return;
+  state.deploy = { id, at: secondsNow() };
+  save();
+}
+
+// when the running version went live. a local run has none, so it never shows railway's
+export function deployedAt(env = process.env) {
+  return env.RAILWAY_DEPLOYMENT_ID && state.deploy?.id === env.RAILWAY_DEPLOYMENT_ID ? state.deploy.at : null;
+}
+
 export function startTracking(postChannel) {
   channel = postChannel;
+  recordDeploy();
 
   // lastCheck only moves while it's running, so the oldest one is when it went down.
   // Infinity with nobody tracked

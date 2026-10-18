@@ -9,10 +9,11 @@ const FILE = `${stateDir}/state.json`;
 // regPings are discord ids that turned reg pings on. regSkipped are tournament ids whose reminder got deleted, so admins' don't come back.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
 // accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.
-// messages holds the /messages switches and recap schedule. weeklyRecap is the recap partway through sending, built once so a restart sends the rest
+// messages holds the /messages switches and recap schedule. weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
+// deploy is the railway deployment that last started: { id, at }, with at the first time it started
 const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], dqs: [], regReminders: {}, regPings: [], regAdmins: {}, regSkipped: [],
-  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null,
+  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null,
 };
 
 function load() {

@@ -79,7 +79,7 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 | Command | What it does |
 | --- | --- |
 | `/help` | Show the commands. |
-| `/status` | Show uptime, host, and the last start.gg checks. |
+| `/status` | Show uptime, when the latest version was deployed, and the last start.gg checks. A copy run on another computer also shows that computer's name. |
 | `/profile` | Find a tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
 | `/messages` | Show or change automatic posts and the recap schedule. |
 | `/socials` | Show saved streams and social links. |

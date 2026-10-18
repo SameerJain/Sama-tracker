@@ -181,7 +181,7 @@ export const commands = [
       },
     ],
   },
-  { name: 'status', description: 'Uptime and the last start.gg checks' },
+  { name: 'status', description: 'Uptime, when the latest version was deployed, and the last start.gg checks' },
   {
     name: 'set_reg_reminder',
     description: 'Set a registration reminder and track everyone registered',

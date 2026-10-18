@@ -3,7 +3,7 @@ import { MessageFlags } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state } from '../store.js';
-import { health } from '../tracker.js';
+import { deployedAt, health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run } from './players.js';
@@ -158,8 +158,9 @@ function status(interaction) {
   const tournaments = Object.values(state.tournaments).filter((tournament) => !tournament.resultsPosted && tournament.entries.length);
   const info = {
     ...health,
-    // the hostname there is a random container id
-    host: process.env.RAILWAY_ENVIRONMENT_NAME ? 'Railway' : hostname(),
+    // only off the server, to spot a copy running somewhere it shouldn't. the server's is a random container id
+    host: process.env.RAILWAY_ENVIRONMENT_NAME ? null : hostname(),
+    deployedAt: deployedAt(),
     avatar: interaction.client.user.displayAvatarURL(),
     players: Object.keys(state.players).length,
     tournaments: tournaments.length,

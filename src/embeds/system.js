@@ -49,12 +49,13 @@ export function status(info) {
   let setCheck = ago(info.setCheck);
   if (info.setError) setCheck += `, last try failed (${escapeMarkdown(info.setError)})`;
 
-  const lines = [
-    `**Started:** ${ago(info.startedAt)} on ${escapeMarkdown(info.host)}`,
+  const lines = [`**Started:** ${ago(info.startedAt)}${info.host ? ` on ${escapeMarkdown(info.host)}` : ''}`];
+  if (info.deployedAt) lines.push(`**Latest version deployed:** <t:${info.deployedAt}:R>`);
+  lines.push(
     `**Last set check:** ${setCheck}`,
     `**Signups and placements updated:** ${ago(info.tournamentCheck)}`,
     `**Tracking:** ${count(info.players, 'player')} · ${count(info.tournaments, 'tournament')}`,
-  ];
+  );
   if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
@@ -82,7 +83,7 @@ export function help() {
     [
       '**General**',
       '`/help` this list',
-      '`/status` uptime and the last start.gg checks',
+      '`/status` uptime, when the latest version was deployed, and the last start.gg checks',
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
