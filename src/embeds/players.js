@@ -1,28 +1,32 @@
 import { escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
 import { FORM_SETS } from '../predict.js';
-import { colors, FOOTER, baseEmbed, withLines, percent, topText, count, gameName, gameCount, recordOf, winsOf, GRAND_FINALS, bold, setLink, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
+import { colors, FOOTER, baseEmbed, withLines, percent, topText, count, gameName, gameCount, recordOf, winsOf, GRAND_FINALS, bold, setLink, vodLink, filterLine, filtersOn, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
 
 // sets is newest first. verbose lists every set and adds splits, streaks and when they first played.
 // melee means sets is only their melee ones, and otherGames is how many got left out. odds is a
-// predict result, shown as one line in both report lengths. verbose never expands it, use /predict for why
-export function headToHead(a, b, sets, { verbose = false, melee = false, otherGames = 0, odds = null } = {}) {
+// predict result, shown as one line in both report lengths. verbose never expands it, use /predict for why.
+// filters only narrowed the sets, so the card names them on its small line
+export function headToHead(a, b, sets, { verbose = false, melee = false, otherGames = 0, odds = null, filters = {} } = {}) {
   const results = sets.map((set) => fromSide(set, a.playerId));
   const wins = winsOf(results);
   const losses = results.length - wins;
 
   const playedGames = [...new Set(sets.map(({ event }) => gameName(event)))];
   const game = melee ? 'Melee' : playedGames.length === 1 ? playedGames[0] : null;
-  const embed = baseEmbed(colors.clash, game ? `${FOOTER} · ${game}` : undefined).setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) });
+  const embed = baseEmbed(colors.clash, game ? `${FOOTER} · ${game}` : undefined).setAuthor({ name: melee ? `${a.tag} · Melee` : a.tag, iconURL: a.image, url: startggUrl(a.slug) });
   if (b.image) embed.setThumbnail(b.image);
   const leftOut = otherGames ? `${count(otherGames, 'set')} in other games left out` : null;
 
   const oddsLine = odds ? `**Predicted:** ${bold(a.tag)} ${chancePercent(odds)}% · ${100 - chancePercent(odds)}% ${bold(b.tag)} in ${escapeMarkdown(odds.game)}` : null;
+  const scope = filtersOn(filters) ? ' matching those filters' : '';
+  const line = filterLine(filters);
 
   if (!results.length) {
-    const none = [`They haven't played each other in ${melee ? 'Melee ' : ''}singles on start.gg yet.`];
+    const none = [`They haven't played each other in ${melee ? 'Melee ' : ''}singles on start.gg yet${scope}.`];
     if (oddsLine) none.push(oddsLine);
     if (leftOut) none.push(`-# ${leftOut}, leave out \`melee\` to count them`);
+    if (line) none.push(line);
     return [embed.setTitle(`${escapeMarkdown(a.tag)} vs ${escapeMarkdown(b.tag)}`).setDescription(none.join('\n'))];
   }
 
@@ -45,6 +49,7 @@ export function headToHead(a, b, sets, { verbose = false, melee = false, otherGa
   lines.push(...shown.map(meetingLine));
   if (shown.length < results.length) lines.push(`-# ${count(results.length - shown.length, 'older set')} not shown, Full report lists them all`);
   if (leftOut) lines.push(`-# Melee only, ${leftOut}`);
+  if (line) lines.push(line);
   return withLines(embed, lines);
 }
 
@@ -73,11 +78,11 @@ function rivalry(a, b, results) {
   if (run > 1) lines.push(`**Streak:** ${bold((results[0].won ? a : b).tag)} has won the last ${run}`);
 
   const first = results.at(-1);
-  lines.push(`**First played:** <t:${first.set.completedAt}:D> at ${setLink(first.set)}`);
+  lines.push(`**First played:** <t:${first.set.completedAt}:D> at ${setLink(first.set)}${vodLink(first.set)}`);
   return lines;
 }
 
-const FACTORS = { h2h: 'Head-to-head', common: 'Common opponents', seeding: 'Seeding and form' };
+const FACTORS = { h2h: 'Head-to-head', common: 'Common opponents', seeding: 'Seeding and form', slippi: 'Slippi ranked' };
 
 // 28-12 in seeded sets, seeding expected 24-16. just the record if none of their sets were seeded
 function formText(tag, { wins, total, seededWins, seeded, expected }) {
@@ -98,17 +103,18 @@ export function commonOpponentLines(odds, tagA, tagB) {
     .map(({ name, a: x, b: y }) => `${bold(name)}: ${tagA} ${x.wins}-${x.total - x.wins} · ${tagB} ${y.wins}-${y.total - y.wins}`);
 }
 
-// verbose shows how much each part counted and what it says on its own, plus what's behind them
-export function prediction(a, b, odds, verbose) {
+// verbose shows how much each part counted and what it says on its own, plus what's behind them.
+// filters only narrowed the sets behind the odds, so the card names them on its small line
+export function prediction(a, b, odds, verbose, filters = {}) {
   const chanceA = chancePercent(odds);
   const embed = baseEmbed(colors.clash, `${FOOTER} · ${odds.game}`)
-    .setAuthor({ name: a.tag, iconURL: a.image, url: startggUrl(a.slug) })
+    .setAuthor({ name: odds.game === 'Melee' ? `${a.tag} · Melee` : a.tag, iconURL: a.image, url: startggUrl(a.slug) })
     .setTitle(`${escapeMarkdown(a.tag)} ${chanceA}% · ${100 - chanceA}% ${escapeMarkdown(b.tag)}`);
   if (b.image) embed.setThumbnail(b.image);
 
   const tagA = bold(a.tag);
   const tagB = bold(b.tag);
-  const { h2h, common, seeding, level, form } = odds;
+  const { h2h, common, seeding, level, form, slippi } = odds;
   const lines = [];
 
   const losses = h2h.total - h2h.wins;
@@ -130,8 +136,13 @@ export function prediction(a, b, odds, verbose) {
   } else if (level.a && level.b) {
     lines.push(`**Usual seed:** ${tagA} ${topText(level.a.share)} of their brackets · ${tagB} ${topText(level.b.share)}`);
   }
+  if (slippi) lines.push(`**Slippi ranked:** ${tagA} ${escapeMarkdown(slippi.aRank)} ${slippi.aRating.toFixed(1)} · ${tagB} ${escapeMarkdown(slippi.bRank)} ${slippi.bRating.toFixed(1)}`);
   lines.push(`**Form, last ${FORM_SETS} sets:** ${formText(tagA, form.a)} · ${formText(tagB, form.b)}`);
-  if (!verbose) return [embed.setDescription(lines.join('\n'))];
+  const line = filterLine(filters);
+  if (!verbose) {
+    if (line) lines.push(line);
+    return [embed.setDescription(lines.join('\n'))];
+  }
 
   section(lines, 'How it adds up', [
     ...odds.factors.map(({ key, n, share, chance }) => {
@@ -152,6 +163,8 @@ export function prediction(a, b, odds, verbose) {
   const basis = odds.seededSets ? `Going by the ${count(odds.seededSets, 'seeded set')} the two of them played in ${game}` : `With none of their ${game} sets seeded`;
   lines.push(`-# Newer sets count more, a year old counts half. ${basis}, when one seed number is double the other's, `
     + `the player with the lower one wins about ${percent(odds.seedEdge, 1)}. That's how much seeding counts`);
+  if (slippi) lines.push('-# Slippi ratings are netplay Elo, so they count conservatively and only for Melee when both players are ranked');
+  if (line) lines.push(line);
   return withLines(embed, lines);
 }
 
@@ -159,7 +172,7 @@ export function prediction(a, b, odds, verbose) {
 // searched is how many sets got looked through across every game
 export function characters(player, usage, { game, file, note, searched = 0 } = {}) {
   const embed = baseEmbed(colors.brand, game ? `${FOOTER} · ${game}` : undefined)
-    .setAuthor({ name: 'Characters' })
+    .setAuthor({ name: game === 'Melee' ? 'Melee characters' : 'Characters' })
     .setTitle(escapeMarkdown(player.tag))
     .setURL(startggUrl(player.slug));
   if (file) embed.setThumbnail(`attachment://${file}`);

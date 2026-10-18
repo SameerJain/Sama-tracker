@@ -12,7 +12,7 @@
     "track": "node --env-file-if-exists=.env tools/track-attendees.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.134.0",
+    "@anthropic-ai/sdk": "^0.135.0",
     "discord.js": "^14.27.0"
   }
 }

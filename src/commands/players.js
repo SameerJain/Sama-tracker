@@ -16,12 +16,12 @@ async function trackAdd(interaction) {
   const player = await findPlayer(interaction, input);
   if (!player) return;
   if (state.players[player.userId]) {
-    return interaction.editReply(`Already tracking ${player.tag}.`);
+    return interaction.editReply({ content: `Already tracking ${player.tag}.`, allowedMentions: { parse: [] } });
   }
 
   state.players[player.userId] = newTracked(player);
   save();
-  await interaction.editReply({ embeds: embeds.withImage([embeds.added(player)]) });
+  await interaction.editReply({ content: null, embeds: embeds.withImage([embeds.added(player)]) });
 
   // don't wait 15 min for their tournaments to show up
   checkTournaments();
@@ -33,7 +33,7 @@ async function trackRemove(interaction) {
 
   delete state.players[player.userId];
   save();
-  await interaction.reply(`Stopped tracking ${player.tag}.`);
+  await interaction.reply({ content: `Stopped tracking ${player.tag}.`, allowedMentions: { parse: [] } });
 }
 
 // only lets commands default to them, they don't get tracked.
@@ -65,9 +65,9 @@ async function link(interaction) {
   state.links[interaction.user.id] = player;
   save();
   if (previous?.userId === player.userId) {
-    return interaction.editReply(`Already linked to ${player.tag}. Leave the player out of a command like \`/stats\` to look yourself up.`);
+    return interaction.editReply({ content: `Already linked to ${player.tag}. Leave the player out of a command like \`/stats\` to look yourself up.`, allowedMentions: { parse: [] } });
   }
-  return interaction.editReply({ embeds: embeds.withImage([embeds.linked(player, previous)]) });
+  return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.linked(player, previous)]) });
 }
 
 // /link with the profile left out, so nobody has to copy a link over. start.gg can't be searched by
@@ -105,7 +105,7 @@ async function profile(interaction) {
     const player = readPlayer(interaction);
     if (!player) return replyNoPlayer(interaction);
     await interaction.deferReply();
-    return interaction.editReply({ embeds: embeds.withImage([embeds.profile(player, { name: player.tag })]) });
+    return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.profile(player, { name: player.tag })]) });
   }
   const picked = interaction.options.getUser('user');
   const user = picked ?? interaction.user;
@@ -115,7 +115,7 @@ async function profile(interaction) {
 
   await interaction.deferReply();
   const account = await findAccount(user.id);
-  if (account) return interaction.editReply({ embeds: embeds.withImage([embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })]) });
+  if (account) return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })]) });
   if (user.id === interaction.user.id) {
     return interaction.editReply('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.');
   }
@@ -191,11 +191,11 @@ async function recent(interaction) {
   // sort is stable, so each player's sets stay newest first
   if (choice === 'all') cards.sort((a, b) => (a.data.author?.name ?? '').localeCompare(b.data.author?.name ?? ''));
 
-  // a message's buttons aren't tied to one card, so they only go on one player's sets, named for who it's against
-  await sendEmbeds(interaction, cards, choice === 'all' ? [] : h2hButtons(choice, latest));
+  // finished sets, so no head to head buttons. /run has them for who's next
+  await sendEmbeds(interaction, cards);
 }
 
-// /h2h buttons for the first few different opponents in these sets. discord fits 5 in a row
+// /h2h buttons for the first few different opponents in these sets, named for who it's against. discord fits 5 in a row
 function h2hButtons(player, sets) {
   const seen = new Set();
   const buttons = [];
@@ -239,7 +239,7 @@ async function run(interaction) {
     cards.push(...embeds.run(player, tournament, runs, now));
     nextSets.push(...embeds.nextOpponents(player, runs).map(({ set }) => set));
   }
-  if (!cards.length) return interaction.editReply(`${player.tag} has no current tournament run on start.gg.`);
+  if (!cards.length) return interaction.editReply({ content: `${player.tag} has no current tournament run on start.gg.`, allowedMentions: { parse: [] } });
   // the record against whoever's next is one tap away
   return sendEmbeds(interaction, cards, h2hButtons(player, nextSets));
 }

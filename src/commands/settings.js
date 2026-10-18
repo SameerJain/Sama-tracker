@@ -137,7 +137,7 @@ function toggles({ option, field, label, onAt }) {
     }
     save();
 
-    return interaction.reply(`${label} ${on ? 'on' : 'off'} for ${choice === 'all' ? 'everyone' : choice.tag}.`);
+    return interaction.reply({ content: `${label} ${on ? 'on' : 'off'} for ${choice === 'all' ? 'everyone' : choice.tag}.`, allowedMentions: { parse: [] } });
   };
 }
 

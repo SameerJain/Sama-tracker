@@ -150,3 +150,69 @@ test('the seeding note doesn\'t count sets it doesn\'t have', () => {
   const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
   assert.match(text, /With none of their Ultimate sets seeded, when one seed number is double the other's, the player with the lower one wins about 67%/);
 });
+
+test('slippi ratings count toward melee odds when both are ranked, the same from either side', () => {
+  const historyA = [set(1, 100, true, { game: 'Melee' }), set(1, 101, false, { game: 'Melee' })];
+  const historyB = [set(2, 200, true, { game: 'Melee' }), set(2, 201, false, { game: 'Melee' })];
+  const slippiA = { rating: 1800, updates: 20 };
+  const slippiB = { rating: 1400, updates: 20 };
+  const plain = predict(a, b, historyA, historyB, { now, game: 'Melee' });
+  assert.equal(plain.slippi, null);
+  assert.ok(Math.abs(plain.chance - 0.5) < 0.05, `${plain.chance}`);
+
+  const odds = predict(a, b, historyA, historyB, { now, game: 'Melee', slippiA, slippiB });
+  assert.ok(odds.slippi, 'ranked ratings should count');
+  assert.ok(odds.chance > 0.75, `${odds.chance}`);
+  const flipped = predict(b, a, historyB, historyA, { now, game: 'Melee', slippiA: slippiB, slippiB: slippiA });
+  assert.ok(Math.abs(odds.chance + flipped.chance - 1) < 1e-9);
+
+  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  assert.match(short, /\*\*Slippi ranked:\*\*/);
+  const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
+  assert.match(text, /\*\*Slippi ranked:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
+  assert.match(text, /Slippi ratings are netplay Elo/);
+});
+
+test('slippi stays out unless it is melee with two ranked ratings', () => {
+  const historyA = [set(1, 100, true, { game: 'Melee' }), set(1, 101, false, { game: 'Melee' })];
+  const historyB = [set(2, 200, true, { game: 'Melee' }), set(2, 201, false, { game: 'Melee' })];
+  const ranked = { rating: 1800, updates: 20 };
+  const other = { rating: 1400, updates: 20 };
+  // ultimate never counts, even ranked
+  const ultimateA = [set(1, 100, true), set(1, 101, false)];
+  const ultimateB = [set(2, 200, true), set(2, 201, false)];
+  assert.equal(predict(a, b, ultimateA, ultimateB, { now, slippiA: ranked, slippiB: other }).slippi, null);
+  // pending, unranked and missing stay out
+  assert.equal(predict(a, b, historyA, historyB, { now, game: 'Melee', slippiA: { rating: 1800, updates: 4 }, slippiB: other }).slippi, null);
+  assert.equal(predict(a, b, historyA, historyB, { now, game: 'Melee', slippiA: { rating: null, updates: 20 }, slippiB: other }).slippi, null);
+  assert.equal(predict(a, b, historyA, historyB, { now, game: 'Melee', slippiA: ranked }).slippi, null);
+  // without slippi the card says nothing about it
+  const plain = predict(a, b, historyA, historyB, { now, game: 'Melee' });
+  assert.doesNotMatch(embeds.prediction(a, b, plain, false)[0].data.description, /Slippi ranked:/);
+  const verbose = embeds.prediction(a, b, plain, true).map((embed) => embed.data.description).join('\n');
+  assert.match(verbose, /\*\*Slippi ranked:\*\* nothing to go on/);
+});
+
+test('slippi alone predicts melee when both are ranked with no sets on start.gg', () => {
+  const slippiA = { rating: 1800, updates: 20 };
+  const slippiB = { rating: 1400, updates: 20 };
+  // nothing on start.gg at all, so the game comes from the ranks
+  assert.equal(predict(a, b, [], [], { now }), null);
+  const odds = predict(a, b, [], [], { now, slippiA, slippiB });
+  assert.equal(odds.game, 'Melee');
+  assert.ok(odds.slippi, 'both ranked should predict');
+  assert.ok(odds.chance > 0.75, `${odds.chance}`);
+  const flipped = predict(b, a, [], [], { now, slippiA: slippiB, slippiB: slippiA });
+  assert.ok(Math.abs(odds.chance + flipped.chance - 1) < 1e-9);
+  // one ranked is still nothing to go on
+  assert.equal(predict(a, b, [], [], { now, game: 'Melee', slippiA }), null);
+  // ultimate never counts, even ranked
+  assert.equal(predict(a, b, [], [], { now, game: 'Ultimate', slippiA, slippiB }), null);
+
+  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  assert.match(short, /\*\*Head-to-head:\*\* never played/);
+  assert.match(short, /\*\*Slippi ranked:\*\*/);
+  const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
+  assert.match(text, /\*\*Head-to-head:\*\* nothing to go on/);
+  assert.match(text, /\*\*Slippi ranked:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
+});

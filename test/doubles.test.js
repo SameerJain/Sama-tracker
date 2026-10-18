@@ -74,6 +74,13 @@ test('melee wording when nothing is left after filtering', () => {
   assert.match(text(doublesReport(player, [], [])), /No doubles sets on start\.gg yet\./);
 });
 
+test('melee doubles says so at the top, ultimate shows nothing there', () => {
+  assert.equal(doubles(player, [], [], { melee: true }).toJSON().author.name, 'Melee doubles stats');
+  assert.equal(doubles(player, [], []).toJSON().author.name, 'Doubles stats');
+  assert.equal(doublesReport(player, [], [], { melee: true })[0].toJSON().author.name, 'Melee full doubles stats');
+  assert.equal(doublesReport(player, [], [])[0].toJSON().author.name, 'Full doubles stats');
+});
+
 test('doubles events skip unfinished ones and leave the player out of their own partners', async () => {
   const queries = [];
   globalThis.fetch = async (_url, options) => {

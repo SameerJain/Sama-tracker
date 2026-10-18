@@ -1,6 +1,7 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { buttonFailed, commands, handleAutocomplete, handleButton, handleCommand } from './commands/index.js';
-import { asCommand, checkToken, commandProgress } from './startgg.js';
+import { inTurn } from './commands/turns.js';
+import { checkToken } from './startgg.js';
 import { missingThreadPermissions, startTracking } from './tracker.js';
 import { messageSettings } from './message-settings.js';
 import { setFallbackImage } from './embeds/index.js';
@@ -54,28 +55,18 @@ client.once(Events.ClientReady, async () => {
   startTracking(channel);
 });
 
-// one command per person at a time so spamming can't pile up start.gg requests
-const busy = new Set();
-
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isAutocomplete()) {
     await handleAutocomplete(interaction).catch(console.error);
     return;
   }
-  // a report's buttons run it again, so they wait their turn like commands. so do the Apps menu ones on a member
+  // a report's buttons run it again like commands. so do the Apps menu ones on a member
   const button = interaction.isButton();
   if (!interaction.isChatInputCommand() && !interaction.isUserContextMenuCommand() && !button) return;
 
-  const userId = interaction.user.id;
-  if (busy.has(userId)) {
-    await interaction.reply({ content: 'Still working on your last command.', flags: MessageFlags.Ephemeral }).catch(console.error);
-    return;
-  }
-  busy.add(userId);
-
+  // someone's second command starts right away but its start.gg requests wait for their first, see turns.js
   try {
-    await asCommand(async () => {
-      const progress = commandProgress();
+    await inTurn(interaction, async (progress) => {
       const started = Date.now();
       try {
         await (button ? handleButton(interaction) : handleCommand(interaction));
@@ -98,8 +89,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } else {
       await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);
     }
-  } finally {
-    busy.delete(userId);
   }
 });
 

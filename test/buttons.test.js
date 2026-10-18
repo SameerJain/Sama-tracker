@@ -11,7 +11,7 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleButton, buttonFailed } = await import('../src/commands/index.js');
-const { reportButton, readButton, buttonRow, sendEmbeds } = await import('../src/commands/shared.js');
+const { reportButton, readButton, parseSince, buttonRow, sendEmbeds } = await import('../src/commands/shared.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
@@ -40,14 +40,30 @@ function press(button, { ephemeral = false, user = 'crew-discord' } = {}) {
 
 test('a button carries the report, profile slugs and options in its id, within discord\'s 100 characters', () => {
   const button = reportButton('Full report', 'more', 'h2h', { player: crew, opponent: rival, melee: true }).toJSON();
-  assert.equal(button.custom_id, 'more:h2h:crew:rival:melee:');
+  assert.equal(button.custom_id, 'more:h2h:crew:rival:melee:::');
   assert.equal(button.label, 'Full report');
-  assert.deepEqual(readButton(button.custom_id), { action: 'more', command: 'h2h', player: 'crew', opponent: 'rival', melee: true, game: null });
+  assert.deepEqual(readButton(button.custom_id), { action: 'more', command: 'h2h', player: 'crew', opponent: 'rival', melee: true, game: null, since: null, venue: null });
   assert.equal(readButton(reportButton('Full report', 'more', 'characters', { player: crew, game: 1 }).toJSON().custom_id).game, 1);
   // too long for discord, or nobody to look up again, means no button instead of a broken one
   assert.equal(reportButton('Full report', 'more', 'stats', { player: { slug: `user/${'x'.repeat(100)}` } }), null);
   assert.equal(reportButton('Full report', 'more', 'stats', { player: { tag: 'No Slug' } }), null);
   assert.deepEqual(buttonRow(null, false, 0), []);
+});
+
+test('since and venue ride along in the button id, and old buttons still read without them', () => {
+  const button = reportButton('Full report', 'more', 'stats', { player: crew, since: '2026-01-01', venue: 'offline' }).toJSON();
+  assert.equal(button.custom_id, 'more:stats:crew::::2026-01-01:offline');
+  assert.deepEqual(readButton(button.custom_id), { action: 'more', command: 'stats', player: 'crew', opponent: '', melee: false, game: null, since: '2026-01-01', venue: 'offline' });
+  // buttons posted before the filters split short
+  assert.deepEqual(readButton('more:h2h:crew:rival:melee:'), { action: 'more', command: 'h2h', player: 'crew', opponent: 'rival', melee: true, game: null, since: null, venue: null });
+});
+
+test('since takes a YYYY-MM-DD date and nothing else', () => {
+  assert.deepEqual(parseSince(null), { since: null });
+  assert.equal(parseSince('2026-01-01').since, Date.UTC(2026, 0, 1) / 1000);
+  for (const junk of ['yesterday', '2026-13-01', '2026-02-30', '01-01-2026', '2026-1-1']) {
+    assert.match(parseSince(junk).error, /Use YYYY-MM-DD/, junk);
+  }
 });
 
 test('a button looks players up again: tracked ones from the list, anyone else on start.gg by profile slug', async () => {
@@ -82,7 +98,7 @@ test('a press that fails puts the report back the way it was and tells only whoe
   assert.deepEqual([restored.content, restored.embeds, restored.components], [null, run.message.embeds, run.message.components]);
   const [, told] = run.calls[3];
   assert.equal(told.flags, MessageFlags.Ephemeral);
-  assert.equal(told.content, 'Couldn\'t find that player on start.gg anymore. Run `/h2h` again.');
+  assert.equal(told.content, 'Couldn\'t find a start.gg account for that player. Run `/h2h` again.');
 
   // a button from a report that's since gone away
   globalThis.fetch = async () => assert.fail('no start.gg lookup');
@@ -94,7 +110,7 @@ test('a press that fails puts the report back the way it was and tells only whoe
   const failed = press(reportButton('Why these odds', 'new', 'predict', { player: crew, opponent: rival }));
   failed.deferred = true;
   await buttonFailed(failed, 'Something went wrong: start.gg is down');
-  assert.deepEqual(failed.calls, [['delete'], ['followUp', { content: 'Something went wrong: start.gg is down', flags: MessageFlags.Ephemeral }]]);
+  assert.deepEqual(failed.calls, [['delete'], ['followUp', { content: 'Something went wrong: start.gg is down', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }]]);
 });
 
 test('a /scout button compares with whoever pressed it, as long as start.gg still has their discord', async () => {
@@ -120,4 +136,57 @@ test('a pressed button on a private report keeps its follow-ups private, and the
   assert.deepEqual(calls.map(([kind]) => kind), ['edit', 'followUp']);
   assert.deepEqual(calls[0][1].components, []);
   assert.equal(calls[1][1].flags, MessageFlags.Ephemeral);
+});
+
+// a deferred command run this many seconds ago. records replies and channel posts in order
+function waited(seconds, { ephemeral = false, customId = null, send } = {}) {
+  const calls = [];
+  return {
+    calls, deferred: true, ephemeral, customId, commandName: 'stats', user: { id: '300' },
+    createdTimestamp: Date.now() - seconds * 1000,
+    isButton: () => Boolean(customId),
+    editReply: async (result) => calls.push(['edit', result]),
+    deleteReply: async () => calls.push(['delete']),
+    followUp: async (result) => calls.push(['followUp', result]),
+    channel: { send: send ?? (async (result) => calls.push(['send', result])) },
+  };
+}
+const cards = (n) => Array.from({ length: n }, (_, i) => new EmbedBuilder().setDescription(`card ${i + 1}`));
+
+test('a public answer over a minute late goes out as a new message pinging whoever asked, and the thinking reply goes', async () => {
+  const run = waited(61);
+  const row = buttonRow(reportButton('Full report', 'more', 'stats', { player: crew }));
+  await sendEmbeds(run, cards(11), row);
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['send', 'send', 'delete']);
+  const [[, first], [, rest]] = run.calls;
+  assert.equal(first.content, '<@300> here\'s your /stats.');
+  assert.deepEqual(first.allowedMentions, { users: ['300'] });
+  assert.equal(first.embeds.length, 10);
+  assert.equal(first.components, row);
+  // the rest of it pings nobody
+  assert.deepEqual(rest.allowedMentions, { parse: [] });
+
+  // a Full report press keeps the report it was swapping, without its greyed out buttons
+  const swap = waited(90, { customId: reportButton('Full report', 'more', 'h2h', { player: crew, opponent: rival }).toJSON().custom_id });
+  await sendEmbeds(swap, cards(1));
+  assert.deepEqual(swap.calls.map(([kind]) => kind), ['send', 'edit']);
+  assert.equal(swap.calls[0][1].content, '<@300> here\'s your /h2h.');
+  assert.deepEqual(swap.calls[1][1], { content: null, components: [] });
+});
+
+test('a quick, private or unpostable answer edits the reply the usual way', async () => {
+  for (const run of [waited(30), waited(120, { ephemeral: true })]) {
+    await sendEmbeds(run, cards(1));
+    assert.deepEqual(run.calls.map(([kind]) => kind), ['edit']);
+  }
+  // no permission to post in the channel
+  const blocked = waited(120, { send: async () => { throw new Error('Missing Permissions'); } });
+  const logged = console.error;
+  console.error = () => {};
+  try {
+    await sendEmbeds(blocked, cards(1));
+  } finally {
+    console.error = logged;
+  }
+  assert.deepEqual(blocked.calls.map(([kind]) => kind), ['edit']);
 });

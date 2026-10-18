@@ -1,123 +1,152 @@
 import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MessageFlags } from 'discord.js';
 
-// start.gg requests go out 800ms apart, a fake clock gets through minutes of them right away
+// someone's commands taking turns. start.gg requests go out 800ms apart, a fake clock gets through them right away
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+const directory = mkdtempSync(join(tmpdir(), 'sama-queue-'));
+process.env.STATE_DIR = directory;
+// the fun posts would call Claude on import
+delete process.env.ANTHROPIC_API_KEY;
+const { inTurn, QUEUED_PER_PERSON } = await import('../src/commands/turns.js');
+const { reportButton } = await import('../src/commands/shared.js');
 const startgg = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
-after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; });
+after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
-// moves the fake clock until it settles
-async function settle(promise) {
-  let done = false;
-  promise.finally(() => { done = true; }).catch(() => {});
-  while (!done) {
+let requests = 0;
+globalThis.fetch = async () => {
+  requests++;
+  return { ok: true, status: 200, json: async () => ({ data: { currentUser: { id: 1 } } }) };
+};
+
+// moves the fake clock until check passes
+async function until(check) {
+  for (let i = 0; i < 2000 && !check(); i++) {
     mock.timers.tick(100);
     await new Promise((resolve) => setImmediate(resolve));
   }
-  return promise;
+  assert.ok(check(), 'never happened');
 }
 
-const okFetch = () => {
-  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) });
-};
+// a discord interaction with what the line touches
+function fake({ user = 'u1', commandName = 'stats', customId = null } = {}) {
+  const calls = [];
+  const run = {
+    calls, user: { id: user }, commandName, customId, deferred: false, replied: false,
+    isButton: () => Boolean(customId),
+    deferReply: async (options) => { calls.push(['defer', options]); run.deferred = true; },
+    editReply: async (content) => { calls.push(['edit', content]); },
+    reply: async (content) => { calls.push(['reply', content]); run.replied = true; },
+  };
+  return run;
+}
 
-test('a burst of commands all gets through, one request every 800ms', async () => {
-  okFetch();
-  let calls = 0;
-  const counting = globalThis.fetch;
-  globalThis.fetch = async (...args) => { calls++; return counting(...args); };
-  const start = Date.now();
-  const finished = await settle(Promise.all(Array.from({ length: 5 }, () => startgg.asCommand(async () => {
-    for (let n = 0; n < 20; n++) await startgg.checkToken();
-  }))));
-  assert.equal(finished.length, 5);
-  assert.equal(calls, 100);
-  assert.equal(startgg.queueLength(), 0);
-  // 100 requests at 800ms apart, so nothing skipped the rate limit
-  const elapsed = Date.now() - start;
-  assert.ok(elapsed >= 79_000, `${elapsed}ms for 100 requests`);
-  assert.ok(elapsed < 100_000, `${elapsed}ms for 100 requests`);
-});
+const edits = (run) => run.calls.filter(([kind]) => kind === 'edit').map(([, content]) => content);
 
-test('a small command takes turns with a big one instead of waiting behind it', async () => {
-  okFetch();
-  let calls = 0;
-  const counting = globalThis.fetch;
-  globalThis.fetch = async (...args) => { calls++; return counting(...args); };
-  const start = Date.now();
-  let smallDone;
-  const big = startgg.asCommand(async () => {
-    for (let n = 0; n < 30; n++) await startgg.checkToken();
+test('a second command answers right away, says it is queued, and only asks start.gg once the first is done', async () => {
+  let releaseFirst;
+  const holding = new Promise((resolve) => { releaseFirst = resolve; });
+  const first = fake();
+  const firstDone = inTurn(first, async () => {
+    await first.deferReply();
+    await startgg.checkToken();
+    await holding;
   });
-  const small = startgg.asCommand(async () => {
-    for (let n = 0; n < 2; n++) await startgg.checkToken();
-    smallDone = Date.now() - start;
-  });
-  await settle(Promise.all([big, small]));
-  assert.equal(calls, 32);
-  assert.equal(startgg.queueLength(), 0);
-  // two of its own slots plus a turn each for the big one, not 30 slots behind it
-  assert.ok(smallDone < 10_000, `${smallDone}ms`);
-});
+  await until(() => requests === 1);
 
-test('429s push everything back 15 seconds, then every request still goes through', async () => {
-  let calls = 0;
-  globalThis.fetch = async () => {
-    calls++;
-    // the first three go out before the token notices the other copy
-    if (calls <= 3) return { ok: false, status: 429, json: async () => ({}) };
-    return { ok: true, status: 200, json: async () => ({ data: {} }) };
-  };
-  const start = Date.now();
-  const seen = [];
-  await settle(Promise.all([1, 2].map(() => startgg.asCommand(async () => {
-    for (let n = 0; n < 3; n++) await startgg.checkToken();
-    seen.push(startgg.commandProgress()());
-  }))));
-  // six requests plus one retry for each 429
-  assert.equal(calls, 9);
-  assert.deepEqual(seen.map((progress) => progress.waiting), [0, 0]);
-  assert.equal(seen.reduce((sum, progress) => sum + progress.sent, 0), 9);
-  assert.equal(seen.reduce((sum, progress) => sum + progress.limited, 0), 3);
-  assert.equal(startgg.queueLength(), 0);
-  const elapsed = Date.now() - start;
-  assert.ok(elapsed >= 45_000, `${elapsed}ms`);
-  assert.ok(elapsed < 120_000, `${elapsed}ms`);
-});
-
-test('a timed-out request retries instead of failing the command', async () => {
-  let calls = 0;
-  globalThis.fetch = async () => {
-    calls++;
-    if (calls === 1) throw new Error('The operation was aborted due to timeout');
-    return { ok: true, status: 200, json: async () => ({ data: {} }) };
-  };
-  await settle(startgg.asCommand(() => startgg.checkToken()));
-  assert.equal(calls, 2);
-  assert.equal(startgg.queueLength(), 0);
-
-  // retries run out after the first try and two more
-  calls = 0;
-  globalThis.fetch = async () => {
-    calls++;
-    throw new Error('The operation was aborted due to timeout');
-  };
-  await assert.rejects(settle(startgg.asCommand(() => startgg.checkToken())), /start\.gg didn't respond/);
-  assert.equal(calls, 3);
-  assert.equal(startgg.queueLength(), 0);
-});
-
-test("a command's requests go ahead of the background checks", async () => {
+  const second = fake({ commandName: 'h2h' });
   const order = [];
-  globalThis.fetch = async (_url, options) => {
-    order.push(JSON.parse(options.body).query.includes('currentUser') ? 'command' : 'background');
-    return { ok: true, status: 200, json: async () => ({ data: { currentUser: { id: 1 }, u1: { slug: 'user/t', player: { gamerTag: 'T' }, authorizations: [] } } }) };
-  };
-  const background = startgg.inBackground(() => startgg.getProfiles(['1']));
-  const command = startgg.asCommand(() => startgg.checkToken());
-  const [profiles] = await settle(Promise.all([background, command]));
-  assert.deepEqual(order, ['command', 'background']);
-  assert.equal(profiles[0][1].tag, 'T');
-  assert.equal(startgg.queueLength(), 0);
+  const secondDone = inTurn(second, async () => {
+    await second.deferReply();
+    order.push('answered');
+    await startgg.checkToken();
+    order.push('asked start.gg');
+  });
+  await until(() => edits(second).length === 1);
+  assert.deepEqual(order, ['answered']);
+  assert.equal(edits(second)[0], '**Queued** behind your /stats. This one starts when it\'s done.');
+
+  // someone else never waits on them
+  const other = fake({ user: 'u2' });
+  let otherAsked = false;
+  inTurn(other, () => startgg.checkToken().then(() => { otherAsked = true; }));
+  await until(() => otherAsked);
+  assert.deepEqual(other.calls, []);
+  assert.deepEqual(order, ['answered']);
+
+  releaseFirst();
+  await until(() => order.length === 2);
+  await Promise.all([firstDone, secondDone]);
+  assert.equal(requests, 3);
+});
+
+test('a queued command that needs nothing from start.gg answers without waiting', async () => {
+  let releaseFirst;
+  const holding = new Promise((resolve) => { releaseFirst = resolve; });
+  const firstDone = inTurn(fake(), () => holding);
+  const help = fake({ commandName: 'help' });
+  await inTurn(help, () => help.reply({ embeds: [] }));
+  assert.deepEqual(help.calls.map(([kind]) => kind), ['reply']);
+  releaseFirst();
+  await firstDone;
+});
+
+test('the queued line says how long the one ahead has left, counting other people in the line', async () => {
+  const before = requests;
+  const first = fake();
+  const firstDone = inTurn(first, async () => {
+    await first.deferReply();
+    await Promise.all(Array.from({ length: 20 }, () => startgg.checkToken()));
+  });
+  // someone else's command takes turns with it, so it has longer to go
+  const otherDone = inTurn(fake({ user: 'u2' }), () => Promise.all(Array.from({ length: 20 }, () => startgg.checkToken())));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const button = fake({ customId: reportButton('Full report', 'more', 'scout', { opponent: { slug: 'user/abc' } }).toJSON().custom_id });
+  const buttonDone = inTurn(button, async () => {
+    await button.deferReply();
+    await startgg.checkToken();
+  });
+  await until(() => edits(button).length === 1);
+  // 40 requests at 800ms apart less the one already out, and buttons go by the report they run
+  assert.match(edits(button)[0], /^\*\*Queued\*\* behind your \/stats, which has about 40 seconds left\. This one starts when it's done\.$/);
+  await until(() => requests === before + 41);
+  await Promise.all([firstDone, otherDone, buttonDone]);
+});
+
+test(`past ${QUEUED_PER_PERSON} waiting, the next is turned away and only they see why`, async () => {
+  let release;
+  const holding = new Promise((resolve) => { release = resolve; });
+  const going = Array.from({ length: QUEUED_PER_PERSON + 1 }, () => inTurn(fake(), () => holding));
+  const extra = fake();
+  let ran = false;
+  assert.equal(await inTurn(extra, () => { ran = true; }), false);
+  assert.equal(ran, false);
+  assert.deepEqual(extra.calls, [['reply', { content: `You have ${QUEUED_PER_PERSON + 1} commands going already. Try again once one is done.`, flags: MessageFlags.Ephemeral }]]);
+  release();
+  await Promise.all(going);
+  // the line is clear again
+  assert.equal(await inTurn(fake(), () => {}), true);
+});
+
+test('a command that throws still lets the next one go', async () => {
+  const failed = inTurn(fake(), async () => {
+    await startgg.checkToken();
+    throw new Error('broke');
+  });
+  const next = fake();
+  let asked = false;
+  const nextDone = inTurn(next, async () => {
+    await next.deferReply();
+    await startgg.checkToken();
+    asked = true;
+  });
+  const threw = assert.rejects(failed, /broke/);
+  await until(() => asked);
+  await threw;
+  await nextDone;
 });

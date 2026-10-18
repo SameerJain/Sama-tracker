@@ -105,11 +105,13 @@ test('more pages failing keeps the copy it was adding to', async () => {
   // Them has 30 pages cached from /scout verbose. /stats verbose wants all 60, and page 40 fails
   state.players[2] = { userId: 2, playerId: 99, tag: 'Them', slug: 'user/them' };
   fakeStartgg({ 99: 60 }, { fail: (request) => request === 'sets 99 40' });
-  await assert.rejects(settle(startgg.asCommand(() => handleCommand({
-    commandName: 'stats', user: { id: 'me' },
-    options: { getSubcommand: () => null, getString: () => '2', getBoolean: (name) => name === 'verbose' },
-    deferReply: async () => {}, editReply: async () => {},
-  }))), /HTTP 500/);
+  // deferReply marks it like discord does, so the report edits the thinking reply
+  const interaction = {
+    commandName: 'stats', user: { id: 'me' }, deferred: false,
+    options: { getSubcommand: () => null, getString: (name) => (name === 'player' ? '2' : null), getBoolean: (name) => name === 'verbose' },
+    deferReply: async () => { interaction.deferred = true; }, editReply: async () => {},
+  };
+  await assert.rejects(settle(startgg.asCommand(() => handleCommand(interaction))), /HTTP 500/);
   // the 30 pages are still there, so /scout verbose needs none of them again
   const asked = fakeStartgg({ 99: 60 });
   await command('scout', { profile: 'them', verbose: true });

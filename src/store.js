@@ -15,9 +15,10 @@ const FILE = `${stateDir}/state.json`;
 // userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back.
 // threads are the tournament threads from /messages threads, keyed by tournament slug: { id, at }, with at when it was started.
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
+// buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }, with at when it was sent
 const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], streamPings: [], regAdmins: {}, regSkipped: [],
-  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {},
+  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
 };
 
 function load() {

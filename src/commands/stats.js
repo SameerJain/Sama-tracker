@@ -16,7 +16,7 @@ import { slippiFor, slippiLookup } from './slippi.js';
 import { LOGO as slippiLogo } from '../slippi.js';
 import {
   fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, reportButton, fullReport, buttonRow,
-  linkedPlayer, rememberPick,
+  linkedPlayer, rememberPick, parseSince,
 } from './shared.js';
 
 // /characters verbose, so the cards fit in one message
@@ -41,6 +41,45 @@ const allMelee = (melee, ...lists) => melee
 // each report runs after its command's checks and the defer, so a button can run it again with the same
 // players. these are the options it takes from the command
 const reportOptions = (interaction) => ({ verbose: flag(interaction, 'verbose'), melee: flag(interaction, 'melee') });
+
+// since is unix seconds, venue offline, online or null for both, and sinceText the YYYY-MM-DD for
+// buttons. error answers with what to type instead, before anything gets deferred
+function filterOptions(interaction) {
+  const text = interaction.options.getString('since');
+  const { since, error } = parseSince(text);
+  if (error) return { error };
+  const venue = interaction.options.getString('venue');
+  return { since, sinceText: text?.trim() || null, venue: venue === 'offline' || venue === 'online' ? venue : null };
+}
+
+// sets carry tournament.isOnline under event, and standings and events do too. anything missing it
+// stays out once filtering is on. character sets have no tournament to go by, so venue leaves them alone
+const onlineOf = (tournament) => tournament?.isOnline ?? null;
+const venueMatch = (venue, online) => !venue || online === (venue === 'online');
+
+const scopeSets = ({ since, venue }) => (list) => (list ?? []).filter((set) =>
+  (!since || (set.completedAt ?? 0) >= since) && venueMatch(venue, onlineOf(set.event?.tournament)));
+// null stays null, so a failed event lookup still reads seeding from the sets themselves
+const scopeEntries = ({ since, venue }) => (list) => (!list ? list : list.filter((entry) =>
+  (!since || (entry.event?.startAt ?? 0) >= since) && venueMatch(venue, onlineOf(entry.event?.tournament))));
+const scopeCharacters = ({ since }) => (list) => (!list ? list : list.filter((set) => (set.completedAt ?? 0) >= since));
+
+// the same odds with slippi ratings when both are ranked and the game is melee. slippi never sinks
+// the report, so anything going wrong here leaves the start.gg odds as they were
+async function oddsWithSlippi(a, b, historyA, historyB, options, ranked, show) {
+  const plain = predictOdds(a, b, historyA, historyB, options);
+  let profiles = null;
+  try {
+    profiles = await ranked(show || plain?.game === 'Melee');
+    if (plain?.game === 'Melee' && profiles?.[0] && profiles?.[1]) {
+      const withSlippi = predictOdds(a, b, historyA, historyB, { ...options, slippiA: profiles[0], slippiB: profiles[1] });
+      if (withSlippi?.slippi) return { odds: withSlippi, profiles };
+    }
+  } catch (err) {
+    console.error('slippi odds failed:', err.message);
+  }
+  return { odds: plain, profiles };
+}
 
 // the two players a matchup command works on, opponent first. either option also takes a start.gg
 // profile link or ID, so it doesn't matter whether either is tracked or linked. null when it answered
@@ -106,21 +145,27 @@ async function scout(interaction) {
   const opponent = readPlayer(interaction, 'profile') ?? await findPlayer(interaction, input);
   if (!opponent) return;
   if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
+  const filters = filterOptions(interaction);
+  if (filters.error) return interaction.editReply(filters.error);
 
-  return scoutReport(interaction, { player, opponent, ...reportOptions(interaction) });
+  return scoutReport(interaction, { player, opponent, ...reportOptions(interaction), ...filters });
 }
 
 // player is always whoever ran it, so its button only carries the opponent
-async function scoutReport(interaction, { player, opponent, verbose, melee }) {
+async function scoutReport(interaction, { player, opponent, verbose, melee, since, venue, sinceText }) {
   const only = onlyMelee(melee);
+  const filters = { since, venue };
+  const inScope = (list) => scopeSets(filters)(only(list));
+  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
+  const inScopeCharacters = (list) => scopeCharacters(filters)(only(list));
   const ranked = slippiLookup([player, opponent], melee);
   const [mine, theirs, characters] = await withCountdown(interaction, `Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
     setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
   ]));
-  const mySets = only(mine);
+  const mySets = inScope(mine);
   const profiles = await ranked(allMelee(melee, theirs, characters));
-  const quick = embeds.withSlippi(embeds.scout(player, opponent, mySets, only(theirs), only(characters), { melee }), [player, opponent], profiles);
-  if (!verbose) return sendEmbeds(interaction, quick, buttonRow(fullReport('scout', { opponent, melee })));
+  const quick = embeds.withSlippi(embeds.scout(player, opponent, mySets, inScope(theirs), inScopeCharacters(characters), { melee, filters }), [player, opponent], profiles);
+  if (!verbose) return sendEmbeds(interaction, quick, buttonRow(fullReport('scout', { opponent, melee, since: sinceText, venue })));
 
   // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
   // meeting them and the odds, so the usual amount is plenty
@@ -128,26 +173,32 @@ async function scoutReport(interaction, { player, opponent, verbose, melee }) {
     setHistories(opponent.playerId, SCOUT_PAGES), characterHistories(opponent.playerId, SCOUT_CHARACTER_PAGES), eventHistory(opponent.userId),
     eventHistory(player.userId).catch(() => null),
   ]), quick);
-  const theirSets = only(deeper);
-  const odds = predictOdds(player, opponent, mySets, theirSets, { game: melee ? 'Melee' : undefined, eventsA: myEvents && only(myEvents), eventsB: only(events) });
+  const theirSets = inScope(deeper);
+  const options = { game: melee ? 'Melee' : undefined, eventsA: myEvents && inScopeEvents(myEvents), eventsB: inScopeEvents(events) };
+  const { odds, profiles: full } = await oddsWithSlippi(player, opponent, mySets, theirSets, options, ranked, allMelee(melee, theirs, characters));
   const report = embeds.scoutReport(player, opponent, {
-    mine: mySets, theirs: theirSets, characterSets: only(characterSets), events: only(events), odds, players: state.players, melee,
+    mine: mySets, theirs: theirSets, characterSets: inScopeCharacters(characterSets), events: inScopeEvents(events), odds, players: state.players, melee, filters,
   });
-  return sendEmbeds(interaction, embeds.withSlippi(report, [player, opponent], profiles, { odds: Boolean(odds) }));
+  return sendEmbeds(interaction, embeds.withSlippi(report, [player, opponent], full ?? profiles, { odds: Boolean(odds), slippi: Boolean(odds?.slippi) }));
 }
 
 async function headToHead(interaction) {
+  const filters = filterOptions(interaction);
+  if (filters.error) return replyEphemeral(interaction, filters.error);
   const players = await pair(interaction);
   if (!players) return;
   const [player, opponent] = players;
 
   // pair only has to defer itself when it looked a link up
   if (!interaction.deferred) await interaction.deferReply();
-  return headToHeadReport(interaction, { player, opponent, ...reportOptions(interaction) });
+  return headToHeadReport(interaction, { player, opponent, ...reportOptions(interaction), ...filters });
 }
 
-async function headToHeadReport(interaction, { player: a, opponent: b, verbose, melee }) {
+async function headToHeadReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
   const only = onlyMelee(melee);
+  const filters = { since, venue };
+  const inScope = (list) => scopeSets(filters)(only(list));
+  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
   const ranked = slippiLookup([a, b], melee);
   // meetings for the record, histories and events for one line of /predict odds
   const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
@@ -156,44 +207,51 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
       setHistory(a.playerId), setHistory(b.playerId),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
-  const shown = only(sets);
-  // every meeting, so the odds go by the same record the card shows
-  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB, meetings: sets });
+  const shown = inScope(sets);
+  // every meeting in scope, so the odds go by the same record the card shows. the odds pick their
+  // own game out of these, so since and venue narrow them but melee doesn't
+  const inScopeOdds = (list) => scopeSets(filters)(list ?? []);
+  const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: shown };
+  // the odds went with melee as the game they share, so it's a melee matchup even without the option
+  const { odds, profiles } = await oddsWithSlippi(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options, ranked, allMelee(melee, shown));
   // never having played, the full report would say the same thing. the odds stay one line in both, so
   // the other button posts /predict for why
   const buttons = buttonRow(
-    !verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee }),
-    odds && reportButton('Why these odds', 'new', 'predict', { player: a, opponent: b, melee }),
+    !verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee, since: sinceText, venue }),
+    odds && reportButton('Why these odds', 'new', 'predict', { player: a, opponent: b, melee, since: sinceText, venue }),
   );
-  const cards = embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - shown.length, odds });
-  // the odds went with melee as the game they share, so it's a melee matchup even without the option
-  const profiles = await ranked(allMelee(melee, shown) || odds?.game === 'Melee');
-  return sendEmbeds(interaction, embeds.withSlippi(cards, [a, b], profiles, { odds: Boolean(odds) }), buttons);
+  const cards = embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - only(sets).length, odds, filters });
+  return sendEmbeds(interaction, embeds.withSlippi(cards, [a, b], profiles, { odds: Boolean(odds), slippi: Boolean(odds?.slippi) }), buttons);
 }
 
 async function stats(interaction) {
   const player = readPlayer(interaction);
   if (!player) return replyNoPlayer(interaction);
+  const filters = filterOptions(interaction);
+  if (filters.error) return replyEphemeral(interaction, filters.error);
 
   await interaction.deferReply();
-  return statsReport(interaction, { player, ...reportOptions(interaction) });
+  return statsReport(interaction, { player, ...reportOptions(interaction), ...filters });
 }
 
-async function statsReport(interaction, { player, verbose, melee }) {
+async function statsReport(interaction, { player, verbose, melee, since, venue, sinceText }) {
   const only = onlyMelee(melee);
+  const filters = { since, venue };
+  const inScope = (list) => scopeSets(filters)(only(list));
+  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
   const ranked = slippiLookup([player], melee);
-  const { standings, sets } = await startgg.getStats(player.playerId, { videogameId: melee ? startgg.MELEE : undefined });
+  const { standings, sets } = await startgg.getStats(player.playerId, { videogameId: melee ? startgg.MELEE : undefined, since, venue });
   const profiles = await ranked(allMelee(melee, standings, sets));
-  const [recent] = embeds.withSlippi([embeds.stats(player, only(standings), only(sets), { melee })], [player], profiles);
+  const [recent] = embeds.withSlippi([embeds.stats(player, inScopeEvents(standings), inScope(sets), { melee, filters })], [player], profiles);
   if (!verbose) {
     // nothing recent on start.gg means nothing older either
-    const more = only(standings).length || only(sets).length ? buttonRow(fullReport('stats', { player, melee })) : [];
-    return interaction.editReply({ embeds: embeds.withImage([recent]), components: more });
+    const more = inScopeEvents(standings).length || inScope(sets).length ? buttonRow(fullReport('stats', { player, melee, since: sinceText, venue })) : [];
+    return sendEmbeds(interaction, [recent], more);
   }
   // show the recent card while the lifetime report loads
   const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
     Promise.all([eventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
-  return sendEmbeds(interaction, embeds.withSlippi(embeds.lifetimeStats(player, only(events), only(history), state.players, { melee }), [player], profiles));
+  return sendEmbeds(interaction, embeds.withSlippi(embeds.lifetimeStats(player, inScopeEvents(events), inScope(history), state.players, { melee, filters }), [player], profiles));
 }
 
 async function doubles(interaction) {
@@ -253,17 +311,12 @@ async function charactersReport(interaction, { player, verbose, game: picked }) 
   const art = await Promise.all(cards.map(({ game, usage }) => (game && usage.characters.length
     ? startgg.getCharacterArt(usage.characters[0].name, game.id).catch(() => null)
     : null)));
-  await interaction.editReply({
-    // clears a countdown
-    content: null,
-    embeds: embeds.withImage(cards.map(({ game, usage }, i) => {
-      const card = embeds.characters(player, usage, { game: game?.displayName, file: art[i]?.name, note: i === cards.length - 1 ? note : undefined, searched: sets.length });
-      return game?.id === startgg.MELEE ? embeds.withRankedCharacters(card, ranked) : card;
-    })),
-    // replaces the art when a button swaps in the full report
-    files: art.filter(Boolean),
-    components: verbose ? [] : buttonRow(fullReport('characters', { player, game: picked })),
+  const shown = cards.map(({ game, usage }, i) => {
+    const card = embeds.characters(player, usage, { game: game?.displayName, file: art[i]?.name, note: i === cards.length - 1 ? note : undefined, searched: sets.length });
+    return game?.id === startgg.MELEE ? embeds.withRankedCharacters(card, ranked) : card;
   });
+  // the files replace the art when a button swaps in the full report
+  await sendEmbeds(interaction, shown, verbose ? [] : buttonRow(fullReport('characters', { player, game: picked })), art.filter(Boolean));
 }
 
 // a card for the picked game, or whichever has more reported. verbose adds one for each other game with
@@ -291,31 +344,39 @@ function characterCards(sets, verbose, picked) {
 }
 
 // nothing to predict with: without melee that means no game in common. with it, name whoever is missing
-// Melee and point at the game the odds do work for, since the old pair wording read like both were missing it
-function noOdds(a, b, historyA, historyB, melee) {
+// Melee and point at the game the odds do work for, since the old pair wording read like both were missing it.
+// the hint goes by the filters without the melee one, since melee-only histories never share another game
+function noOdds(a, b, historyA, historyB, melee, filters = {}, hintA = historyA, hintB = historyB) {
   const tags = [escapeMarkdown(a.tag), escapeMarkdown(b.tag)];
-  if (!melee) return `${tags[0]} and ${tags[1]} haven't played singles in the same game on start.gg.`;
+  const scope = filters.since || filters.venue ? ' matching those filters' : '';
+  if (!melee) return `${tags[0]} and ${tags[1]} haven't played singles in the same game on start.gg${scope}.`;
 
   const missing = [a, b].filter((player, i) => !gameSets(i ? historyB : historyA, player, 'Melee').length).map((player) => escapeMarkdown(player.tag));
   const who = missing.length === 2 ? `Neither ${tags[0]} nor ${tags[1]} has` : `${missing[0]} hasn't`;
   // the game predict would pick without melee, which leaves out DQs, so leaving melee out really gives odds there
-  const shared = sharedGame(a, b, historyA, historyB);
+  const shared = sharedGame(a, b, hintA, hintB);
   const hint = shared ? `\n-# Leave out \`melee\` for ${escapeMarkdown(shared)} odds` : '';
-  return `${who} played Melee singles on start.gg.${hint}`;
+  return `${who} played Melee singles on start.gg${scope}.${hint}`;
 }
 
 // verbose explains the same odds instead of changing them
 async function predict(interaction) {
+  const filters = filterOptions(interaction);
+  if (filters.error) return replyEphemeral(interaction, filters.error);
   const players = await pair(interaction);
   if (!players) return;
   const [player, opponent] = players;
 
   // pair only has to defer itself when it looked a link up
   if (!interaction.deferred) await interaction.deferReply();
-  return predictReport(interaction, { player, opponent, ...reportOptions(interaction) });
+  return predictReport(interaction, { player, opponent, ...reportOptions(interaction), ...filters });
 }
 
-async function predictReport(interaction, { player: a, opponent: b, verbose, melee }) {
+async function predictReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
+  const only = onlyMelee(melee);
+  const filters = { since, venue };
+  const inScope = (list) => scopeSets(filters)(only(list));
+  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
   const ranked = slippiLookup([a, b], melee);
   // meetings go back past the histories, usually in one request, so head-to-head matches /h2h. events say how
   // big each bracket was, which helps seeding count. the histories have the recent meetings and the odds still
@@ -325,16 +386,21 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
       setHistory(a.playerId), setHistory(b.playerId), startgg.getHeadToHead(a.playerId, b.playerId).catch(() => []),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
-  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB, meetings });
-  const profiles = await ranked(melee || odds?.game === 'Melee');
+  // the odds and the no-odds wording pick their own game out of these, so since and venue
+  // narrow them but melee doesn't
+  const scopedA = scopeSets(filters)(historyA ?? []);
+  const scopedB = scopeSets(filters)(historyB ?? []);
+  const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: inScope(meetings) };
+  const { odds, profiles } = await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, melee);
   // netplay players can have a rank without a melee set on start.gg, which is when it says the most
   if (!odds) {
     const ranks = embeds.slippiMatchup([a, b], profiles);
-    return interaction.editReply(ranks.length ? { content: noOdds(a, b, historyA, historyB, melee), embeds: ranks, files: [slippiLogo] } : noOdds(a, b, historyA, historyB, melee));
+    const hinted = noOdds(a, b, scopedA, scopedB, melee, filters, scopeSets(filters)(historyA), scopeSets(filters)(historyB));
+    return interaction.editReply(ranks.length ? { content: hinted, embeds: ranks, files: [slippiLogo], allowedMentions: { parse: [] } } : { content: hinted, allowedMentions: { parse: [] } });
   }
 
-  const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee }));
-  await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose), [a, b], profiles, { odds: true }), more);
+  const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee, since: sinceText, venue }));
+  await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, filters), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }), more);
 }
 
 // long-press someone in the server, then Apps. nothing to type, which is the point on a phone. checks the

@@ -21,8 +21,9 @@ function tournamentSlug(input) {
   return path.match(/tournament\/([\w-]+)/)?.[1] ?? path.split(/[/?#]/)[0];
 }
 
+// mentions stay off so a typed link can't ping anyone
 function tournamentNotFound(input) {
-  return `Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`;
+  return { content: `Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`, allowedMentions: { parse: [] } };
 }
 
 // autocomplete, so nobody has to paste a link for a tournament the bot already knows: ones with reminders
@@ -57,7 +58,7 @@ async function setRegReminder(interaction) {
   if (!tournament) return interaction.editReply(tournamentNotFound(input));
 
   if (state.regReminders[tournament.id]) {
-    return interaction.editReply(`${tournament.name} already has reminders set. \`/delete_reg_reminder\` cancels them.`);
+    return interaction.editReply({ content: `${tournament.name} already has reminders set. \`/delete_reg_reminder\` cancels them.`, allowedMentions: { parse: [] } });
   }
 
   const deadline = regDeadline(tournament);
@@ -65,7 +66,7 @@ async function setRegReminder(interaction) {
   const firstAt = deadline - REG_REMINDER_HOURS[next] * 60 * 60;
   // further out it might just not be open yet
   if (deadline <= secondsNow() || (firstAt <= secondsNow() && !tournament.isRegistrationOpen)) {
-    return interaction.editReply(`Registration for ${tournament.name} is closed.`);
+    return interaction.editReply({ content: `Registration for ${tournament.name} is closed.`, allowedMentions: { parse: [] } });
   }
 
   state.regReminders[tournament.id] = { id: tournament.id, slug: tournament.slug, name: tournament.name, deadline, next };
@@ -94,11 +95,11 @@ async function setRegReminder(interaction) {
     : added ? ` ${added} players from ${tournament.name} are now tracked, with set results, stream alerts and match call pings off.` : '';
 
   if (firstAt <= secondsNow()) {
-    return interaction.editReply(`Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`);
+    return interaction.editReply({ content: `Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`, allowedMentions: { parse: [] } });
   }
   const duration = (hours) => (hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`);
   const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(duration));
-  return interaction.editReply(`Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/reg_role\` to turn yours on.${tracked}`);
+  return interaction.editReply({ content: `Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/reg_role\` to turn yours on.${tracked}`, allowedMentions: { parse: [] } });
 }
 
 function deleteRegReminder(interaction) {
@@ -110,7 +111,7 @@ function deleteRegReminder(interaction) {
   // so a reg admin's doesn't get added back
   state.regSkipped = [...state.regSkipped, reminder.id].slice(-200);
   save();
-  return interaction.reply(`Deleted the reminder for ${reminder.name}.`);
+  return interaction.reply({ content: `Deleted the reminder for ${reminder.name}.`, allowedMentions: { parse: [] } });
 }
 
 async function regAdminAdd(interaction) {
@@ -120,12 +121,12 @@ async function regAdminAdd(interaction) {
   const admin = await findPlayer(interaction, input);
   if (!admin) return;
   if (state.regAdmins[admin.userId]) {
-    return interaction.editReply(`${admin.tag} is already a reg admin.`);
+    return interaction.editReply({ content: `${admin.tag} is already a reg admin.`, allowedMentions: { parse: [] } });
   }
 
   state.regAdmins[admin.userId] = { userId: admin.userId, slug: admin.slug, tag: admin.tag };
   save();
-  await interaction.editReply(`Tournaments ${admin.tag} is an admin of on start.gg get reg reminders now. \`/delete_reg_reminder\` skips one.`);
+  await interaction.editReply({ content: `Tournaments ${admin.tag} is an admin of on start.gg get reg reminders now. \`/delete_reg_reminder\` skips one.`, allowedMentions: { parse: [] } });
 
   // don't wait 15 min for theirs to show up
   checkRegReminders();
@@ -137,19 +138,51 @@ function regAdminRemove(interaction) {
 
   delete state.regAdmins[admin.userId];
   save();
-  return interaction.reply(`No more automatic reminders for ${admin.tag}'s tournaments. Ones already set stay, \`/delete_reg_reminder\` cancels them.`);
+  return interaction.reply({ content: `No more automatic reminders for ${admin.tag}'s tournaments. Ones already set stay, \`/delete_reg_reminder\` cancels them.`, allowedMentions: { parse: [] } });
+}
+
+// from a little before the start until well after the end, since locals run late. soonest first, each tournament once
+function goingOn(tournaments) {
+  const now = secondsNow();
+  const seen = new Set();
+  return tournaments
+    .filter((tournament) => now >= tournament.startAt - BRACKET_MINUTES_BEFORE * 60 && now <= endTime(tournament) + RUNS_LATE_HOURS * 60 * 60)
+    .filter((tournament) => !seen.has(String(tournament.id)) && seen.add(String(tournament.id)))
+    .sort((a, b) => a.startAt - b.startAt);
 }
 
 // reg reminder tournaments only, they're the ones the server cares about
 function bracket(interaction) {
-  const now = secondsNow();
-  const live = Object.values(state.regReminders)
-    .filter((reminder) => now >= reminder.startAt - BRACKET_MINUTES_BEFORE * 60 && now <= endTime(reminder) + RUNS_LATE_HOURS * 60 * 60)
-    .sort((a, b) => a.startAt - b.startAt);
+  const live = goingOn(Object.values(state.regReminders));
   if (!live.length) {
     return interaction.reply('No tournaments set as active. Check the other channels if you\'re expecting one.');
   }
   return sendEmbeds(interaction, live.flatMap((reminder) => embeds.bracket(reminder)));
+}
+
+const ASK_A_TO = 'If you were expecting a stream, ask a TO in another channel. `/socials` has the server\'s saved streams.';
+
+// reminder tournaments and the ones tracked players are in. start.gg only has the streams a TO added on the
+// tournament page, so a tournament with none is left out and named instead
+async function streamLink(interaction) {
+  const live = goingOn([...Object.values(state.regReminders), ...Object.values(state.tournaments).filter((tournament) => !tournament.resultsPosted)]);
+  if (!live.length) return interaction.reply(`No tracked tournaments are going on right now. ${ASK_A_TO}`);
+
+  await interaction.deferReply();
+  let streams;
+  try {
+    streams = await startgg.getTournamentStreams(live.map((tournament) => tournament.id));
+  } catch (err) {
+    console.error('stream links failed:', err.message);
+    return interaction.editReply(`Couldn't get stream links from start.gg right now. ${ASK_A_TO}`);
+  }
+  const shown = live.filter((tournament) => streams.get(String(tournament.id))?.length);
+  if (!shown.length) {
+    const names = live.slice(0, 5).map((tournament) => escapeMarkdown(tournament.name));
+    if (live.length > 5) names.push(`${live.length - 5} more`);
+    return interaction.editReply({ content: `No stream links on start.gg for ${new Intl.ListFormat('en').format(names)}. ${ASK_A_TO}`, allowedMentions: { parse: [] } });
+  }
+  return sendEmbeds(interaction, shown.flatMap((tournament) => embeds.streamLinks(tournament, streams.get(String(tournament.id)))));
 }
 
 // only ever changes the person who ran it. pings go off this list, not the role,
@@ -210,7 +243,7 @@ async function registered(interaction) {
   const participants = await startgg.getParticipants(found.id);
   rememberAccounts(participants);
   if (startgg.attendeesHidden(found, participants)) {
-    return interaction.editReply(`start.gg hides who's registered for ${escapeMarkdown(found.name)}, so there's no list to show.`);
+    return interaction.editReply({ content: `start.gg hides who's registered for ${escapeMarkdown(found.name)}, so there's no list to show.`, allowedMentions: { parse: [] } });
   }
   const linked = participants.filter((participant) => participant.discordId);
   const members = await serverMembers(interaction.guild, [...new Set(linked.map((participant) => participant.discordId))]);
@@ -238,14 +271,14 @@ async function regWarn(interaction) {
   rememberAccounts(participants);
   if (participants.some((participant) => participant.discordId === user.id)) {
     const name = interaction.options.getMember('user')?.displayName ?? user.displayName;
-    return interaction.editReply(`Already registered.\n-# ${escapeMarkdown(name)} · ${escapeMarkdown(tournament.name)}`);
+    return interaction.editReply({ content: `Already registered.\n-# ${escapeMarkdown(name)} · ${escapeMarkdown(tournament.name)}`, allowedMentions: { parse: [] } });
   }
   const deadline = regDeadline(tournament);
-  if (deadline <= secondsNow()) return interaction.editReply(`Registration for ${tournament.name} already closed.`);
-  if (!tournament.isRegistrationOpen) return interaction.editReply(`Registration for ${tournament.name} isn't open right now.`);
+  if (deadline <= secondsNow()) return interaction.editReply({ content: `Registration for ${tournament.name} already closed.`, allowedMentions: { parse: [] } });
+  if (!tournament.isRegistrationOpen) return interaction.editReply({ content: `Registration for ${tournament.name} isn't open right now.`, allowedMentions: { parse: [] } });
   // not on a hidden list means nothing, so no warning
   if (startgg.attendeesHidden(tournament, participants)) {
-    return interaction.editReply(`start.gg hides who's registered for ${escapeMarkdown(tournament.name)}, so there's no telling if they are. No warning sent.`);
+    return interaction.editReply({ content: `start.gg hides who's registered for ${escapeMarkdown(tournament.name)}, so there's no telling if they are. No warning sent.`, allowedMentions: { parse: [] } });
   }
 
   // editing the reply wouldn't ping them, and a follow-up shows "Original message was deleted"
@@ -261,4 +294,4 @@ async function regWarn(interaction) {
   if (!sent) return interaction.followUp(warning);
 }
 
-export { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn, tournamentChoices };
+export { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, streamLink, regRole, registered, regWarn, tournamentChoices };

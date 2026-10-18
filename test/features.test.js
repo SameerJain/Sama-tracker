@@ -57,6 +57,18 @@ test('registers run, scout, and progress with their required inputs', () => {
   assert.equal(commands.find(c => c.name === 'scout').options[0].autocomplete, true);
 });
 
+test('scout tells a tracked player saved without their discord to /link, without checking everyone tracked', async () => {
+  state.players = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [i + 1, { ...crewPlayer, userId: i + 1, playerId: 100 + i }]));
+  mockApi(() => assert.fail('nobody is saved with this discord, so there is nothing to check'));
+  const replies = [];
+  await handleCommand({
+    commandName: 'scout', user: { id: 'allowed' },
+    options: { getSubcommand: () => null, getString: () => 'target' },
+    deferReply: async () => {}, editReply: async r => replies.push(r),
+  });
+  assert.match(replies.at(-1), /\/link/);
+});
+
 test('scout refuses untracked Discord callers before fetching an opponent', async () => {
   state.players = { 1: { ...crewPlayer, discordId: 'outsider' } };
   mockApi(({ query }) => {
@@ -66,14 +78,15 @@ test('scout refuses untracked Discord callers before fetching an opponent', asyn
   const replies = [];
   await handleCommand({
     commandName: 'scout', user: { id: 'outsider' },
-    options: { getSubcommand: () => null, getString: () => 'target' },
+    options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'target' : null) },
     deferReply: async () => {}, editReply: async r => replies.push(r),
   });
   assert.match(replies.at(-1), /\/link/);
 });
 
 test('tracked callers can scout an untracked opponent without adding them', async () => {
-  state.players = { 1: crewPlayer };
+  // the daily profile refresh saves the discord on their start.gg
+  state.players = { 1: { ...crewPlayer, discordId: 'allowed' } };
   const set = node('scout-meeting', 150);
   mockApi(({ query }) => {
     if (query.includes('user(slug:')) return { user: { id: 2, slug: 'user/target', player: { id: 99, gamerTag: 'Target' } } };
@@ -85,7 +98,7 @@ test('tracked callers can scout an untracked opponent without adding them', asyn
   let reply;
   await handleCommand({
     commandName: 'scout', user: { id: 'allowed' }, deferred: true,
-    options: { getSubcommand: () => null, getString: () => 'https://www.start.gg/user/target', getBoolean: () => null },
+    options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'https://www.start.gg/user/target' : null), getBoolean: () => null },
     deferReply: async options => assert.ok(options.flags), editReply: async result => { reply = result; },
   });
   const text = reply.embeds.map(e => e.toJSON().description).join('\n');
@@ -235,7 +248,7 @@ test('scout verbose says so when nothing is reported, and skips what it has noth
 });
 
 test('scout verbose goes through their whole history and every event, and stays private', async () => {
-  state.players = { 1: { ...crewPlayer, playerId: 11 } };
+  state.players = { 1: { ...crewPlayer, playerId: 11, discordId: 'allowed' } };
   const pages = [];
   const eventsFor = new Set();
   mockApi(({ query, variables }) => {
@@ -255,7 +268,7 @@ test('scout verbose goes through their whole history and every event, and stays 
   const replies = [];
   const interaction = {
     commandName: 'scout', user: { id: 'allowed' },
-    options: { getSubcommand: () => null, getString: () => 'start.gg/user/deep', getBoolean: (name) => name === 'verbose' },
+    options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'start.gg/user/deep' : null), getBoolean: (name) => name === 'verbose' },
     deferReply: async options => { assert.ok(options.flags); Object.assign(interaction, { deferred: true, ephemeral: true }); },
     editReply: async r => replies.push(r),
     followUp: async r => { assert.ok(r.flags, 'follow-ups stay private'); replies.push(r); },
@@ -567,6 +580,10 @@ test('progress verbose asks start.gg about six periods and still answers when ch
   assert.doesNotMatch(text, /Game record by character/);
 });
 
+// the recap's first look: which of the players asked about finished a set that week
+const playedThisWeek = (query, playerIds) => Object.fromEntries([...query.matchAll(/p(\d+): player/g)]
+  .map(([, id]) => [`p${id}`, { sets: { nodes: playerIds.includes(Number(id)) ? [{ id: 1 }] : [] } }]));
+
 test('recap includes spanning-week finishes, excludes inactive players, and persists completion', async () => {
   const until = Date.parse('2026-10-26T01:00:00Z') / 1000;
   const next = Date.parse('2026-11-02T02:00:00Z') / 1000;
@@ -575,9 +592,14 @@ test('recap includes spanning-week finishes, excludes inactive players, and pers
   state.tournaments = { 1: { name: 'Next local', slug: 'tournament/next', startAt: until + 86400, entries: [{ userId: 1 }, { userId: 2 }] } };
   state.tournaments[2] = { name: 'Late Sunday', slug: 'tournament/late', startAt: next - 1800, entries: [{ userId: 1 }] };
   state.tournaments[3] = { name: 'Following week', slug: 'tournament/following', startAt: next, entries: [{ userId: 1 }] };
-  mockApi(({ query, variables }) => query.includes('user(id:')
-    ? { user: { events: { pageInfo: { totalPages: 1 }, nodes: [{ ...event, startAt: until - 8 * 86400, state: 'COMPLETED', userEntrant: { initialSeedNum: 9, standing: { placement: 5 } } }] } } }
-    : { player: { sets: { pageInfo: { totalPages: 1 }, nodes: variables.id === 20 ? [] : [node('weekly', until - 10, variables.id, variables.id === 30)] } } });
+  const histories = [];
+  mockApi(({ query, variables }) => {
+    // the first look, one set id each. Inactive has none, so their history never gets read
+    if (query.includes('nodes { id }')) return playedThisWeek(query, [10, 30]);
+    if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [{ ...event, startAt: until - 8 * 86400, state: 'COMPLETED', userEntrant: { initialSeedNum: 9, standing: { placement: 5 } } }] } } };
+    histories.push(variables.id);
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node('weekly', until - 10, variables.id, variables.id === 30)] } } };
+  });
   const sent = [];
   const channel = { send: async r => sent.push(r) };
   await postWeeklyRecap(channel, until);
@@ -590,6 +612,7 @@ test('recap includes spanning-week finishes, excludes inactive players, and pers
   assert.match(text, /Biggest upset/);
   assert.match(text, /Best finish/);
   assert.doesNotMatch(text, /Inactive|DQ-only|Following week/);
+  assert.deepEqual(histories.sort(), [10, 30]);
   state.weeklyRecap = JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).weeklyRecap;
   mockApi(() => assert.fail('A completed recap must not be fetched again'));
   await postWeeklyRecap(channel, until + 60);
@@ -601,7 +624,7 @@ test('recap retries unfinished message batches without reposting successful batc
   state.players = { 1: crewPlayer };
   state.tournaments = {};
   state.weeklyRecap = undefined;
-  mockApi(({ query }) => query.includes('user(id:')
+  mockApi(({ query }) => query.includes('nodes { id }') ? playedThisWeek(query, [10]) : query.includes('user(id:')
     ? { user: { events: { pageInfo: { totalPages: 1 }, nodes: Array.from({ length: 30 }, (_, i) => ({
       ...event, slug: `tournament/long/event/${i}`, tournament: { name: `Local ${i} ${'x'.repeat(100)}` }, startAt: until - 100,
       state: 'COMPLETED', userEntrant: { standing: { placement: 5 } },
@@ -755,6 +778,46 @@ test('every message gets a picture, the bot avatar on its first card when nothin
   }
 });
 
+test('set result cards link the VOD when the TO added one, and skip it otherwise', () => {
+  const players = { 1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active' } };
+  const sides = [[10, 'Active', 9], [99, 'Opponent', 2]];
+  const named = (set) => ({ ...set, event: { ...set.event, name: 'Singles' }, sides: set.sides.map((side) => ({ ...side, characters: [] })) });
+  const withVod = { ...named(result('v1', 100, sides[0], sides[1], true, [2, 1])), vod: 'https://youtube.example/vod' };
+  const fields = embeds.setResult(withVod, players).data.fields ?? [];
+  assert.match(fields.find((field) => field.name === 'VOD').value, /\[Watch the VOD\]\(https:\/\/youtube\.example\/vod\)/);
+  const plain = embeds.setResult(named(result('v2', 100, sides[0], sides[1], true, [2, 1])), players);
+  assert.ok(!(plain.data.fields ?? []).some((field) => field.name === 'VOD'));
+});
+
+test('set result cards put the winner on the left with a W and the loser on the right with an L', async () => {
+  const { colors } = await import('../src/embeds/shared.js');
+  const players = { 1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active' } };
+  const card = (id, me, them, won, score) => {
+    const set = result(id, 100, me, them, won, score);
+    return embeds.setResult({ ...set, event: { ...set.event, name: 'Singles' }, sides: set.sides.map((side, i) => ({ ...side, characters: [i ? 'Wario' : 'Pac-Man'] })) }, players).data;
+  };
+
+  const win = card('w', [10, 'Active', 2], [99, 'Opponent', 3], true, [3, 0]);
+  assert.equal(win.title, 'W · Active 3-0 Opponent · L');
+  assert.equal(win.color, colors.win);
+
+  // a tracked player losing to someone untracked: the winner still goes first, the card stays theirs
+  const loss = card('l', [10, 'Active', 2], [99, 'Opponent', 3], false, [1, 3]);
+  assert.equal(loss.title, 'W · Opponent 3-1 Active · L');
+  assert.equal(loss.color, colors.loss);
+  assert.equal(loss.author.name, 'Active');
+  assert.equal(loss.fields.find((field) => field.name === 'Characters').value, 'Opponent: Wario\nActive: Pac-Man');
+  assert.doesNotMatch(loss.description, /Major upset/);
+
+  // seed 17 over seed 2 is a major upset whoever won it. seed 9 over seed 2 is short of it
+  const upset = card('u', [10, 'Active', 2], [99, 'Opponent', 17], false, [1, 2]);
+  assert.equal(upset.title, 'W · Opponent 2-1 Active · L');
+  assert.match(upset.description, /^\*\*Major upset\*\* · seed 17 beat seed 2\n\*\*Winners round 1\*\*/);
+  assert.doesNotMatch(card('n', [10, 'Active', 2], [99, 'Opponent', 9], false, [1, 2]).description, /Major upset/);
+  // DQ wins aren't upsets
+  assert.doesNotMatch(card('d', [10, 'Active', 2], [99, 'Opponent', 17], false, [-1, 0]).description, /Major upset/);
+});
+
 test('muted automatic messages are consumed without posting or replaying them later', async () => {
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
@@ -778,10 +841,10 @@ test('muted automatic messages are consumed without posting or replaying them la
   assert.equal(sent.length, 1);
 
   current = { ...node('muted-stream', now), state: 2, stream: { streamName: 'example', streamSource: 'TWITCH' } };
-  await tracker.postStreamAlerts(channel);
+  await tracker.postStreamAlerts(channel, 0);
   assert.ok(state.streamed.includes('muted-stream'));
   state.messages.streams = true;
-  await tracker.postStreamAlerts(channel);
+  await tracker.postStreamAlerts(channel, 0);
   assert.equal(sent.length, 1);
 
   current = { ...node('muted-call', now), state: 6, updatedAt: now };
@@ -845,11 +908,10 @@ test('set results off keeps a player out of the set check and /sets on doesn\'t 
   await tracker.postNewSets(channel);
   assert.deepEqual(asked, [['p20']]);
   assert.deepEqual(sent.map(({ embeds: [card] }) => card.data.author.name), ['Rival']);
-  // against someone only known from the set, by player id, answered just to whoever presses it
-  const [button] = sent[0].components[0].toJSON().components;
-  assert.deepEqual([button.label, button.custom_id], ['Head to head', 'private:h2h:rival:#99::']);
+  // the set's over, so no head to head button
+  assert.equal(sent[0].components, undefined);
 
-  assert.equal(await setsCommand({ player: '1', results: 'on' }), 'Set results on for Active.');
+  assert.equal((await setsCommand({ player: '1', results: 'on' })).content, 'Set results on for Active.');
   assert.ok(state.players[1].setResultsOnAt >= now);
 
   // the set from while they were off is in the fetch window now, but it stays out
@@ -908,14 +970,14 @@ test('/sets on only marks when results came on for players switching from off', 
     3: { userId: 3, playerId: 30, tag: 'Old', slug: 'user/old' },
   };
   const now = Math.floor(Date.now() / 1000);
-  assert.equal(await setsCommand({ player: 'all', results: 'on' }), 'Set results on for everyone.');
+  assert.equal((await setsCommand({ player: 'all', results: 'on' })).content, 'Set results on for everyone.');
   assert.ok(state.players[1].setResultsOnAt >= now);
   // already on, so sets they finished before this still count
   assert.equal(state.players[2].setResultsOnAt, 5);
   assert.equal(state.players[3].setResultsOnAt, undefined);
   assert.ok(Object.values(state.players).every(player => player.setResults === true));
 
-  assert.equal(await setsCommand({ player: 'all', results: 'off' }), 'Set results off for everyone.');
+  assert.equal((await setsCommand({ player: 'all', results: 'off' })).content, 'Set results off for everyone.');
   assert.equal(state.players[1].setResults, false);
 });
 
@@ -934,7 +996,7 @@ test('re-enabling between polls skips events that became due before re-enabling'
   mockApi(() => ({ p10: { sets: { nodes: [current] } } }));
   await tracker.postNewSets(channel);
   current = { ...current, id: 'unpolled-muted-stream', state: 2, stream: { streamName: 'example', streamSource: 'TWITCH' } };
-  await tracker.postStreamAlerts(channel);
+  await tracker.postStreamAlerts(channel, 0);
   current = { ...current, id: 'unpolled-muted-call', state: 6, updatedAt: now - 60 };
   await tracker.postMatchCalls(channel);
   assert.ok(state.called.includes('unpolled-muted-call'));
@@ -963,8 +1025,61 @@ test('a set only waiting at the front of a stream queue still posts after stream
   mockApi(({ query }) => (query.includes('streamQueue')
     ? { tournament: { streamQueue: [{ stream: { streamName: 'local', streamSource: 'TWITCH' }, sets: [queued] }] } }
     : { p10: { sets: { nodes: [] } } }));
-  await tracker.postStreamAlerts({ send: async payload => sent.push(payload) });
+  await tracker.postStreamAlerts({ send: async payload => sent.push(payload) }, 0);
   assert.equal(sent.length, 1);
+});
+
+test('a stream alert links the queue the set is in, not a stream it was moved off', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  state.messages = {};
+  state.players = { 1: { ...crewPlayer, lastCheck: now } };
+  state.streamed = [];
+  state.tournaments = { 1: { id: 1, name: 'Local', startAt: now - 3600, endAt: now + 3600, entries: [{ userId: 1 }] } };
+  const moved = { ...node('moved', null), state: 2, updatedAt: now, stream: { streamName: 'winters_hq', streamSource: 'TWITCH' } };
+  mockApi(({ query }) => (query.includes('streamQueue')
+    ? { tournament: { streamQueue: [{ stream: { streamName: '716esports', streamSource: 'TWITCH' }, sets: [moved] }] } }
+    : { p10: { sets: { nodes: [] } } }));
+  await tracker.postStreamAlerts({ send: async payload => sent.push(payload) }, 0);
+  assert.equal(sent.length, 1);
+  const card = JSON.stringify(sent[0].embeds);
+  assert.ok(card.includes('https://twitch.tv/716esports'));
+  assert.ok(!card.includes('winters_hq'));
+});
+
+test('a set put on stream by mistake and taken back before the confirm look is not posted', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async payload => sent.push(payload) };
+  state.messages = {};
+  state.players = { 1: { ...crewPlayer, lastCheck: now } };
+  state.streamed = [];
+  state.tournaments = {};
+  const on = streamName => ({ ...node('flub', null), state: 2, updatedAt: now, stream: { streamName, streamSource: 'TWITCH' } });
+  // each check asks twice: what's on stream, then again after the wait
+  let answers = [[on('local')], []];
+  mockApi(() => ({ p10: { sets: { nodes: answers.shift() ?? [] } } }));
+  await tracker.postStreamAlerts(channel, 0);
+  assert.equal(sent.length, 0);
+  assert.ok(!state.streamed.includes('flub'));
+
+  // moved to another stream during the wait, so it waits for it to settle
+  answers = [[on('local')], [on('other')]];
+  await tracker.postStreamAlerts(channel, 0);
+  assert.equal(sent.length, 0);
+
+  // put back on stream later and left there
+  answers = [[on('other')], [on('other')]];
+  await tracker.postStreamAlerts(channel, 0);
+  assert.equal(sent.length, 1);
+  assert.ok(JSON.stringify(sent[0].embeds).includes('twitch.tv/other'));
+  assert.ok(state.streamed.includes('flub'));
+
+  // nothing new, so no second look
+  let asked = 0;
+  mockApi(() => (asked++, { p10: { sets: { nodes: [on('other')] } } }));
+  await tracker.postStreamAlerts(channel, 0);
+  assert.equal(asked, 1);
 });
 
 test('stream alerts ping everyone with /stream_pings on, 80 to a message', async () => {
@@ -989,28 +1104,34 @@ test('stream alerts ping everyone with /stream_pings on, 80 to a message', async
   assert.deepEqual(state.streamPings, ['fan']);
 
   current = streamed('one-fan');
-  await tracker.postStreamAlerts(channel);
+  await tracker.postStreamAlerts(channel, 0);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].content, '<@fan> on stream');
   assert.deepEqual(sent[0].allowedMentions, { users: ['fan'] });
   assert.equal(sent[0].embeds.length, 1);
+  // against someone only known from the set, by player id, answered just to whoever presses it
+  const [button] = sent[0].components[0].toJSON().components;
+  assert.deepEqual([button.label, button.custom_id], ['Head to head', 'private:h2h:active:#99::::']);
 
   // nobody opted in still posts the card, pinging no one
   state.streamPings = [];
   current = streamed('no-fans');
-  await tracker.postStreamAlerts(channel);
+  await tracker.postStreamAlerts(channel, 0);
   assert.equal(sent[1].content, undefined);
   assert.deepEqual(sent[1].allowedMentions, { users: [] });
+  assert.equal(sent[1].components.length, 1);
 
   state.streamPings = Array.from({ length: 85 }, (_, i) => `fan${i}`);
   current = streamed('many-fans');
-  await tracker.postStreamAlerts(channel);
+  await tracker.postStreamAlerts(channel, 0);
   const [first, rest] = sent.slice(2);
   assert.equal(sent.length, 4);
   assert.equal(first.allowedMentions.users.length, 80);
   assert.equal(first.embeds.length, 1);
   assert.deepEqual(rest.allowedMentions.users, ['fan80', 'fan81', 'fan82', 'fan83', 'fan84']);
   assert.equal(rest.embeds.length, 0);
+  // the button stays with the card
+  assert.deepEqual([first.components.length, rest.components], [1, []]);
   assert.ok(first.content.length <= 2000);
   state.streamPings = [];
 });
@@ -1070,8 +1191,9 @@ test('stream alerts start off, keeping a new player out of the stream check and 
     asked.push(...aliases);
     return Object.fromEntries(aliases.map(alias => [alias, { sets: { nodes: nodes[alias] } }]));
   });
-  await tracker.postStreamAlerts(channel);
-  assert.deepEqual(asked, ['p20']);
+  await tracker.postStreamAlerts(channel, 0);
+  // asked twice, the second to confirm it's still on stream
+  assert.deepEqual(asked, ['p20', 'p20']);
   assert.equal(sent.length, 1);
 
   const interaction = {
@@ -1080,10 +1202,10 @@ test('stream alerts start off, keeping a new player out of the stream check and 
     reply: async r => { interaction.replied = r; },
   };
   await handleCommand(interaction);
-  assert.equal(interaction.replied, 'Stream alerts on for Active.');
+  assert.equal(interaction.replied.content, 'Stream alerts on for Active.');
   // a set on stream right now is still worth announcing, so there's no cutoff like /sets has
-  await tracker.postStreamAlerts(channel);
-  assert.deepEqual(asked.slice(1).toSorted(), ['p10', 'p20', 'queue']);
+  await tracker.postStreamAlerts(channel, 0);
+  assert.deepEqual(asked.slice(2).toSorted(), ['p10', 'p10', 'p20', 'p20', 'queue', 'queue']);
   assert.equal(sent.length, 2);
 });
 
@@ -1161,8 +1283,8 @@ test('match call pings mention connected discords, one message per set', async (
   assert.deepEqual(sent[1].allowedMentions, { users: [] });
   assert.deepEqual([...state.called].sort(), ['both-called', 'solo-called']);
   // both tracked, it's about whoever's first on the list, and the other is only known from the set by player id
-  assert.equal(sent[0].components[0].toJSON().components[0].custom_id, 'private:h2h:active:#20::');
-  assert.equal(sent[1].components[0].toJSON().components[0].custom_id, 'private:h2h:quiet:#99::');
+  assert.equal(sent[0].components[0].toJSON().components[0].custom_id, 'private:h2h:active:#20::::');
+  assert.equal(sent[1].components[0].toJSON().components[0].custom_id, 'private:h2h:quiet:#99::::');
 
   // a second check sends nothing new
   await tracker.postMatchCalls(channel);
@@ -1216,6 +1338,88 @@ test('match call pings put all four doubles players in one message', async () =>
   assert.equal(sent.length, 2);
 });
 
+test('match calls and stream alerts lose their Head to head button once the set is over', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const edits = [];
+  let nextId = 0;
+  const messages = {
+    edit: async (id, payload) => {
+      if (id === 'gone') throw Object.assign(new Error('Unknown Message'), { code: 10008 });
+      edits.push([id, payload]);
+    },
+  };
+  const channel = {
+    send: async () => ({ id: `m${++nextId}`, channelId: 'c1' }),
+    client: { channels: { fetch: async (id) => { assert.equal(id, 'c1'); return { messages }; } } },
+  };
+  state.messages = { calls: true };
+  state.players = { 1: { ...crewPlayer, callPings: true, streamAlerts: false } };
+  state.called = [];
+  state.buttons = [];
+  const called = { ...node('501', null), state: 6, updatedAt: now - 60, stream: null };
+  let states = {};
+  const asked = [];
+  mockApi(({ query }) => {
+    if (query.includes('set(id:')) {
+      const ids = [...query.matchAll(/s(\d+): set/g)].map(([, id]) => id);
+      asked.push(ids);
+      return Object.fromEntries(ids.map((id) => [`s${id}`, id in states ? { state: states[id] } : null]));
+    }
+    return { p10: { sets: { nodes: [called] } } };
+  });
+  await tracker.postMatchCalls(channel);
+  assert.deepEqual(state.buttons.map(({ setId, channelId, messageId }) => [setId, channelId, messageId]), [['501', 'c1', 'm1']]);
+
+  // still being played, so it keeps the button
+  states = { 501: 2 };
+  await tracker.clearFinishedButtons(channel);
+  assert.deepEqual(edits, []);
+  assert.equal(state.buttons.length, 1);
+
+  states = { 501: 3 };
+  await tracker.clearFinishedButtons(channel);
+  assert.deepEqual(edits, [['m1', { components: [] }]]);
+  assert.deepEqual(state.buttons, []);
+
+  // a deleted set or post counts as over, and one 12 hours old goes without asking start.gg
+  states = { 502: 2 };
+  state.buttons = [
+    { setId: '502', channelId: 'c1', messageId: 'live', at: now },
+    { setId: '503', channelId: 'c1', messageId: 'gone', at: now },
+    { setId: '504', channelId: 'c1', messageId: 'old', at: now - 13 * 3600 },
+  ];
+  asked.length = 0;
+  await tracker.clearFinishedButtons(channel);
+  assert.deepEqual(asked, [['502', '503']]);
+  assert.deepEqual(edits.slice(1).map(([id]) => id), ['old']);
+  assert.deepEqual(state.buttons.map(({ messageId }) => messageId), ['live']);
+
+  // with nothing saved it asks start.gg nothing
+  state.buttons = [];
+  asked.length = 0;
+  await tracker.clearFinishedButtons(channel);
+  assert.deepEqual(asked, []);
+});
+
+test('a stream alert saves the message with the card, not the overflow pings', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  let nextId = 0;
+  const channel = { send: async () => ({ id: `m${++nextId}`, channelId: 'c1' }) };
+  state.messages = {};
+  state.players = { 1: { ...crewPlayer, lastCheck: now } };
+  state.streamed = [];
+  state.tournaments = {};
+  state.buttons = [];
+  state.streamPings = Array.from({ length: 85 }, (_, i) => `fan${i}`);
+  const live = { ...node('601', null), state: 2, updatedAt: now, stream: { streamName: 'local', streamSource: 'TWITCH' } };
+  mockApi(() => ({ p10: { sets: { nodes: [live] } } }));
+  await tracker.postStreamAlerts(channel, 0);
+  assert.equal(nextId, 2);
+  assert.deepEqual(state.buttons.map(({ setId, messageId }) => [setId, messageId]), [['601', 'm1']]);
+  state.streamPings = [];
+  state.buttons = [];
+});
+
 test('/calls turns match call pings on or off for one player or everyone', async () => {
   state.players = {
     1: tracker.newTracked(crewPlayer),
@@ -1229,8 +1433,8 @@ test('/calls turns match call pings on or off for one player or everyone', async
     };
     return handleCommand(interaction).then(() => interaction.replied);
   };
-  assert.equal(await calls({ player: '1', pings: 'on' }), 'Match call pings on for Active.');
+  assert.equal((await calls({ player: '1', pings: 'on' })).content, 'Match call pings on for Active.');
   assert.equal(state.players[1].callPings, true);
-  assert.equal(await calls({ player: 'all', pings: 'off' }), 'Match call pings off for everyone.');
+  assert.equal((await calls({ player: 'all', pings: 'off' })).content, 'Match call pings off for everyone.');
   assert.ok(Object.values(state.players).every(player => player.callPings === false));
 });

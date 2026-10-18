@@ -119,6 +119,28 @@ export function setLink(set) {
   return `[${escapeMarkdown(set.event.tournament.name)}](${setUrl(set)})`;
 }
 
+// whether a report was run with a since date or venue filter on
+export const filtersOn = ({ since, venue } = {}) => Boolean(since || venue);
+
+// what a filtered report says about since and venue. '' when neither is on, so unfiltered
+// reports read exactly the way they did
+export function filterNote({ since, venue } = {}) {
+  const parts = [...(venue ? [`${venue} only`] : []), ...(since ? [`since <t:${since}:D>`] : [])];
+  return parts.length ? parts.join(' · ') : '';
+}
+
+// the note as its own small line, or nothing when neither filter is on
+export function filterLine(filters) {
+  const note = filterNote(filters);
+  return note ? `-# ${note[0].toUpperCase()}${note.slice(1)}` : '';
+}
+
+// the TO's VOD link for a set, if they added one. missing stays unknown, so nothing when there isn't one
+// a ) would end the link early, so those get encoded the way /socials does
+export function vodLink(set) {
+  return set?.vod ? ` · [VOD](${set.vod.replaceAll('(', '%28').replaceAll(')', '%29')})` : '';
+}
+
 export function percent(part, whole) {
   return `${Math.round((part / whole) * 100)}%`;
 }
@@ -229,9 +251,9 @@ export function streaks(played) {
   return { now: played.length ? (ended === -1 ? played.length : ended) : 0, nowWon: played[0]?.won ?? false, best, worst };
 }
 
-// W 2-1 · Winners Final · Tournament · date
+// W 2-1 · Winners Final · Tournament · VOD · date, with the VOD only when the TO added one
 export function meetingLine({ set, me, them, won }) {
-  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)}${set.round ? ` · ${set.round}` : ''} · ${setLink(set)} · <t:${set.completedAt}:d>`;
+  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)}${set.round ? ` · ${set.round}` : ''} · ${setLink(set)}${vodLink(set)} · <t:${set.completedAt}:d>`;
 }
 
 // a small heading over the list, which leaves bold for the labels and names inside it

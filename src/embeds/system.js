@@ -124,9 +124,11 @@ export function help() {
       '`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked',
       '`/progress` last 30 days vs the 30 before, by game',
       '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more',
-      '-# `verbose:True` shows more, same as the Full report button on short reports. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out',
+      '-# `verbose:True` shows more, same as the Full report button on short reports. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. Melee cards say Melee at the top, other games show nothing there since Ultimate is the default. Melee `/predict`, `/h2h` and `/scout` odds count them when both players are ranked, even with no Melee sets to go on. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out',
+      '-# `since:2026-01-01` counts only sets since that date, and `venue:` only offline or online tournaments, on `/stats`, `/h2h`, `/scout` and `/predict`. Full report buttons keep them',
       '-# `/h2h`, `/predict` and `/scout` also take a start.gg link or ID, for players nobody tracks',
-      '-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, `/recent`, set results and match calls have head-to-head buttons',
+      '-# Your commands take start.gg turns one at a time. One sent while another loads says Queued and starts after it, up to 3 waiting. A public report done over a minute after you asked comes in a new message that pings you',
+      '-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, match calls and stream alerts have head-to-head buttons for the set coming up, which come off when it ends',
       '-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation',
     ],
     [
@@ -146,6 +148,7 @@ export function help() {
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
       '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so',
       '`/bracket` bracket links for reminder tournaments that are live or start within 30 min',
+      '`/stream_link` stream links for tracked and reminder tournaments that are live or start within 30 min',
       '-# `tournament:` takes a link or one the bot knows',
     ],
     [
@@ -163,7 +166,7 @@ export function help() {
     [
       '**Posted here automatically**',
       '• finished sets of players with `/sets` on, and their first DQ in an event',
-      '• sets on stream or up next in the stream queue, for players with `/stream` on, pinging everyone with `/stream_pings` on',
+      '• sets on stream or up next in the stream queue for 30 seconds, for players with `/stream` on, pinging everyone with `/stream_pings` on',
       '• called sets, pinging players with `/calls` on whose Discord is on start.gg, all four in one message for doubles',
       '• a roll call an hour before a tournament with 3+ of the crew',
       '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',

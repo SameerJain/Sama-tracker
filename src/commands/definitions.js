@@ -29,6 +29,18 @@ function verboseOption(description) {
   return { type: Option.Boolean, name: 'verbose', description };
 }
 
+// date and online filters for the singles reports. venue left out means both
+function sinceOption() {
+  return { type: Option.String, name: 'since', description: 'Only count sets since this date, like 2026-01-01' };
+}
+
+function venueOption() {
+  return {
+    type: Option.String, name: 'venue', description: 'Only offline or online tournaments, leave out for both',
+    choices: [{ name: 'Offline only', value: 'offline' }, { name: 'Online only', value: 'online' }],
+  };
+}
+
 export const commands = [
   { name: 'help', description: 'Show commands' },
   {
@@ -116,7 +128,8 @@ export const commands = [
     options: [
       { type: Option.String, name: 'profile', description: 'Tracked or linked opponent, or a start.gg profile link or ID', required: true, autocomplete: true },
       verboseOption('More history, habits, toughest opponents and worst matchups, stages and your odds. Slower'),
-      { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and your Melee odds, plus Slippi ranks' },
+      { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and Melee odds, plus Slippi ranks toward them' },
+      sinceOption(), venueOption(),
     ],
   },
   // discord wants required options before optional ones, so the opponent goes first
@@ -126,7 +139,8 @@ export const commands = [
     options: [
       playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
       verboseOption('Every set, splits and streaks. Odds stay one line. Slower'),
-      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and Melee odds, plus Slippi ranks' },
+      { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and Melee odds, plus Slippi ranks which count toward them' },
+      sinceOption(), venueOption(),
     ],
   },
   {
@@ -135,6 +149,7 @@ export const commands = [
     options: [
       playerOption(YOU, 'player', false), verboseOption('Full lifetime report, slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and placements, plus their Slippi rank' },
+      sinceOption(), venueOption(),
     ],
   },
   {
@@ -164,7 +179,8 @@ export const commands = [
     options: [
       playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
       verboseOption('Show how each part of the prediction counts'),
-      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks' },
+      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks which count toward them' },
+      sinceOption(), venueOption(),
     ],
   },
   {
@@ -276,6 +292,7 @@ export const commands = [
     ],
   },
   { name: 'bracket', description: 'Bracket links for reg reminder tournaments that are live or start within 30 min' },
+  { name: 'stream_link', description: 'Stream links for tracked tournaments that are live or start within 30 min' },
   {
     name: 'reg_role',
     description: 'Reg reminder pings for yourself, on or off',

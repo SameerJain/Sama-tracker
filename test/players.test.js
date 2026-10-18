@@ -57,9 +57,16 @@ test('single-player options are optional, and h2h and predict take the opponent 
     assert.equal(verbose.name, 'verbose');
     assert.ok(!verbose.required);
   }
-  for (const name of ['h2h', 'stats', 'progress', 'scout', 'predict']) {
+  for (const name of ['progress']) {
     const melee = commands.find(c => c.name === name).options.at(-1);
     assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined], name);
+  }
+  for (const name of ['h2h', 'stats', 'scout', 'predict']) {
+    const [melee, since, venue] = commands.find(c => c.name === name).options.slice(-3);
+    assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined], name);
+    assert.deepEqual([since.name, since.required], ['since', undefined], name);
+    assert.deepEqual([venue.name, venue.required], ['venue', undefined], name);
+    assert.deepEqual(venue.choices.map((choice) => choice.value), ['offline', 'online'], name);
   }
 });
 
@@ -179,7 +186,7 @@ test('h2h and predict take a start.gg link or ID for either player', async () =>
 
   // /predict takes them the same way, even for someone with nothing linked
   const odds = await run('predict', 'stranger', { player: 'start.gg/user/other', opponent: 'start.gg/user/opponent' });
-  assert.match(odds, /Other and Opponent haven't played singles in the same game/);
+  assert.match(odds.content, /Other and Opponent haven't played singles in the same game/);
 });
 
 test('/link checks the discord on start.gg and does not track them', async () => {
@@ -197,7 +204,7 @@ test('/link checks the discord on start.gg and does not track them', async () =>
   assert.match(linked.data.description, /Not tracked/);
   assert.equal(state.links['me-discord'].playerId, 70);
   assert.deepEqual(Object.keys(state.players), ['1']);
-  assert.match(await run('link', 'me-discord', { profile: 'start.gg/user/me' }), /^Already linked to Me/);
+  assert.match((await run('link', 'me-discord', { profile: 'start.gg/user/me' })).content, /^Already linked to Me/);
 
   mockApi(() => profile([{ externalId: 'someone-else' }]));
   assert.match(await run('link', 'imposter', { profile: 'start.gg/user/me' }), /different Discord/);
@@ -235,7 +242,7 @@ test('/scout works for someone linked, as long as start.gg still has their disco
     });
     const interaction = {
       commandName: 'scout', user: { id: 'me-discord' },
-      options: { getSubcommand: () => null, getString: () => 'start.gg/user/them', getBoolean: () => null },
+      options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'start.gg/user/them' : null), getBoolean: () => null },
       deferReply: async () => { interaction.deferred = true; }, editReply: async (reply) => replies.push(reply),
     };
     return handleCommand(interaction);
@@ -254,7 +261,7 @@ test('/scout says the same thing as /track add when start.gg has nobody for the 
     ? { u1: { player: { gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] } }
     : { user: null }));
   const reply = await run('scout', 'crew-discord', { profile: 'start.gg/user/ghost' });
-  assert.match(reply, /Couldn't find a start\.gg player for `start\.gg\/user\/ghost`\./);
+  assert.match(reply.content, /Couldn't find a start\.gg player for `start\.gg\/user\/ghost`\./);
 });
 
 test('/link refuses when commands already find you, and fixes a tracked discord that was out of date', async () => {
@@ -388,6 +395,40 @@ test('/track list only notes what differs from a new player', () => {
   assert.match(list.data.description, /plus their sets, streams and match calls once `\/sets`, `\/stream` and `\/calls` turn them on/);
 });
 
+test('autocomplete puts recent picks first and matches names loosely', async () => {
+  const { lookup, rememberPick } = await import('../src/commands/shared.js');
+  const choicesFor = async (typed, discordId) => {
+    let choices;
+    await handleAutocomplete({ commandName: 'h2h', user: { id: discordId }, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async c => { choices = c; } });
+    return choices.map((choice) => choice.name);
+  };
+  state.players = Object.fromEntries(['Alpha', 'Tea | Leo', 'Zed', 'Leon'].map((tag, i) => [i + 1, { userId: i + 1, playerId: 10 + i, tag, slug: `user/${i + 1}` }]));
+  state.links = { 'me-discord': { userId: 7, playerId: 70, tag: 'Me', slug: 'user/me' } };
+  state.recentPicks = {};
+
+  const everyone = ['Alpha', 'Tea | Leo', 'Zed', 'Leon', 'Me (linked)'];
+  assert.deepEqual(await choicesFor('', 'me-discord'), everyone);
+  rememberPick('me-discord', 4);
+  rememberPick('me-discord', 3);
+  // your own is what leaving it out does, so it doesn't take a spot
+  rememberPick('me-discord', 7);
+  assert.deepEqual(state.recentPicks['me-discord'], ['3', '4']);
+  assert.deepEqual(await choicesFor('', 'me-discord'), ['Zed', 'Leon', 'Alpha', 'Tea | Leo', 'Me (linked)']);
+  // someone else's picks don't move yours
+  assert.deepEqual(await choicesFor('', 'other-discord'), everyone);
+  // a name that starts with what's typed still beats a recent pick
+  rememberPick('me-discord', 2);
+  assert.deepEqual(await choicesFor('leo', 'me-discord'), ['Leon', 'Tea | Leo']);
+  assert.deepEqual(await choicesFor('tea leo', 'me-discord'), ['Tea | Leo']);
+  assert.deepEqual(await choicesFor('TEALEO', 'me-discord'), ['Tea | Leo']);
+
+  // typed out and sent without picking from the list
+  assert.equal(lookup(state.players, 'tea leo', 'tag')?.userId, 2);
+  assert.equal(lookup(state.players, 'tealeo', 'tag')?.userId, 2);
+  assert.equal(lookup(state.players, '!!', 'tag'), undefined);
+  state.recentPicks = {};
+});
+
 test('autocomplete explains an empty list instead of showing nothing', async () => {
   const choicesFor = async (typed, commandName = 'stats') => {
     let choices;
@@ -440,11 +481,24 @@ test('h2h shows 10 sets by default and everything with splits and streaks when v
   assert.equal(embeds.headToHead(a, b, sets)[0].data.footer.text, 'Sama-tracker by Samatron');
 });
 
+test('h2h set lines link the VOD only when the TO added one', () => {
+  const withVod = { ...meeting(0, true), vod: 'https://youtube.example/vod' };
+  const [card] = embeds.headToHead(a, b, [withVod, meeting(1, false)]);
+  assert.match(card.data.description, /\[VOD\]\(https:\/\/youtube\.example\/vod\)/);
+  assert.equal(card.data.description.match(/\[VOD\]/g).length, 1);
+  // a ) in the link would end the markdown early, so it gets encoded
+  const paren = { ...meeting(0, true), vod: 'https://youtube.example/watch?v=abc(def)' };
+  assert.match(embeds.headToHead(a, b, [paren])[0].data.description, /\[VOD\]\(https:\/\/youtube\.example\/watch\?v=abc%28def%29\)/);
+});
+
 test('h2h melee says so in the footer and how many sets in other games it left out', () => {
   const [card] = embeds.headToHead(a, b, [meeting(0, true, { game: 'Melee' })], { melee: true, otherGames: 3 });
   assert.equal(card.data.title, 'A 1-0 B');
+  assert.equal(card.data.author.name, 'A · Melee');
   assert.equal(card.data.footer.text, 'Sama-tracker by Samatron · Melee');
   assert.match(card.data.description, /\n-# Melee only, 3 sets in other games left out$/);
+  // ultimate stays the default with nothing at the top
+  assert.equal(embeds.headToHead(a, b, [meeting(0, true)])[0].data.author.name, 'A');
 
   const [none] = embeds.headToHead(a, b, [], { melee: true, otherGames: 1 });
   assert.equal(none.data.title, 'A vs B');
@@ -498,6 +552,44 @@ test('h2h melee and verbose combine: splits and streaks come from the Melee sets
   assert.equal(card.data.description.match(/^\*\*[WL]\*\* /gm).length, 2);
   // just the one game left, so no split line
   assert.doesNotMatch(card.data.description, /By game/);
+});
+
+test('/h2h venue and since leave out online sets and old ones, and name the filters', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: b };
+  state.links = {};
+  const now = Math.floor(Date.now() / 1000);
+  const ULTIMATE = { id: 1386, displayName: 'Ultimate' };
+  // id, seconds ago, offline or not, crew won or not
+  const specs = [[1, 100, false, true], [2, 200, true, true], [3, 300, false, false], [4, 90000, false, true]];
+  const nodes = specs.map(([id, ago, online, won]) => ({
+    id, completedAt: now - ago, fullRoundText: 'Winners Final', winnerId: won ? 1 : 2,
+    event: { slug: `tournament/t${id}/event/singles`, videogame: ULTIMATE, tournament: { name: `T${id}`, isOnline: online } },
+    slots: [[1, 10, 'Crew'], [2, 20, 'B']].map(([entrant, player, name]) => ({ entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] }, standing: null })),
+  }));
+  mockApi(({ query }) => {
+    if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes } } };
+  });
+  const title = async (values) => (await run('h2h', 'crew-discord', { opponent: '2', ...values })).embeds[0].data;
+  // date granularity is days, so these land on whole days whatever time it is
+  const day = (ago) => new Date((now - ago) * 1000).toISOString().slice(0, 10);
+  const plain = await title({});
+  assert.equal(plain.title, 'Crew 3-1 B');
+  assert.doesNotMatch(plain.description, /Offline only|Online only|since <t:/);
+  const offline = await title({ venue: 'offline' });
+  assert.equal(offline.title, 'Crew 2-1 B');
+  assert.match(offline.description, /-# Offline only$/m);
+  assert.equal((await title({ venue: 'online' })).title, 'Crew 1-0 B');
+  const everything = await title({ since: day(90000) });
+  assert.equal(everything.title, 'Crew 3-1 B');
+  assert.match(everything.description, /Since <t:\d+:D>/);
+  // tomorrow leaves nothing, so it says so instead of nobody having played
+  const nothing = await title({ since: day(-86400) });
+  assert.equal(nothing.title, 'Crew vs B');
+  assert.match(nothing.description, /haven't played each other in singles on start\.gg yet matching those filters/);
+  const both = await title({ venue: 'offline', since: day(90000) });
+  assert.equal(both.title, 'Crew 2-1 B');
+  assert.match(both.description, /-# Offline only · since <t:\d+:D>$/m);
 });
 
 test('h2h shows one-line predicted odds in both report lengths, never the breakdown', () => {
@@ -571,6 +663,25 @@ test('h2h runs predict behind the scenes for both report lengths and both games'
   assert.match(melee.description, /haven't played each other in Melee singles/);
 });
 
+test('melee cards say Melee at the top, other games show nothing there', () => {
+  const tag = { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew' };
+  const opp = { userId: 2, playerId: 20, tag: 'Opp', slug: 'user/opp' };
+  assert.equal(embeds.stats(tag, [], [], { melee: true }).data.author.name, 'Melee stats');
+  assert.equal(embeds.stats(tag, [], []).data.author.name, 'Stats');
+  assert.equal(embeds.lifetimeStats(tag, [], [], {}, { melee: true })[0].data.author.name, 'Melee lifetime stats');
+  assert.equal(embeds.lifetimeStats(tag, [], [], {}, { label: 'Scouting', melee: true })[0].data.author.name, 'Melee scouting');
+  assert.equal(embeds.lifetimeStats(tag, [], [], {})[0].data.author.name, 'Lifetime stats');
+  const periods = [{ since: 0, until: 30 * 86400, summary: { games: [] } }, { since: -30 * 86400, until: 0, summary: { games: [] } }];
+  assert.equal(embeds.progress(tag, periods, { melee: true })[0].data.title, "Crew's Melee progress");
+  assert.equal(embeds.progress(tag, periods)[0].data.title, "Crew's progress");
+  assert.equal(embeds.scout(tag, opp, [], [], [], { melee: true })[0].data.title, 'Melee scouting Opp');
+  assert.equal(embeds.scout(tag, opp, [], [], [])[0].data.title, 'Scouting Opp');
+  const report = embeds.scoutReport(tag, opp, { mine: [], theirs: [], characterSets: [], events: [], odds: null, players: {}, melee: true });
+  assert.equal(report.find((card) => card.data.title === 'Crew vs Opp').data.author.name, 'Crew · Melee');
+  assert.equal(embeds.characters(tag, { scanned: 0, reported: 0, characters: [] }, { game: 'Melee' }).data.author.name, 'Melee characters');
+  assert.equal(embeds.characters(tag, { scanned: 0, reported: 0, characters: [] }, { game: 'Ultimate' }).data.author.name, 'Characters');
+});
+
 test('predict verbose explains the same odds the short version shows', () => {
   const vs = (i, me, opponent, won) => ({
     id: `${me}-${i}`, completedAt: 1000 - i, winnerId: won ? me : opponent,
@@ -583,6 +694,9 @@ test('predict verbose explains the same odds the short version shows', () => {
   const short = embeds.prediction(a, b, odds);
   const full = embeds.prediction(a, b, odds, true);
   assert.equal(full[0].data.title, short[0].data.title);
+  // melee odds say so at the top, ultimate stays the default with nothing there
+  assert.equal(short[0].data.author.name, 'A');
+  assert.equal(embeds.prediction(a, b, { ...odds, game: 'Melee' })[0].data.author.name, 'A · Melee');
   const text = full.map(e => e.data.description).join('\n');
   assert.match(text, /How it adds up/);
   assert.match(text, /\*\*Head-to-head:\*\* counts for \d+%/);
@@ -611,7 +725,7 @@ test('predict melee names whoever has never played it, and the game the odds do 
     const crewSets = [predictNode(1, ULTIMATE, [61, 62]), predictNode(2, MELEE, [61, 30])];
     return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: variables.id === 61 ? crewSets : [predictNode(1, ULTIMATE, [61, 62])] } } };
   });
-  assert.equal(await run('predict', 'crew-discord', { opponent: '62', melee: true }),
+  assert.equal((await run('predict', 'crew-discord', { opponent: '62', melee: true })).content,
     'Rival hasn\'t played Melee singles on start.gg.\n-# Leave out `melee` for Ultimate odds');
   // the wording is only about the reply, the odds without melee are the same as ever
   assert.match((await run('predict', 'crew-discord', { opponent: '62' })).embeds[0].data.title, /Crew \d+% · \d+% Rival/);
@@ -626,6 +740,6 @@ test('predict melee gives no such hint when the shared game is all DQs for one o
     const crewSets = [predictNode(1, MELEE, [40, 30]), predictNode(2, ULTIMATE, [40, 60]), predictNode(3, ULTIMATE, [40, 50], [2, -1])];
     return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: variables.id === 40 ? crewSets : [predictNode(3, ULTIMATE, [40, 50], [2, -1])] } } };
   });
-  assert.equal(await run('predict', 'crew-discord', { opponent: '2', melee: true }),
+  assert.equal((await run('predict', 'crew-discord', { opponent: '2', melee: true })).content,
     'Rival hasn\'t played Melee singles on start.gg.');
 });

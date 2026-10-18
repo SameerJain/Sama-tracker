@@ -20,9 +20,11 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 
 - `profile` accepts a start.gg profile link or its final ID, such as `start.gg/user/f64a83c8` or `f64a83c8`. `/scout` also accepts a tracked or linked player.
 - The `player` and `opponent` pickers include tracked and linked players. `/track remove`, `/stream`, `/sets`, and `/calls` accept tracked players only. Leave an optional `player` blank to look yourself up.
+- The pickers list the last 5 people you picked first. Names match regardless of case, spaces or punctuation, so `tea leo` finds `Tea | Leo`, and a name typed in full works without picking it from the list.
 - `player:all` works with `/upcoming`, `/recent`, `/stream`, `/sets`, and `/calls`, and includes everyone tracked.
 - `verbose:True` adds the details shown in the stats table below. Leave it out for the short report, which has a **Full report** button that replaces it with the verbose report.
 - `melee:True` limits `/stats`, `/h2h`, `/predict`, `/scout`, and `/progress` to Melee and adds Slippi ranked info, described under Slippi ranked below. It limits `/doubles` to Melee too, without Slippi info, since Slippi ranked is singles. `/characters` uses `game:Melee` or `game:Ultimate` instead.
+- `since:2026-01-01` counts only sets since that date, and `venue:` only offline or online tournaments, on `/stats`, `/h2h`, `/scout`, and `/predict`. Leave `venue` out for both. Filtered reports name the filters on the card, and **Full report** buttons keep them.
 
 ### Tracking and accounts
 
@@ -35,7 +37,7 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 | `/unlink` | Remove your link. This does not stop tracking. |
 | `/upcoming` | Show live and upcoming tournaments. |
 | `/recent` | Show your last 5 sets. With `player:all`, show up to 20, at most 3 per player, from up to 40 players: set results on first, then whoever played most recently. |
-| `/run` | Show your run and next opponent in each current bracket. |
+| `/run` | Show your run and next opponent in each current bracket, with the station and scheduled time when the organizer set them, and a head-to-head button for each next opponent. |
 | `/stream player:<name or all> alerts:<on or off>` | Change stream alerts for tracked players. Newly tracked players start with them off. |
 | `/stream_pings ping:<on or off>` | Get pinged for every stream alert, whoever is on stream. Only changes you, and you don't need to be tracked or linked. |
 | `/sets player:<name or all> results:<on or off>` | Change automatic set results for tracked players. Newly tracked players start with them off. Sets finished before you turn them on are not posted. |
@@ -57,6 +59,8 @@ Anyone can change `/stream`, `/sets`, and `/calls` for tracked players. Use `/me
 
 Add `player:<name or link/ID>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/h2h` odds run the same prediction as `/predict` but stay one line. `verbose:True` doesn't change them; the **Why these odds** button under the card posts the `/predict` reasoning. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
 
+To skip typing, long-press a server member (right-click on desktop), open **Apps**, and pick **H2H with me** for the same report as `/h2h` or **Scout them** for `/scout`. Both find the member's start.gg the way `/profile` does, so they need to be tracked, linked, or registered for a tournament the bot checks. **H2H with me** needs you tracked or linked too.
+
 These reports count singles and leave DQs out of set records. `/doubles` is the exception: it counts 2v2 sets only, for one player, with whoever they teamed with. Its placements come from the events those sets were in, so an event they never played a set in doesn't show. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
 
 ### Slippi ranked
@@ -76,10 +80,10 @@ Melee reports also show Slippi ranked info for players on the watchlist. That co
 | --- | --- |
 | `/stats` | Rank, rating, season record, daily leaderboard placement and top characters. |
 | `/progress` | The same, plus the change in rating since the end of last season. |
-| `/h2h`, `/predict`, `/scout` | Rank, rating and season record for each player on the watchlist. It isn't part of the odds. Slippi has no ranked results between two players, and its ratings come from netplay, so they aren't mixed into a model built on start.gg sets. |
+| `/h2h`, `/predict`, `/scout` | Rank, rating and season record for each player on the watchlist. When both players are ranked and the odds are for Melee, their ratings also count toward the odds, even with no Melee sets to go on. Otherwise the ranks are context only. |
 | `/characters game:Melee` | Ranked characters this season with game counts, next to what tournament organizers reported. |
 
-`/predict melee:True` shows the ranks even when neither player has Melee sets on start.gg, so netplay-only players still get something to compare.
+`/predict melee:True` shows Slippi odds even when neither player has Melee sets on start.gg, so netplay-only players still get something to compare. With only one ranked, it shows the ranks with no odds.
 
 Netplay tournaments on start.gg ask for a connect code at registration, and start.gg keeps it. Once a day the bot looks for the codes of tracked and linked players who aren't on the watchlist yet, in their 8 newest online singles sets, and checks each player at most once a week. Anyone found goes on the watchlist with their start.gg tag. Offline-only players and people who play other games online have no code there, so add them with `code:`.
 
@@ -96,6 +100,7 @@ Ranks use slippi.gg's cutoffs: Bronze 1 through Master 3 by rating, and Grandmas
 | `/reg_admin list` | List saved admins. |
 | `/reg_role ping:<on or off>` | Turn registration pings on or off for yourself. |
 | `/bracket` | Link brackets for reminder tournaments, from 30 minutes before the start until 6 hours after the end. |
+| `/stream_link` | Link the streams added on start.gg for reminder tournaments and tournaments tracked players entered, in the same window as `/bracket`. Twitch streams are links; other sites show the stream name. If none are going on, none have a stream, or start.gg doesn't answer, it says to ask a TO in another channel. |
 | `/registered tournament:<link>` | List registered server members. Add `by_event:True` to group them by event. |
 | `/reg_warn tournament:<link> user:<@someone>` | Ping someone with a registration link if they have not registered. |
 
@@ -117,7 +122,7 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional; links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |
 
-`/profile` checks the Discord connected on start.gg and searches accounts the bot has already seen: tracked players, people who used `/link` and people registered for a tournament the bot checks. If it cannot find you, connect Discord on start.gg and run `/link` with your profile link. Someone else has to be on that list first, then `/profile @them` finds them. Or pick them straight from the tracked and linked list with `player:`, no Discord matching needed.
+`/profile` checks the Discord connected on start.gg and searches accounts the bot has already seen: tracked players, people who used `/link` and people registered for a tournament the bot checks. Registration lists are read again at most every 10 minutes. If it cannot find you, connect Discord on start.gg and run `/link` with your profile link. Someone else has to be on that list first, then `/profile @them` finds them. Or pick them straight from the tracked and linked list with `player:`, no Discord matching needed.
 
 `/messages` requires **Manage Server**. `/socials_edit` requires it by default; you can delegate that command under Server Settings > Integrations > Sama-tracker.
 
@@ -133,9 +138,9 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 
 | Type | When it posts |
 | --- | --- |
-| Set results | After a tracked player with `/sets` on finishes a set. Only their first DQ per event is posted. |
-| Stream alerts | When a tracked player with `/stream` on has a set on stream, called, or next in the stream queue. Pings everyone with `/stream_pings` on, 80 per message. |
-| Match call pings | When a tracked player with `/calls` on has a set called. Pings their Discord when it is connected on start.gg, one message per set. Doubles puts all four players in that one message. |
+| Set results | After a tracked player with `/sets` on finishes a set. The winner is on the left with a W and the loser on the right with an L, whoever is tracked. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. Only their first DQ per event is posted. |
+| Stream alerts | When a tracked player with `/stream` on has a set on stream, called, or next in the stream queue. A new one waits 30 seconds and posts only if the set is still on the same stream, so a set put on stream by mistake and taken back isn't posted. Pings everyone with `/stream_pings` on, 80 per message. Singles sets get a **Head to head** button that replies privately with the record. It comes off when the set ends, or 12 hours after the post. |
+| Match call pings | When a tracked player with `/calls` on has a set called. Pings their Discord when it is connected on start.gg, one message per set. Doubles puts all four players in that one message. Singles sets get the same **Head to head** button, which comes off the same way. |
 | Tournament roll calls | An hour before a tournament with at least 3 tracked players. |
 | Tournament placements | 12 hours after the tournament ends, or up to 24 hours if results are incomplete. Unfinished placements are marked as projected. |
 | Top 8s | Off by default. With the placements post: the top 8 of each event a tracked player entered, listing everyone whether tracked or not. One card per event. Placements are marked as projected if the bracket isn't finished. If start.gg keeps failing on the top 8 for 12 hours, the placements post goes out without it. |
@@ -143,7 +148,7 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 | Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank, including their first rank of a season after Pending. A new season starting everyone over isn't posted. |
 | Weekly recap | Sunday at 9 pm New York time by default: results, highlights, and next week's entries. Only tracked players with a non-DQ singles set that week are included. |
 
-Set results, stream alerts and match call pings start off for newly tracked players. The set, stream and match call checks run every 2 minutes and ask start.gg about each player with that switch on, 20 players per request, so keeping them off keeps those checks small however many players are tracked.
+Set results, stream alerts and match call pings start off for newly tracked players. The set, stream and match call checks run every 2 minutes and ask start.gg about each player with that switch on, 20 players per request, so keeping them off keeps those checks small however many players are tracked. When the stream check finds a new set on stream, it asks again 30 seconds later to confirm.
 
 Run `/messages` without options to see the current settings. Change any combination of the nine switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `top8`, `registration`, `slippi`, and `recap`. Match call pings start off server-wide too; turn both that and `/calls` on to get them. Top 8s also start off.
 
@@ -217,11 +222,13 @@ On Railway, run `railway ssh`, then `npm run track` or `node tools/track-attende
 
 Every card message has a picture. It's the player's or tournament's start.gg image when there is one; set result, stream and match call cards fall back to the tracked player's picture when the tournament has none. A message with no picture of its own shows the bot's avatar. Plain text replies, like errors and on/off confirmations, have none.
 
-start.gg can omit scores, seeds, characters, and stages. Missing data stays unknown. Predictions estimate outcomes from head-to-head results, common opponents, and seeding; newer sets count more, and limited data pulls the odds toward 50%.
+start.gg can omit scores, seeds, characters, and stages. Missing data stays unknown. Sets link their VOD when the TO adds one on start.gg. Predictions estimate outcomes from head-to-head results, common opponents, seeding, and Slippi ranked ratings when both players are ranked and the game is Melee; with no Melee sets the odds come from Slippi alone. Newer sets count more, and limited data pulls the odds toward 50%.
 
 Slippi rank checks ask about 20 watchlist players per request, one request a second. The connect code search asks start.gg about 10 players per request. Melee reports refresh a watchlist player's Slippi profile at most every 30 minutes and wait up to 3 seconds for it, then use the last rank check's numbers. If the Slippi section doesn't fit on a card, the report goes out without it.
 
-First lookups can take tens of seconds or about a minute for a large report. start.gg limits requests, and commands share cached history where available. Long history lookups show progress while they load.
+First lookups can take tens of seconds or about a minute for a large report. start.gg allows 80 requests a minute, and commands share cached history where available. Long history lookups show progress while they load.
+
+Your commands take turns with start.gg one at a time. A command sent while your last one is still loading answers right away. If it needs start.gg, it says **Queued** with about how long your last one has left, counting everyone else's commands too, and starts when that one finishes. Commands that don't need start.gg, like `/help`, don't wait. Up to 3 can wait behind the one running; past that the bot asks you to try again. A public report that finishes more than a minute after you ran it goes out as a new message that pings you, and the loading reply is removed. Private answers, like `/scout`, stay private and don't ping.
 
 <details>
 <summary>History limits and placement calculations</summary>
@@ -239,7 +246,7 @@ First lookups can take tens of seconds or about a minute for a large report. sta
 | `/characters` | Up to 400 sets, or 1,600 with verbose. Verbose shows up to 6 games. |
 | `/progress` | 60 days, or 180 with verbose, split into 30-day periods. |
 
-`melee:True` filters the history each report checks. The limits above still apply. `/h2h` and `/predict` check every meeting; short `/stats` and `/doubles` read back far enough to fill their Melee set windows when possible.
+`melee:True` filters the history each report checks. The limits above still apply. `/h2h` and `/predict` check every meeting; short `/stats` and `/doubles` read back far enough to fill their Melee set windows when possible. `since` and `venue` filter the same checked history: short `/stats` reads back far enough to fill its 30-set window for those too, and anything older than the checked history stays out.
 
 Progress placements count toward the period when the event started. Average finishes account for bracket size. Seed comparisons use placement tiers, so seed 6 finishing 5th counts as on seed.
 

@@ -1,8 +1,8 @@
 import { escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
-import { colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, ordinal, medal, scoreText, upsetFactor, shortRecord, count } from './shared.js';
+import { colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, shortRecord, count } from './shared.js';
 
-const MAJOR_UPSET = 5; // seed 9 beating seed 2
+const MAJOR_UPSET = 7; // seed 13 beating seed 1, or seed 17 beating seed 2
 
 function tournamentEmbed(color, label, tournament) {
   const embed = baseEmbed(color)
@@ -97,31 +97,34 @@ export function setResult(set, players) {
   const trackedB = findTracked(b, players);
   const clash = Boolean(trackedA && trackedB);
 
-  // tracked player first, or the winner if both are tracked
-  const bFirst = clash ? b.id === set.winnerId : !trackedA;
-  const me = bFirst ? b : a;
-  const them = bFirst ? a : b;
-  const player = bFirst ? trackedB : trackedA;
-  const won = me.id === set.winnerId;
-
-  let label = won ? 'W' : 'L';
-  // DQ wins aren't upsets
-  if (won && scoreText(me, them) !== 'DQ' && upsetFactor(me, them) >= MAJOR_UPSET) label = 'Major upset';
-  let color = won ? colors.win : colors.loss;
+  // winner on the left with the W, loser on the right with the L, whoever is tracked
+  const bWon = b.id === set.winnerId;
+  const winner = bWon ? b : a;
+  const loser = bWon ? a : b;
+  // the card is still about the tracked one: their picture, and green or red for how they did
+  const player = (bWon ? trackedB : trackedA) ?? (bWon ? trackedA : trackedB);
+  const trackedWon = Boolean(bWon ? trackedB : trackedA);
+  let color = trackedWon ? colors.win : colors.loss;
   if (clash) color = colors.clash;
 
   const embed = setEmbed(set, color, player)
-    .setTitle(`${label} · ${escapeMarkdown(me.name)} ${scoreText(me, them)} ${escapeMarkdown(them.name)}`)
+    .setTitle(`W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
     .setURL(setUrl(set))
     .setTimestamp(set.completedAt * 1000);
+  // DQ wins aren't upsets
+  if (scoreText(winner, loser) !== 'DQ' && upsetFactor(winner, loser) >= MAJOR_UPSET) {
+    embed.setDescription(`**Major upset** · seed ${winner.seed} beat seed ${loser.seed}\n${embed.data.description}`);
+  }
 
   const characterLines = [];
-  for (const side of [me, them]) {
+  for (const side of [winner, loser]) {
     if (side.characters.length) {
       characterLines.push(`${escapeMarkdown(side.name)}: ${side.characters.join(', ')}`);
     }
   }
   if (characterLines.length) embed.addFields({ name: 'Characters', value: characterLines.join('\n') });
+  // a ) would end the link early, same as the inline VOD links
+  if (set.vod) embed.addFields({ name: 'VOD', value: `[Watch the VOD](${set.vod.replaceAll('(', '%28').replaceAll(')', '%29')})` });
 
   return embed;
 }
@@ -265,6 +268,18 @@ export function bracket(tournament) {
   return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? 'Live' : 'Starting soon', tournament), lines);
 }
 
+// /stream_link. start.gg only says which site a stream is on, and twitch is the only one its name makes a link for
+export function streamLinks(tournament, streams) {
+  const now = Math.floor(Date.now() / 1000);
+  const started = tournament.startAt <= now;
+  const lines = [`${started ? 'Started' : 'Starts'} <t:${tournament.startAt}:R>`, ''];
+  for (const { name, source } of streams) {
+    if (source === 'TWITCH') lines.push(`[twitch.tv/${escapeMarkdown(name)}](https://twitch.tv/${encodeURIComponent(name)})`);
+    else lines.push(`${escapeMarkdown(name)}${source ? ` (${source.charAt(0)}${source.slice(1).toLowerCase()})` : ''}`);
+  }
+  return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? 'Live' : 'Starting soon', tournament), lines);
+}
+
 function placementText(entry) {
   let name = playerLink(entry.player);
   if (entry.dq) name += ' (DQ)';
@@ -316,7 +331,7 @@ function upcomingCard(tournament, players, label, color) {
 // in progress, called, queued, ready, then waiting
 const UP_NEXT = [2, 6, 7, 4, 1];
 
-const NEXT_TEXT = { 2: 'playing', 6: 'called vs', 7: 'queued vs', 4: 'ready vs', 1: 'next vs' };
+const NEXT_TEXT = { 2: 'playing vs', 6: 'called vs', 7: 'queued vs', 4: 'ready vs', 1: 'next vs' };
 
 // where a run in one event stands. rank sorts the events by how soon they need them
 function runStatus(player, { entry, sets }) {
@@ -355,11 +370,11 @@ function overviewText(status, now) {
   return status.next ? nextText(status.next, now) : 'waiting for the next opponent';
 }
 
-// one event's sets so far and what's next
+// one event's sets so far and what's next. completed sets link their VOD when the TO added one
 function runLines(status, now) {
   const lines = status.played.map(({ set, me, them, won }) => {
     const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
-    return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}**${round}`;
+    return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}**${round}${vodLink(set)}`;
   });
   if (!lines.length && status.entry.started) lines.push('No completed sets reported yet.');
   if (status.finished || !status.entry.started) return lines;

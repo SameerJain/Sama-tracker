@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'disc
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
+import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
 // a slow lookup's reply says how far along start.gg is once there's at least this long left, or this long
 // with a quick answer to show meanwhile. the first check waits for the first pages, since those say how many more there are
@@ -9,6 +10,8 @@ const WAIT_SHOWN_SECONDS = 20;
 const WAIT_PREVIEW_SECONDS = 5;
 const WAIT_FIRST_SECONDS = 5;
 const WAIT_UPDATE_SECONDS = 15;
+// a public answer later than this pings whoever asked, see sendLate
+const LATE_SECONDS = 60;
 
 // players each person picked last, so autocomplete can put them first before anything's typed
 const RECENT_PICKS = 5;
@@ -83,10 +86,42 @@ function isEphemeral(interaction) {
   return Boolean(interaction.ephemeral ?? interaction.message?.flags.has(MessageFlags.Ephemeral));
 }
 
+// /stats, for telling someone about their command. buttons and the Apps menu ones say the report they run
+function commandLabel(interaction) {
+  if (interaction.isButton?.()) return `/${readButton(interaction.customId).command}`;
+  return { [MEMBER_H2H]: '/h2h', [MEMBER_SCOUT]: '/scout' }[interaction.commandName] ?? `/${interaction.commandName}`;
+}
+
+// a Full report press swaps the report it's on instead of answering with a new message
+const swapsReport = (interaction) => Boolean(interaction.isButton?.()) && readButton(interaction.customId).action === 'more';
+
+// a public answer this long after the command scrolled up the channel with nobody watching, and discord
+// stops taking edits 15 minutes in. it goes out as a new message that pings whoever asked instead, and
+// the old reply goes. false when it can't, so the usual reply goes out
+async function sendLate(interaction, batches, components, files) {
+  const waited = (Date.now() - interaction.createdTimestamp) / 1000;
+  if (!interaction.deferred || !(waited >= LATE_SECONDS) || isEphemeral(interaction) || !interaction.channel?.send) return false;
+  const [first, ...rest] = batches;
+  const { id } = interaction.user;
+  try {
+    await interaction.channel.send({ content: `<@${id}> here's your ${commandLabel(interaction)}.`, embeds: first, components, files, allowedMentions: { users: [id] } });
+  } catch (err) {
+    console.error(`late ${commandLabel(interaction)} couldn't be posted as a new message:`, err.message);
+    return false;
+  }
+  for (const batch of rest) await interaction.channel.send({ embeds: batch, allowedMentions: { parse: [] } });
+  // the report a Full report press was swapping stays, just without its greyed out buttons
+  if (swapsReport(interaction)) await interaction.editReply({ content: null, components: [] }).catch(() => {});
+  else await interaction.deleteReply().catch(() => {});
+  return true;
+}
+
 // whatever doesn't fit in the reply goes in follow-ups, which are only ephemeral when the reply is.
 // buttons and files go with the reply, and leaving buttons out clears the ones a pressed button's message had
 async function sendEmbeds(interaction, list, components = [], files = []) {
-  for (const [i, batch] of embeds.messages(list).entries()) {
+  const batches = embeds.messages(list);
+  if (await sendLate(interaction, batches, components, files)) return;
+  for (const [i, batch] of batches.entries()) {
     if (i > 0) await interaction.followUp({ embeds: batch, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
     // null clears a countdown from withCountdown
     else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components, files });
@@ -95,16 +130,30 @@ async function sendEmbeds(interaction, list, components = [], files = []) {
 }
 
 // a button that runs a report again. discord keeps nothing but its id, so that holds everything:
-// action:command:player:opponent:melee:game, with players as profile slugs so anyone start.gg has still
-// works after a restart, or #playerId for someone only known from a set. more swaps the message for the
-// full report, new answers with another report, and private answers just whoever pressed it.
+// action:command:player:opponent:melee:game:since:venue, with players as profile slugs so anyone
+// start.gg has still works after a restart, or #playerId for someone only known from a set. since is the
+// YYYY-MM-DD it was run with, venue offline or online. more swaps the message for the full report, new
+// answers with another report, and private answers just whoever pressed it.
 // null when it won't fit in discord's 100 characters
-function reportButton(label, action, command, { player = null, opponent = null, melee = false, game = null } = {}) {
+function reportButton(label, action, command, { player = null, opponent = null, melee = false, game = null, since = null, venue = null } = {}) {
   const slug = (who) => who?.slug?.replace(/^user\//, '') ?? (who?.playerId ? `#${who.playerId}` : '');
   if ((player && !slug(player)) || (opponent && !slug(opponent))) return null;
-  const id = [action, command, slug(player), slug(opponent), melee ? 'melee' : '', game ?? ''].join(':');
+  const id = [action, command, slug(player), slug(opponent), melee ? 'melee' : '', game ?? '', since ?? '', venue ?? ''].join(':');
   if (id.length > 100) return null;
   return new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(ButtonStyle.Secondary);
+}
+
+// 'YYYY-MM-DD' to unix seconds at the UTC midnight it starts. null when left out, and an error to answer
+// with when it isn't a date. the error names what to type instead
+function parseSince(input) {
+  if (!input) return { since: null };
+  const text = input.trim();
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parts = match?.slice(1).map(Number);
+  const at = parts ? Date.UTC(parts[0], parts[1] - 1, parts[2]) / 1000 : NaN;
+  const real = Number.isFinite(at) && new Date(at * 1000).toISOString().slice(0, 10) === text;
+  if (!real) return { error: `Couldn't read \`${text}\` as a date. Use YYYY-MM-DD, like 2026-01-01.` };
+  return { since: at };
 }
 
 // under a short report, the same as running it with verbose:True
@@ -125,8 +174,9 @@ function buttonRow(...buttons) {
 }
 
 function readButton(customId) {
-  const [action, command, player, opponent, melee, game] = customId.split(':');
-  return { action, command, player, opponent, melee: melee === 'melee', game: Number(game) || null };
+  // buttons from before since and venue still split short, so those come back null
+  const [action, command, player, opponent, melee, game, since, venue] = customId.split(':');
+  return { action, command, player, opponent, melee: melee === 'melee', game: Number(game) || null, since: since || null, venue: venue || null };
 }
 
 // a player from a button: someone tracked or linked, or anyone start.gg still has
@@ -179,8 +229,9 @@ async function withCountdown(interaction, doing, work, preview) {
   }
 }
 
-// failures and switches don't need the channel to see them
-const replyEphemeral = (interaction, content) => interaction.reply({ content, flags: MessageFlags.Ephemeral });
+// failures and switches don't need the channel to see them. mentions stay off so a
+// start.gg tag or typed link can't ping anyone
+const replyEphemeral = (interaction, content) => interaction.reply({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 
 // left out with no start.gg linked, or someone picked who isn't on the list
 function replyNoPlayer(interaction, name = 'player', { trackedOnly = false } = {}) {
@@ -200,7 +251,7 @@ function profileSlug(input) {
 async function findPlayer(interaction, input, whose = 'their') {
   const text = input.trim();
   const player = await startgg.getPlayer(profileSlug(text));
-  if (!player) await interaction.editReply(`Couldn't find a start.gg player for \`${text}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`);
+  if (!player) await interaction.editReply({ content: `Couldn't find a start.gg player for \`${text}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`, allowedMentions: { parse: [] } });
   return player;
 }
 
@@ -220,7 +271,7 @@ async function fetchPlayer(interaction, input) {
 async function replyEphemeralAfterDefer(interaction, content) {
   if (!interaction.deferred) return replyEphemeral(interaction, content);
   await interaction.deleteReply();
-  return interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+  return interaction.followUp({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 }
 
 // a boolean option, false when left out
@@ -228,5 +279,6 @@ const flag = (interaction, name) => interaction.options.getBoolean(name) ?? fals
 
 export {
   pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag,
-  reportButton, fullReport, h2hButton, buttonRow, readButton, playerBySlug, recentPicks, rememberPick, nameMatches,
+  reportButton, fullReport, h2hButton, buttonRow, readButton, parseSince, playerBySlug, recentPicks, rememberPick, nameMatches,
+  commandLabel, roughly, LATE_SECONDS,
 };

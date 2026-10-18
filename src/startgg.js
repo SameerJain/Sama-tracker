@@ -23,8 +23,10 @@ const REQUEST_GAP_MS = 800;
 let nextSlot = 0;
 let timer;
 
-// a command's queue also counts what it sent and how often start.gg said to slow down
-export const asCommand = (fn) => fromCommand.run(Object.assign([], { sent: 0, limited: 0 }), fn);
+// a command's queue also counts what it sent and how often start.gg said to slow down. wait, when given,
+// gets called on its first request and every request waits on what it returns, which is how someone's
+// next command holds its requests until their last one is done
+export const asCommand = (fn, wait) => fromCommand.run(Object.assign([], { sent: 0, limited: 0, wait }), fn);
 export const inBackground = (fn) => fromCommand.run(background, fn);
 // slippi.js keeps its own line the same way
 export const isBackground = () => fromCommand.getStore() === background;
@@ -43,9 +45,13 @@ export function commandProgress() {
   };
 }
 
-function takeTurn() {
+async function takeTurn() {
+  const queue = fromCommand.getStore() ?? background;
+  if (queue.wait) {
+    queue.turn ??= Promise.resolve(queue.wait());
+    await queue.turn;
+  }
   return new Promise((resolve) => {
-    const queue = fromCommand.getStore() ?? background;
     if (queue !== background && !queue.length) commandQueues.push(queue);
     queue.push(resolve);
     sendNext();
@@ -216,12 +222,13 @@ const SET_FIELDS = `
   updatedAt
   fullRoundText
   winnerId
+  vodUrl
   stream { streamName streamSource }
   event {
     name
     slug
     videogame { displayName }
-    tournament { name slug images(type: "profile") { url } }
+    tournament { name slug isOnline images(type: "profile") { url } }
   }
   ${SET_SLOTS}
   games {
@@ -253,6 +260,8 @@ function toSet(node) {
     updatedAt: node.updatedAt,
     round: node.fullRoundText,
     winnerId: node.winnerId,
+    // the TO's VOD link, null when they didn't add one
+    vod: typeof node.vodUrl === 'string' && /^https?:\/\//i.test(node.vodUrl.trim()) ? node.vodUrl.trim() : null,
     stream: node.stream,
     // only /run asks for these
     station: node.station?.number ?? null,
@@ -297,6 +306,17 @@ export async function getSets(playerIds, { since, perPage = 10, states = [3] } =
   return [...setsById.values()];
 }
 
+// the ones with a finished singles set updated since then. a set finished then was updated then too, so
+// nobody who played gets missed. one id each, so 50 players fit in a request
+export async function getActivePlayers(playerIds, since) {
+  const data = await lookupMany(playerIds, (group) => `
+    query ($filters: SetFilters) {
+      ${group.map((id) => `p${id}: player(id: ${id}) { sets(perPage: 1, page: 1, filters: $filters) { nodes { id } } }`).join('\n')}
+    }
+  `, { filters: { state: [3], entrantSize: [1], updatedAfter: since - 1 } }, 50);
+  return new Set(playerIds.filter((id) => data[`p${id}`]?.sets?.nodes?.length));
+}
+
 // for history/predict and opponent-filtered h2h. no games or characters, so 40 sets come to about 960
 // objects. adding numEntrants put a page at 1003, so bracket sizes come from getEventHistory.
 // opponent lookups can include teams, so 30 leaves room for their extra participants
@@ -312,7 +332,8 @@ export async function getSetHistory(playerId, page, { opponentId, ...filters } =
             completedAt
             fullRoundText
             winnerId
-            event { slug videogame { id displayName } tournament { name } }
+            vodUrl
+            event { slug videogame { id displayName } tournament { name isOnline } }
             ${SET_SLOTS}
           }
         }
@@ -347,6 +368,7 @@ export async function getDoublesHistory(playerId, page) {
             completedAt
             fullRoundText
             winnerId
+            vodUrl
             event { id slug videogame { id displayName } tournament { name } }
             slots {
               entrant { id name initialSeedNum participants { player { id gamerTag } } }
@@ -411,7 +433,7 @@ export async function getRunSets(eventId, playerId) {
         sets(page: $page, perPage: 30, sortType: STANDARD, filters: { playerIds: [$player], showByes: false }) {
           pageInfo { totalPages }
           nodes {
-            id state completedAt fullRoundText winnerId startAt
+            id state completedAt fullRoundText winnerId startAt vodUrl
             event { slug }
             station { number }
             ${SET_SLOTS}
@@ -437,7 +459,7 @@ export async function getEventHistory(userId) {
             numEntrants
             state
             videogame { id displayName }
-            tournament { name }
+            tournament { name isOnline }
             userEntrant(userId: $id) { initialSeedNum isDisqualified standing { placement } }
           }
         }
@@ -455,8 +477,12 @@ export async function getEventHistory(userId) {
   return events.sort((a, b) => b.event.startAt - a.event.startAt);
 }
 
-// 30 sets keeps this under the object limit
-export async function getStats(playerId, { videogameId } = {}) {
+// 30 sets keeps this under the object limit. since is unix seconds, venue offline or online,
+// and the window fills from further pages the way a game filter does
+export async function getStats(playerId, { videogameId, since, venue } = {}) {
+  const inScope = (set) => (!videogameId || set?.event.videogame?.id === videogameId)
+    && (!since || (set?.completedAt ?? 0) >= since)
+    && (!venue || (set?.event.tournament?.isOnline ?? null) === (venue === 'online'));
   const getPage = (page) => query(`
     query ($id: ID!, $videogameId: ID, $page: Int!, $standings: Boolean!) {
       player(id: $id) {
@@ -466,7 +492,7 @@ export async function getStats(playerId, { videogameId } = {}) {
           entrant {
             initialSeedNum
             isDisqualified
-            event { name slug numEntrants startAt videogame { id } tournament { name slug } }
+            event { name slug numEntrants startAt videogame { id } tournament { name slug isOnline } }
           }
         }
         sets(perPage: 30, page: $page, filters: { state: [3], entrantSize: [1] }) {
@@ -475,7 +501,8 @@ export async function getStats(playerId, { videogameId } = {}) {
             id
             completedAt
             winnerId
-            event { slug videogame { id displayName } tournament { name } }
+            vodUrl
+            event { slug videogame { id displayName } tournament { name isOnline } }
             ${SET_SLOTS}
           }
         }
@@ -488,14 +515,14 @@ export async function getStats(playerId, { videogameId } = {}) {
     .filter((standing) => standing.isFinal && standing.placement && standing.entrant?.event)
     .map(({ placement, entrant }) => ({ placement, seed: entrant.initialSeedNum, dq: entrant.isDisqualified, event: entrant.event }));
   const sets = (data.player?.sets?.nodes ?? []).map(toSet).filter(Boolean);
-  if (!videogameId) return { standings, sets };
+  if (!videogameId && !since && !venue) return { standings, sets };
 
-  // Player.sets has no videogame filter, so keep reading until the recent window is full for this game
-  const matching = sets.filter((set) => set.event.videogame?.id === videogameId);
+  // Player.sets has no filter for these, so keep reading until the recent window is full for them
+  const matching = sets.filter(inScope);
   const totalPages = data.player?.sets?.pageInfo?.totalPages ?? 0;
   for (let page = 2; page <= totalPages && matching.length < 30; page++) {
     const next = await getPage(page);
-    matching.push(...(next.player?.sets?.nodes ?? []).map(toSet).filter((set) => set?.event.videogame?.id === videogameId));
+    matching.push(...(next.player?.sets?.nodes ?? []).map(toSet).filter((set) => set && inScope(set)));
   }
   return { standings, sets: matching.slice(0, 30) };
 }
@@ -625,8 +652,8 @@ export async function getStreamQueues(tournamentId) {
 
   const queues = [];
   for (const queue of data.tournament?.streamQueue ?? []) {
-    // queued sets don't always have the stream on them
-    const sets = (queue.sets ?? []).map(toSet).filter(Boolean).map((set) => ({ ...set, stream: set.stream ?? queue.stream }));
+    // the queue is what the overlay shows. a set's own stream can be missing, or left on the stream it was moved off
+    const sets = (queue.sets ?? []).map(toSet).filter(Boolean).map((set) => ({ ...set, stream: queue.stream ?? set.stream }));
     queues.push({ stream: queue.stream, sets });
   }
   return queues;
@@ -638,6 +665,17 @@ export async function getStreamedSets(playerIds) {
   const sets = await getSets(playerIds, { since, perPage: 3, states: [2, 6] });
   // some streams have no name to link to
   return sets.filter((set) => set.stream?.streamName);
+}
+
+// each set's state by id, so a post's Head to head button can come off once its set is over.
+// a set is a couple of objects, so 50 to a request stays far under the complexity limit. a deleted set is null
+export async function getSetStates(setIds) {
+  const data = await lookupMany(setIds, (group) => `
+    query {
+      ${group.map((id) => `s${id}: set(id: ${id}) { state }`).join('\n')}
+    }
+  `, {}, 50);
+  return new Map(setIds.map((id) => [id, data[`s${id}`]?.state ?? null]));
 }
 
 // called sets for match call pings. last hour only, since a set stays called until it starts
@@ -667,6 +705,16 @@ const TOURNAMENT_FIELDS = `
   isOnline
   images(type: "profile") { url }
 `;
+
+// Map of tournament id to the streams TOs added on its start.gg page, [{ name, source }]. none is an empty list
+export async function getTournamentStreams(tournamentIds) {
+  const data = await lookupMany(tournamentIds, (group) => `{
+    ${group.map((id) => `t${id}: tournament(id: ${id}) { streams { streamName streamSource } }`).join('\n')}
+  }`);
+  return new Map(tournamentIds.map((id) => [String(id), (data[`t${id}`]?.streams ?? [])
+    .filter((stream) => stream?.streamName)
+    .map(({ streamName, streamSource }) => ({ name: streamName, source: streamSource }))]));
+}
 
 // [userId, tournaments] for each of them. also returns ones they only admin, those just end up with no entries
 export async function getUpcomingTournaments(userIds) {

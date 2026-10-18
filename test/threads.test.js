@@ -163,7 +163,7 @@ test('stream alerts and their pings go in the tournament thread', async () => {
   state.streamPings = ['fan'];
   const channel = fakeChannel();
   sets = [node('live', now(), tournament('Local'), 2)];
-  await tracker.postStreamAlerts(channel);
+  await tracker.postStreamAlerts(channel, 0);
   const [thread] = channel.threads.all.values();
   assert.equal(channel.sent.length, 1);
   assert.equal(thread.sent.length, 1);

@@ -3,7 +3,7 @@ import { singles, startggUrl } from '../startgg.js';
 import { characterUsageByGame, leans } from '../characters.js';
 import { lifetimeStats } from './stats.js';
 import { chancePercent, commonOpponentLines } from './players.js';
-import { colors, FOOTER, baseEmbed, withLines, count, gameName, recordOf, section, bold, scoreText, setLink, closeLine, seedLine, sweepLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine } from './shared.js';
+import { colors, FOOTER, baseEmbed, withLines, count, gameName, recordOf, section, bold, scoreText, setLink, vodLink, filterLine, closeLine, seedLine, sweepLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine } from './shared.js';
 
 // /scout's form line per game, and how many sets it lists
 const RECENT_SETS = 20;
@@ -37,9 +37,9 @@ function formLines(played, verbose = false) {
   });
 }
 
-// W 2-1 vs Foo · Tournament · date, with the round for verbose
+// W 2-1 vs Foo · Tournament · VOD · date, with the round for verbose and the VOD when the TO added one
 function latestSetLine({ set, me, them, won }, round = false) {
-  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs ${bold(them.name)}${round && set.round ? ` · ${set.round}` : ''} · ${setLink(set)} · <t:${set.completedAt}:d>`;
+  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs ${bold(them.name)}${round && set.round ? ` · ${set.round}` : ''} · ${setLink(set)}${vodLink(set)} · <t:${set.completedAt}:d>`;
 }
 
 // sets between the two from player's side, newest first. both histories since either can get cut off
@@ -100,8 +100,9 @@ function trickyMatchupLines(characterSets, limit = LEANS_SHOWN) {
   return lines;
 }
 
-// melee means every list holds only Melee, filtered before it got here
-export function scout(player, opponent, mine, theirs, characterSets, { melee = false } = {}) {
+// melee means every list holds only Melee, filtered before it got here. filters only narrowed them,
+// so the card names those on its small line
+export function scout(player, opponent, mine, theirs, characterSets, { melee = false, filters = {} } = {}) {
   const played = singles(theirs, opponent);
   const meetings = meetingsOf(player, opponent, mine, theirs);
   const lines = [];
@@ -121,23 +122,25 @@ export function scout(player, opponent, mine, theirs, characterSets, { melee = f
   section(lines, `You vs ${escapeMarkdown(opponent.tag)}`, h2h.length ? h2h
     : [melee ? 'You haven\'t played each other in Melee singles, as far back as this checks.' : 'You haven\'t played each other in singles, as far back as this checks.']);
   lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date`);
-  const card = baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(`Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug));
+  const line = filterLine(filters);
+  if (line) lines.push(line);
+  const card = baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(melee ? `Melee scouting ${escapeMarkdown(opponent.tag)}` : `Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug));
   if (opponent.image) card.setThumbnail(opponent.image);
   return withLines(card, lines);
 }
 
 // /scout verbose. their lifetime cards, then how they play, their characters and stages, and how you match up.
 // odds is from predict and null when you've never played the same game, or Melee. players is everyone tracked.
-// melee means every list holds only Melee, filtered before it got here
-export function scoutReport(player, opponent, { mine, theirs, characterSets, events, odds, players, melee = false }) {
-  const cards = lifetimeStats(opponent, events, theirs, players, { label: 'Scouting', melee });
+// melee means every list holds only Melee, filtered before it got here, and filters only narrowed them
+export function scoutReport(player, opponent, { mine, theirs, characterSets, events, odds, players, melee = false, filters = {} }) {
+  const cards = lifetimeStats(opponent, events, theirs, players, { label: 'Scouting', melee, filters });
   const played = singles(theirs, opponent);
   const meetings = meetingsOf(player, opponent, mine, theirs);
-  if (!played.length) return [...cards, ...matchup(player, opponent, { meetings, odds, melee })];
+  if (!played.length) return [...cards, ...matchup(player, opponent, { meetings, odds, melee, filters })];
 
   // the game you'd play them in, or their most played if you don't share one
   const focus = odds?.game ?? [...Map.groupBy(played, ({ set }) => gameName(set.event))].sort(([, x], [, y]) => y.length - x.length)[0][0];
-  return [...cards, ...tendencies(played, focus), ...scoutCharacters(characterSets, focus), ...matchup(player, opponent, { meetings, odds, melee, mine, played, focus, characterSets })];
+  return [...cards, ...tendencies(played, focus), ...scoutCharacters(characterSets, focus), ...matchup(player, opponent, { meetings, odds, melee, mine, played, focus, characterSets, filters })];
 }
 
 // /scout verbose, form in every game and how they play the one that matters
@@ -206,7 +209,7 @@ function leanLines(records, badLabel, goodLabel) {
 
 // /scout verbose, the caller against them. mine and played show your record against their toughest
 // opponents, and characterSets shows the characters they struggle with in the game that matters
-function matchup(player, opponent, { meetings, odds, melee = false, mine = [], played = [], focus = null, characterSets = [] }) {
+function matchup(player, opponent, { meetings, odds, melee = false, mine = [], played = [], focus = null, characterSets = [], filters = {} }) {
   const tagA = bold(player.tag);
   const tagB = bold(opponent.tag);
   const lines = [];
@@ -236,8 +239,10 @@ function matchup(player, opponent, { meetings, odds, melee = false, mine = [], p
   if (odds?.common.total) section(lines, `Common opponents · ${odds.common.total} in ${escapeMarkdown(odds.game)}`, commonOpponentLines(odds, tagA, tagB));
   lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. `
     + `${odds ? 'Odds work like /predict, and characters' : 'Characters'} and stages only show up if the TO reported them, and that can be out of date`);
+  const line = filterLine(filters);
+  if (line) lines.push(line);
   const card = baseEmbed(colors.clash)
-    .setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) })
+    .setAuthor({ name: melee ? `${player.tag} · Melee` : player.tag, iconURL: player.image, url: startggUrl(player.slug) })
     .setTitle(`${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`);
   if (opponent.image) card.setThumbnail(opponent.image);
   return withLines(card, lines);

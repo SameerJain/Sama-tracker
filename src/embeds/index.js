@@ -1,5 +1,5 @@
 export { messages, withSections, withImage, setFallbackImage } from './shared.js';
-export { tournamentThread, onStream, matchCall, setResult, rollCall, regReminder, regWarning, registered, results, topEight, bracket, upcoming, run, nextOpponents } from './tournaments.js';
+export { tournamentThread, onStream, matchCall, setResult, rollCall, regReminder, regWarning, registered, results, topEight, bracket, streamLinks, upcoming, run, nextOpponents } from './tournaments.js';
 export { stats, progress, weeklyRecap, lifetimeStats } from './stats.js';
 export { doubles, doublesReport } from './doubles.js';
 export { scout, scoutReport } from './scouting.js';

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
-import { getCharacterSets, getEventHistory, getHeadToHead, getSetHistory, getStats } from '../src/startgg.js';
+import { getActivePlayers, getCharacterSets, getEventHistory, getHeadToHead, getSetHistory, getStats } from '../src/startgg.js';
 import { predict } from '../src/predict.js';
 
 const originalFetch = globalThis.fetch;
@@ -136,6 +136,16 @@ test('sets from a deleted event get left out instead of breaking everything afte
   assert.equal(predict({ playerId: 10 }, { playerId: 20 }, sets, sets).game, 'Ultimate');
 });
 
+test('set histories ask for the tournament online flag the venue filter goes by', async () => {
+  let query;
+  globalThis.fetch = async (_url, options) => {
+    query = JSON.parse(options.body).query;
+    return { ok: true, json: async () => ({ data: { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } } }) };
+  };
+  await settle(getSetHistory(10, 1));
+  assert.match(query, /tournament \{ name isOnline \}/);
+});
+
 test('character sets from a deleted event, or one without a game, get left out', async () => {
   const games = [{ winnerId: 10, stage: null, selections: [{ entrant: { id: 10 }, character: { name: 'Fox' } }] }];
   reply({ player: { sets: { pageInfo: { totalPages: 1 }, nodes: [
@@ -158,6 +168,23 @@ test('events whose tournament is gone get left out', async () => {
     { ...event, slug: 'gone', tournament: null, startAt: 1, numEntrants: 8, state: 'COMPLETED', userEntrant: entrant },
   ] } } });
   assert.deepEqual((await settle(getEventHistory(1))).map(({ event: { slug } }) => slug), ['tournament/t/event/e']);
+});
+
+test('sets carry the TO’s VOD link when present, null when missing or junk', async () => {
+  let query;
+  globalThis.fetch = async (_url, options) => {
+    query = JSON.parse(options.body).query;
+    return { ok: true, json: async () => ({ data: { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [
+      { id: 'vod', completedAt: 3, winnerId: 10, vodUrl: 'https://youtube.example/vod', event, slots },
+      { id: 'none', completedAt: 2, winnerId: 10, event, slots },
+      { id: 'junk', completedAt: 1, winnerId: 10, vodUrl: 'not a url', event, slots },
+    ] } } } }) };
+  };
+  const { sets } = await settle(getSetHistory(10, 1));
+  assert.match(query, /vodUrl/);
+  assert.equal(sets.find((set) => set.id === 'vod').vod, 'https://youtube.example/vod');
+  assert.equal(sets.find((set) => set.id === 'none').vod, null);
+  assert.equal(sets.find((set) => set.id === 'junk').vod, null);
 });
 
 test('dense five-game character history keeps logical pages complete when 20 sets still exceed the limit', async () => {
@@ -187,4 +214,22 @@ test('dense five-game character history keeps logical pages complete when 20 set
   assert.deepEqual(sets.map((set) => set.id), Array.from({ length: 85 }, (_, i) => String(i + 1)));
   assert.ok(sets.every((set) => set.games.length === 5));
   assert.deepEqual(sets[0].games[0], { character: 'Fox', against: 'Falco', stage: 'Battlefield', won: true });
+});
+
+test('the recap first asks which players played, 50 a request, about singles sets updated since the week began', async () => {
+  const asked = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    const ids = [...query.matchAll(/p(\d+): player/g)].map(([, id]) => Number(id));
+    asked.push({ ids, filters: variables.filters });
+    // only even ids played
+    const data = Object.fromEntries(ids.map((id) => [`p${id}`, { sets: { nodes: id % 2 ? [] : [{ id }] } }]));
+    return { ok: true, json: async () => ({ data }) };
+  };
+  const players = Array.from({ length: 120 }, (_, i) => i + 1);
+  const played = await settle(getActivePlayers(players, 1000));
+  assert.deepEqual(asked.map(({ ids }) => ids.length), [50, 50, 20]);
+  assert.deepEqual(asked[0].filters, { state: [3], entrantSize: [1], updatedAfter: 999 });
+  assert.equal(played.size, 60);
+  assert.ok(played.has(2) && !played.has(1));
 });

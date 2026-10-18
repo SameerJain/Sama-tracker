@@ -20,6 +20,22 @@ export function rememberAccounts(participants) {
   save();
 }
 
+// a big tournament is 10 or more pages of participants, and someone who isn't found tends to try again
+// right away, so each list is kept a little. a failed lookup isn't kept
+const PARTICIPANTS_CACHE_MINUTES = 10;
+const participantLists = new Map();
+function participantsOf(tournamentId) {
+  const cached = participantLists.get(tournamentId);
+  if (cached && Date.now() - cached.at < PARTICIPANTS_CACHE_MINUTES * 60 * 1000) return cached.list;
+  const list = startgg.getParticipants(tournamentId);
+  participantLists.set(tournamentId, { at: Date.now(), list });
+  list.catch(() => participantLists.delete(tournamentId));
+  return list;
+}
+
+// for tests, which change who's registered between cases
+export const forgetParticipants = () => participantLists.clear();
+
 // start.gg can't be searched by discord, so this tries the accounts the bot already has for it, then
 // everyone registered for a reg reminder tournament. a match only counts if start.gg still has this
 // discord connected to it. null if nothing does
@@ -37,19 +53,19 @@ export async function findAccount(discordId) {
     save();
   }
 
-  const participants = (await Promise.all(Object.values(state.regReminders).map((reminder) => startgg.getParticipants(reminder.id)))).flat();
+  const participants = (await Promise.all(Object.values(state.regReminders).map((reminder) => participantsOf(reminder.id)))).flat();
   rememberAccounts(participants);
   return connected(discordId, participants.filter((participant) => participant.discordId === discordId).map((participant) => participant.userId));
 }
 
 // for /scout: the tracked or linked account of whoever ran it, as long as start.gg still has their discord
-// connected to it, so disconnecting it there takes /scout away right away. the saved ones go first, so
-// it's usually one lookup. the rest of the tracked list catches someone who connected it since the last refresh
+// connected to it, so disconnecting it there takes /scout away right away. one lookup at most. checking the
+// whole tracked list for someone who connected it since the daily refresh cost a request per 20 players on
+// every miss, and /link finds them right away instead
 export async function verifiedCaller(discordId) {
   const link = state.links[discordId];
-  const tracked = Object.values(state.players);
-  const saved = [...tracked.filter((player) => player.discordId === discordId).map((player) => player.userId), link?.userId];
-  const found = await connected(discordId, saved) ?? await connected(discordId, tracked.map((player) => player.userId));
+  const saved = [...Object.values(state.players).filter((player) => player.discordId === discordId).map((player) => player.userId), link?.userId];
+  const found = await connected(discordId, saved);
   if (!found) return null;
   return state.players[found.userId] ?? (String(link?.userId) === found.userId ? link : null);
 }

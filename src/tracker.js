@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { PermissionFlagsBits, RESTJSONErrorCodes, ThreadAutoArchiveDuration } from 'discord.js';
 import * as startgg from './startgg.js';
 import * as slippi from './slippi.js';
@@ -41,6 +42,8 @@ const SLIPPI_SKIPPED_KEPT = 1000;
 const THREAD_PERMISSIONS = { CreatePublicThreads: 'Create Public Threads', SendMessagesInThreads: 'Send Messages in Threads' };
 // longer than any tournament runs, then the thread is forgotten
 const THREAD_KEPT_DAYS = 14;
+// a Head to head button comes off when its set is over, or this long after the post if start.gg never says so
+const BUTTON_KEPT_HOURS = 12;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -163,6 +166,7 @@ const checkSets = queued(async () => {
   await postNewSets();
   await postStreamAlerts();
   await postMatchCalls();
+  await clearFinishedButtons();
 });
 export const checkTournaments = queued(updateTournaments);
 const checkProfiles = queued(updateProfiles);
@@ -179,7 +183,11 @@ export async function postWeeklyRecap(postChannel = channel, now = secondsNow())
   // built once and saved, so a restart partway through sends the rest instead of starting over
   if (state.weeklyRecap?.until !== period.until) {
     const crew = [];
-    for (const player of Object.values(state.players)) {
+    const players = Object.values(state.players);
+    // most of a big tracked list didn't play that week, and one request rules out 50 of them
+    const played = await startgg.getActivePlayers(players.map((player) => player.playerId), period.since);
+    for (const player of players) {
+      if (!played.has(player.playerId)) continue;
       const sets = await startgg.getPeriodHistory(player.playerId, period.since, period.until);
       const summary = periodSummary(player, sets, [], period.since, period.until);
       // only people with a set that wasn't a DQ
@@ -342,7 +350,8 @@ export async function postNewSets(postChannel = channel) {
       // it still counts as posted so the next check doesn't look at it again
       const showing = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
       if (showing && messageEnabled('sets', set.completedAt)) {
-        await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players)]), components: h2hRow(set) });
+        // no head to head button, the set's over
+        await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players)]) });
       }
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
@@ -361,20 +370,13 @@ export async function postNewSets(postChannel = channel) {
   save();
 }
 
-export async function postStreamAlerts(postChannel = channel) {
-  const announce = async (sets, eligible = () => true) => {
-    for (const set of sets) {
-      if (state.streamed.includes(set.id) || !eligible(set)) continue;
-      // everyone with /stream_pings on, for every alert whoever is on stream
-      if (messageEnabled('streams', wentLiveAt(set))) {
-        await sendPinging(tournamentPosts(set, postChannel), 'streams', state.streamPings, 'on stream', embeds.onStream(set, state.players));
-      }
-      state.streamed.push(set.id);
-    }
-  };
+// sets on stream with someone who has alerts on, by id. a set in a stream queue goes by the queue's
+// stream, since the set's own can still name a stream it was moved off
+async function streamedNow() {
+  const found = new Map();
   try {
     const playerIds = Object.values(state.players).filter(alertsOn).map((player) => player.playerId);
-    await announce(await startgg.getStreamedSets(playerIds));
+    for (const set of await startgg.getStreamedSets(playerIds)) found.set(set.id, set);
   } catch (err) {
     console.error('checking streams failed:', err.message);
   }
@@ -383,10 +385,34 @@ export async function postStreamAlerts(postChannel = channel) {
   for (const tournament of liveTournaments()) {
     try {
       for (const queue of await startgg.getStreamQueues(tournament.id)) {
-        await announce(setsToAnnounce(queue.sets), hasPlayerWithAlerts);
+        for (const set of setsToAnnounce(queue.sets).filter(hasPlayerWithAlerts)) found.set(set.id, set);
       }
     } catch (err) {
       console.error(`checking stream queue at ${tournament.name} failed:`, err.message);
+    }
+  }
+  return found;
+}
+
+// TOs misclick a set onto stream and take it back seconds later, so a new one has to still be there after this
+const STREAM_CONFIRM_MS = 30_000;
+
+export async function postStreamAlerts(postChannel = channel, confirmAfter = STREAM_CONFIRM_MS) {
+  const seen = [...(await streamedNow()).values()].filter((set) => !state.streamed.includes(set.id));
+  if (seen.length) {
+    await sleep(confirmAfter);
+    const still = await streamedNow();
+    for (const { id, stream } of seen) {
+      const set = still.get(id);
+      // taken off stream or moved to another one. the next check looks again once it settles
+      if (!set || set.stream.streamName !== stream.streamName || state.streamed.includes(id)) continue;
+      // everyone with /stream_pings on, for every alert whoever is on stream
+      if (messageEnabled('streams', wentLiveAt(set))) {
+        const components = h2hRow(set);
+        const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', state.streamPings, 'on stream', embeds.onStream(set, state.players), components);
+        rememberButton(sent, set, components);
+      }
+      state.streamed.push(id);
     }
   }
 
@@ -394,18 +420,22 @@ export async function postStreamAlerts(postChannel = channel) {
   save();
 }
 
-// the card goes with the first batch of pings, or alone if there's nobody to ping. the rest
-// stop if /messages turns the type off partway through
-async function sendPinging(postChannel, type, ids, text, embed) {
+// the card and its buttons go with the first batch of pings, or alone if there's nobody to ping. the rest
+// stop if /messages turns the type off partway through. returns the message with the card
+async function sendPinging(postChannel, type, ids, text, embed, components = []) {
+  let first;
   for (let i = 0; i === 0 || i < ids.length; i += MENTIONS_PER_MESSAGE) {
     if (i > 0 && !messageEnabled(type)) break;
     const users = ids.slice(i, i + MENTIONS_PER_MESSAGE);
-    await postChannel.send({
+    const sent = await postChannel.send({
       content: users.length ? `${users.map((id) => `<@${id}>`).join(' ')} ${text}` : undefined,
       embeds: i === 0 ? embeds.withImage([embed]) : [],
+      components: i === 0 ? components : [],
       allowedMentions: { users },
     });
+    first ??= sent;
   }
+  return first;
 }
 
 // the thread permissions the bot is missing in the channel, or null when it can't have threads at all,
@@ -476,12 +506,14 @@ export async function postMatchCalls(postChannel = channel) {
       if (!inSet.length) continue;
       if (messageEnabled('calls', set.updatedAt)) {
         const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(Boolean))];
-        await postChannel.send({
+        const components = h2hRow(set);
+        const sent = await postChannel.send({
           content: discordIds.length ? `${discordIds.map((id) => `<@${id}>`).join(' ')} your match was called` : undefined,
           embeds: embeds.withImage([embeds.matchCall(set, state.players)]),
-          components: h2hRow(set),
+          components,
           allowedMentions: { users: discordIds },
         });
+        rememberButton(sent, set, components);
       }
       state.called.push(set.id);
     }
@@ -527,13 +559,51 @@ function alertsOn(player) {
   return Boolean(player) && player.streamAlerts !== false;
 }
 
-// a Head to head button under a set card, about the tracked player in it, the winner if both are. it answers
-// only whoever pressed it, so the channel doesn't fill up with reports
+// a Head to head button under a match call or stream alert, about the first tracked player in it. finished sets
+// don't get one. it answers only whoever pressed it, so the channel doesn't fill up with reports
 function h2hRow(set) {
-  const tracked = Object.values(state.players).filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
-  const winner = set.sides.find((side) => side.id === set.winnerId);
-  const player = tracked.find((each) => winner?.playerIds.includes(each.playerId)) ?? tracked[0];
+  const player = Object.values(state.players).find((each) => set.sides.some((side) => side.playerIds.includes(each.playerId)));
   return player ? buttonRow(h2hButton(set, player, { label: 'Head to head', action: 'private' })) : [];
+}
+
+// saved so clearFinishedButtons can find the post again after a restart. start.gg's preview sets
+// have ids like preview_1_2 that can't be looked up, and those never get called anyway
+function rememberButton(message, set, components) {
+  if (!components.length || !message?.id || !/^\d+$/.test(set.id)) return;
+  (state.buttons ??= []).push({ setId: set.id, channelId: message.channelId, messageId: message.id, at: secondsNow() });
+  state.buttons = state.buttons.slice(-200);
+  save();
+}
+
+// takes the Head to head button off match calls and stream alerts whose set is over, or got deleted,
+// in one request for all of them. a post that's 12 hours old loses it without asking
+export async function clearFinishedButtons(postChannel = channel) {
+  const saved = state.buttons ?? [];
+  if (!saved.length) return;
+  const now = secondsNow();
+  const recent = saved.filter((each) => each.at > now - BUTTON_KEPT_HOURS * HOUR);
+  let states;
+  try {
+    states = recent.length ? await startgg.getSetStates([...new Set(recent.map((each) => each.setId))]) : new Map();
+  } catch (err) {
+    console.error('checking sets with buttons failed:', err.message);
+    return;
+  }
+  const over = (each) => !recent.includes(each) || [3, null].includes(states.get(each.setId));
+
+  for (const each of saved.filter(over)) {
+    try {
+      const where = await postChannel.client.channels.fetch(each.channelId);
+      await where.messages.edit(each.messageId, { components: [] });
+    } catch (err) {
+      // someone deleted the post, or its thread, which is fine
+      if (![RESTJSONErrorCodes.UnknownMessage, RESTJSONErrorCodes.UnknownChannel].includes(err.code)) {
+        console.error(`taking the button off message ${each.messageId} failed:`, err.message);
+      }
+    }
+  }
+  state.buttons = saved.filter((each) => !over(each));
+  save();
 }
 
 // /sets turns a player's automatic set results on. players saved before they started off have no field

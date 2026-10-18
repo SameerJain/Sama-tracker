@@ -251,6 +251,10 @@ test('melee reports get a Slippi ranked field for whoever has a connect code', (
   assert.doesNotMatch(pairText, /Rival/);
   assert.match(pairText, /not part of the odds/);
 
+  const [counted] = embeds.withSlippi(card(), [crew, rival], [profile('CREW#1', 1600), profile('RIVAL#1', 1400)], { odds: true, slippi: true });
+  assert.match(counted.data.fields[0].value, /part of the Melee odds/);
+  assert.doesNotMatch(counted.data.fields[0].value, /not part/);
+
   const [one] = embeds.withSlippi(card(), [crew], [profile('CREW#1', 1600)], { seasons: true });
   assert.match(one.data.fields[0].value, /Gold 2\*\* · 1600\.0 · 12-8 this season\n\*\*Characters:\*\* Fox 30 games · Marth 10 games\n\*\*Since Season 4:\*\* 1500\.0 to 1600\.0 \(\+100\.0\)/);
 

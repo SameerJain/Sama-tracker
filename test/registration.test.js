@@ -159,7 +159,7 @@ test('registered says when start.gg hides who is registered, instead of an empty
   const run = interaction('registered', { tournament: 'start.gg/tournament/local' });
   await handleCommand(run);
   assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'edit']);
-  assert.match(run.calls[1][1], /hides who's registered for Local/);
+  assert.match(run.calls[1][1].content, /hides who's registered for Local/);
 });
 
 test('reg_warn says already registered without a mention or a ping', async () => {
@@ -167,7 +167,7 @@ test('reg_warn says already registered without a mention or a ping', async () =>
   const run = interaction('reg_warn', { tournament: 'start.gg/tournament/local' }, { id: 'in-server', displayName: 'Here' });
   await handleCommand(run);
   assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'edit']);
-  const [, content] = run.calls[1];
+  const [, { content }] = run.calls[1];
   assert.match(content, /^Already registered\./);
   assert.doesNotMatch(content, /<@/);
 });
@@ -205,7 +205,7 @@ test('reg_warn sends nothing when start.gg hides who is registered', async () =>
   const run = interaction('reg_warn', { tournament: 'local' }, { id: 'in-server', displayName: 'Here' });
   await handleCommand(run);
   assert.deepEqual(run.calls.map(([kind]) => kind), ['defer', 'edit']);
-  const [, content] = run.calls[1];
+  const [, { content }] = run.calls[1];
   assert.match(content, /hides who's registered for Local.*No warning sent/);
   assert.doesNotMatch(content, /<@/);
 });
@@ -226,7 +226,7 @@ test('reg_warn does not ping once registration closed, or for bots', async () =>
   const closed = interaction('reg_warn', { tournament: 'local' }, { id: 'slacker', displayName: 'Slacker' });
   await handleCommand(closed);
   assert.deepEqual(closed.calls.map(([kind]) => kind), ['defer', 'edit']);
-  assert.match(closed.calls[1][1], /already closed/);
+  assert.match(closed.calls[1][1].content, /already closed/);
 
   globalThis.fetch = async () => assert.fail('no start.gg lookup for a bot');
   const bot = interaction('reg_warn', { tournament: 'local' }, { id: 'bot', bot: true });
@@ -253,7 +253,7 @@ test('set_reg_reminder tracks everyone registered for the tournament', async () 
   assert.ok(state.regReminders[5]);
   // the reminder's own channel send can land anywhere around the reply
   const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1], /sending the last call now\. 3 players from Local are now tracked, with set results, stream alerts and match call pings off\./);
+  assert.match(edit[1].content, /sending the last call now\. 3 players from Local are now tracked, with set results, stream alerts and match call pings off\./);
 });
 
 test('set_reg_reminder still sets the reminder when the list is hidden, tracking nobody', async () => {
@@ -266,7 +266,7 @@ test('set_reg_reminder still sets the reminder when the list is hidden, tracking
   assert.deepEqual(state.players, {});
   assert.ok(state.regReminders[5]);
   const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.doesNotMatch(edit[1], /now tracked/);
+  assert.doesNotMatch(edit[1].content, /now tracked/);
 });
 
 async function autocomplete(commandName, typed) {
@@ -329,4 +329,63 @@ test('a picked tournament goes to start.gg by its slug, the same as a pasted lin
 // while the fake is still answering so nothing reaches the real start.gg
 test('background checks finish before the fake goes away', async () => {
   while (queueLength() || Date.now() - lastFetch < 2000) await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+// /stream_link with these tournaments going on and start.gg answering streams. records each answer
+async function streamLink({ reminders = {}, tournaments = {}, streams = () => [] } = {}) {
+  state.regReminders = reminders;
+  state.tournaments = tournaments;
+  const asked = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query } = JSON.parse(options.body);
+    const ids = [...query.matchAll(/\bt(\d+): tournament/g)].map(([, id]) => Number(id));
+    asked.push(ids);
+    if (streams === 'down') return { ok: false, status: 500, json: async () => ({ message: 'down' }) };
+    return { ok: true, json: async () => ({ data: Object.fromEntries(ids.map((id) => [`t${id}`, { streams: streams(id) }])) }) };
+  };
+  const calls = [];
+  const run = {
+    commandName: 'stream_link', user: { id: 'anyone' }, options: { getSubcommand: () => null },
+    reply: async (result) => calls.push(['reply', result]),
+    deferReply: async () => { calls.push(['defer']); run.deferred = true; },
+    editReply: async (result) => calls.push(['edit', result]),
+  };
+  await handleCommand(run);
+  return { calls, asked };
+}
+
+const going = (id, name, extra = {}) => ({ id, name, slug: `tournament/${name.toLowerCase()}`, startAt: now - 3600, endAt: now + 3600, images: [], ...extra });
+
+test('stream_link links each going-on tournament\'s streams, a reminder and a tracked one counted once', async () => {
+  const { calls, asked } = await streamLink({
+    reminders: { 5: going(5, 'Local') },
+    tournaments: { 5: going(5, 'Local', { entries: [] }), 6: going(6, 'Weekly', { entries: [] }), 7: going(7, 'Over', { resultsPosted: true }) },
+    streams: (id) => (id === 5 ? [{ streamName: 'localstream', streamSource: 'TWITCH' }, { streamName: 'LocalTube', streamSource: 'YOUTUBE' }] : []),
+  });
+  // one request for the lot, and finished ones aren't asked about
+  assert.deepEqual(asked, [[5, 6]]);
+  const cards = calls.at(-1)[1].embeds.map((embed) => embed.data);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].title, 'Local');
+  assert.match(cards[0].description, /\[twitch\.tv\/localstream\]\(https:\/\/twitch\.tv\/localstream\)/);
+  assert.match(cards[0].description, /LocalTube \(Youtube\)/);
+});
+
+test('stream_link says to ask a TO when nothing is going on, nothing has a stream, or start.gg is down', async () => {
+  const quiet = await streamLink({ tournaments: { 8: going(8, 'Later', { startAt: now + 86400, endAt: now + 90000 }) } });
+  assert.deepEqual(quiet.asked, []);
+  assert.match(quiet.calls[0][1], /^No tracked tournaments are going on right now\. If you were expecting a stream, ask a TO in another channel\./);
+
+  const none = await streamLink({ tournaments: { 5: going(5, 'Local') } });
+  assert.equal(none.calls.at(-1)[1].content, 'No stream links on start.gg for Local. If you were expecting a stream, ask a TO in another channel. `/socials` has the server\'s saved streams.');
+  assert.deepEqual(none.calls.at(-1)[1].allowedMentions, { parse: [] });
+
+  const logged = console.error;
+  console.error = () => {};
+  try {
+    const down = await streamLink({ tournaments: { 5: going(5, 'Local') }, streams: 'down' });
+    assert.match(down.calls.at(-1)[1], /^Couldn't get stream links from start\.gg right now\. If you were expecting a stream, ask a TO/);
+  } finally {
+    console.error = logged;
+  }
 });

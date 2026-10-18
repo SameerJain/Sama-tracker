@@ -125,9 +125,10 @@ function addSlippiField(card, lines) {
 
 // a Slippi ranked field on the first card of a melee report, one line each for a matchup and more for one
 // player. profiles lines up with players, null for anyone not on the watchlist, who isn't mentioned. odds says
-// it isn't part of them, seasons adds how far their rating moved since last season for /progress. anything
-// going wrong here leaves the report as it was
-export function withSlippi(cards, players, profiles, { odds = false, seasons = false } = {}) {
+// whether the card has prediction odds, and slippi whether their ratings counted toward those melee odds.
+// seasons adds how far their rating moved since last season for /progress. anything going wrong here
+// leaves the report as it was
+export function withSlippi(cards, players, profiles, { odds = false, slippi = false, seasons = false } = {}) {
   if (!cards.length || !profiles?.some(Boolean)) return cards;
   try {
     const lines = [];
@@ -141,7 +142,7 @@ export function withSlippi(cards, players, profiles, { odds = false, seasons = f
       if (last && isRanked(rankOf(profile).name)) lines.push(`**Since ${escapeMarkdown(last.name)}:** ${rating(last.rating)} to ${rating(profile.rating)} (${signed(profile.rating - last.rating)})`);
       else if (last) lines.push(`**${escapeMarkdown(last.name)}:** ${rating(last.rating)} · ${last.wins}-${last.losses}`);
     }
-    lines.push(`-# Netplay ranked from slippi.gg${odds ? ', not part of the odds' : ''}`);
+    lines.push(`-# Netplay ranked from slippi.gg${odds ? (slippi ? ', part of the Melee odds' : ', not part of the odds') : ''}`);
     addSlippiField(cards[0], lines);
   } catch (err) {
     console.error('adding slippi to a report failed:', err.message);

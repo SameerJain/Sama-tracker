@@ -72,8 +72,8 @@ function doublesUpsetLine(result, player) {
 // the same two players are the same team under any team name. no ids, then it goes by the name
 const teamKey = (side) => (side.playerIds.length && side.playerIds.every(Boolean) ? side.playerIds.map(String).sort().join('+') : side.name);
 
-function card(player, label) {
-  const embed = baseEmbed(colors.brand).setAuthor({ name: label }).setTitle(escapeMarkdown(player.tag)).setURL(startggUrl(player.slug));
+function card(player, label, melee = false) {
+  const embed = baseEmbed(colors.brand).setAuthor({ name: melee ? `Melee ${label[0].toLowerCase()}${label.slice(1)}` : label }).setTitle(escapeMarkdown(player.tag)).setURL(startggUrl(player.slug));
   if (player.image) embed.setThumbnail(player.image);
   return embed;
 }
@@ -82,7 +82,7 @@ const nothing = (melee) => (melee ? 'No Melee doubles sets on start.gg yet.' : '
 
 // the short report: recent record, partners and placements. events are the ones those sets came from
 export function doubles(player, sets, events, { melee = false } = {}) {
-  const embed = card(player, 'Doubles stats');
+  const embed = card(player, 'Doubles stats', melee);
   // fromSide finds them on a team the same way, so this works for 2v2 too
   const played = singles(sets, player);
   const entered = events.filter((entry) => !entry.dq);
@@ -113,7 +113,7 @@ export function doubles(player, sets, events, { melee = false } = {}) {
 
 // the full report: the numbers on one card, then partners, finishes and the teams they played
 export function doublesReport(player, sets, events, { melee = false } = {}) {
-  const overview = card(player, 'Full doubles stats');
+  const overview = card(player, 'Full doubles stats', melee);
   const played = singles(sets, player);
   const entered = events.filter((entry) => !entry.dq);
   if (!played.length && !entered.length) return [overview.setDescription(nothing(melee))];

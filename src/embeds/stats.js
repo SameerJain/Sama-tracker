@@ -1,7 +1,7 @@
 import { escapeMarkdown } from 'discord.js';
 import { singles, startggUrl } from '../startgg.js';
 import { characterUsage } from '../characters.js';
-import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
+import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, vodLink, filterLine, filtersOn, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
 
 const RECENT_EVENTS = 4;
 
@@ -12,15 +12,17 @@ const UPSETS_SHOWN = 3;
 // /progress verbose, opponents played in both periods
 const REMATCHES_SHOWN = 5;
 
-export function stats(player, standings, sets, { melee = false } = {}) {
+export function stats(player, standings, sets, { melee = false, filters = {} } = {}) {
   const embed = baseEmbed(colors.brand)
-    .setAuthor({ name: 'Stats' })
+    .setAuthor({ name: melee ? 'Melee stats' : 'Stats' })
     .setTitle(escapeMarkdown(player.tag))
     .setURL(startggUrl(player.slug));
   if (player.image) embed.setThumbnail(player.image);
 
+  // filtered reports only looked at some of it, so an empty one says so instead of none at all
+  const scope = filtersOn(filters) ? ' matching those filters' : '';
   const played = singles(sets, player);
-  if (!played.length && !standings.length) return embed.setDescription(melee ? 'No Melee sets or events on start.gg yet.' : 'Nothing on start.gg yet.');
+  if (!played.length && !standings.length) return embed.setDescription(melee ? `No Melee sets or events on start.gg yet${scope}.` : `Nothing on start.gg yet${scope}.`);
 
   const lines = [];
   if (played.length) {
@@ -45,6 +47,8 @@ export function stats(player, standings, sets, { melee = false } = {}) {
   if (played.length) from.push(count(played.length, 'singles set'));
   if (standings.length) from.push(count(standings.length, 'event'));
   lines.push(`-# From their last ${from.join(' and ')} on start.gg`);
+  const line = filterLine(filters);
+  if (line) lines.push(line);
 
   return embed.setDescription(lines.join('\n'));
 }
@@ -55,7 +59,7 @@ export function stats(player, standings, sets, { melee = false } = {}) {
 export function progress(player, periods, { verbose = false, characterSets = null, melee = false } = {}) {
   const [current, previous] = periods;
   const days = Math.round((current.until - current.since) / DAY);
-  const title = `${escapeMarkdown(player.tag)}'s progress`;
+  const title = melee ? `${escapeMarkdown(player.tag)}'s Melee progress` : `${escapeMarkdown(player.tag)}'s progress`;
   const inGame = (period, game) => period.summary.games.find((entry) => entry.game === game);
   const games = [...new Set(periods.flatMap((period) => period.summary.games.map(({ game }) => game)))];
   if (!games.length) {
@@ -213,10 +217,10 @@ export function weeklyRecap(crew, upcoming, { since, until }) {
   return withLines(baseEmbed(colors.results).setTitle('Weekly crew recap'), lines);
 }
 
-// beat Foo (seed 2) 3-1 as seed 9 at Tournament
+// beat Foo (seed 2) 3-1 as seed 9 at Tournament, with the VOD when the TO added one
 function upsetLine({ set, me, them, won }) {
   const score = scoreText(me, them) === 'vs' ? '' : ` ${scoreText(me, them)}`;
-  return `${won ? 'beat' : 'lost to'} ${bold(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}`;
+  return `${won ? 'beat' : 'lost to'} ${bold(them.name)} (seed ${them.seed})${score} as seed ${me.seed} at ${setLink(set)}${vodLink(set)}`;
 }
 
 // how big an upset the set was, whichever way it went
@@ -266,24 +270,27 @@ function breakdownLine({ key, events, wins, losses }) {
   return parts.join(' · ');
 }
 
-// two cards: the lifetime numbers, then the results behind them. /scout verbose labels them its own way
-export function lifetimeStats(player, events, sets, players, { label = 'Lifetime stats', melee = false } = {}) {
+// two cards: the lifetime numbers, then the results behind them. /scout verbose labels them its own way.
+// filters only narrow what got counted, so the lifetime wording stays
+export function lifetimeStats(player, events, sets, players, { label = 'Lifetime stats', melee = false, filters = {} } = {}) {
   const overview = baseEmbed(colors.brand)
-    .setAuthor({ name: label })
+    .setAuthor({ name: melee ? `Melee ${label[0].toLowerCase()}${label.slice(1)}` : label })
     .setTitle(escapeMarkdown(player.tag))
     .setURL(startggUrl(player.slug));
   if (player.image) overview.setThumbnail(player.image);
 
   const entered = events.filter((entry) => !entry.dq);
   const played = singles(sets, player);
-  if (!entered.length && !played.length) return [overview.setDescription(melee ? 'No Melee sets or events on start.gg yet.' : 'Nothing on start.gg yet.')];
+  const scope = filtersOn(filters) ? ' matching those filters' : '';
+  if (!entered.length && !played.length) return [overview.setDescription(melee ? `No Melee sets or events on start.gg yet${scope}.` : `Nothing on start.gg yet${scope}.`)];
 
   const from = [];
   if (played.length) from.push(`${count(played.length, 'singles set')} since <t:${played.at(-1).set.completedAt}:D>`);
   if (entered.length) from.push(`${count(entered.length, 'event')} since <t:${entered.at(-1).event.startAt}:D>`);
   const dqs = events.length - entered.length;
   const latest = Math.max(played[0]?.set.completedAt ?? 0, entered[0]?.event.startAt ?? 0);
-  overview.setDescription(`Last played <t:${latest}:R>\n-# From ${from.join(' and ')} on start.gg${dqs ? `, ${count(dqs, 'DQ')} left out` : ''}`);
+  const line = filterLine(filters);
+  overview.setDescription(`Last played <t:${latest}:R>\n-# From ${from.join(' and ')} on start.gg${dqs ? `, ${count(dqs, 'DQ')} left out` : ''}${line ? `\n${line}` : ''}`);
 
   const sized = entered.filter((entry) => entry.event.numEntrants);
   const seeded = entered.filter((entry) => entry.seed);

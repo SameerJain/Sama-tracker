@@ -11,7 +11,7 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleCommand } = await import('../src/commands/index.js');
-const { rememberAccounts } = await import('../src/accounts.js');
+const { rememberAccounts, forgetParticipants } = await import('../src/accounts.js');
 const tracker = await import('../src/tracker.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -27,6 +27,7 @@ let asked;
 const user = (slug, tag, discordId) => ({ slug, images: [{ url: `https://images.example/${tag}.png` }], player: { gamerTag: tag }, authorizations: discordId ? [{ externalId: discordId }] : [] });
 
 beforeEach(() => {
+  forgetParticipants();
   state.players = {};
   state.links = {};
   state.accounts = {};
@@ -107,6 +108,14 @@ test('someone only registered for a reg reminder tournament gets found, then rem
   assert.deepEqual(asked, ['profiles']);
 });
 
+test('someone nobody can find costs one read of the reminder tournaments in 10 minutes, however often they ask', async () => {
+  state.regReminders = { 5: { id: 5, slug: 'tournament/local', name: 'Local' } };
+  registered = [{ gamerTag: 'No Discord', user: { id: 9, authorizations: [] } }];
+  await profile();
+  await profile();
+  assert.deepEqual(asked, ['participants']);
+});
+
 test('a start.gg that disconnected their discord does not count, and gets forgotten', async () => {
   state.accounts = { [HERB]: 7 };
   users = { 7: user('user/old', 'Old', null) };
@@ -168,7 +177,7 @@ test('profile autocompletes tracked and linked players', async () => {
 test('only server members, and no bots, without asking start.gg', async () => {
   globalThis.fetch = async () => assert.fail('no start.gg lookup');
   const outsider = await profile({ picked: { id: HERB, bot: false }, pickedMember: null });
-  assert.deepEqual(outsider, [['reply', { content: 'Pick someone in this server.', flags: MessageFlags.Ephemeral }]]);
+  assert.deepEqual(outsider, [['reply', { content: 'Pick someone in this server.', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }]]);
   const bot = await profile({ picked: { id: HERB, bot: true } });
   assert.equal(bot[0][1].content, 'Bots don\'t have start.gg accounts.');
 });

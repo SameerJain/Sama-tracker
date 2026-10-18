@@ -8,10 +8,10 @@ import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run } from './players.js';
 import { progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
-import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn, tournamentChoices } from './registration.js';
+import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, streamLink, regRole, registered, regWarn, tournamentChoices } from './registration.js';
 import { configureMessages, socialsAdd, socialsRemove, streamAlerts, streamPings, setResults, matchCalls } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
-import { pickable, sendEmbeds, readButton, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
+import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
 
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
@@ -67,6 +67,7 @@ const handlers = new Map([
   ['reg_admin remove', regAdminRemove],
   ['reg_admin list', (interaction) => interaction.reply({ embeds: embeds.withImage([embeds.regAdmins(state.regAdmins)]) })],
   ['bracket', bracket],
+  ['stream_link', streamLink],
   ['reg_role', regRole],
   ['registered', registered],
   ['reg_warn', regWarn],
@@ -84,7 +85,9 @@ export async function handleCommand(interaction) {
 // another report, and private does too but only for whoever pressed it, so buttons on the automatic posts
 // don't fill the channel. the button only has profile slugs or player ids, so the players get looked up again
 export async function handleButton(interaction) {
-  const { action, command, player, opponent, melee, game } = readButton(interaction.customId);
+  const { action, command, player, opponent, melee, game, since: sinceText, venue } = readButton(interaction.customId);
+  // buttons only ever hold dates the command accepted, so a bad one just means no filter
+  const { since } = parseSince(sinceText);
   if (action === 'more') {
     await interaction.deferUpdate();
     await interaction.editReply({ components: disabled(interaction.message) });
@@ -99,7 +102,7 @@ export async function handleButton(interaction) {
   if (!who && command === 'scout') return buttonFailed(interaction, NOT_LINKED);
   const against = opponent ? await playerBySlug(opponent) : null;
   if (!who || (opponent && !against)) return buttonFailed(interaction, `Couldn't find a start.gg account for that player. Run \`/${command}\` again.`);
-  return report(interaction, { player: who, opponent: against, verbose: action === 'more', melee, game });
+  return report(interaction, { player: who, opponent: against, verbose: action === 'more', melee, game, since, venue });
 }
 
 // the same buttons, greyed out

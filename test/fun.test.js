@@ -299,9 +299,9 @@ test('the message lists the game\'s points, then the video and article as more o
   assert.equal(funMessage({ style: 's', points: ['one', 'two', 'three'] }), 'Style: s\nTalking points: one; two; three');
 });
 
-// taking a post starts on the next one, which has to finish before fetch goes back to the real one
+// taking a post refills the queue, which has to finish before fetch goes back to the real one
 async function nextPostWritten(sent) {
-  while (sent.length < 2) await new Promise((resolve) => setImmediate(resolve));
+  while (sent.length < 4) await new Promise((resolve) => setImmediate(resolve));
 }
 
 // the shared scenarios the fake game picked
@@ -404,7 +404,7 @@ test('a made up scenario that fails falls back to the lists', async (t) => {
   console.error = originalError;
   assert.equal(post.text, 'post');
   assert.match(message, /^Style: a rant\n/);
-  assert.deepEqual(errors, Array(2).fill('melee made up scenario failed: overloaded'));
+  assert.deepEqual(errors, Array(4).fill('melee made up scenario failed: overloaded'));
 });
 
 test('most posts take their style from the lists', async (t) => {
@@ -453,6 +453,19 @@ test('smashwiki articles down and no youtube key still makes a post, from three 
   console.error = originalError;
   assert.equal(post.text, 'post');
   assert.match(message, /^Style: .+\nTalking points: [a-z]+; [a-z]+; [a-z]+$/);
-  // once for that post and once for the next one it started on
-  assert.deepEqual(errors, Array(2).fill('melee SmashWiki article failed: SmashWiki returned 500'));
+  // one for that post and the three more queued ahead plus its refill
+  assert.deepEqual(errors, Array(4).fill('melee SmashWiki article failed: SmashWiki returned 500'));
+});
+
+test('more than one post stays queued so bursts reply right away', async (t) => {
+  fakeSites();
+  t.mock.method(Math, 'random', () => 0.5);
+  const sent = [];
+  const fun = funPost(sent);
+  while (sent.length < 3) await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(sent.length >= 3);
+  assert.equal((await fun.takePost()).text, 'post');
+  await nextPostWritten(sent);
+  assert.equal((await fun.takePost()).text, 'post');
+  await nextPostWritten(sent);
 });

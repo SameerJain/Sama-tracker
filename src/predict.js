@@ -1,7 +1,10 @@
 import { singles } from './startgg.js';
+import { rankOf } from './slippi.js';
 
 // form is someone's last this many sets in the game, against anyone but the other player
 export const FORM_SETS = 40;
+// slippi ranked needs this many sets in the season to count, the same as a rank
+export const SLIPPI_MIN_UPDATES = 5;
 
 const DAY = 86400;
 // a set from a year ago counts half as much as one today
@@ -23,6 +26,12 @@ const SEED_WEIGHT = { mean: 1, sd: 0.5 };
 const SEED_NOISE = 0.7;
 const SEED_SHARED_NOISE = 0.3;
 const FIELD_NOISE = 1;
+// slippi ratings are elo, so a gap in rating points turns into log odds this way. netplay form
+// carries over to offline only so far, which is the noise, and a rating from few sets is noisier
+// still, with the extra variance falling as each player's update count grows
+const SLIPPI_SCALE = Math.LN10 / 400;
+const SLIPPI_NOISE = 1;
+const SLIPPI_UPDATE_SCALE = 5;
 
 const sigmoid = (x) => (x >= 0 ? 1 / (1 + Math.exp(-x)) : Math.exp(x) / (1 + Math.exp(x)));
 // both seeds, so the set says something about seeding
@@ -239,9 +248,34 @@ function commonOpponentsPart(opponents) {
   };
 }
 
-// seeding, adjusted for how far each of them has been running ahead of or behind it lately
+// seeding, adjusted for how far each of them has been running ahead of or behind it lately.
+// slippi ratings use the same shape, a rating gap turned into log odds with its own uncertainty
 function seedingPart(mean, variance) {
   return (gap) => [-(gap - mean) / variance, -1 / variance];
+}
+
+// a ranked slippi profile, with a rating that can count. pending and unranked stay out, and so
+// does anything without a rating, like a watchlist entry from a failed lookup
+function rankedSlippi(profile) {
+  if (!profile || profile.rating == null) return null;
+  if ((profile.updates ?? 0) < SLIPPI_MIN_UPDATES) return null;
+  return profile;
+}
+
+// their slippi rating gap in log odds, for melee only. null unless both are ranked
+function slippiGap(game, slippiA, slippiB) {
+  if (game !== 'Melee') return null;
+  const rankedA = rankedSlippi(slippiA);
+  const rankedB = rankedSlippi(slippiB);
+  if (!rankedA || !rankedB) return null;
+  const diff = rankedA.rating - rankedB.rating;
+  const mean = SLIPPI_SCALE * diff;
+  const variance = SLIPPI_NOISE ** 2 + SLIPPI_UPDATE_SCALE / rankedA.updates + SLIPPI_UPDATE_SCALE / rankedB.updates;
+  return {
+    mean, variance, diff,
+    aRating: rankedA.rating, bRating: rankedB.rating,
+    aRank: rankOf(rankedA).name, bRank: rankOf(rankedB).name,
+  };
 }
 
 // the gap's most likely value and how sure that is, from these parts and the prior
@@ -257,12 +291,18 @@ function fit(parts) {
 // a's odds of beating b in their shared game, or the one picked. events are their event histories, which
 // make seeding count for more. meetings is every set between them from getHeadToHead, which goes back past
 // where the histories stop. now is when the odds are for, which only changes how much older sets count.
-// null if they haven't played singles in the same game
-export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, historyA, historyB), now = Date.now() / 1000, eventsA, eventsB, meetings: allMeetings = [] } = {}) {
+// slippiA and slippiB are their slippi profiles, which count when both are ranked and the game is melee.
+// with no sets on start.gg but both ranked, the odds come from slippi alone. null if there's nothing to go on
+export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, historyA, historyB), now = Date.now() / 1000, eventsA, eventsB, meetings: allMeetings = [], slippiA = null, slippiB = null } = {}) {
+  // slippi is melee-only, so two ranked profiles are a melee matchup even with nothing on start.gg
+  if (!game && slippiGap('Melee', slippiA, slippiB)) game = 'Melee';
   if (!game) return null;
   const listA = results(historyA, a, game, now);
   const listB = results(historyB, b, game, now);
-  if (!listA.length || !listB.length) return null;
+  const alone = slippiGap(game, slippiA, slippiB);
+  if (!listA.length || !listB.length) {
+    if (listA.length || listB.length || !alone) return null;
+  }
 
   // the histories too, in case meetings wasn't looked up. deduped by set id, from a's side
   const met = new Map();
@@ -321,6 +361,12 @@ export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, hist
   } else {
     parts.push({ key: 'seeding', n: 0, part: () => [0, 0] });
   }
+  const slippi = slippiGap(game, slippiA, slippiB);
+  if (slippi) {
+    parts.push({ key: 'slippi', n: 1, part: seedingPart(slippi.mean, slippi.variance) });
+  } else {
+    parts.push({ key: 'slippi', n: 0, part: () => [0, 0] });
+  }
 
   const { gap, variance } = fit(parts.map(({ part }) => part));
   // how much each part counted is its share of what's known at the answer, the prior being the rest.
@@ -333,7 +379,7 @@ export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, hist
   });
 
   return {
-    game, chance: chanceOf(gap, variance), h2h, common, seeding, level, form, factors,
+    game, chance: chanceOf(gap, variance), h2h, common, seeding, level, form, factors, slippi,
     // the starting point of even odds, for how much thin evidence keeps it near 50%
     prior: 1 / GAP_PRIOR ** 2 / everything,
     // what a seed twice as high won, by their sets in this game

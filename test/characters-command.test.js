@@ -44,18 +44,20 @@ async function characters(sets, values = {}) {
 
   let reply;
   let deferred;
-  await handleCommand({
+  const interaction = {
     commandName: 'characters',
     user: { id: 'crew-discord' },
     options: {
       getSubcommand: () => null, getString: () => '1',
       getBoolean: (name) => values[name] ?? null, getInteger: (name) => values[name] ?? null,
     },
-    deferReply: async (options) => { deferred = options; },
+    // discord.js marks it deferred, which is how the answer knows to edit
+    deferReply: async (options) => { deferred = options; interaction.deferred = true; },
     editReply: async (result) => { reply = result; },
-  });
+  };
+  await handleCommand(interaction);
   assert.ok(!deferred?.flags, 'everyone in the channel sees it');
-  return reply.embeds.map((embed) => ({ game: embed.data.footer.text.replace('Sama-tracker by Samatron · ', ''), text: embed.data.description }));
+  return reply.embeds.map((embed) => ({ game: embed.data.footer.text.replace('Sama-tracker by Samatron · ', ''), author: embed.data.author.name, text: embed.data.description }));
 }
 
 test('game is an optional choice of ultimate or melee', () => {
@@ -70,6 +72,13 @@ test('left out, it shows whichever of the two has more games reported', async ()
   assert.match(cards[0].text, /\*\*Fox\*\*/);
 });
 
+test('melee characters say so at the top, ultimate shows nothing there', async () => {
+  const meleeCards = await characters([set(games.melee, 'Fox'), set(games.ultimate, 'Pikachu')], { game: MELEE });
+  assert.equal(meleeCards[0].author, 'Melee characters');
+  const ultimateCards = await characters([set(games.melee, 'Fox'), set(games.ultimate, 'Pikachu')], { game: ULTIMATE });
+  assert.equal(ultimateCards[0].author, 'Characters');
+});
+
 test('picking a game shows it even when the other has more reported', async () => {
   const cards = await characters([set(games.melee, 'Fox'), set(games.melee, 'Fox'), set(games.ultimate, 'Pikachu')], { game: ULTIMATE });
   assert.deepEqual(cards.map(({ game }) => game), ['Ultimate']);
@@ -78,12 +87,12 @@ test('picking a game shows it even when the other has more reported', async () =
 
 test('with nothing reported in either, it goes by who they played more sets in', async () => {
   const cards = await characters([set(games.melee), set(games.melee), set(games.melee), set(games.ultimate)]);
-  assert.deepEqual(cards, [{ game: 'Melee', text: 'No characters reported in their last 3 Melee singles sets. Lots of tournaments don\'t bother.' }]);
+  assert.deepEqual(cards, [{ game: 'Melee', author: 'Melee characters', text: 'No characters reported in their last 3 Melee singles sets. Lots of tournaments don\'t bother.' }]);
 });
 
 test('a picked game they have no sets in says how far back it looked', async () => {
   const cards = await characters([set(games.ultimate, 'Pikachu'), set(games.ultimate)], { game: MELEE });
-  assert.deepEqual(cards, [{ game: 'Melee', text: 'No Melee singles sets in their last 2 singles sets.' }]);
+  assert.deepEqual(cards, [{ game: 'Melee', author: 'Melee characters', text: 'No Melee singles sets in their last 2 singles sets.' }]);
 });
 
 test('verbose puts the picked game on top, then every other reported game by most games', async () => {

@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { MessageFlags } from 'discord.js';
 
 // every command once against a fake start.gg, so a handler that throws shows up here
 const directory = mkdtempSync(join(tmpdir(), 'sama-commands-'));
@@ -19,7 +20,7 @@ after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: t
 const now = Math.floor(Date.now() / 1000);
 const event = {
   name: 'Ultimate Singles', slug: 'tournament/local/event/singles', startAt: now - 3600, numEntrants: 32,
-  videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'Local', slug: 'tournament/local', images: [] },
+  videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'Local', slug: 'tournament/local', isOnline: false, images: [] },
 };
 // crew (player 10, entrant 1) against rival (player 20, entrant 2)
 const setNode = (id, completedAt, setState = 3) => ({
@@ -57,6 +58,8 @@ function respond(query, variables) {
   const aliases = [...query.matchAll(/\b([pu])(\d+): /g)].map(([, kind, id]) => `${kind}${id}`);
   const each = (value) => Object.fromEntries(aliases.map((alias) => [alias, value]));
   if (query.includes('currentUser')) return { currentUser: { id: 1 } };
+  // /stream_link: the streams on each tournament's page
+  if (query.includes('streams { streamName')) return Object.fromEntries([...query.matchAll(/\bt(\d+): tournament/g)].map(([, id]) => [`t${id}`, { streams: [{ streamName: 'localstream', streamSource: 'TWITCH' }] }]));
   // /doubles: 2v2 sets, then the events they were in with crew's team
   if (query.includes('entrantSize: [2]')) return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [doublesNode('d1', now - 900), doublesNode('d2', now - 8000)] } } };
   if (/\be\d+: event\(id: \d+\)/.test(query) && query.includes('userEntrant')) {
@@ -92,6 +95,10 @@ function respond(query, variables) {
   }
   if (query.includes('tournamentView')) return each({ tournaments: { nodes: [] } });
   if (query.includes('tournaments(query:')) return each({ tournaments: { nodes: [live] } });
+  // a button about someone only known from a set. 31 played without a start.gg account
+  if (query.includes('player(id: $id)') && query.includes('user { id slug')) {
+    return { player: { id: variables.id, gamerTag: 'Opponent', user: variables.id === '31' ? null : { id: 3, slug: 'user/opponent', images: [], authorizations: [] } } };
+  }
   if (query.includes('authorizations')) return each({ slug: 'user/crew', images: [], player: { gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] });
   // the connect code on crew's netplay registrations
   if (query.includes('isEventOnline')) {
@@ -133,12 +140,14 @@ globalThis.fetch = async (url, options) => {
   return { ok: true, json: async () => ({ data: respond(query, variables) }) };
 };
 
-function interaction(commandName, { subcommand = null, values = {}, user = 'crew-discord' } = {}) {
+// target is the member an Apps menu command was used on
+function interaction(commandName, { subcommand = null, values = {}, user = 'crew-discord', target = null } = {}) {
   const calls = [];
   const discord = (what, result) => async () => { beforeAnswer(run, what); return result; };
   const run = {
     commandName, calls, waitedOn: [],
     user: { id: user, bot: false, displayName: 'Crew' },
+    targetUser: target, targetMember: target && { displayName: target.displayName },
     guild: {
       members: { fetch: async ({ user: ids }) => { beforeAnswer(run, 'discord members'); return new Map(ids.map((id) => [id, {}])); } },
       roles: { cache: { find: () => undefined }, create: discord('discord role create', {}) },
@@ -190,20 +199,34 @@ const runs = [
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
   ['scout', { values: { profile: 'start.gg/user/opponent', melee: true } }, /No recent Melee singles sets\..*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
   ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
+  // the fake tournaments are all offline, so online leaves rival with no recent sets
+  ['scout', { values: { profile: '2', venue: 'online' } }, /No recent singles sets\./],
+  ['scout', { values: { profile: '2', since: '2026-01-01', venue: 'offline' } }, /Scouting Rival.*Offline only/],
   ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival.*Predicted.*Ultimate/], ['h2h', { values: { opponent: '2', verbose: true } }, /Predicted.*Ultimate.*First played/],
   // the fake sets are all ultimate
   ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out.*Slippi ranked.*\*\*Crew\*\*: \[CREW#1\]/],
   // ultimate, so no slippi
   ['h2h', { values: { opponent: '2' } }, /^(?!.*Slippi ranked)/],
   ['h2h', { values: { opponent: '2', verbose: true, melee: true } }, /haven't played each other in Melee singles on start\.gg yet/],
+  // the fake sets are recent and offline, so both filters keep the 2-0 record and name themselves
+  ['h2h', { values: { opponent: '2', since: '2026-01-01', venue: 'offline' } }, /Crew 2-0 Rival.*Offline only/],
+  ['h2h', { values: { opponent: '2', since: 'someday' } }, /Couldn't read `someday` as a date/],
   // either player can be a start.gg link or ID instead of a tracked or linked pick
   ['h2h', { values: { opponent: 'start.gg/user/opponent' } }, /Crew vs Opponent.*haven't played each other in singles on start\.gg yet/],
   ['h2h', { values: { player: 'start.gg/user/opponent', opponent: '2' } }, /Opponent vs Rival.*haven't played each other in singles on start\.gg yet/],
   ['h2h', { values: { opponent: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
+  // long-press a member, then Apps. rival has this discord connected on start.gg
+  ['H2H with me', { target: { id: 'rival-discord', bot: false, displayName: 'Rival' } }, /Crew 2-0 Rival.*Predicted/],
+  ['Scout them', { target: { id: 'rival-discord', bot: false, displayName: 'Rival' } }, /Scouting Rival/],
+  ['H2H with me', { target: { id: 'stranger-discord', bot: false, displayName: 'Stranger' } }, /Couldn't find a start\.gg with Stranger's Discord connected/],
+  ['Scout them', { target: { id: 'crew-discord', bot: false, displayName: 'Crew' } }, /Pick someone else/],
+  ['H2H with me', { target: { id: 'a-bot', bot: true, displayName: 'Bot' } }, /Bots don't have start\.gg accounts/],
   ['stats', {}, /Recent sets/], ['stats', { values: { verbose: true } }, /Lifetime stats/],
   // a netplay player can have a rank with nothing on start.gg
   ['stats', { values: { melee: true } }, /No Melee sets or events on start\.gg yet\..*Slippi ranked.*CREW#1.*Gold 2.*Characters:\*\* Fox 30 games/],
   ['stats', { values: { verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\..*Slippi ranked/],
+  ['stats', { values: { since: '2026-01-01', venue: 'offline' } }, /Recent sets.*Offline only/],
+  ['stats', { values: { venue: 'online' } }, /Nothing on start\.gg yet matching those filters/],
   ['doubles', {}, /Doubles stats.*Ultimate 2-0 \(100%\).*Best finish:\*\* 🥇 \*\*1st\*\* of 32.*with \*\*Partner\*\*.*### Partners\\n\*\*Partner\*\* · 2-0 \(100%\) · 1 event.*From their last 2 doubles sets and 1 event/],
   ['doubles', { values: { verbose: true } }, /Full doubles stats.*"name":"Partners","value":"1".*best 1st of 32.*Most played teams","value":"\*\*Rival \/ Ally\*\* 2-0/],
   // the fake doubles sets are all ultimate, and slippi ranked is singles, so no slippi either
@@ -213,6 +236,7 @@ const runs = [
   ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /How it adds up/],
   ['predict', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles on start\.gg\..*Leave out `melee` for Ultimate odds.*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
   ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
+  ['predict', { values: { opponent: '2', verbose: true, since: '2026-01-01', venue: 'offline' } }, /How it adds up.*Offline only/],
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
   ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
   ['stream_pings', { values: { ping: 'on' } }, /pinged for every stream alert/],
@@ -233,7 +257,7 @@ const runs = [
   ['reg_admin', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Opponent is an admin of/],
   ['reg_admin', { subcommand: 'list' }, /Reg admins · 1/],
   ['reg_admin', { subcommand: 'remove', values: { admin: '3' } }, /No more automatic reminders/],
-  ['bracket', {}, /No tournaments set as active/],
+  ['bracket', {}, /No tournaments set as active/], ['stream_link', {}, /twitch\.tv\/localstream/],
   ['reg_role', { values: { ping: 'on' } }, /pinged for reg reminders/],
   ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /Registered from this server · 1/],
   ['reg_warn', { values: { tournament: 'start.gg/tournament/soon', user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /"content":"<@someone>"/],
@@ -243,7 +267,7 @@ const runs = [
 test('every command and subcommand answers without throwing', async () => {
   state.players = {
     1: { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew', discordId: 'crew-discord', lastCheck: now, streamAlerts: true },
-    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastCheck: now, streamAlerts: true },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', discordId: 'rival-discord', lastCheck: now, streamAlerts: true },
   };
   state.tournaments = { 5: { ...live, entries: [{ userId: 1, event: event.name, eventSlug: event.slug, eventId: 50, started: true }], userIds: [1] } };
   state.links = {};
@@ -270,6 +294,7 @@ test('every command and subcommand answers without throwing', async () => {
     if (expected) assert.match(JSON.stringify(answers), expected, label);
   }
 
+  // user commands run from the Apps menu, not chat, so the runs table only covers slash commands
   const every = commands.flatMap((command) => {
     const subcommands = (command.options ?? []).filter((option) => option.type === 1);
     return subcommands.length ? subcommands.map((sub) => `${command.name} ${sub.name}`) : [command.name];
@@ -278,6 +303,31 @@ test('every command and subcommand answers without throwing', async () => {
 
   // let the background checks finish while the fake is still in place
   while (startgg.queueLength() || Date.now() - lastFetch < 2000) await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+test('command replies naming a player never ping, even for a tag like @everyone', async () => {
+  state.players = { 9: { userId: 9, playerId: 90, tag: '@everyone', slug: 'user/evil' } };
+  state.links = {};
+  const remove = interaction('track', { subcommand: 'remove', values: { player: '9' } });
+  await runningCommand.run(remove, () => handleCommand(remove));
+  const said = remove.calls.find(([kind]) => kind === 'reply')?.[1];
+  assert.match(said.content, /Stopped tracking/);
+  assert.deepEqual(said.allowedMentions, { parse: [] });
+
+  state.players = { 9: { userId: 9, playerId: 90, tag: '@everyone', slug: 'user/evil' } };
+  const toggled = interaction('sets', { values: { player: '9', results: 'off' } });
+  await runningCommand.run(toggled, () => handleCommand(toggled));
+  const switched = toggled.calls.find(([kind]) => kind === 'reply')?.[1];
+  assert.match(switched.content, /Set results off/);
+  assert.deepEqual(switched.allowedMentions, { parse: [] });
+
+  state.players = {};
+  state.links = { 'evil-discord': { userId: 9, playerId: 90, tag: '@everyone', slug: 'user/evil' } };
+  const unlinked = interaction('unlink', { user: 'evil-discord' });
+  await runningCommand.run(unlinked, () => handleCommand(unlinked));
+  const told = unlinked.calls.find(([kind]) => kind === 'reply')?.[1];
+  assert.match(told.content, /Unlinked/);
+  assert.deepEqual(told.allowedMentions, { parse: [] });
 });
 
 // a press of a button on the message a command answered with
@@ -290,7 +340,7 @@ function press(message, label) {
     message: { content: '', embeds: message.embeds, components: message.components, flags: { has: () => false } },
     isButton: () => true,
     deferUpdate: async () => { calls.push(['update']); run.deferred = true; },
-    deferReply: async () => { calls.push(['defer']); run.deferred = true; },
+    deferReply: async (options) => { calls.push(['defer', options]); run.deferred = true; },
     editReply: async (result) => calls.push(['edit', result]),
     deleteReply: async () => calls.push(['delete']),
     followUp: async (result) => calls.push(['followUp', result]),
@@ -308,6 +358,8 @@ const presses = [
   ['h2h', { values: { opponent: '2' } }, 'Full report', /First played/],
   ['h2h', { values: { opponent: '2' } }, 'Why these odds', /Crew \d+% · \d+% Rival/],
   ['predict', { values: { opponent: '2' } }, 'Full report', /How it adds up/],
+  // whoever's next, by the player id in the set
+  ['run', {}, 'H2H vs Rival', /Crew 2-0 Rival/],
 ];
 
 test('every report button answers the way its command would, and the full reports have no Full report button', async () => {
@@ -341,8 +393,44 @@ test('every report button answers the way its command would, and the full report
       assert.match(buttons, /Full report/, what);
     }
   }
-  // the verbose /h2h still offers the odds
-  const verbose = interaction('h2h', { values: { opponent: '2', verbose: true } });
-  await runningCommand.run(verbose, () => handleCommand(verbose));
-  assert.deepEqual(JSON.parse(JSON.stringify(verbose.calls.at(-1)[1].components))[0].components.map((button) => button.label), ['Why these odds']);
+  // /recent sets are over, so they get no head to head buttons
+  const recent = interaction('recent', {});
+  await runningCommand.run(recent, () => handleCommand(recent));
+  const sent = recent.calls.filter(([kind]) => kind === 'edit' || kind === 'followUp').map(([, result]) => result);
+  assert.ok(sent.some((result) => result.embeds?.length), '/recent never answers');
+  assert.ok(sent.every((result) => !result.components?.length), '/recent has buttons');
+  // verbose is the full report, so it never offers another one. /h2h still offers the odds
+  const verboseRuns = [
+    ['stats', {}], ['doubles', {}], ['progress', {}], ['characters', {}],
+    ['scout', { values: { profile: '2' } }], ['h2h', { values: { opponent: '2' } }], ['predict', { values: { opponent: '2' } }],
+  ];
+  for (const [name, options] of verboseRuns) {
+    const what = `/${name} verbose`;
+    const verbose = interaction(name, { ...options, values: { ...options.values, verbose: true } });
+    await runningCommand.run(verbose, () => handleCommand(verbose));
+    const answer = verbose.calls.findLast(([kind, result]) => kind === 'edit' && 'components' in result)?.[1];
+    assert.ok(answer, `${what} never answers`);
+    assert.doesNotMatch(JSON.stringify(answer.components), /Full report/, what);
+    if (name === 'h2h') {
+      assert.deepEqual(JSON.parse(JSON.stringify(answer.components))[0].components.map((button) => button.label), ['Why these odds'], what);
+    }
+  }
+});
+
+test('a button about someone only known from a set finds their start.gg by player id, and private ones answer just the presser', async () => {
+  state.players = { 1: { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew', discordId: 'crew-discord', lastCheck: now } };
+  state.links = {};
+  const pressed = async (customId) => {
+    const message = { embeds: [], components: [{ toJSON: () => ({ components: [{ label: 'Head to head', custom_id: customId }] }) }] };
+    const run = press(message, 'Head to head');
+    await runningCommand.run(run, () => handleButton(run));
+    assert.deepEqual(run.waitedOn, [], customId);
+    return run.calls;
+  };
+  const calls = await pressed('private:h2h:crew:#30::::');
+  assert.deepEqual(calls[0], ['defer', { flags: MessageFlags.Ephemeral }]);
+  assert.match(JSON.stringify(calls.findLast(([kind]) => kind === 'edit')[1]), /Crew vs Opponent/);
+  // a TO can add someone without an account, and there's nobody to look up then
+  const missing = await pressed('new:h2h:crew:#31::::');
+  assert.match(JSON.stringify(missing.at(-1)), /Couldn't find a start\.gg account for that player/);
 });

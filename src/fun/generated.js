@@ -265,16 +265,20 @@ export function makeFun({ name, line, category, prompt, styles, scenarios = [], 
     return { text, screenshot, image };
   }
 
-  // made ahead of time so the command replies right away
-  let nextPost;
+  // made ahead of time so the command replies right away, kept full for busy servers
+  const QUEUE_SIZE = 3;
+  const queue = [];
 
   function prepare() {
-    nextPost = makePost();
-    nextPost.catch(() => {}); // handled in takePost
+    while (queue.length < QUEUE_SIZE) {
+      const pending = makePost();
+      pending.catch(() => {}); // handled in takePost
+      queue.push(pending);
+    }
   }
 
   function takePost() {
-    const ready = nextPost;
+    const ready = queue.shift() ?? makePost();
     prepare();
     // if the prefetched one failed, try again now
     return ready.catch(makePost);
