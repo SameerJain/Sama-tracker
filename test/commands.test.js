@@ -181,7 +181,7 @@ const runs = [
   ['reg_role', { values: { ping: 'on' } }, /pinged for reg reminders/],
   ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /Registered from this server · 1/],
   ['reg_warn', { values: { tournament: 'start.gg/tournament/soon', user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /"content":"<@someone>"/],
-  ['sm4sh'], ['melee'], ['ult'], ['64'], ['brawl'], ['pplus'], ['bills', {}, /Wikimedia Commons/], ['view_pfp', {}, /pfp\.png/],
+  ['sm4sh'], ['melee'], ['ult'], ['64'], ['brawl'], ['pplus'], ['bills', {}, /Wikimedia Commons|Imgflip|GIPHY/], ['view_pfp', {}, /pfp\.png/],
 ];
 
 test('every command and subcommand answers without throwing', async () => {

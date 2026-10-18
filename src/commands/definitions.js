@@ -239,7 +239,7 @@ export const commands = [
       { type: Option.User, name: 'user', description: 'Who to check', required: true },
     ],
   },
-  ...Object.values(funCommands).map((fun) => ({ name: fun.name, description: fun.line })),
+  ...Object.values(funCommands).map((fun) => ({ name: fun.name, description: fun.description ?? fun.line })),
   { name: 'view_pfp', description: 'My profile picture, full size' },
 ];
 

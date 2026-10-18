@@ -6,7 +6,6 @@ delete process.env.ANTHROPIC_API_KEY;
 const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../src/fun/smashwiki.js');
 const { addCommunity, searchVideos } = await import('../src/fun/youtube.js');
 const { billsImagePool } = await import('../src/fun/bills.js');
-const { default: bills } = await import('../src/fun/bills.js');
 const { SCENARIOS, funMessage, makeFun, pickStyle } = await import('../src/fun/generated.js');
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
@@ -136,10 +135,64 @@ test('bills images come from the fan, player, team, stadium and mascot Commons c
   assert.deepEqual(await billsImagePool(), [{
     name: 'Bills fan', image: 'https://images.example/fan.jpg', page: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg',
   }]);
-  assert.deepEqual(asked, ['Category:Bills Mafia', 'Category:Buffalo Bills players', 'Category:Buffalo Bills', 'Category:Highmark Stadium (Orchard Park, New York)', 'Category:New Highmark Stadium', 'Category:Billy Buffalo']);
+  for (const category of ['Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Highmark Stadium (Orchard Park, New York)', 'New Highmark Stadium', 'Billy Buffalo', 'Josh Allen in 2021', 'Josh Allen in 2025', 'James Cook (running back)', 'Terrel Bernard']) {
+    assert.ok(asked.includes(`Category:${category}`), category);
+  }
 });
 
-test('bills uploads the image instead of hotlinking it', async () => {
+test('bills follows both thumbnail and category continuation without duplicating files', async () => {
+  const image = (title, name) => ({ title: `File:${title}.jpg`, imageinfo: [{ mime: 'image/jpeg', thumburl: `https://images.example/${name}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:${title}.jpg` }] });
+  globalThis.fetch = async (url) => {
+    const params = new URL(url).searchParams;
+    if (params.get('gcmtitle') !== 'Category:Bills Mafia') return json({ query: { pages: [] } });
+    if (params.get('gcmcontinue')) {
+      assert.equal(params.get('continue'), 'gcmcontinue||');
+      assert.equal(params.get('iicontinue'), null);
+      return json({ query: { pages: [image('Third', 'third')] } });
+    }
+    if (params.get('iicontinue')) {
+      assert.equal(params.get('continue'), '||');
+      return json({ query: { pages: [image('First', 'first'), image('Second', 'second')] }, continue: { continue: 'gcmcontinue||', gcmcontinue: 'more-files' } });
+    }
+    return json({ query: { pages: [image('First', 'first'), { title: 'File:Second.jpg' }] }, continue: { continue: '||', iicontinue: 'more-thumbnails' } });
+  };
+  assert.deepEqual((await billsImagePool()).map(({ name }) => name), ['First', 'Second', 'Third']);
+});
+
+test('bills keeps the available photos if one Commons category fails', async () => {
+  console.error = () => {};
+  try {
+    globalThis.fetch = async (url) => {
+      if (new URL(url).searchParams.get('gcmtitle') === 'Category:Bills Mafia') return json({}, false);
+      return json({ query: { pages: [{ title: 'File:Team.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/team.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Team.jpg' }] }] } });
+    };
+    assert.equal((await billsImagePool())[0].name, 'Team');
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test('bills stops loading photo categories when the pool timeout expires', async (t) => {
+  const controller = new AbortController();
+  t.mock.method(AbortSignal, 'timeout', () => controller.signal);
+  let requests = 0;
+  console.error = () => {};
+  try {
+    globalThis.fetch = async () => {
+      requests++;
+      controller.abort();
+      throw new Error('timed out');
+    };
+    await assert.rejects(billsImagePool(), /found no Bills images/);
+    assert.equal(requests, 1);
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test('bills uploads the image instead of hotlinking it', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const { default: bills } = await import('../src/fun/bills.js?upload');
   globalThis.fetch = async (url) => {
     if (String(url).includes('commons.wikimedia.org')) return json({ query: { pages: [
       { title: 'File:Bills fan.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/fan.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg' }] },
@@ -155,16 +208,73 @@ test('bills uploads the image instead of hotlinking it', async () => {
   assert.match(reply.embeds[0].data.footer.text, /Wikimedia Commons/);
 });
 
-test('bills falls back to the image url when the download fails', async () => {
+test('bills falls back to the image url when the download fails', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const { default: bills } = await import('../src/fun/bills.js?download-failure');
   console.error = () => {};
   try {
-    // the pool is cached from the last test, so this only breaks the download
-    globalThis.fetch = async () => { throw new Error('nope'); };
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('commons.wikimedia.org')) return json({ query: { pages: [{ title: 'File:Fan.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/fan.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Fan.jpg' }] }] } });
+      throw new Error('nope');
+    };
     const post = await bills.takePost();
     assert.equal(post.file, undefined);
     const reply = bills.format(post);
     assert.equal(reply.embeds[0].data.image.url, 'https://images.example/fan.jpg');
     assert.deepEqual(reply.files, []);
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test('bills rotates photos, memes and animated gifs, using each pool before repeating', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const { default: bills } = await import('../src/fun/bills.js?rotation');
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('commons.wikimedia.org')) return json({ query: { pages: ['one', 'two', 'three'].map((name) => ({ title: `File:${name}.jpg`, imageinfo: [{ mime: 'image/jpeg', thumburl: `https://images.example/${name}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:${name}.jpg` }] })) } });
+    return { ok: true, arrayBuffer: async () => new Uint8Array([71, 73, 70, 56]).buffer };
+  };
+  const posts = [];
+  for (let i = 0; i < 24; i++) posts.push(await bills.takePost());
+  for (let i = 0; i < posts.length; i += 3) {
+    assert.match(posts[i].page, /^https:\/\/commons\.wikimedia\.org\//);
+    assert.match(posts[i + 1].page, /^https:\/\/imgflip\.com\//);
+    assert.match(posts[i + 2].page, /^https:\/\/giphy\.com\//);
+  }
+  assert.equal(new Set([posts[0].image, posts[3].image, posts[6].image]).size, 3);
+  assert.notEqual(posts[6].image, posts[9].image);
+  const memes = posts.filter((_, i) => i % 3 === 1).map(({ image }) => image);
+  assert.equal(new Set(memes.slice(0, 7)).size, 7);
+  assert.notEqual(memes[6], memes[7]);
+  const gifs = posts.filter((_, i) => i % 3 === 2);
+  assert.equal(new Set(gifs.slice(0, 5).map(({ image }) => image)).size, 5);
+  assert.notEqual(gifs[4].image, gifs[5].image);
+  const reply = bills.format(gifs[0]);
+  assert.equal(reply.embeds[0].data.image.url, 'attachment://bills.gif');
+  assert.match(reply.embeds[0].data.footer.text, /GIPHY/);
+  assert.doesNotMatch(reply.embeds[0].data.footer.text, /Wikimedia Commons/);
+  assert.equal(reply.files[0].attachment.toString(), 'GIF8');
+  assert.match(bills.format(posts[1]).embeds[0].data.footer.text, /Imgflip/);
+});
+
+test('bills still posts memes and gifs when Commons is down, then retries the photos', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const { default: bills } = await import('../src/fun/bills.js?commons-failure');
+  let down = true;
+  console.error = () => {};
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('commons.wikimedia.org')) {
+        if (down) return json({}, false);
+        return json({ query: { pages: [{ title: 'File:Back.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/back.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Back.jpg' }] }] } });
+      }
+      return json({});
+    };
+    assert.match((await bills.takePost()).page, /^https:\/\/(imgflip|giphy)\.com\//);
+    down = false;
+    const posts = [];
+    for (let i = 0; i < 3; i++) posts.push(await bills.takePost());
+    assert.ok(posts.some(({ image }) => image === 'https://images.example/back.jpg'));
   } finally {
     console.error = originalError;
   }
