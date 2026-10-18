@@ -17,7 +17,8 @@ export async function post(interaction, fun) {
   try {
     const content = await fun.takePost();
     const reply = fun.format?.(content) ?? { embeds: [embeds.fun(fun.name, fun.line, content)], files: [content.image] };
-    await interaction.editReply(reply);
+    // haiku and wiki text are quoted material, so they never get to ping
+    await interaction.editReply({ ...reply, allowedMentions: { parse: [] } });
   } catch (err) {
     // A source is down, so just say the command's line.
     console.error(`${fun.name} failed:`, err.message);

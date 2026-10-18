@@ -128,13 +128,14 @@ export function newTracked(player) {
 }
 
 // players queued by tools/track-attendees.js, added the same way /track add does and saved
-// before the request is cleared. the requests are only made by that tool, so keep it simple
+// before the request is cleared. ids are numeric from start.gg, so anything else is a bad file and stays out
+const numericId = (id) => /^\d+$/.test(String(id));
 export function importTrackRequest() {
   try {
     const request = readTrackRequest();
     if (!request) return;
 
-    const adding = (request.players ?? []).filter((player) => player.userId && player.playerId && !state.players[player.userId]);
+    const adding = (request.players ?? []).filter((player) => numericId(player.userId) && numericId(player.playerId) && !state.players[player.userId] && !Object.hasOwn(Object.prototype, player.userId));
     for (const player of adding) state.players[player.userId] = newTracked(player);
     if (adding.length) {
       save();
@@ -192,7 +193,8 @@ async function editPost(postChannel, { channelId, messageId }, payload) {
   }
 }
 
-const mentions = (discordIds) => discordIds.map((id) => `<@${id}>`).join(' ');
+// discord ids are snowflakes. anything else is a bad start.gg value, and it stays out instead of going in as text
+const mentions = (discordIds) => discordIds.filter((id) => /^\d+$/.test(String(id))).map((id) => `<@${id}>`).join(' ');
 
 const checkSets = queued(async () => {
   await postNewSets();
@@ -390,6 +392,8 @@ export async function postNewSets(postChannel = channel) {
       }
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
+      // saved per set so a crash after the post doesn't post it again on restart
+      save();
     }
     // only on success so a failed check gets covered next time
     for (const player of players) player.lastCheck = checkedAt;
@@ -418,9 +422,14 @@ function watchResult(message, set) {
 // reset or deleted get marked. one small request covers all of them, and only a changed set is asked for in full
 export async function fixCorrectedResults(postChannel = channel) {
   const now = secondsNow();
+  const before = state.resultPosts.length;
   state.resultPosts = state.resultPosts.filter((each) => each.at > now - RESULT_WATCH_MINUTES * 60);
   const watching = state.resultPosts;
-  if (!watching.length) return;
+  if (!watching.length) {
+    // expired posts were dropped, so save so they don't come back on restart
+    if (state.resultPosts.length !== before) save();
+    return;
+  }
   try {
     const outcomes = await startgg.getSetOutcomes([...new Set(watching.map((each) => each.setId))]);
     // a reset set reported again with the same result still needs its card put back
@@ -598,7 +607,8 @@ export async function postMatchCalls(postChannel = channel) {
       const inSet = players.filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
       if (!inSet.length) continue;
       if (messageEnabled('calls', set.updatedAt)) {
-        const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(Boolean))];
+        // discord ids come from start.gg, so only snowflakes get to ping
+        const discordIds = [...new Set(inSet.map((player) => player.discordId).filter((id) => /^\d+$/.test(String(id))))];
         const components = h2hRow(set);
         const sent = await postChannel.send({
           content: discordIds.length ? `${mentions(discordIds)} your match was called` : undefined,
@@ -610,6 +620,7 @@ export async function postMatchCalls(postChannel = channel) {
         watchCall(sent, set, discordIds);
       }
       state.called.push(set.id);
+      save();
     }
   } catch (err) {
     console.error('checking match calls failed:', err.message);
@@ -625,6 +636,7 @@ function watchCall(message, set, discordIds) {
   const [ref] = postRefs([message]);
   state.callPosts.push({ setId: set.id, ...ref, calledAt: Math.min(set.updatedAt ?? Infinity, secondsNow()), discordIds, warned: false });
   state.callPosts = state.callPosts.slice(-200);
+  save();
 }
 
 // match calls from the last 15 minutes, in one request. a call usually means go now, so there's no wait
@@ -632,9 +644,13 @@ function watchCall(message, set, discordIds) {
 // it was uncalled, and the next call pings again. one still called 5 minutes in pings its players once more
 export async function followCalls(postChannel = channel) {
   const now = secondsNow();
+  const before = state.callPosts.length;
   state.callPosts = state.callPosts.filter((each) => each.calledAt > now - CALL_WATCH_MINUTES * 60);
   const watching = state.callPosts;
-  if (!watching.length) return;
+  if (!watching.length) {
+    if (state.callPosts.length !== before) save();
+    return;
+  }
   try {
     const states = await startgg.getSetStates([...new Set(watching.map((each) => each.setId))]);
     for (const each of watching) {
@@ -646,21 +662,26 @@ export async function followCalls(postChannel = channel) {
         each.warned = true;
         save();
         if (messageEnabled('calls', each.calledAt + CALL_WARN_MINUTES * 60)) {
+          const users = each.discordIds.filter((id) => /^\d+$/.test(String(id)));
           await postChannel.send({
             content: `${mentions(each.discordIds)} called ${minutes} min ago, TOs usually DQ at ${CALL_DQ_MINUTES}`,
             reply: { messageReference: each.messageId, failIfNotExists: false },
-            allowedMentions: { users: each.discordIds },
+            allowedMentions: { users },
           });
         }
         continue;
       }
-      // started, finished, deleted or uncalled, so there's nothing more to watch for
-      state.callPosts = state.callPosts.filter((other) => other !== each);
-      if (!UNCALLED_STATES.includes(setState)) continue;
+      // started, finished or deleted, so there's nothing more to watch for
+      if (!UNCALLED_STATES.includes(setState)) {
+        state.callPosts = state.callPosts.filter((other) => other !== each);
+        continue;
+      }
+      // uncalled: edit first so a failed edit stays watched for the next check
       state.called = state.called.filter((id) => id !== each.setId);
       // an edit never pings, the mentions just stay so they can see it was theirs
       const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~your match was called~~ Uncalled by the TO, wait for the next call` : 'Uncalled by the TO, wait for the next call';
       await editPost(postChannel, each, { content, allowedMentions: { parse: [] } });
+      state.callPosts = state.callPosts.filter((other) => other !== each);
     }
   } catch (err) {
     console.error('following up match calls failed:', err.message);

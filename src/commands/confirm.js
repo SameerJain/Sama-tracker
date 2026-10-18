@@ -17,6 +17,8 @@ const CHOICES = ['confirm', 'cancel', 'undo'];
 
 // what Undo would put back, in memory since it's only kept a minute. a restart in that minute loses it
 const removed = new Map();
+// a double press before the first update lands runs twice without this
+const confirming = new Set();
 
 function confirmable(kind, spec) {
   kinds.set(kind, spec);
@@ -53,15 +55,26 @@ function undoRow(reply, kind, target, record) {
 }
 
 async function handleChoice(interaction) {
-  const [choice, kind, target, discordId] = interaction.customId.split(':');
+  // target could hold a colon one day, so the outer parts are pinned and the middle stays whole
+  const parts = interaction.customId.split(':');
+  const [choice, kind] = parts;
+  const discordId = parts.at(-1);
+  const target = parts.slice(2, -1).join(':');
   const spec = kinds.get(kind);
-  if (!spec) return replyEphemeral(interaction, 'That button doesn\'t work anymore.');
+  if (parts.length < 4 || !target || !spec) return replyEphemeral(interaction, 'That button doesn\'t work anymore.');
   if (interaction.user.id !== discordId) return replyEphemeral(interaction, `Only whoever ran \`${spec.command}\` can press this.`);
 
   if (choice === 'cancel') return interaction.update({ content: spec.cancel(target), components: [], allowedMentions: { parse: [] } });
   if (choice === 'confirm') {
-    const { content, undo } = spec.run(target);
-    return interaction.update({ content, components: undo ? undoRow(interaction, kind, target, undo) : [], allowedMentions: { parse: [] } });
+    const key = interaction.customId;
+    if (confirming.has(key)) return replyEphemeral(interaction, 'Already on it, one press is enough.');
+    confirming.add(key);
+    try {
+      const { content, undo } = spec.run(target);
+      return await interaction.update({ content, components: undo ? undoRow(interaction, kind, target, undo) : [], allowedMentions: { parse: [] } });
+    } finally {
+      confirming.delete(key);
+    }
   }
 
   const key = [kind, target, discordId].join(':');

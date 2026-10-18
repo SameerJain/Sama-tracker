@@ -147,6 +147,12 @@ async function fitPage(getPage, page, perPage) {
 
 // a bunch of lookups per request, aliased by id. start.gg's 1000 object limit counts what comes back
 // and most checks come back empty, so groups start big and get split in half when they go over
+// ids go straight into the query text, so only numeric start.gg ids get through
+function cleanId(id) {
+  const text = String(id);
+  if (!/^\d+$/.test(text)) throw new Error('bad start.gg id');
+  return text;
+}
 async function lookupMany(ids, toQuery, variables, size = 20) {
   const results = await Promise.all(chunk(ids, size).map((group) => lookupGroup(group, toQuery, variables)));
   return Object.assign({}, ...results);
@@ -224,7 +230,7 @@ export async function getPlayer(id) {
 // [userId, { slug, tag, image, discordId }] for each of them, null if they're gone from start.gg
 export async function getProfiles(userIds) {
   const data = await lookupMany(userIds, (group) => `{
-    ${group.map((id) => `u${id}: user(id: ${id}) { slug images(type: "profile") { url } player { gamerTag } authorizations(types: [DISCORD]) { externalId } }`).join('\n')}
+    ${group.map((id) => `u${cleanId(id)}: user(id: ${cleanId(id)}) { slug images(type: "profile") { url } player { gamerTag } authorizations(types: [DISCORD]) { externalId } }`).join('\n')}
   }`);
 
   return userIds.map((userId) => {
@@ -339,7 +345,7 @@ export const isMelee = (entry) => ((entry.set ?? entry).event?.videogame ?? entr
 export async function getSets(playerIds, { since, perPage = 10, states = [3] } = {}) {
   const data = await lookupMany(playerIds, (group) => `
     query ($perPage: Int!, $filters: SetFilters) {
-      ${group.map((id) => `p${id}: player(id: ${id}) { sets(perPage: $perPage, page: 1, filters: $filters) { nodes { ${SET_FIELDS} } } }`).join('\n')}
+      ${group.map((id) => `p${cleanId(id)}: player(id: ${cleanId(id)}) { sets(perPage: $perPage, page: 1, filters: $filters) { nodes { ${SET_FIELDS} } } }`).join('\n')}
     }
   `, { perPage, filters: { state: states, updatedAfter: since } });
 
@@ -358,7 +364,7 @@ export async function getSets(playerIds, { since, perPage = 10, states = [3] } =
 export async function getActivePlayers(playerIds, since) {
   const data = await lookupMany(playerIds, (group) => `
     query ($filters: SetFilters) {
-      ${group.map((id) => `p${id}: player(id: ${id}) { sets(perPage: 1, page: 1, filters: $filters) { nodes { id } } }`).join('\n')}
+      ${group.map((id) => `p${cleanId(id)}: player(id: ${cleanId(id)}) { sets(perPage: 1, page: 1, filters: $filters) { nodes { id } } }`).join('\n')}
     }
   `, { filters: { state: [3], entrantSize: [1], updatedAfter: since - 1 } }, 50);
   return new Set(playerIds.filter((id) => data[`p${id}`]?.sets?.nodes?.length));
@@ -435,9 +441,9 @@ export async function getDoublesHistory(playerId, page) {
 // so each event gets looked up with their entrant. ~9 objects an event, so 40 a request
 export async function getDoublesEvents(player, eventIds) {
   const data = await lookupMany(eventIds, (group) => `{
-    ${group.map((id) => `e${id}: event(id: ${id}) {
+    ${group.map((id) => `e${cleanId(id)}: event(id: ${cleanId(id)}) {
       id name slug startAt numEntrants state videogame { id displayName } tournament { name }
-      userEntrant(userId: ${player.userId}) { initialSeedNum isDisqualified standing { placement } participants { player { id gamerTag } } }
+      userEntrant(userId: ${cleanId(player.userId)}) { initialSeedNum isDisqualified standing { placement } participants { player { id gamerTag } } }
     }`).join('\n')}
   }`, undefined, 40);
 
@@ -721,7 +727,7 @@ export async function getStreamedSets(playerIds) {
 export async function getSetStates(setIds) {
   const data = await lookupMany(setIds, (group) => `
     query {
-      ${group.map((id) => `s${id}: set(id: ${id}) { state }`).join('\n')}
+      ${group.map((id) => `s${cleanId(id)}: set(id: ${cleanId(id)}) { state }`).join('\n')}
     }
   `, {}, 50);
   return new Map(setIds.map((id) => [id, data[`s${id}`]?.state ?? null]));
@@ -732,7 +738,7 @@ export async function getSetStates(setIds) {
 export async function getSetOutcomes(setIds) {
   const data = await lookupMany(setIds, (group) => `
     query {
-      ${group.map((id) => `s${id}: set(id: ${id}) { state winnerId slots { standing { stats { score { value } } } } }`).join('\n')}
+      ${group.map((id) => `s${cleanId(id)}: set(id: ${cleanId(id)}) { state winnerId slots { standing { stats { score { value } } } } }`).join('\n')}
     }
   `, {}, 50);
   return new Map(setIds.map((id) => {
@@ -747,7 +753,7 @@ export async function getSetOutcomes(setIds) {
 export async function getSetsById(setIds) {
   const data = await lookupMany(setIds, (group) => `
     query {
-      ${group.map((id) => `s${id}: set(id: ${id}) { ${SET_FIELDS} }`).join('\n')}
+      ${group.map((id) => `s${cleanId(id)}: set(id: ${cleanId(id)}) { ${SET_FIELDS} }`).join('\n')}
     }
   `, {}, 10);
   return new Map(setIds.map((id) => [id, data[`s${id}`] ? toSet(data[`s${id}`]) : null]));
@@ -784,7 +790,7 @@ const TOURNAMENT_FIELDS = `
 // Map of tournament id to the streams TOs added on its start.gg page, [{ name, source }]. none is an empty list
 export async function getTournamentStreams(tournamentIds) {
   const data = await lookupMany(tournamentIds, (group) => `{
-    ${group.map((id) => `t${id}: tournament(id: ${id}) { streams { streamName streamSource } }`).join('\n')}
+    ${group.map((id) => `t${cleanId(id)}: tournament(id: ${cleanId(id)}) { streams { streamName streamSource } }`).join('\n')}
   }`);
   return new Map(tournamentIds.map((id) => [String(id), (data[`t${id}`]?.streams ?? [])
     .filter((stream) => stream?.streamName)
@@ -794,7 +800,7 @@ export async function getTournamentStreams(tournamentIds) {
 // [userId, tournaments] for each of them. also returns ones they only admin, those just end up with no entries
 export async function getUpcomingTournaments(userIds) {
   const data = await lookupMany(userIds, (group) => `{
-    ${group.map((id) => `u${id}: user(id: ${id}) { tournaments(query: { perPage: 20, filter: { upcoming: true, past: false } }) { nodes { ${TOURNAMENT_FIELDS} } } }`).join('\n')}
+    ${group.map((id) => `u${cleanId(id)}: user(id: ${cleanId(id)}) { tournaments(query: { perPage: 20, filter: { upcoming: true, past: false } }) { nodes { ${TOURNAMENT_FIELDS} } } }`).join('\n')}
   }`);
 
   return userIds.map((userId) => [userId, data[`u${userId}`]?.tournaments?.nodes ?? []]);
@@ -803,7 +809,7 @@ export async function getUpcomingTournaments(userIds) {
 // only ones they're an admin of, not ones they entered
 export async function getAdminTournaments(userIds) {
   const data = await lookupMany(userIds, (group) => `{
-    ${group.map((id) => `u${id}: user(id: ${id}) { tournaments(query: { perPage: 20, filter: { tournamentView: "admin", upcoming: true, past: false } }) { nodes { id name slug startAt endAt } } }`).join('\n')}
+    ${group.map((id) => `u${cleanId(id)}: user(id: ${cleanId(id)}) { tournaments(query: { perPage: 20, filter: { tournamentView: "admin", upcoming: true, past: false } }) { nodes { id name slug startAt endAt } } }`).join('\n')}
   }`);
 
   return Object.values(data).flatMap((user) => user?.tournaments?.nodes ?? []);
@@ -853,7 +859,7 @@ export async function getTournament(tournamentId, userIds) {
 
 async function lookupEntries(tournamentId, userIds) {
   const entrantLookups = userIds
-    .map((id) => `u${id}: userEntrant(userId: ${id}) { id isDisqualified standing { placement isFinal } }`)
+    .map((id) => `u${cleanId(id)}: userEntrant(userId: ${cleanId(id)}) { id isDisqualified standing { placement isFinal } }`)
     .join('\n');
 
   const data = await query(`
@@ -879,7 +885,7 @@ async function lookupEntries(tournamentId, userIds) {
 // double elimination ties fill 8 exactly (5th and 7th go two each). an event is ~17 objects here
 export async function getTopEight(eventIds) {
   const data = await lookupMany(eventIds, (group) => `{
-    ${group.map((id) => `e${id}: event(id: ${id}) { state standings(query: { page: 1, perPage: 8 }) { nodes { placement isFinal entrant { name } } } }`).join('\n')}
+    ${group.map((id) => `e${cleanId(id)}: event(id: ${cleanId(id)}) { state standings(query: { page: 1, perPage: 8 }) { nodes { placement isFinal entrant { name } } } }`).join('\n')}
   }`);
   return new Map(eventIds.filter((id) => data[`e${id}`]).map((id) => {
     const event = data[`e${id}`];
@@ -938,7 +944,7 @@ export async function getParticipants(tournamentId) {
 // each for 10 players stays under the limit
 export async function getConnectCodes(playerIds) {
   const data = await lookupMany(playerIds, (group) => `{
-    ${group.map((id) => `p${id}: player(id: ${id}) { sets(perPage: 8, page: 1, filters: { state: [3], isEventOnline: true, entrantSize: [1] }) { nodes { slots { entrant { participants { player { id } connectedAccounts } } } } } }`).join('\n')}
+    ${group.map((id) => `p${cleanId(id)}: player(id: ${cleanId(id)}) { sets(perPage: 8, page: 1, filters: { state: [3], isEventOnline: true, entrantSize: [1] }) { nodes { slots { entrant { participants { player { id } connectedAccounts } } } } } }`).join('\n')}
   }`, undefined, 10);
 
   const codes = new Map();
