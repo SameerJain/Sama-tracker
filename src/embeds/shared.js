@@ -60,9 +60,19 @@ export function split(lines, max = 4096) {
 }
 
 // a list too long for one embed carries on in more of the same color
-export function withLines(embed, lines) {
-  const [first, ...rest] = split(lines).map((group) => group.join('\n'));
+function continued(embed, [first, ...rest]) {
   return [embed.setDescription(first), ...rest.map((text) => baseEmbed(embed.data.color, embed.data.footer?.text).setDescription(text))];
+}
+
+export function withLines(embed, lines) {
+  return continued(embed, split(lines).map((group) => group.join('\n')));
+}
+
+// the same for sections with a blank line between, so a card only ever starts at a section.
+// a section too long for a card of its own is the one thing that gets cut
+export function withSections(embed, sections) {
+  const blocks = sections.flatMap((lines) => split(lines, 4095).map((group) => `${group.join('\n')}\n`));
+  return continued(embed, split(blocks).map((group) => group.join('\n').trimEnd()));
 }
 
 // a message fits 10 embeds and 6000 chars between them, the rest go in more messages

@@ -29,6 +29,12 @@ const STYLES = [
   'a commentator who stops calling the set to correct the players\' tech',
 ];
 
+// the shared ones in generated.js that fit an elitist who is always online
+const SCENARIOS = [
+  'commentWarrior', 'thread', 'xFriend', 'streamer', 'videoEssay', 'newsInterview', 'radioCaller', 'argument', 'scene', 'veteran',
+  'archaeologist', 'alien', 'firstContact', 'candidate', 'dating', 'breakup', 'gamesSite', 'hostage', 'trueCrime', 'pilot',
+];
+
 // haiku makes up frame data without real facts to go off
 const TALKING_POINTS = [
   'Jigglypuff is pure cheese: Rest hits on frame 1, does 28% and kills absurdly early, and Puff has five midair jumps to float back and fish for another one',
@@ -45,8 +51,8 @@ const TALKING_POINTS = [
   'Captain Falcon\'s knee, the sweetspot on his forward air',
   'the 2021 PG Stats tier list: Fox, Marth, Jigglypuff, Falco and Sheik on top, Zelda, Kirby and Bowser at the bottom',
   'Ganondorf, 14th on the tier list, slow and stuck there forever, but his stomp feels incredible',
-  'Pikachu sneaking into the top 10, with Axe 6th in SSBMRank 2025',
-  'Ice Climbers still winning without wobbling, with Nicki 12th in SSBMRank 2025',
+  'Axe keeping Pikachu winning at the top level for years',
+  'Ice Climbers players like Nicki still winning without wobbling',
   'Bowser dead last on the tier list, and Pichu, 22nd, hurting itself with its own electric attacks',
   'Yoshi recovers with an armored double jump because his up special just throws an egg',
   'Zain\'s Marth was ranked #1 for 2025, with Fox mains Cody Schwab, Joshman and moky 2nd, 4th and 5th',
@@ -68,6 +74,7 @@ export default makeFun({
   category: 'Screenshots (SSBM)',
   prompt: PROMPT,
   styles: STYLES,
+  scenarios: SCENARIOS,
   points: TALKING_POINTS,
   focus: /Melee/,
   articles: [

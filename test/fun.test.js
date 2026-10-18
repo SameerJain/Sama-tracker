@@ -7,7 +7,7 @@ const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../
 const { addCommunity, searchVideos } = await import('../src/fun/youtube.js');
 const { billsImagePool } = await import('../src/fun/bills.js');
 const { default: bills } = await import('../src/fun/bills.js');
-const { funMessage, makeFun } = await import('../src/fun/generated.js');
+const { SCENARIOS, funMessage, makeFun, pickStyle } = await import('../src/fun/generated.js');
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
 after(() => { globalThis.fetch = originalFetch; console.error = originalError; });
@@ -194,14 +194,23 @@ async function nextPostWritten(sent) {
   while (sent.length < 2) await new Promise((resolve) => setImmediate(resolve));
 }
 
-// a fun post with a fake Claude, so what Haiku would get can be checked
-function funPost(sent) {
+// the shared scenarios the fake game picked
+const MIX = ['candidate', 'scene', 'alien', 'pilot', 'subway', 'hostage'];
+
+// a fun post with a fake Claude, so what Haiku would get can be checked. posts go in sent, and the
+// requests for a made up scenario go in invented, answered by scenario()
+function funPost(sent, { invented = [], scenario = async () => 'a lighthouse keeper signaling ships about the take' } = {}) {
   const client = { messages: { create: async (request) => {
-    sent.push(request.messages[0].content);
+    const content = request.messages[0].content;
+    if (!content.startsWith('Style: ')) {
+      invented.push(content);
+      return { stop_reason: 'end_turn', content: [{ type: 'text', text: await scenario() }] };
+    }
+    sent.push(content);
     return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'post' }] };
   } } };
   return makeFun({
-    name: 'melee', line: 'MELEE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], points: ['one', 'two', 'three'],
+    name: 'melee', line: 'MELEE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: MIX, points: ['one', 'two', 'three'],
     articles: ['Techniques (SSBM)'], videos: ['melee combo video'], focus: /Melee/,
   }, client);
 }
@@ -222,30 +231,118 @@ function fakeSites({ wikiDown = false } = {}) {
   };
 }
 
-test('a post gets a video and an article on top of two of the game\'s points', async () => {
-  process.env.YOUTUBE_API_KEY = 'test-key';
-  fakeSites();
-  const sent = [];
-  const post = await funPost(sent).takePost();
-  await nextPostWritten(sent);
-  assert.equal(post.text, 'post');
-  assert.equal(post.image.name, 'melee.png');
-  const [message] = sent;
-  assert.match(message, /^Style: a rant\nTalking points: [a-z]+; [a-z]+\n/);
-  assert.match(message, /\nA YouTube video: "Combo video" from Someone, 2015, 50K views\n/);
-  assert.match(message, /\nFrom the "Wavedash" article on SmashWiki:\nWavedash is a technique\.\nIn Melee it slides/);
+test('a post\'s style is one of the game\'s own half the time, or else one of its shared scenarios with a famous scene filled in', (t) => {
+  // the first draw picks the game's styles or its shared ones, the rest pick from them
+  let draws;
+  t.mock.method(Math, 'random', () => draws.shift());
+  const mix = [SCENARIOS.candidate, SCENARIOS.scene];
+  const pick = (own, at, shared = mix) => {
+    draws = [own ? 0.49 : 0.5, at, at];
+    return pickStyle(['a rant', 'a copypasta'], shared);
+  };
+  assert.equal(pick(true, 0), 'a rant');
+  assert.equal(pick(true, 0.99), 'a copypasta');
+  assert.equal(pick(false, 0), SCENARIOS.candidate);
+  assert.match(pick(false, 0.99), /^the .+, redone about the game: /);
+  // a game with no shared ones always uses its own
+  assert.equal(pick(false, 0, []), 'a rant');
+
+  const every = Array.from({ length: 1000 }, (_, i) => pick(false, i / 1000, Object.values(SCENARIOS)));
+  assert.ok(every.every((style) => !style.includes('{scene}')));
+  assert.equal(new Set(every.map((style) => style.includes(', redone about the game: ') ? 'scene' : style)).size, Object.keys(SCENARIOS).length);
 });
 
-test('smashwiki articles down and no youtube key still makes a post, from three of the game\'s points', async () => {
+test('a game listing a shared scenario that doesn\'t exist fails at startup', () => {
+  assert.throws(() => makeFun({ name: 'melee', line: 'MELEE', category: 'c', prompt: 'p', styles: ['a rant'], scenarios: ['candidate', 'mime'], points: ['one'] }, null),
+    { message: '/melee lists scenarios that don\'t exist: mime' });
+});
+
+test('the smash commands go in release order with project+ sixth, and each one\'s scenarios exist', async () => {
+  const { funCommands } = await import('../src/fun/index.js');
+  assert.deepEqual(Object.keys(funCommands), ['64', 'melee', 'brawl', 'sm4sh', 'ult', 'pplus', 'bills']);
+});
+
+// the same value for every Math.random call. under 1/3 a post uses only the game's points,
+// under 2/3 it tries a video first, and above that an article first. under 1/4 haiku makes up the style
+async function postWith(t, random, options) {
+  t.mock.method(Math, 'random', () => random);
+  const sent = [];
+  const post = await funPost(sent, options).takePost();
+  await nextPostWritten(sent);
+  return { post, message: sent[0] };
+}
+
+test('some posts run on a scenario haiku makes up first for the game\'s character, from a few in its mix', async (t) => {
+  fakeSites();
+  const invented = [];
+  const { message } = await postWith(t, 0, { invented });
+  assert.match(message, /^Style: a lighthouse keeper signaling ships about the take\n/);
+  const [character, existing] = invented[0].split('\n\n');
+  assert.equal(character, 'The character:\np');
+  const [heading, ...examples] = existing.split('\n');
+  assert.equal(heading, 'Scenarios that already exist:');
+  assert.equal(examples.length, 5);
+  const mix = MIX.map((each) => SCENARIOS[each]);
+  assert.ok(examples.every((each) => mix.includes(each.slice(2)) || /^- the .+, redone about the game: /.test(each)));
+});
+
+test('a made up scenario that fails falls back to the lists', async (t) => {
+  fakeSites();
+  const errors = [];
+  console.error = (...args) => errors.push(args.join(' '));
+  const { post, message } = await postWith(t, 0, { scenario: async () => { throw new Error('overloaded'); } });
+  console.error = originalError;
+  assert.equal(post.text, 'post');
+  assert.match(message, /^Style: a rant\n/);
+  assert.deepEqual(errors, Array(2).fill('melee made up scenario failed: overloaded'));
+});
+
+test('most posts take their style from the lists', async (t) => {
+  fakeSites();
+  const invented = [];
+  await postWith(t, 0.5, { invented });
+  assert.deepEqual(invented, []);
+});
+
+test('a post can draw on a youtube video and two of the game\'s points', async (t) => {
+  process.env.YOUTUBE_API_KEY = 'test-key';
+  fakeSites();
+  const { post, message } = await postWith(t, 0.5);
+  assert.equal(post.text, 'post');
+  assert.equal(post.image.name, 'melee.png');
+  assert.match(message, /^Style: .+\nTalking points: [a-z]+; [a-z]+\nA YouTube video: "Combo video" from Someone, 2015, 50K views$/);
+  assert.doesNotMatch(message, /SmashWiki/);
+});
+
+test('a post can draw on a smashwiki article instead, even with a youtube key', async (t) => {
+  process.env.YOUTUBE_API_KEY = 'test-key';
+  fakeSites();
+  const { message } = await postWith(t, 0.9);
+  assert.match(message, /^Style: .+\nTalking points: [a-z]+; [a-z]+\nFrom the "Wavedash" article on SmashWiki:\nWavedash is a technique\.\nIn Melee it slides/);
+  assert.doesNotMatch(message, /YouTube/);
+});
+
+test('some posts use only three of the game\'s points', async (t) => {
+  process.env.YOUTUBE_API_KEY = 'test-key';
+  fakeSites();
+  const { message } = await postWith(t, 0);
+  assert.match(message, /^Style: .+\nTalking points: [a-z]+; [a-z]+; [a-z]+$/);
+});
+
+test('a post that would use a video uses an article without a youtube key', async (t) => {
+  fakeSites();
+  const { message } = await postWith(t, 0.5);
+  assert.match(message, /\nFrom the "Wavedash" article on SmashWiki:\n/);
+});
+
+test('smashwiki articles down and no youtube key still makes a post, from three of the game\'s points', async (t) => {
   fakeSites({ wikiDown: true });
   const errors = [];
   console.error = (...args) => errors.push(args.join(' '));
-  const sent = [];
-  const post = await funPost(sent).takePost();
-  await nextPostWritten(sent);
+  const { post, message } = await postWith(t, 0.9);
   console.error = originalError;
   assert.equal(post.text, 'post');
-  assert.match(sent[0], /^Style: a rant\nTalking points: [a-z]+; [a-z]+; [a-z]+$/);
+  assert.match(message, /^Style: .+\nTalking points: [a-z]+; [a-z]+; [a-z]+$/);
   // once for that post and once for the next one it started on
   assert.deepEqual(errors, Array(2).fill('melee SmashWiki article failed: SmashWiki returned 500'));
 });

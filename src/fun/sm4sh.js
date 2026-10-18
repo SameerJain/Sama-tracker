@@ -22,6 +22,13 @@ const STYLES = [
   'a gushing superfan defending it as the best Smash ever like someone just said otherwise: an over-the-top opener, two or three short bolded bullet point reasons, then a sign-off, under 130 words',
 ];
 
+// the shared ones in generated.js that fit a fan who loves it way too much
+const SCENARIOS = [
+  'support', 'grandparent', 'breakup', 'candidate', 'streamer', 'youtubeScript', 'gamesSite', 'trailer', 'scene', 'newsInterview',
+  'disasterReporter', 'parent', 'firstContact', 'alien', 'archaeologist', 'radioCaller', 'subway', 'xFriend', 'professor', 'hostage',
+  'argument',
+];
+
 // haiku mixes up the smash games without real facts to go off
 const TALKING_POINTS = [
   'Ryu as DLC, with real fighting game inputs that make his specials stronger',
@@ -52,6 +59,7 @@ export default makeFun({
   category: 'Screenshots (SSB4-Wii U)',
   prompt: PROMPT,
   styles: STYLES,
+  scenarios: SCENARIOS,
   points: TALKING_POINTS,
   focus: /Smash 4|Wii U|SSB4/,
   // the wii u ones where there's a split

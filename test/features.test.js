@@ -805,11 +805,31 @@ test('a set only waiting at the front of a stream queue still posts after stream
   assert.equal(sent.length, 1);
 });
 
-// a second card would have no title and split a section, so trim the text instead of growing past it
-test('/help fits in one card under discord\'s 4096', () => {
+test('/help lists every command, and each card starts at a section', () => {
   const cards = embeds.help();
-  assert.equal(cards.length, 1, `${cards.map(card => card.data.description).join('\n').length} chars`);
   assert.equal(cards[0].data.title, 'Sama-tracker');
+  for (const card of cards) {
+    assert.ok(card.data.description.length <= 4096);
+    assert.match(card.data.description, /^\*\*/);
+  }
+  const text = cards.map(card => card.data.description).join('\n');
+  for (const { name } of commands) assert.match(text, new RegExp(`\`/${name}[\` ]`), name);
+});
+
+test('sections past discord\'s 4096 carry on in another card, cut only between sections', () => {
+  const section = (title, lines) => [`**${title}**`, ...Array.from({ length: lines }, (_, i) => `${title} ${i} ${'x'.repeat(90)}`)];
+  const card = { data: { color: 1, footer: { text: 'footer' } }, setDescription(text) { this.data.description = text; return this; } };
+  const [first, second, third] = embeds.withSections(card, [section('One', 20), section('Two', 20), section('Three', 30)]);
+  assert.match(first.data.description, /^\*\*One\*\*\n.*\n\n\*\*Two\*\*\n/s);
+  assert.match(second.data.description, /^\*\*Three\*\*\n/);
+  assert.equal(second.data.color, 1);
+  assert.equal(second.data.footer.text, 'footer');
+  assert.equal(third, undefined);
+
+  // one section too long for a card on its own still fits
+  const cards = embeds.withSections(card, [section('Huge', 60)]);
+  assert.equal(cards.length, 2);
+  assert.ok(cards.every(each => each.data.description.length <= 4096));
 });
 
 test('stream alerts start off, keeping a new player out of the stream check and their tournament\'s queues', async () => {

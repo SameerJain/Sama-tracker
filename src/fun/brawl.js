@@ -25,6 +25,13 @@ const STYLES = [
   'two or three haiku',
 ];
 
+// the shared ones in generated.js that fit someone defending the indefensible
+const SCENARIOS = [
+  'support', 'dating', 'streetCorner', 'archaeologist', 'trueCrime', 'newsInterview', 'disasterReporter', 'snakeOil', 'commercial',
+  'hostage', 'scene', 'alien', 'firstContact', 'candidate', 'breakup', 'videoEssay', 'gamesSite', 'userReview', 'argument',
+  'radioCaller', 'grandparent', 'commentWarrior',
+];
+
 // haiku makes up results without real facts to go off
 const TALKING_POINTS = [
   'random tripping: a 1% chance to fall over whenever you start a dash, and 1.25% when you turn around in a run',
@@ -57,6 +64,7 @@ export default makeFun({
   category: 'Screenshots (SSBB)',
   prompt: PROMPT,
   styles: STYLES,
+  scenarios: SCENARIOS,
   points: TALKING_POINTS,
   focus: /Brawl\b/,
   articles: [

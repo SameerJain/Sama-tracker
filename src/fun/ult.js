@@ -29,6 +29,12 @@ const STYLES = [
   'two or three bitter haiku',
 ];
 
+// the shared ones in generated.js that fit someone who can't quit a game they hate
+const SCENARIOS = [
+  'veteran', 'streamer', 'commentWarrior', 'xFriend', 'trueCrime', 'disasterReporter', 'hostage', 'subway', 'breakup', 'parent',
+  'candidate', 'newsInterview', 'radioCaller', 'sketchyAd', 'alien', 'scene', 'argument', 'videoEssay', 'streetCorner', 'userReview',
+];
+
 // haiku makes up patches and results without real facts to go off
 const TALKING_POINTS = [
   'Steve mines blocks, crafts tools, drops anvils, minecart grabs people and blows them up with TNT',
@@ -40,19 +46,20 @@ const TALKING_POINTS = [
   'Sora in October 2021 was the last fighter ever added',
   'Kazuya takes a stock in a couple of touches with his 10-hit combo and Electric Wind God Fist',
   'Hero\'s Command Selection is RNG, and it rolls Thwack or Hocus Pocus at the worst time',
-  'Doramigi, a Min Min and Hero player, was ranked #1 in UltRank 2025',
   'Min Min zoning with ARMS from across the stage and edgeguarding from the middle of it',
-  'Sonic getting a lead and running away for the rest of the game; Sonix\'s Sonic was 6th in UltRank 2025',
-  'Snake camping with grenades and C4; Hurt, a Snake main, was 4th in UltRank 2025',
-  'R.O.B. players and their gyro, with Zomba 8th in UltRank 2025',
+  'Sonic getting a lead and running away for the rest of the game',
+  'Snake camping with grenades and C4',
+  'R.O.B. players and their gyro',
   'Pyra and Mythra everywhere',
   'MkLeo, long called the best Ultimate player ever, finished 2025 ranked 14th',
-  'Light is the only Fox main in the UltRank 2025 top 20, at 16th',
-  'six of the UltRank 2025 top 10 are from Japan',
+  'six of the UltRank 2025 top 10 are from Japan, and the only Fox main in the top 20 is Light at 16th',
+  'Doramigi, a Min Min and Hero player, was UltRank\'s #1 for 2025, then acola\'s Steve passed him for #1 on the UltRank Half Year 2026',
   'online: Elite Smash, GSP, input delay, wifi players and Quickplay ignoring your preferred rules',
   'every character has had the same 3 frame jumpsquat since launch',
+  'parrying: let go of shield right as a hit lands',
+  '"Everyone is here!": every fighter from every earlier Smash came back for Ultimate',
+  'Ultimate is the best-selling fighting game of all time',
   'Nintendo wouldn\'t license the 2022 Smash World Tour Championships, so they got canceled, and its 2023 community tournament guidelines cap unlicensed events at 200 entrants in person or 300 online, with no prize over $5,000',
-  'acola, a Steve main, was ranked #1 on the UltRank Half Year 2026, with Doramigi 2nd',
   'Ganondorf and Sheik waiting on buffs that are never coming',
   'Pikachu, Wolf, Joker and Palutena players getting carried by their character',
   'Melee players still calling Ultimate a party game',
@@ -64,6 +71,7 @@ export default makeFun({
   category: 'Screenshots (SSBU)',
   prompt: PROMPT,
   styles: STYLES,
+  scenarios: SCENARIOS,
   points: TALKING_POINTS,
   focus: /Ultimate/,
   articles: [

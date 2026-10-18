@@ -26,6 +26,12 @@ const STYLES = [
   'a closing argument to a jury',
 ];
 
+// the shared ones in generated.js that fit a grumpy old head
+const SCENARIOS = [
+  'grandparent', 'streetCorner', 'veteran', 'archaeologist', 'radioCaller', 'newsInterview', 'trueCrime', 'alien', 'firstContact',
+  'candidate', 'parent', 'pilot', 'scene', 'argument', 'gamesSite', 'hostage', 'trailer',
+];
+
 // haiku gives 64 melee's mechanics without real facts to go off
 const TALKING_POINTS = [
   'only 12 characters: Mario, Donkey Kong, Link, Samus, Yoshi, Kirby, Fox and Pikachu, plus unlockable Luigi, Captain Falcon, Ness and Jigglypuff',
@@ -54,6 +60,7 @@ export default makeFun({
   category: 'Screenshots (SSB)',
   prompt: PROMPT,
   styles: STYLES,
+  scenarios: SCENARIOS,
   points: TALKING_POINTS,
   // smashwiki calls it the original Super Smash Bros.
   focus: /Smash 64|original Super Smash Bros|SSB64|N64/,

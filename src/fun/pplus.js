@@ -27,6 +27,12 @@ const STYLES = [
   'two or three haiku',
 ];
 
+// the shared ones in generated.js that fit a recruiter who never stops pitching
+const SCENARIOS = [
+  'snakeOil', 'sketchyAd', 'commercial', 'streetCorner', 'support', 'dating', 'professor', 'youtubeScript', 'streamer', 'trailer',
+  'candidate', 'breakup', 'parent', 'firstContact', 'hostage', 'radioCaller', 'subway', 'pilot', 'scene', 'userReview',
+];
+
 // haiku makes up patch notes without real facts to go off
 const TALKING_POINTS = [
   'Project M was a Brawl mod that brought back Melee\'s speed, wavedashing and L-canceling',
@@ -57,6 +63,7 @@ export default makeFun({
   category: 'P+ Stages',
   prompt: PROMPT,
   styles: STYLES,
+  scenarios: SCENARIOS,
   points: TALKING_POINTS,
   focus: /Project M|Project\+/,
   // smashwiki covers project m more thoroughly than project+

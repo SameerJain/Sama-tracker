@@ -7,7 +7,8 @@ import brawl from './brawl.js';
 import pplus from './pplus.js';
 import bills from './bills.js';
 
-export const funCommands = Object.fromEntries([sm4sh, melee, ult, smash64, brawl, pplus, bills].map((fun) => [fun.name, fun]));
+// release order, with project+ after the official games
+export const funCommands = Object.fromEntries([smash64, melee, brawl, sm4sh, ult, pplus, bills].map((fun) => [fun.name, fun]));
 
 export async function post(interaction, fun) {
   if (!fun.enabled) return interaction.reply(fun.line);
