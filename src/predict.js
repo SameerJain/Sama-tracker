@@ -46,20 +46,22 @@ function maximize(slopeAndBend, start = 0) {
 // odds for a gap of mean with this much uncertainty. unsure pulls it toward 50%
 const chanceOf = (mean, variance) => sigmoid(mean / Math.sqrt(1 + (Math.PI * variance) / 8));
 
-export function sharedGame(historyA, historyB) {
-  const count = (sets) => {
+// the game they've both played the most singles sets in. DQs don't count, or a game someone only got
+// DQ'd out of could win and leave nothing to predict with
+export function sharedGame(a, b, historyA, historyB) {
+  const count = (history, player) => {
     const games = new Map();
-    for (const set of sets) {
+    for (const { set } of singles(history, player)) {
       const game = set.event.videogame?.displayName;
       if (game) games.set(game, (games.get(game) ?? 0) + 1);
     }
     return games;
   };
-  const gamesB = count(historyB);
+  const gamesB = count(historyB, b);
 
   let best;
   let bestCount = 0;
-  for (const [game, n] of count(historyA)) {
+  for (const [game, n] of count(historyA, a)) {
     const shared = Math.min(n, gamesB.get(game) ?? 0);
     if (shared > bestCount) [best, bestCount] = [game, shared];
   }
@@ -253,18 +255,23 @@ function fit(parts) {
 }
 
 // a's odds of beating b in their shared game, or the one picked. events are their event histories, which
-// make seeding count for more. now is when the odds are for, which only changes how much older sets count.
+// make seeding count for more. meetings is every set between them from getHeadToHead, which goes back past
+// where the histories stop. now is when the odds are for, which only changes how much older sets count.
 // null if they haven't played singles in the same game
-export function predict(a, b, historyA, historyB, { game = sharedGame(historyA, historyB), now = Date.now() / 1000, eventsA, eventsB } = {}) {
+export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, historyA, historyB), now = Date.now() / 1000, eventsA, eventsB, meetings: allMeetings = [] } = {}) {
   if (!game) return null;
   const listA = results(historyA, a, game, now);
   const listB = results(historyB, b, game, now);
   if (!listA.length || !listB.length) return null;
 
-  // check both histories in case one is cut off, dedupe by set id
+  // the histories too, in case meetings wasn't looked up. deduped by set id, from a's side
   const met = new Map();
-  for (const { set, opponent, won, weight } of listA) if (opponent === b.playerId) met.set(set.id, { sign: won ? 1 : -1, weight });
-  for (const { set, opponent, won, weight } of listB) if (opponent === a.playerId) met.set(set.id, { sign: won ? -1 : 1, weight });
+  const meet = (list, them, sign) => {
+    for (const { set, opponent, won, weight } of list) if (opponent === them.playerId) met.set(set.id, { sign: won ? sign : -sign, weight });
+  };
+  meet(results(allMeetings, a, game, now), b, 1);
+  meet(listA, b, 1);
+  meet(listB, a, -1);
   const meetings = [...met.values()];
   const h2h = { wins: meetings.filter(({ sign }) => sign > 0).length, total: meetings.length };
 

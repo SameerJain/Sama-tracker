@@ -71,6 +71,7 @@ async function main() {
   const names = adding.map((player) => player.tag);
   const listed = names.length > NAMES_SHOWN ? `${names.slice(0, NAMES_SHOWN).join(', ')} and ${names.length - NAMES_SHOWN} more` : names.join(', ');
   console.log(`Queued ${adding.length} player${adding.length === 1 ? '' : 's'}: ${listed}`);
+  console.log('Their set results and stream alerts start off. /sets and /stream in Discord turn them on.');
 
   // on the bot's host the request is read within 30 seconds and this can say it's done. anywhere
   // else there may be no bot running, and it'll be read on the next start

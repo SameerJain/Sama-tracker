@@ -9,7 +9,9 @@ import { periodSummary } from '../reports.js';
 import { PICKABLE_GAMES } from './definitions.js';
 import { SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory } from './history.js';
 import { verifiedCaller } from '../accounts.js';
-import { fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag } from './shared.js';
+import {
+  fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, reportButton, fullReport, buttonRow,
+} from './shared.js';
 
 // /characters verbose, so the cards fit in one message
 const CHARACTER_GAMES = 6;
@@ -18,12 +20,14 @@ const CHARACTER_GAMES = 6;
 const PROGRESS_DAYS = 30;
 const TREND_PERIODS = 6;
 
-// the melee option and its filter, the same for sets, standings, events and character sets
-const onlyMelee = (list, melee) => (melee ? list.filter(startgg.isMelee) : list);
-function meleeOption(interaction) {
-  const melee = flag(interaction, 'melee');
-  return { melee, only: (list) => onlyMelee(list, melee) };
-}
+const NOT_LINKED = '/scout needs to know who you are on start.gg. Connect your Discord on your start.gg profile, then `/link` it.';
+
+// the melee option's filter, the same for sets, standings, events and character sets
+const onlyMelee = (melee) => (list) => (melee ? list.filter(startgg.isMelee) : list);
+
+// each report runs after its command's checks and the defer, so a button can run it again with the same
+// players. these are the options it takes from the command
+const reportOptions = (interaction) => ({ verbose: flag(interaction, 'verbose'), melee: flag(interaction, 'melee') });
 
 // the two players a matchup command works on, opponent first. either option also takes a start.gg
 // profile link or ID, so it doesn't matter whether either is tracked or linked. null when it answered
@@ -37,9 +41,11 @@ async function pair(interaction) {
   }
   // a typed link or ID isn't on either list, so it gets looked up; that request waits for the defer
   if (!a || !b) await interaction.deferReply();
+  // a miss has already answered and deleted the thinking reply, so the other one doesn't get looked up
   const first = a ?? await fetchPlayer(interaction, interaction.options.getString('player'));
+  if (!first) return null;
   const second = b ?? await fetchPlayer(interaction, interaction.options.getString('opponent'));
-  if (!first || !second) return null;
+  if (!second) return null;
   if (first.userId === second.userId) {
     await replyEphemeralAfterDefer(interaction, 'Pick two different players.');
     return null;
@@ -52,8 +58,11 @@ async function progress(interaction) {
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  const verbose = flag(interaction, 'verbose');
-  const { melee, only } = meleeOption(interaction);
+  return progressReport(interaction, { player, ...reportOptions(interaction) });
+}
+
+async function progressReport(interaction, { player, verbose, melee }) {
+  const only = onlyMelee(melee);
   const now = secondsNow();
   const span = PROGRESS_DAYS * 24 * 60 * 60;
   // newest first, the first two get compared
@@ -67,13 +76,15 @@ async function progress(interaction) {
   const played = only(sets);
   const finishes = only(events);
   for (const period of periods) period.summary = periodSummary(player, played, finishes, period.since, period.until);
-  return sendEmbeds(interaction, embeds.progress(player, periods, { verbose, characterSets: characterSets && only(characterSets), melee }));
+  // the full report looks back 180 days, so it's worth a look even when the last 60 had nothing
+  const more = verbose ? [] : buttonRow(fullReport('progress', { player, melee }));
+  return sendEmbeds(interaction, embeds.progress(player, periods, { verbose, characterSets: characterSets && only(characterSets), melee }), more);
 }
 
 async function scout(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const player = await verifiedCaller(interaction.user.id);
-  if (!player) return interaction.editReply('/scout needs to know who you are on start.gg. Connect your Discord on your start.gg profile, then `/link` it.');
+  if (!player) return interaction.editReply(NOT_LINKED);
 
   const input = interaction.options.getString('profile', true);
   // a tracked or linked pick from autocomplete, otherwise a start.gg link or ID
@@ -81,13 +92,18 @@ async function scout(interaction) {
   if (!opponent) return;
   if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
 
-  const { melee, only } = meleeOption(interaction);
+  return scoutReport(interaction, { player, opponent, ...reportOptions(interaction) });
+}
+
+// player is always whoever ran it, so its button only carries the opponent
+async function scoutReport(interaction, { player, opponent, verbose, melee }) {
+  const only = onlyMelee(melee);
   const [mine, theirs, characters] = await withCountdown(interaction, `Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
     setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
   ]));
   const mySets = only(mine);
   const quick = embeds.scout(player, opponent, mySets, only(theirs), only(characters), { melee });
-  if (!flag(interaction, 'verbose')) return sendEmbeds(interaction, quick);
+  if (!verbose) return sendEmbeds(interaction, quick, buttonRow(fullReport('scout', { opponent, melee })));
 
   // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
   // meeting them and the odds, so the usual amount is plenty
@@ -105,12 +121,15 @@ async function scout(interaction) {
 async function headToHead(interaction) {
   const players = await pair(interaction);
   if (!players) return;
-  const [a, b] = players;
+  const [player, opponent] = players;
 
   // pair only has to defer itself when it looked a link up
   if (!interaction.deferred) await interaction.deferReply();
-  const verbose = flag(interaction, 'verbose');
-  const { melee, only } = meleeOption(interaction);
+  return headToHeadReport(interaction, { player, opponent, ...reportOptions(interaction) });
+}
+
+async function headToHeadReport(interaction, { player: a, opponent: b, verbose, melee }) {
+  const only = onlyMelee(melee);
   // meetings for the record, histories and events for one line of /predict odds
   const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
     Promise.all([
@@ -119,8 +138,15 @@ async function headToHead(interaction) {
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
   const shown = only(sets);
-  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB });
-  return sendEmbeds(interaction, embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - shown.length, odds }));
+  // every meeting, so the odds go by the same record the card shows
+  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB, meetings: sets });
+  // never having played, the full report would say the same thing. the odds stay one line in both, so
+  // the other button posts /predict for why
+  const buttons = buttonRow(
+    !verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee }),
+    odds && reportButton('Why these odds', 'new', 'predict', { player: a, opponent: b, melee }),
+  );
+  return sendEmbeds(interaction, embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - shown.length, odds }), buttons);
 }
 
 async function stats(interaction) {
@@ -128,10 +154,18 @@ async function stats(interaction) {
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  const { melee, only } = meleeOption(interaction);
+  return statsReport(interaction, { player, ...reportOptions(interaction) });
+}
+
+async function statsReport(interaction, { player, verbose, melee }) {
+  const only = onlyMelee(melee);
   const { standings, sets } = await startgg.getStats(player.playerId, { videogameId: melee ? startgg.MELEE : undefined });
   const recent = embeds.stats(player, only(standings), only(sets), { melee });
-  if (!flag(interaction, 'verbose')) return interaction.editReply({ embeds: [recent] });
+  if (!verbose) {
+    // nothing recent on start.gg means nothing older either
+    const more = only(standings).length || only(sets).length ? buttonRow(fullReport('stats', { player, melee })) : [];
+    return interaction.editReply({ embeds: [recent], components: more });
+  }
   // show the recent card while the lifetime report loads
   const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
     Promise.all([eventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
@@ -143,8 +177,11 @@ async function characters(interaction) {
   if (!player) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  const verbose = flag(interaction, 'verbose');
-  const picked = interaction.options.getInteger('game');
+  return charactersReport(interaction, { player, verbose: flag(interaction, 'verbose'), game: interaction.options.getInteger('game') });
+}
+
+// game is the one picked, null for whichever has more reported
+async function charactersReport(interaction, { player, verbose, game: picked }) {
   let sets = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s reported characters`, characterHistory(player.playerId));
   if (verbose) {
     // every game is the same pages and more, so the usual card shows while it loads
@@ -164,7 +201,9 @@ async function characters(interaction) {
     embeds: cards.map(({ game, usage }, i) => embeds.characters(player, usage, {
       game: game?.displayName, file: art[i]?.name, note: i === cards.length - 1 ? note : undefined, searched: sets.length,
     })),
+    // replaces the art when a button swaps in the full report
     files: art.filter(Boolean),
+    components: verbose ? [] : buttonRow(fullReport('characters', { player, game: picked })),
   });
 }
 
@@ -200,10 +239,9 @@ function noOdds(a, b, historyA, historyB, melee) {
 
   const missing = [a, b].filter((player, i) => !gameSets(i ? historyB : historyA, player, 'Melee').length).map((player) => escapeMarkdown(player.tag));
   const who = missing.length === 2 ? `Neither ${tags[0]} nor ${tags[1]} has` : `${missing[0]} hasn't`;
-  // only point at leaving melee out when that really gives odds there, not when a shared game is all DQs
-  const shared = sharedGame(historyA, historyB);
-  const hint = shared && gameSets(historyA, a, shared).length && gameSets(historyB, b, shared).length
-    ? `\n-# Leave out \`melee\` for ${escapeMarkdown(shared)} odds` : '';
+  // the game predict would pick without melee, which leaves out DQs, so leaving melee out really gives odds there
+  const shared = sharedGame(a, b, historyA, historyB);
+  const hint = shared ? `\n-# Leave out \`melee\` for ${escapeMarkdown(shared)} odds` : '';
   return `${who} played Melee singles on start.gg.${hint}`;
 }
 
@@ -211,18 +249,32 @@ function noOdds(a, b, historyA, historyB, melee) {
 async function predict(interaction) {
   const players = await pair(interaction);
   if (!players) return;
-  const [a, b] = players;
+  const [player, opponent] = players;
 
   // pair only has to defer itself when it looked a link up
   if (!interaction.deferred) await interaction.deferReply();
-  const melee = flag(interaction, 'melee');
-  // events say how big each bracket was, which helps seeding count. the odds still work without them
-  const [historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
-    Promise.all([setHistory(a.playerId), setHistory(b.playerId), eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null)]));
-  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB });
-  if (!odds) return interaction.editReply(noOdds(a, b, historyA, historyB, melee));
-
-  await sendEmbeds(interaction, embeds.prediction(a, b, odds, flag(interaction, 'verbose')));
+  return predictReport(interaction, { player, opponent, ...reportOptions(interaction) });
 }
 
-export { progress, scout, headToHead, stats, characters, predict };
+async function predictReport(interaction, { player: a, opponent: b, verbose, melee }) {
+  // meetings go back past the histories, usually in one request, so head-to-head matches /h2h. events say how
+  // big each bracket was, which helps seeding count. the histories have the recent meetings and the odds still
+  // work without events, so either failing doesn't sink it
+  const [historyA, historyB, meetings, eventsA, eventsB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
+    Promise.all([
+      setHistory(a.playerId), setHistory(b.playerId), startgg.getHeadToHead(a.playerId, b.playerId).catch(() => []),
+      eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
+    ]));
+  const odds = predictOdds(a, b, historyA, historyB, { game: melee ? 'Melee' : undefined, eventsA, eventsB, meetings });
+  if (!odds) return interaction.editReply(noOdds(a, b, historyA, historyB, melee));
+
+  const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee }));
+  await sendEmbeds(interaction, embeds.prediction(a, b, odds, verbose), more);
+}
+
+// what each report button runs
+const reports = {
+  progress: progressReport, scout: scoutReport, h2h: headToHeadReport, stats: statsReport, characters: charactersReport, predict: predictReport,
+};
+
+export { progress, scout, headToHead, stats, characters, predict, reports, NOT_LINKED };

@@ -12,11 +12,20 @@ const { state } = await import('../src/store.js');
 const { commands, handleAutocomplete, handleCommand } = await import('../src/commands/index.js');
 const embeds = await import('../src/embeds/index.js');
 const { predict } = await import('../src/predict.js');
+const { queueLength } = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
 function mockApi(respond) {
   globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
+}
+
+// background checks a command kicks off, so they don't reach the next test's fake
+async function settle() {
+  await new Promise((resolve) => setImmediate(resolve));
+  const deadline = Date.now() + 3000;
+  while (queueLength() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 25));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 // a command run by discordId, values are its options. returns the last reply or edit
@@ -111,6 +120,32 @@ test('matchup commands wait for every validation reply before finishing', async 
       assert.match(content, message);
       assert.equal(finishedBeforeReply, false, `${commandName}: ${content}`);
     }
+  }
+});
+
+test('h2h and predict stop at the first link that matches nobody', async () => {
+  state.players = {};
+  state.links = {};
+  let lookups = 0;
+  mockApi(({ query }) => {
+    if (query.includes('user(slug:')) lookups++;
+    return { user: null };
+  });
+  for (const commandName of ['h2h', 'predict']) {
+    lookups = 0;
+    const replies = [];
+    let deleted = false;
+    const interaction = {
+      commandName, user: { id: 'stranger' },
+      options: { getSubcommand: () => null, getString: name => ({ player: 'start.gg/user/nope1', opponent: 'start.gg/user/nope2' })[name] ?? null, getBoolean: () => null },
+      deferReply: async () => { interaction.deferred = true; },
+      // discord answers a second delete of the same reply with Unknown Message
+      deleteReply: async () => { if (deleted) throw new Error('Unknown Message'); deleted = true; },
+      followUp: async result => replies.push(result.content),
+    };
+    await handleCommand(interaction);
+    assert.equal(lookups, 1, commandName);
+    assert.deepEqual(replies, ['Couldn\'t find a start.gg player for `start.gg/user/nope1`. Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.']);
   }
 });
 
@@ -250,6 +285,32 @@ test('/link to a different profile says what it replaced', async () => {
   assert.equal(state.links['me-discord'].userId, 7);
 });
 
+test('/link with the profile left out finds your start.gg by the Discord connected there', async () => {
+  state.players = {};
+  state.links = {};
+  state.regReminders = {};
+  // seen in a tournament's participant list
+  state.accounts = { 'me-discord': 7 };
+  const requests = [];
+  mockApi(({ query, variables }) => {
+    requests.push(query.includes('user(slug:') ? variables.slug : 'profiles');
+    if (query.includes('user(slug:')) return { user: { id: 7, slug: 'user/me', player: { id: 70, gamerTag: 'Me' }, authorizations: [{ externalId: 'me-discord' }] } };
+    return { u7: { slug: 'user/me', player: { gamerTag: 'Me' }, authorizations: [{ externalId: 'me-discord' }] } };
+  });
+  const [linked] = (await run('link', 'me-discord')).embeds;
+  assert.equal(linked.data.title, 'Linked to Me');
+  assert.equal(state.links['me-discord'].playerId, 70);
+  // start.gg still has this discord on it, then the player behind it
+  assert.deepEqual(requests, ['profiles', 'user/me']);
+
+  // nobody saved for this discord, so there's nothing to ask start.gg
+  globalThis.fetch = async () => assert.fail('no start.gg lookup');
+  const missing = await run('link', 'stranger');
+  assert.match(missing, /^Couldn't find a start\.gg with this Discord connected.*run `\/link` with your profile link/);
+  assert.equal(state.links.stranger, undefined);
+  state.accounts = {};
+});
+
 test('/stream for someone from /link says there are no alerts instead of pretending', async () => {
   state.players = { 1: crew };
   state.links = { 'me-discord': me };
@@ -266,6 +327,50 @@ test('/sets for someone from /link says there are no results to change instead o
   assert.ok(reply.flags);
   assert.match(reply.content, /aren't tracked/);
   assert.equal(state.links['me-discord'].setResults, undefined);
+});
+
+test('/track add starts set results and stream alerts off and says how to turn them on', async () => {
+  state.players = {};
+  state.links = {};
+  state.tournaments = {};
+  // the second answer is for the tournament check it kicks off
+  mockApi(({ query }) => (query.includes('user(slug:') ? { user: { id: 8, slug: 'user/new', player: { id: 80, gamerTag: 'New' } } } : {}));
+  const reply = await run('track', 'someone', { profile: 'start.gg/user/new' }, 'add');
+  assert.match(reply.embeds[0].data.description, /^Now tracking \[New\].*\. Their placements post here\.\n-# Set results and stream alerts start off\. `\/sets` and `\/stream` turn them on$/);
+  assert.equal(state.players[8].setResults, false);
+  assert.equal(state.players[8].streamAlerts, false);
+  await settle();
+});
+
+test('/recent all asks about players with set results on first, since only their last set time stays fresh', async () => {
+  // the 40 with results off played later, as far as the set check last saw
+  state.players = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [100 + i,
+    { userId: 100 + i, playerId: 1000 + i, tag: `Off ${i}`, slug: `user/off${i}`, setResults: false, lastSetAt: 500 }]));
+  state.players[1] = { ...crew, lastSetAt: 100 };
+  const asked = [];
+  mockApi(({ query }) => {
+    asked.push(...[...query.matchAll(/(p\d+): player\(/g)].map(([, alias]) => alias));
+    return {};
+  });
+  assert.equal(await run('recent', 'someone', { player: 'all' }), 'No sets found.');
+  assert.equal(asked.length, 40);
+  assert.ok(asked.includes('p10'));
+});
+
+test('/track list only notes what differs from a new player', () => {
+  const [list] = embeds.trackedList({
+    1: { ...crew, setResults: false, streamAlerts: false },
+    2: { userId: 2, playerId: 20, tag: 'Old', slug: 'user/old' },
+    3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', setResults: true, streamAlerts: false },
+    4: { userId: 4, playerId: 40, tag: 'Streamer', slug: 'user/streamer', setResults: false, streamAlerts: true },
+  });
+  const [crewLine, oldLine, quietLine, streamerLine] = list.data.description.split('\n');
+  assert.equal(crewLine, '[Crew](https://www.start.gg/user/crew)');
+  // saved before either started off, so both still count as on
+  assert.match(oldLine, /\[Old\].* · set results on · stream alerts on$/);
+  assert.match(quietLine, /\[Quiet\].* · set results on$/);
+  assert.match(streamerLine, /\[Streamer\].* · stream alerts on$/);
+  assert.match(list.data.description, /plus their sets and streams once `\/sets` and `\/stream` turn them on/);
 });
 
 test('autocomplete explains an empty list instead of showing nothing', async () => {

@@ -132,3 +132,15 @@ test('after 10 minutes only their newest page gets asked for, and new sets show 
   assert.deepEqual(sets(asked, 99), [1]);
   assert.match(JSON.stringify(replies.at(-1).embeds.map((embed) => embed.toJSON())), /set\/99-new/);
 });
+
+test('/predict counts every meeting, not just the ones still in the histories', async () => {
+  // fresh ids so nothing is cached. every history set here is against player 5, so the only
+  // meetings are the two the opponent-filtered lookup finds, like ones older than either history
+  state.players = { 7: { userId: 7, playerId: 70, tag: 'Old', slug: 'user/old' }, 8: { userId: 8, playerId: 80, tag: 'Rival', slug: 'user/rival' } };
+  const asked = fakeStartgg({ 70: 2, 80: 2 });
+  const replies = await command('predict', { player: '7', opponent: '8' });
+  // pages 1 and 2 twice for player 70: once for the meetings, once for the history
+  assert.deepEqual(sets(asked, 70).toSorted(), [1, 1, 2, 2]);
+  assert.deepEqual(sets(asked, 80), [1, 2]);
+  assert.match(replies.at(-1).embeds[0].toJSON().description, /\*\*Head-to-head:\*\* \*\*Old\*\* leads 2-0/);
+});

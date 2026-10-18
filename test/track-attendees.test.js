@@ -81,8 +81,8 @@ test('queued attendees are added like /track add and the request is cleared', as
   importTrackRequest();
   assert.deepEqual(Object.keys(state.players), ['1', '2']);
   assert.equal(state.players[2].playerId, 20);
-  assert.equal(state.players[2].streamAlerts, true);
-  assert.equal(state.players[2].setResults, true);
+  assert.equal(state.players[2].streamAlerts, false);
+  assert.equal(state.players[2].setResults, false);
   assert.ok(state.players[2].lastCheck > 1);
   assert.equal(readTrackRequest(), null);
   assert.equal(existsSync(requestFile), false);

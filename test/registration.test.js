@@ -9,7 +9,7 @@ process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
-const { handleCommand } = await import('../src/commands/index.js');
+const { handleAutocomplete, handleCommand } = await import('../src/commands/index.js');
 const { queueLength } = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -245,13 +245,14 @@ test('set_reg_reminder tracks everyone registered for the tournament', async () 
   // the TO-added entry has no account, so there's nothing to track
   assert.deepEqual(Object.keys(state.players).sort(), ['1', '2', '3']);
   assert.equal(state.players[1].playerId, 10);
-  assert.equal(state.players[1].streamAlerts, true);
-  assert.equal(state.players[1].setResults, true);
+  // the set and stream checks skip them until /sets and /stream turn those on
+  assert.equal(state.players[1].streamAlerts, false);
+  assert.equal(state.players[1].setResults, false);
   assert.ok(state.players[1].lastCheck >= now);
   assert.ok(state.regReminders[5]);
   // the reminder's own channel send can land anywhere around the reply
   const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1], /sending the last call now\. 3 players from Local are now tracked\./);
+  assert.match(edit[1], /sending the last call now\. 3 players from Local are now tracked, with set results and stream alerts off\./);
 });
 
 test('set_reg_reminder still sets the reminder when the list is hidden, tracking nobody', async () => {
@@ -265,6 +266,62 @@ test('set_reg_reminder still sets the reminder when the list is hidden, tracking
   assert.ok(state.regReminders[5]);
   const edit = run.calls.find(([kind]) => kind === 'edit');
   assert.doesNotMatch(edit[1], /now tracked/);
+});
+
+async function autocomplete(commandName, typed) {
+  let choices;
+  await handleAutocomplete({ commandName, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async (result) => { choices = result; } });
+  return choices;
+}
+
+test('tournament options offer reminders and tracked players\' tournaments, soonest first, without finished ones', async () => {
+  const day = 86400;
+  state.regReminders = {
+    5: { id: 5, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600 },
+    // a reg admin's, before the reminder check fills in its dates
+    8: { id: 8, slug: 'tournament/admin-weekly', name: 'Admin Weekly' },
+  };
+  state.tournaments = {
+    5: { id: 5, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600 },
+    6: { id: 6, slug: 'tournament/live', name: 'Live Now', startAt: now - 3600, endAt: now + 3600 },
+    7: { id: 7, slug: 'tournament/last-week', name: 'Last Week', startAt: now - 8 * day, endAt: now - 7 * day },
+    9: { id: 9, slug: 'tournament/next-month', name: 'Next Month', startAt: now + 30 * day, endAt: now + 30 * day + 3600 },
+  };
+  const names = async (commandName, typed) => (await autocomplete(commandName, typed)).map(({ name }) => name);
+  assert.deepEqual(await autocomplete('registered', ''), [
+    { name: 'Live Now', value: 'tournament/live' }, { name: 'Local', value: 'tournament/local' },
+    { name: 'Next Month', value: 'tournament/next-month' }, { name: 'Admin Weekly', value: 'tournament/admin-weekly' },
+  ]);
+  assert.deepEqual(await names('reg_warn', 'LOC'), ['Local']);
+  // a pasted link to one it knows shows its name
+  assert.deepEqual(await names('registered', 'https://www.start.gg/tournament/live/details'), ['Live Now']);
+  // a new reminder only for ones that haven't started and don't have one
+  assert.deepEqual(await names('set_reg_reminder', ''), ['Next Month']);
+
+  // anything else typed comes back as it is, so a pasted link still goes through
+  assert.deepEqual(await autocomplete('registered', ' start.gg/tournament/genesis-x '), [{ name: 'start.gg/tournament/genesis-x', value: 'start.gg/tournament/genesis-x' }]);
+  state.regReminders = {};
+  state.tournaments = {};
+  assert.deepEqual(await autocomplete('set_reg_reminder', ''), [{ name: 'No tournaments to pick yet, paste a start.gg link', value: 'none' }]);
+});
+
+test('a picked tournament goes to start.gg by its slug, the same as a pasted link', async () => {
+  state.players = {};
+  state.regReminders = {};
+  mockStartgg();
+  // start.gg only knows it as local here. a reminder check from the tests above can still be asking in the background
+  const answer = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    if (query.includes('registrationClosesAt') && variables.slug !== 'local') return { ok: true, json: async () => ({ data: { tournament: null } }) };
+    return answer(url, options);
+  };
+  const picked = interaction('registered', { tournament: 'tournament/local' });
+  await handleCommand(picked);
+  const pasted = interaction('registered', { tournament: 'https://www.start.gg/tournament/local/details' });
+  await handleCommand(pasted);
+  assert.match(picked.calls.at(-1)[1].embeds[0].data.author.name, /Registered from this server · 1/);
+  assert.equal(JSON.stringify(picked.calls.at(-1)), JSON.stringify(pasted.calls.at(-1)));
 });
 
 // the reminder and tournament checks above run in the background, let them finish

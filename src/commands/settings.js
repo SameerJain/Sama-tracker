@@ -107,8 +107,8 @@ function socialsRemove(interaction) {
   return replyEphemeral(interaction, `Removed ${social.url} from ${social.name}.`);
 }
 
-// /stream and /sets: the same switch on a different field
-function toggles({ option, field, label }) {
+// /stream and /sets: the same switch on a different field. onAt saves when it went from off to on
+function toggles({ option, field, label, onAt }) {
   return (interaction) => {
     const choice = readChoice(interaction, 'player', { trackedOnly: true });
     if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
@@ -118,7 +118,11 @@ function toggles({ option, field, label }) {
     }
 
     const on = interaction.options.getString(option, true) === 'on';
-    for (const player of choice === 'all' ? Object.values(state.players) : [choice]) player[field] = on;
+    const now = secondsNow();
+    for (const player of choice === 'all' ? Object.values(state.players) : [choice]) {
+      if (on && onAt && player[field] === false) player[onAt] = now;
+      player[field] = on;
+    }
     save();
 
     return interaction.reply(`${label} ${on ? 'on' : 'off'} for ${choice === 'all' ? 'everyone' : choice.tag}.`);
@@ -126,6 +130,7 @@ function toggles({ option, field, label }) {
 }
 
 const streamAlerts = toggles({ option: 'alerts', field: 'streamAlerts', label: 'Stream alerts' });
-const setResults = toggles({ option: 'results', field: 'setResults', label: 'Set results' });
+// the set check doesn't ask about players with results off, so this is how their older sets stay out
+const setResults = toggles({ option: 'results', field: 'setResults', label: 'Set results', onAt: 'setResultsOnAt' });
 
 export { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults };

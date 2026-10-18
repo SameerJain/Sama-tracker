@@ -71,6 +71,13 @@ export function startTracking(postChannel) {
   setInterval(importTrackRequest, 30 * 1000);
 }
 
+// /track add, /set_reg_reminder and the host tool all save this. set results and stream alerts start
+// off since everyone with them on goes in the set or stream check every 2 minutes, and bulk adds made
+// that slow. /sets and /stream turn them on
+export function newTracked(player) {
+  return { ...player, lastCheck: secondsNow(), streamAlerts: false, setResults: false };
+}
+
 // players queued by tools/track-attendees.js, added the same way /track add does and saved
 // before the request is cleared. the requests are only made by that tool, so keep it simple
 export function importTrackRequest() {
@@ -79,9 +86,7 @@ export function importTrackRequest() {
     if (!request) return;
 
     const adding = (request.players ?? []).filter((player) => player.userId && player.playerId && !state.players[player.userId]);
-    for (const player of adding) {
-      state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true, setResults: true };
-    }
+    for (const player of adding) state.players[player.userId] = newTracked(player);
     if (adding.length) {
       save();
       console.log(`${adding.length} player${adding.length === 1 ? '' : 's'} from ${request.source ?? 'a track request'} added to the track`);
@@ -195,18 +200,19 @@ async function updateProfiles() {
 export async function postNewSets(postChannel = channel) {
   const players = Object.values(state.players);
   const playerIds = players.map((player) => player.playerId);
-  const showingIds = new Set(players.filter(resultsOn).map((player) => player.playerId));
+  // only players with results on get asked about, by playerId to when /sets turned them on
+  const showingSince = new Map(players.filter(resultsOn).map((player) => [player.playerId, player.setResultsOnAt ?? 0]));
   const checkedAt = secondsNow();
   // one request for everyone, so go from the oldest lastCheck
   const lastCheck = Math.min(checkedAt, ...players.map((player) => player.lastCheck));
   const since = Math.max(lastCheck, checkedAt - CATCH_UP_HOURS * HOUR);
   try {
     // 2 min overlap for sets reported during the last check
-    const sets = await startgg.getSets(playerIds, { since: since - 120 });
+    const sets = await startgg.getSets([...showingSince.keys()], { since: since - 120 });
     sets.sort((a, b) => a.completedAt - b.completedAt);
 
     for (const set of sets) {
-      // for /recent all
+      // for /recent all. results-off players only get it from a set against someone with them on
       for (const player of players) {
         if (!set.sides.some((side) => side.playerIds.includes(player.playerId))) continue;
         // edits bring back old sets
@@ -220,9 +226,9 @@ export async function postNewSets(postChannel = channel) {
       const dqed = set.sides.find((side) => side.score === -1);
       if (dqed && (!dqed.playerIds.some((id) => playerIds.includes(id)) || state.dqs.includes(dqed.id))) continue;
 
-      // everyone tracked in this set has results off, so it stays out of the channel.
-      // it still counts as posted so turning results back on only posts sets from then on
-      const showing = set.sides.some((side) => side.playerIds.some((id) => showingIds.has(id)));
+      // finished before /sets turned results on for everyone tracked in it, so it stays out of the channel.
+      // it still counts as posted so the next check doesn't look at it again
+      const showing = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
       if (showing && messageEnabled('sets', set.completedAt)) await postChannel.send({ embeds: [embeds.setResult(set, state.players)] });
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
@@ -300,12 +306,13 @@ function hasPlayerWithAlerts(set) {
   return set.sides.some((side) => players.some((player) => side.playerIds.includes(player.playerId)));
 }
 
+// /stream turns a player's stream alerts on. players saved before they started off have no field
 function alertsOn(player) {
   return Boolean(player) && player.streamAlerts !== false;
 }
 
-// /sets turns a player's automatic set results off
-function resultsOn(player) {
+// /sets turns a player's automatic set results on. players saved before they started off have no field
+export function resultsOn(player) {
   return Boolean(player) && player.setResults !== false;
 }
 

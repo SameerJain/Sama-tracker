@@ -89,7 +89,7 @@ test('verbose says how the parts add up and how much a seed is worth', () => {
   assert.match(text, /\*\*Head-to-head:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
   assert.match(text, /\*\*Seeding and form:\*\* counts for \d+%/);
   assert.match(text, /\*\*Starting from even:\*\* counts for \d+%/);
-  assert.match(text, /when one seed number was double the other's, the player with the lower one won \d+% of the time/);
+  assert.match(text, /Going by the 8 seeded sets the two of them played in Ultimate, when one seed number is double the other's, the player with the lower one wins about \d+%/);
   assert.match(text, /Seeding:\*\* \*\*A\*\* got the better seed in 8 of 8 shared brackets, \*\*B\*\*'s average seed number was 3\.0x \*\*A\*\*'s/);
   const short = embeds.prediction(a, b, odds, false)[0].data.description;
   assert.match(short, /Form, last 40 sets:/);
@@ -111,4 +111,42 @@ test('common opponents name who did better and how many are even', () => {
   const short = embeds.prediction(a, b, odds, false)[0].data.description;
   assert.equal(odds.common.total, 2);
   assert.match(short, /Common opponents:\*\* 2 shared\. \*\*A\*\* did better against 1, \*\*B\*\* against 0, even against the other 1/);
+});
+
+test('a game one of them only got DQ\'d in doesn\'t get picked over one they both played', () => {
+  // a mostly plays Ultimate and has one Melee set. b's only Ultimate sets are DQs, and b plays Melee
+  const dq = (me, them) => {
+    const each = set(me, them, true);
+    each.sides[1].score = -1;
+    return each;
+  };
+  const historyA = [...Array.from({ length: 6 }, (_, i) => set(1, 50 + i, true)), set(1, 9, true, { game: 'Melee' })];
+  const historyB = [dq(2, 60), dq(2, 61), ...Array.from({ length: 4 }, () => set(2, 9, false, { game: 'Melee' }))];
+  const odds = predict(a, b, historyA, historyB, { now });
+  assert.equal(odds.game, 'Melee');
+  assert.equal(odds.common.total, 1);
+});
+
+test('meetings older than either history still count, once each', () => {
+  const recent = Array.from({ length: 2 }, (_, i) => set(1, 2, i === 0, { daysAgo: 10 + i }));
+  // the 600 sets in a history can end before these. the first two are the ones the histories have
+  const older = Array.from({ length: 6 }, (_, i) => set(1, 2, true, { daysAgo: 400 + i }));
+  const historyA = [...recent, ...Array.from({ length: 4 }, (_, i) => set(1, 70 + i, true))];
+  const historyB = mirror(recent);
+  const without = predict(a, b, historyA, historyB, { now });
+  const odds = predict(a, b, historyA, historyB, { now, meetings: [...recent, ...older] });
+  assert.deepEqual(without.h2h, { wins: 1, total: 2 });
+  assert.deepEqual(odds.h2h, { wins: 7, total: 8 });
+  assert.ok(odds.chance > without.chance + 0.1, `${without.chance} -> ${odds.chance}`);
+  // from b's side the same meetings flip
+  const flipped = predict(b, a, historyB, historyA, { now, meetings: mirror([...recent, ...older]) });
+  assert.ok(Math.abs(odds.chance + flipped.chance - 1) < 1e-9);
+});
+
+test('the seeding note doesn\'t count sets it doesn\'t have', () => {
+  const sets = Array.from({ length: 4 }, (_, i) => set(1, 2, i < 3, { event: `n${i}` }));
+  const odds = predict(a, b, sets, mirror(sets), { now });
+  assert.equal(odds.seededSets, 0);
+  const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
+  assert.match(text, /With none of their Ultimate sets seeded, when one seed number is double the other's, the player with the lower one wins about 67%/);
 });

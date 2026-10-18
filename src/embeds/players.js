@@ -43,7 +43,7 @@ export function headToHead(a, b, sets, { verbose = false, melee = false, otherGa
 
   const shown = verbose ? results : results.slice(0, 10);
   lines.push(...shown.map(meetingLine));
-  if (shown.length < results.length) lines.push(`-# ${count(results.length - shown.length, 'older set')} not shown, \`verbose:True\` lists them all`);
+  if (shown.length < results.length) lines.push(`-# ${count(results.length - shown.length, 'older set')} not shown, Full report lists them all`);
   if (leftOut) lines.push(`-# Melee only, ${leftOut}`);
   return withLines(embed, lines);
 }
@@ -147,8 +147,11 @@ export function prediction(a, b, odds, verbose) {
   section(lines, 'Common opponents', commonOpponentLines(odds, tagA, tagB));
   section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
     .map(({ slug, name, a: x, b: y }) => `[${escapeMarkdown(name)}](${startggUrl(slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
-  lines.push(`-# Newer sets count more, a year old counts half. In ${escapeMarkdown(odds.game)}, across the ${count(odds.seededSets, 'seeded set')} `
-    + `the two of them played, when one seed number was double the other's, the player with the lower one won ${percent(odds.seedEdge, 1)} of the time, which is how much seeding counts`);
+  // seedEdge is an estimate that starts at 67% and moves with their seeded sets, not a count of what happened
+  const game = escapeMarkdown(odds.game);
+  const basis = odds.seededSets ? `Going by the ${count(odds.seededSets, 'seeded set')} the two of them played in ${game}` : `With none of their ${game} sets seeded`;
+  lines.push(`-# Newer sets count more, a year old counts half. ${basis}, when one seed number is double the other's, `
+    + `the player with the lower one wins about ${percent(odds.seedEdge, 1)}. That's how much seeding counts`);
   return withLines(embed, lines);
 }
 
@@ -220,7 +223,7 @@ export function profile(account, member) {
 
 export function added(player) {
   const embed = baseEmbed(colors.brand)
-    .setDescription(`Now tracking ${playerLink(player)}.`);
+    .setDescription(`Now tracking ${playerLink(player)}. Their placements post here.\n-# Set results and stream alerts start off. \`/sets\` and \`/stream\` turn them on`);
   if (player.image) embed.setThumbnail(player.image);
   return embed;
 }

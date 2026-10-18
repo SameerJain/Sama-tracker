@@ -680,30 +680,85 @@ test('muted automatic messages are consumed without posting or replaying them la
   assert.equal(sent.length, 1);
 });
 
-test('set results off keeps a player\'s sets out and coming back on doesn\'t dump the backlog', async () => {
+// answers only for the players a query names, like start.gg does, and keeps who got asked about
+function mockSetCheck(nodesFor) {
+  const asked = [];
+  mockApi(({ query }) => {
+    const aliases = [...query.matchAll(/(p\d+): player\(/g)].map(([, alias]) => alias);
+    asked.push(aliases);
+    return Object.fromEntries(aliases.map(alias => [alias, { sets: { nodes: nodesFor[alias] ?? [] } }]));
+  });
+  return asked;
+}
+
+const setsCommand = (values) => {
+  const interaction = {
+    commandName: 'sets', user: { id: 'someone' },
+    options: { getSubcommand: () => null, getString: name => values[name] ?? null },
+    reply: async r => { interaction.replied = r; },
+  };
+  return handleCommand(interaction).then(() => interaction.replied);
+};
+
+test('set results off keeps a player out of the set check and /sets on doesn\'t dump the backlog', async () => {
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
   const channel = { send: async payload => sent.push(payload) };
   state.messages = {};
   state.players = {
     1: { ...crewPlayer, lastCheck: now - 120, setResults: false },
+    // saved before set results started off, so no field still means on
     2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastCheck: now - 120 },
   };
   state.posted = [];
   state.dqs = [];
-  mockApi(() => ({
-    p10: { sets: { nodes: [{ ...node('muted-set', now - 60), state: 3 }] } },
-    p20: { sets: { nodes: [{ ...node('shown-set', now - 60, 20), state: 3 }] } },
-  }));
+  const nodes = { p10: [{ ...node('while-off', now - 60), state: 3 }], p20: [{ ...node('shown-set', now - 60, 20), state: 3 }] };
+  const asked = mockSetCheck(nodes);
 
   await tracker.postNewSets(channel);
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].embeds[0].data.author.name, 'Rival');
+  assert.deepEqual(asked, [['p20']]);
+  assert.deepEqual(sent.map(({ embeds: [card] }) => card.data.author.name), ['Rival']);
 
-  // the fetch window covers the muted set again, but it stays skipped
-  state.players[1].setResults = true;
+  assert.equal(await setsCommand({ player: '1', results: 'on' }), 'Set results on for Active.');
+  assert.ok(state.players[1].setResultsOnAt >= now);
+
+  // the set from while they were off is in the fetch window now, but it stays out
   await tracker.postNewSets(channel);
+  assert.deepEqual(asked.at(-1), ['p10', 'p20']);
   assert.equal(sent.length, 1);
+  assert.ok(state.posted.includes('while-off'));
+
+  nodes.p10.push({ ...node('after-on', state.players[1].setResultsOnAt), state: 3 });
+  await tracker.postNewSets(channel);
+  assert.deepEqual(sent.map(({ embeds: [card] }) => card.data.author.name), ['Rival', 'Active']);
+});
+
+test('the set check sends nothing to start.gg when nobody has set results on', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...crewPlayer, lastCheck: now - 120, setResults: false } };
+  globalThis.fetch = async () => assert.fail('nobody to ask about');
+  await tracker.postNewSets({ send: async () => assert.fail('nothing to post') });
+  // still counts as a check, so a restart doesn't think the bot was down
+  assert.equal(tracker.health.setError, null);
+  assert.ok(state.players[1].lastCheck >= now);
+});
+
+test('/sets on only marks when results came on for players switching from off', async () => {
+  state.players = {
+    1: { ...crewPlayer, setResults: false },
+    2: { userId: 2, playerId: 20, tag: 'On', slug: 'user/on', setResults: true, setResultsOnAt: 5 },
+    3: { userId: 3, playerId: 30, tag: 'Old', slug: 'user/old' },
+  };
+  const now = Math.floor(Date.now() / 1000);
+  assert.equal(await setsCommand({ player: 'all', results: 'on' }), 'Set results on for everyone.');
+  assert.ok(state.players[1].setResultsOnAt >= now);
+  // already on, so sets they finished before this still count
+  assert.equal(state.players[2].setResultsOnAt, 5);
+  assert.equal(state.players[3].setResultsOnAt, undefined);
+  assert.ok(Object.values(state.players).every(player => player.setResults === true));
+
+  assert.equal(await setsCommand({ player: 'all', results: 'off' }), 'Set results off for everyone.');
+  assert.equal(state.players[1].setResults, false);
 });
 
 test('re-enabling between polls skips events that became due before re-enabling', async () => {
@@ -748,4 +803,53 @@ test('a set only waiting at the front of a stream queue still posts after stream
     : { p10: { sets: { nodes: [] } } }));
   await tracker.postStreamAlerts({ send: async payload => sent.push(payload) });
   assert.equal(sent.length, 1);
+});
+
+// a second card would have no title and split a section, so trim the text instead of growing past it
+test('/help fits in one card under discord\'s 4096', () => {
+  const cards = embeds.help();
+  assert.equal(cards.length, 1, `${cards.map(card => card.data.description).join('\n').length} chars`);
+  assert.equal(cards[0].data.title, 'Sama-tracker');
+});
+
+test('stream alerts start off, keeping a new player out of the stream check and their tournament\'s queues', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async payload => sent.push(payload) };
+  state.messages = {};
+  state.players = {
+    1: tracker.newTracked(crewPlayer),
+    // saved before stream alerts started off, so no field still means on
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival' },
+  };
+  state.streamed = [];
+  // only the new player is in it, so its stream queue isn't worth a request
+  state.tournaments = { 1: { id: 1, name: 'Local', startAt: now - 3600, endAt: now + 3600, entries: [{ userId: 1 }] } };
+  const live = (id, playerId) => ({ ...node(id, null, playerId), state: 2, updatedAt: now - 60, stream: { streamName: 'local', streamSource: 'TWITCH' } });
+  const nodes = { p10: [live('new-on-stream', 10)], p20: [live('rival-on-stream', 20)] };
+  const asked = [];
+  mockApi(({ query }) => {
+    if (query.includes('streamQueue')) {
+      asked.push('queue');
+      return { tournament: { streamQueue: [] } };
+    }
+    const aliases = [...query.matchAll(/(p\d+): player\(/g)].map(([, alias]) => alias);
+    asked.push(...aliases);
+    return Object.fromEntries(aliases.map(alias => [alias, { sets: { nodes: nodes[alias] } }]));
+  });
+  await tracker.postStreamAlerts(channel);
+  assert.deepEqual(asked, ['p20']);
+  assert.equal(sent.length, 1);
+
+  const interaction = {
+    commandName: 'stream', user: { id: 'someone' },
+    options: { getSubcommand: () => null, getString: name => ({ player: '1', alerts: 'on' })[name] ?? null },
+    reply: async r => { interaction.replied = r; },
+  };
+  await handleCommand(interaction);
+  assert.equal(interaction.replied, 'Stream alerts on for Active.');
+  // a set on stream right now is still worth announcing, so there's no cutoff like /sets has
+  await tracker.postStreamAlerts(channel);
+  assert.deepEqual(asked.slice(1).toSorted(), ['p10', 'p20', 'queue']);
+  assert.equal(sent.length, 2);
 });

@@ -2,7 +2,7 @@ import { MessageFlags, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
+import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, newTracked, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts } from '../accounts.js';
 import { findPlayer, lookup, replyEphemeral, sendEmbeds, flag } from './shared.js';
 
@@ -23,6 +23,30 @@ function tournamentSlug(input) {
 
 function tournamentNotFound(input) {
   return `Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`;
+}
+
+// autocomplete, so nobody has to paste a link for a tournament the bot already knows: ones with reminders
+// and ones tracked players are in, soonest first. a new reminder only offers upcoming ones without one.
+// a pasted link of one of them shows its name, and anything else typed is offered back as it is
+function tournamentChoices(typed, { newReminder = false } = {}) {
+  const now = secondsNow();
+  const search = typed.trim().toLowerCase();
+  const known = new Map();
+  for (const tournament of [...Object.values(state.regReminders), ...Object.values(state.tournaments)]) {
+    if (!tournament.slug || known.has(tournament.id)) continue;
+    // a reg admin's reminder has no dates until the next reminder check
+    if (tournament.startAt && endTime(tournament) < now) continue;
+    if (newReminder && (state.regReminders[tournament.id] || !(tournament.startAt > now))) continue;
+    known.set(tournament.id, tournament);
+  }
+  const choices = [...known.values()]
+    .filter((tournament) => tournament.name.toLowerCase().includes(search) || tournament.slug === `tournament/${tournamentSlug(search)}`)
+    .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity))
+    .map((tournament) => ({ name: tournament.name.slice(0, 100), value: tournament.slug }));
+  if (choices.length) return choices.slice(0, 25);
+  // picking the empty one gets the not found reply
+  if (!search) return [{ name: 'No tournaments to pick yet, paste a start.gg link', value: 'none' }];
+  return [{ name: typed.trim().slice(0, 100), value: typed.trim().slice(0, 100) }];
 }
 
 async function setRegReminder(interaction) {
@@ -49,14 +73,12 @@ async function setRegReminder(interaction) {
   // inside the last call window it goes out now
   checkRegReminders();
 
-  // everyone registered gets tracked too, so their sets post like anyone else's
+  // everyone registered gets tracked too, the same as /track add
   let added = 0;
   try {
     const adding = (await startgg.getAttendees(tournament.id))
       .filter((attendee) => attendee.userId && attendee.playerId && !state.players[attendee.userId]);
-    for (const player of adding) {
-      state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true, setResults: true };
-    }
+    for (const player of adding) state.players[player.userId] = newTracked(player);
     if (adding.length) {
       save();
       // don't wait 15 min for their tournaments to show up
@@ -68,8 +90,8 @@ async function setRegReminder(interaction) {
     console.error(`tracking registrants for ${tournament.name} failed:`, err.message);
   }
   const tracked = added === 1
-    ? ` 1 player from ${tournament.name} is now tracked.`
-    : added ? ` ${added} players from ${tournament.name} are now tracked.` : '';
+    ? ` 1 player from ${tournament.name} is now tracked, with set results and stream alerts off.`
+    : added ? ` ${added} players from ${tournament.name} are now tracked, with set results and stream alerts off.` : '';
 
   if (firstAt <= secondsNow()) {
     return interaction.editReply(`Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`);
@@ -239,4 +261,4 @@ async function regWarn(interaction) {
   if (!sent) return interaction.followUp(warning);
 }
 
-export { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn };
+export { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn, tournamentChoices };

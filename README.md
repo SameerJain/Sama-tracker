@@ -10,7 +10,7 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 
 ## Use the bot
 
-**Track a player** to post their sets, stream alerts, and placements in the channel. Anyone can add a player with `/track add`.
+**Track a player** to post their placements in the channel. Anyone can add a player with `/track add`. Set results and stream alerts start off; `/sets` and `/stream` turn them on.
 
 **Link yourself** to use player lookups without automatic posts. Connect Discord on your start.gg profile, then run `/link`. Tracked players with Discord connected can already use these lookups without linking.
 
@@ -19,23 +19,23 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 - `profile` accepts a start.gg profile link or its final ID, such as `start.gg/user/f64a83c8` or `f64a83c8`. `/scout` also accepts a tracked or linked player.
 - The `player` and `opponent` pickers include tracked and linked players. `/track remove`, `/stream`, and `/sets` accept tracked players only. Leave an optional `player` blank to look yourself up.
 - `player:all` works with `/upcoming`, `/recent`, `/stream`, and `/sets`, and includes everyone tracked.
-- `verbose:True` adds the details shown in the stats table below. Leave it out for the short report.
+- `verbose:True` adds the details shown in the stats table below. Leave it out for the short report, which has a **Full report** button that replaces it with the verbose report.
 - `melee:True` limits `/stats`, `/h2h`, `/predict`, `/scout`, and `/progress` to Melee. `/characters` uses `game:Melee` or `game:Ultimate` instead.
 
 ### Tracking and accounts
 
 | Command | What it does |
 | --- | --- |
-| `/track add profile:<link or ID>` | Start automatic posts for a player. |
+| `/track add profile:<link or ID>` | Start automatic posts for a player. Set results and stream alerts start off. |
 | `/track remove player:<name>` | Stop tracking them. |
-| `/track list` | List tracked players and any muted alerts. |
-| `/link profile:<link or ID>` | Link your own start.gg account. |
+| `/track list` | List tracked players, noting who has set results or stream alerts on. |
+| `/link profile:<link or ID>` | Link your own start.gg account. Leave out `profile` to find it by the Discord connected on start.gg, among the accounts `/profile` searches. |
 | `/unlink` | Remove your link. This does not stop tracking. |
 | `/upcoming` | Show live and upcoming tournaments. |
-| `/recent` | Show your last 5 sets. With `player:all`, show up to 20, at most 3 per player. |
+| `/recent` | Show your last 5 sets. With `player:all`, show up to 20, at most 3 per player, from up to 40 players: set results on first, then whoever played most recently. |
 | `/run` | Show your run and next opponent in each current bracket. |
-| `/stream player:<name or all> alerts:<on or off>` | Change stream alerts for tracked players. |
-| `/sets player:<name or all> results:<on or off>` | Change automatic set results for tracked players. |
+| `/stream player:<name or all> alerts:<on or off>` | Change stream alerts for tracked players. Newly tracked players start with them off. |
+| `/sets player:<name or all> results:<on or off>` | Change automatic set results for tracked players. Newly tracked players start with them off. Sets finished before you turn them on are not posted. |
 
 Anyone can change `/stream` and `/sets` for tracked players. Use `/messages` for server-wide controls.
 
@@ -50,7 +50,7 @@ Anyone can change `/stream` and `/sets` for tracked players. Use `/messages` for
 | `/progress` | Last 30 days against the previous 30, with changes in win rates and placements. | More detail on each period and a 6-month trend. |
 | `/characters` | Reported characters in Ultimate or Melee. | More history and other games with reported characters. |
 
-Add `player:<name or link/ID>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/h2h` odds run the same prediction as `/predict` but stay one line. `verbose:True` doesn't change them, use `/predict` for the reasoning. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
+Add `player:<name or link/ID>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/h2h` odds run the same prediction as `/predict` but stay one line. `verbose:True` doesn't change them; the **Why these odds** button under the card posts the `/predict` reasoning. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
 
 These reports count singles and leave DQs out of set records. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
 
@@ -68,7 +68,9 @@ These reports count singles and leave DQs out of set records. Characters and sta
 | `/registered tournament:<link>` | List registered server members. Add `by_event:True` to group them by event. |
 | `/reg_warn tournament:<link> user:<@someone>` | Ping someone with a registration link if they have not registered. |
 
-Reminders go out 7 days, 3 days, 1 day, and 12 hours before registration closes. If registration extends past the tournament start, the start is the deadline. Past reminders are skipped; a last call set within 12 hours goes out immediately. Setting a reminder also tracks everyone registered for the tournament, so their sets post.
+`tournament` takes a start.gg link, or pick a tournament the bot already knows: ones with reminders and ones tracked players are in, soonest first. `/set_reg_reminder` offers only upcoming ones without a reminder.
+
+Reminders go out 7 days, 3 days, 1 day, and 12 hours before registration closes. If registration extends past the tournament start, the start is the deadline. Past reminders are skipped; a last call set within 12 hours goes out immediately. Setting a reminder also tracks everyone registered for the tournament, with set results and stream alerts off.
 
 Connect Discord on start.gg so the bot can recognize your registration and skip your reminder pings. Hidden entrant lists can prevent these checks. `/reg_warn` sends no ping if registration is closed, the person is registered, or the list is hidden. `/registered` lists names without pinging anyone.
 
@@ -84,7 +86,7 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional; links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |
 
-`/profile` checks the Discord connected on start.gg and searches accounts the bot has already seen: tracked players, people who used `/link` and people registered for a tournament the bot checks. If it cannot find you, connect Discord on start.gg and run `/link`. Someone else has to be on that list first, then `/profile @them` finds them. Or pick them straight from the tracked and linked list with `player:`, no Discord matching needed.
+`/profile` checks the Discord connected on start.gg and searches accounts the bot has already seen: tracked players, people who used `/link` and people registered for a tournament the bot checks. If it cannot find you, connect Discord on start.gg and run `/link` with your profile link. Someone else has to be on that list first, then `/profile @them` finds them. Or pick them straight from the tracked and linked list with `player:`, no Discord matching needed.
 
 `/messages` requires **Manage Server**. `/socials_edit` requires it by default; you can delegate that command under Server Settings > Integrations > Sama-tracker.
 
@@ -100,12 +102,14 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 
 | Type | When it posts |
 | --- | --- |
-| Set results | After a tracked player finishes a set. Only their first DQ per event is posted. |
-| Stream alerts | When their set is on stream, called, or next in the stream queue. |
+| Set results | After a tracked player with `/sets` on finishes a set. Only their first DQ per event is posted. |
+| Stream alerts | When a tracked player with `/stream` on has a set on stream, called, or next in the stream queue. |
 | Tournament roll calls | An hour before a tournament with at least 3 tracked players. |
 | Tournament placements | 12 hours after the tournament ends, or up to 24 hours if results are incomplete. Unfinished placements are marked as projected. |
 | Registration reminders | At the deadlines listed above, for people who enabled `/reg_role` pings. |
 | Weekly recap | Sunday at 9 pm New York time by default: results, highlights, and next week's entries. Only tracked players with a non-DQ singles set that week are included. |
+
+Set results and stream alerts start off for newly tracked players. The set and stream checks run every 2 minutes and ask start.gg about each player with that switch on, 20 players per request, so keeping them off keeps those checks small however many players are tracked.
 
 Run `/messages` without options to see the current settings. Change any combination of the six switches: `sets`, `streams`, `rollcall`, `results`, `registration`, and `recap`.
 
@@ -164,7 +168,7 @@ A push to master redeploys it automatically.
 Add everyone at a tournament to the track from the bot's host, without using Discord. Run `npm run track` (or `node tools/track-attendees.js` in the app folder) and paste a start.gg tournament link when it asks.
 
 - A link from the tournament's attendees page adds just the events that page is filtered to. A plain tournament link adds everyone registered. Example filter: `start.gg/tournament/smashcade-2-4/attendees?filter={"eventIds":["1682422"]}`.
-- Already tracked players are skipped, and attendees without a start.gg account are left out.
+- Already tracked players are skipped, and attendees without a start.gg account are left out. New players start with set results and stream alerts off, as with `/track add`.
 - The bot adds queued players within 30 seconds on its host and the tool reports how many. Players queued while the bot is down are added on its next start.
 
 On Railway, run `railway ssh`, then `npm run track` or `node tools/track-attendees.js`.
@@ -183,13 +187,13 @@ First lookups can take tens of seconds or about a minute for a large report. sta
 | `/stats` | Latest 15 standings and 30 singles sets. With `melee:True`, standings are game-filtered and older pages are read for 30 Melee sets, or all available if fewer. |
 | `/stats verbose:True` | Every finished singles event and up to 3,000 sets. |
 | `/h2h` | All available meetings against the selected opponent, plus up to 600 sets per player for one-line predicted odds, in either report length. |
-| `/predict` | Up to 600 sets per player. Verbose explains the same prediction. |
+| `/predict` | Every meeting between the two players, plus up to 600 sets per player. Verbose explains the same prediction. |
 | `/scout` | Up to 600 sets per player and 400 sets for the opponent's characters. |
 | `/scout verbose:True` | Up to 1,200 opponent sets, 800 for characters and stages, every finished event, and 600 of your sets. |
 | `/characters` | Up to 400 sets, or 1,600 with verbose. Verbose shows up to 6 games. |
 | `/progress` | 60 days, or 180 with verbose, split into 30-day periods. |
 
-`melee:True` filters the history each report checks. The limits above still apply. `/h2h` checks every meeting; short `/stats` reads back far enough to fill its Melee set window when possible.
+`melee:True` filters the history each report checks. The limits above still apply. `/h2h` and `/predict` check every meeting; short `/stats` reads back far enough to fill its Melee set window when possible.
 
 Progress placements count toward the period when the event started. Average finishes account for bracket size. Seed comparisons use placement tiers, so seed 6 finishing 5th counts as on seed.
 

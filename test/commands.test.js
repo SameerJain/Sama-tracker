@@ -11,7 +11,7 @@ process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
-const { commands, handleCommand } = await import('../src/commands/index.js');
+const { commands, handleButton, handleCommand } = await import('../src/commands/index.js');
 const startgg = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -134,10 +134,12 @@ const runs = [
   ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
-  ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\]/],
+  ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results and stream alerts start off/],
   ['track', { subcommand: 'list' }, /Tracking 3/],
   ['track', { subcommand: 'remove', values: { player: '3' } }, /Stopped tracking Opponent/],
   ['link', { values: { profile: 'start.gg/user/opponent' }, user: 'opponent-discord' }, /Linked to Opponent/],
+  // left out, it searches the accounts the bot has seen, and nobody has this discord
+  ['link', { user: 'stranger-discord' }, /Couldn't find a start\.gg with this Discord connected/],
   ['unlink', { user: 'opponent-discord' }, /Unlinked from Opponent/],
   ['profile', {}, /"title":"Crew","url":"https:\/\/www\.start\.gg\/user\/crew"/],
   ['profile', { values: { player: '2' } }, /"title":"Rival","url":"https:\/\/www\.start\.gg\/user\/rival"/],
@@ -213,4 +215,70 @@ test('every command and subcommand answers without throwing', async () => {
 
   // let the background checks finish while the fake is still in place
   while (startgg.queueLength() || Date.now() - lastFetch < 2000) await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+// a press of a button on the message a command answered with
+function press(message, label) {
+  const button = message.components.flatMap((row) => row.toJSON().components).find((each) => each.label === label);
+  assert.ok(button, `no ${label} button`);
+  const calls = [];
+  const run = {
+    customId: button.custom_id, calls, waitedOn: [], user: { id: 'crew-discord' },
+    message: { content: '', embeds: message.embeds, components: message.components, flags: { has: () => false } },
+    isButton: () => true,
+    deferUpdate: async () => { calls.push(['update']); run.deferred = true; },
+    deferReply: async () => { calls.push(['defer']); run.deferred = true; },
+    editReply: async (result) => calls.push(['edit', result]),
+    deleteReply: async () => calls.push(['delete']),
+    followUp: async (result) => calls.push(['followUp', result]),
+  };
+  return run;
+}
+
+// [command, options, button, what pressing it should show]
+const presses = [
+  ['stats', {}, 'Full report', /Lifetime stats/],
+  ['progress', {}, 'Full report', /Every 30 days, newest first/],
+  ['characters', {}, 'Full report', /Fox/],
+  ['scout', { values: { profile: '2' } }, 'Full report', /Crew vs Rival/],
+  ['h2h', { values: { opponent: '2' } }, 'Full report', /First played/],
+  ['h2h', { values: { opponent: '2' } }, 'Why these odds', /Crew \d+% · \d+% Rival/],
+  ['predict', { values: { opponent: '2' } }, 'Full report', /How it adds up/],
+];
+
+test('every report button answers the way its command would, and the full reports have no Full report button', async () => {
+  state.players = {
+    1: { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew', discordId: 'crew-discord', lastCheck: now },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastCheck: now },
+  };
+  state.links = {};
+
+  for (const [name, options, label, expected] of presses) {
+    const what = `/${name} ${label}`;
+    const command = interaction(name, options);
+    await runningCommand.run(command, () => handleCommand(command));
+    const message = command.calls.findLast(([kind, result]) => kind === 'edit' && result.components?.length)?.[1];
+    assert.ok(message, `/${name} has no buttons`);
+
+    const run = press(message, label);
+    await runningCommand.run(run, () => handleButton(run));
+    assert.deepEqual(run.waitedOn, [], `${what} waits on ${run.waitedOn.join(', ')} before answering, so discord can give up on it`);
+    const [, answer] = run.calls.findLast(([kind]) => kind === 'edit');
+    assert.match(JSON.stringify(answer), expected, what);
+    const buttons = JSON.stringify(answer.components);
+    if (label === 'Full report') {
+      // greyed out before anything else, so nobody presses it twice
+      assert.deepEqual(run.calls.slice(0, 2).map(([kind]) => kind), ['update', 'edit'], what);
+      assert.ok(run.calls[1][1].components.every((row) => row.components.every((button) => button.disabled)), what);
+      assert.doesNotMatch(buttons, /Full report/, what);
+    } else {
+      // a new message for /predict, with its own button
+      assert.equal(run.calls[0][0], 'defer', what);
+      assert.match(buttons, /Full report/, what);
+    }
+  }
+  // the verbose /h2h still offers the odds
+  const verbose = interaction('h2h', { values: { opponent: '2', verbose: true } });
+  await runningCommand.run(verbose, () => handleCommand(verbose));
+  assert.deepEqual(JSON.parse(JSON.stringify(verbose.calls.at(-1)[1].components))[0].components.map((button) => button.label), ['Why these odds']);
 });

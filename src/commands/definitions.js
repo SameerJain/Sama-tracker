@@ -17,6 +17,10 @@ const YOU_OR_ALL = 'Tracked or linked player, or all for everyone tracked. Leave
 const MATCHUP = 'Tracked or linked player to compare with, or a start.gg profile link or ID';
 const MATCHUP_YOU = 'Tracked or linked player, or a start.gg profile link or ID. Leave out for yourself';
 
+// picking one saves pasting a link, which is slow on a phone
+const KNOWN_TOURNAMENT = 'start.gg tournament link, or pick one with a reminder or tracked players in it';
+const UPCOMING_TOURNAMENT = 'start.gg tournament link, or pick an upcoming one tracked players are in';
+
 function verboseOption(description) {
   return { type: Option.Boolean, name: 'verbose', description };
 }
@@ -59,12 +63,12 @@ export const commands = [
   },
   {
     name: 'track',
-    description: 'Players whose sets, streams and placements get posted here',
+    description: 'Players whose placements get posted here, plus sets and streams with /sets and /stream on',
     options: [
       {
         type: Option.Subcommand,
         name: 'add',
-        description: 'Post a start.gg player\'s sets, streams and placements here',
+        description: 'Post a start.gg player\'s placements here. /sets and /stream turn on their sets and streams',
         options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
       },
       {
@@ -79,7 +83,7 @@ export const commands = [
   {
     name: 'link',
     description: 'Link your own start.gg so commands know who you are. Unlike /track, nothing gets posted',
-    options: [{ type: Option.String, name: 'profile', description: 'Your start.gg profile link or ID. It needs your Discord connected', required: true }],
+    options: [{ type: Option.String, name: 'profile', description: 'Your start.gg profile link or ID. Leave out to find it by the Discord connected on start.gg' }],
   },
   { name: 'unlink', description: 'Undo /link. Doesn\'t change whether you\'re tracked' },
   {
@@ -151,7 +155,7 @@ export const commands = [
   },
   {
     name: 'stream',
-    description: 'Turn on-stream alerts on or off',
+    description: 'Turn on-stream alerts on or off. Newly tracked players start with them off',
     options: [
       playerOption('Tracked player, or all'),
       {
@@ -165,7 +169,7 @@ export const commands = [
   },
   {
     name: 'sets',
-    description: 'Turn automatic set results on or off for a player',
+    description: 'Turn automatic set results on or off. Newly tracked players start with them off',
     options: [
       playerOption('Tracked player, or all'),
       {
@@ -181,7 +185,7 @@ export const commands = [
   {
     name: 'set_reg_reminder',
     description: 'Set a registration reminder and track everyone registered',
-    options: [{ type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true }],
+    options: [{ type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true }],
   },
   {
     name: 'delete_reg_reminder',
@@ -223,7 +227,7 @@ export const commands = [
     name: 'registered',
     description: 'Who in this server is registered for a tournament, going by the Discord on their start.gg',
     options: [
-      { type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true },
+      { type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true },
       { type: Option.Boolean, name: 'by_event', description: 'Each event with who\'s in it, instead of each person with their events' },
     ],
   },
@@ -231,7 +235,7 @@ export const commands = [
     name: 'reg_warn',
     description: 'Warn someone who isn\'t registered for a tournament yet. No ping if they are',
     options: [
-      { type: Option.String, name: 'tournament', description: 'start.gg tournament link', required: true },
+      { type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true },
       { type: Option.User, name: 'user', description: 'Who to check', required: true },
     ],
   },

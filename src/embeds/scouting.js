@@ -120,7 +120,7 @@ export function scout(player, opponent, mine, theirs, characterSets, { melee = f
     .map(([game, list]) => `**${escapeMarkdown(game)}:** ${recordOf(list)}`);
   section(lines, `You vs ${escapeMarkdown(opponent.tag)}`, h2h.length ? h2h
     : [melee ? 'You haven\'t played each other in Melee singles, as far back as this checks.' : 'You haven\'t played each other in singles, as far back as this checks.']);
-  lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date. \`verbose:True\` for the full report`);
+  lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date`);
   const card = baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(`Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug));
   if (opponent.image) card.setThumbnail(opponent.image);
   return withLines(card, lines);

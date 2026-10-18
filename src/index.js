@@ -1,5 +1,5 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
-import { commands, handleAutocomplete, handleCommand } from './commands/index.js';
+import { buttonFailed, commands, handleAutocomplete, handleButton, handleCommand } from './commands/index.js';
 import { asCommand, checkToken, commandProgress } from './startgg.js';
 import { startTracking } from './tracker.js';
 
@@ -53,7 +53,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await handleAutocomplete(interaction).catch(console.error);
     return;
   }
-  if (!interaction.isChatInputCommand()) return;
+  // a report's buttons run it again, so they wait their turn like commands
+  const button = interaction.isButton();
+  if (!interaction.isChatInputCommand() && !button) return;
 
   const userId = interaction.user.id;
   if (busy.has(userId)) {
@@ -67,19 +69,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const progress = commandProgress();
       const started = Date.now();
       try {
-        await handleCommand(interaction);
+        await (button ? handleButton(interaction) : handleCommand(interaction));
       } finally {
         const { sent, limited } = progress();
-        const verbose = interaction.options.getBoolean('verbose') ? ' verbose' : '';
         if (sent >= LOGGED_REQUESTS) {
-          console.log(`/${interaction.commandName}${verbose}: ${sent} start.gg requests in ${Math.round((Date.now() - started) / 1000)}s${limited ? `, rate limited ${limited} times` : ''}`);
+          console.log(`${described(interaction)}: ${sent} start.gg requests in ${Math.round((Date.now() - started) / 1000)}s${limited ? `, rate limited ${limited} times` : ''}`);
         }
       }
     });
   } catch (err) {
     console.error(err);
     const message = `Something went wrong: ${err.message}`;
-    if (interaction.replied) {
+    if (button) {
+      await buttonFailed(interaction, message).catch(console.error);
+    } else if (interaction.replied) {
       await interaction.followUp({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);
     } else if (interaction.deferred) {
       await interaction.editReply(message).catch(console.error);
@@ -90,6 +93,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     busy.delete(userId);
   }
 });
+
+// /stats verbose, or /stats button for its Full report
+function described(interaction) {
+  if (interaction.isButton()) return `/${interaction.customId.split(':')[1]} button`;
+  return `/${interaction.commandName}${interaction.options.getBoolean('verbose') ? ' verbose' : ''}`;
+}
 
 // log instead of crashing
 client.on(Events.Error, console.error);

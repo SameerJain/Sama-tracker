@@ -5,11 +5,12 @@ import * as embeds from '../embeds/index.js';
 import { state } from '../store.js';
 import { health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
+import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run } from './players.js';
-import { progress, scout, headToHead, stats, characters, predict } from './stats.js';
-import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn } from './registration.js';
+import { progress, scout, headToHead, stats, characters, predict, reports, NOT_LINKED } from './stats.js';
+import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn, tournamentChoices } from './registration.js';
 import { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults } from './settings.js';
-import { pickable, sendEmbeds } from './shared.js';
+import { pickable, sendEmbeds, readButton, playerBySlug, replyEphemeralAfterDefer } from './shared.js';
 
 export { commands } from './definitions.js';
 
@@ -17,6 +18,8 @@ export { commands } from './definitions.js';
 const TRACKED_ONLY = ['track remove', 'stream', 'sets'];
 // all means everyone tracked
 const TAKES_ALL = ['upcoming', 'recent', 'stream', 'sets'];
+// a tournament link, or one the bot already knows
+const TAKES_TOURNAMENT = ['set_reg_reminder', 'registered', 'reg_warn'];
 
 // "track add", or just the command for the ones without subcommands
 function commandName(interaction) {
@@ -25,7 +28,7 @@ function commandName(interaction) {
 }
 
 const handlers = new Map([
-  ['help', (interaction) => interaction.reply({ embeds: [embeds.help()] })],
+  ['help', (interaction) => sendEmbeds(interaction, embeds.help())],
   ['messages', configureMessages],
   ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],
   ['socials_edit add', socialsAdd],
@@ -65,11 +68,50 @@ export async function handleCommand(interaction) {
   return handlers.get(commandName(interaction))?.(interaction);
 }
 
+// a report's button. more greys out the buttons and swaps the message for the full report, new answers with
+// another report. the button only has profile slugs, so the players get looked up again
+export async function handleButton(interaction) {
+  const { action, command, player, opponent, melee, game } = readButton(interaction.customId);
+  if (action === 'more') {
+    await interaction.deferUpdate();
+    await interaction.editReply({ components: disabled(interaction.message) });
+  } else {
+    await interaction.deferReply();
+  }
+  const report = reports[command];
+  if (!report || !['more', 'new'].includes(action)) return buttonFailed(interaction, 'That button doesn\'t work anymore, run the command again.');
+
+  // /scout compares with whoever ran it, and nobody else can see its buttons
+  const who = command === 'scout' ? await verifiedCaller(interaction.user.id) : player && await playerBySlug(player);
+  if (!who && command === 'scout') return buttonFailed(interaction, NOT_LINKED);
+  const against = opponent ? await playerBySlug(opponent) : null;
+  if (!who || (opponent && !against)) return buttonFailed(interaction, `Couldn't find that player on start.gg anymore. Run \`/${command}\` again.`);
+  return report(interaction, { player: who, opponent: against, verbose: action === 'more', melee, game });
+}
+
+// the same buttons, greyed out
+function disabled(message) {
+  return message.components.map((row) => {
+    const { components, ...rest } = row.toJSON();
+    return { ...rest, components: components.map((button) => ({ ...button, disabled: true })) };
+  });
+}
+
+// only whoever pressed it hears what went wrong. a report that was being swapped goes back the way it was
+export async function buttonFailed(interaction, content) {
+  if (readButton(interaction.customId).action !== 'more' || !interaction.deferred) return replyEphemeralAfterDefer(interaction, content);
+  const { message } = interaction;
+  await interaction.editReply({ content: message.content || null, embeds: message.embeds, components: message.components });
+  return interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+}
+
 export async function handleAutocomplete(interaction) {
   const focused = interaction.options.getFocused();
   const typed = focused.toLowerCase();
   const name = commandName(interaction);
   const choices = [];
+
+  if (TAKES_TOURNAMENT.includes(name)) return interaction.respond(tournamentChoices(focused, { newReminder: name === 'set_reg_reminder' }));
 
   if (name === 'delete_reg_reminder') {
     for (const reminder of Object.values(state.regReminders)) {

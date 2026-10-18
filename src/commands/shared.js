@@ -1,4 +1,4 @@
-import { MessageFlags } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state } from '../store.js';
@@ -46,14 +46,51 @@ function readPlayer(interaction, name = 'player', options = {}) {
   return choice === 'all' ? undefined : choice;
 }
 
-// whatever doesn't fit in the reply goes in follow-ups, which are only ephemeral when asked
-async function sendEmbeds(interaction, list) {
+// discord.js only knows for replies it sent itself, so a pressed button goes by the message it's on
+function isEphemeral(interaction) {
+  return Boolean(interaction.ephemeral ?? interaction.message?.flags.has(MessageFlags.Ephemeral));
+}
+
+// whatever doesn't fit in the reply goes in follow-ups, which are only ephemeral when the reply is.
+// buttons go under the reply, and leaving them out clears the ones a pressed button's message had
+async function sendEmbeds(interaction, list, components = []) {
   for (const [i, batch] of embeds.messages(list).entries()) {
-    if (i > 0) await interaction.followUp({ embeds: batch, ...(interaction.ephemeral && { flags: MessageFlags.Ephemeral }) });
+    if (i > 0) await interaction.followUp({ embeds: batch, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
     // null clears a countdown from withCountdown
-    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch });
-    else await interaction.reply({ embeds: batch });
+    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components });
+    else await interaction.reply({ embeds: batch, components });
   }
+}
+
+// a button that runs a report again. discord keeps nothing but its id, so that holds everything:
+// action:command:player:opponent:melee:game, with players as profile slugs so anyone start.gg has still
+// works after a restart. more swaps the message for the full report, new answers with another report.
+// null when it won't fit in discord's 100 characters
+function reportButton(label, action, command, { player = null, opponent = null, melee = false, game = null } = {}) {
+  const slug = (who) => who?.slug?.replace(/^user\//, '') ?? '';
+  if ((player && !slug(player)) || (opponent && !slug(opponent))) return null;
+  const id = [action, command, slug(player), slug(opponent), melee ? 'melee' : '', game ?? ''].join(':');
+  if (id.length > 100) return null;
+  return new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(ButtonStyle.Secondary);
+}
+
+// under a short report, the same as running it with verbose:True
+const fullReport = (command, options) => reportButton('Full report', 'more', command, options);
+
+// the row the buttons go in, or none when there aren't any
+function buttonRow(...buttons) {
+  const shown = buttons.filter(Boolean);
+  return shown.length ? [new ActionRowBuilder().addComponents(shown)] : [];
+}
+
+function readButton(customId) {
+  const [action, command, player, opponent, melee, game] = customId.split(':');
+  return { action, command, player, opponent, melee: melee === 'melee', game: Number(game) || null };
+}
+
+// a player from a button: someone tracked or linked, or anyone start.gg still has
+async function playerBySlug(slug) {
+  return Object.values(pickable()).find((player) => player.slug === `user/${slug}`) ?? startgg.getPlayer(slug);
 }
 
 // about 40 seconds, about 3 minutes
@@ -143,4 +180,7 @@ async function replyEphemeralAfterDefer(interaction, content) {
 // a boolean option, false when left out
 const flag = (interaction, name) => interaction.options.getBoolean(name) ?? false;
 
-export { pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag };
+export {
+  pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag,
+  reportButton, fullReport, buttonRow, readButton, playerBySlug,
+};

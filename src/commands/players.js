@@ -2,7 +2,7 @@ import { MessageFlags, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { RUNS_LATE_HOURS, checkTournaments, endTime, secondsNow } from '../tracker.js';
+import { RUNS_LATE_HOURS, checkTournaments, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
 import { findAccount } from '../accounts.js';
 import { findPlayer, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
 
@@ -19,7 +19,7 @@ async function trackAdd(interaction) {
     return interaction.editReply(`Already tracking ${player.tag}.`);
   }
 
-  state.players[player.userId] = { ...player, lastCheck: secondsNow(), streamAlerts: true, setResults: true };
+  state.players[player.userId] = newTracked(player);
   save();
   await interaction.editReply({ embeds: [embeds.added(player)] });
 
@@ -43,10 +43,10 @@ async function link(interaction) {
   const tracked = Object.values(state.players).find((player) => player.discordId === interaction.user.id);
   if (tracked) return replyEphemeral(interaction, noLinkNeeded(tracked));
 
-  const input = interaction.options.getString('profile', true);
+  const input = interaction.options.getString('profile');
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const player = await findPlayer(interaction, input, 'your');
+  const player = input ? await findPlayer(interaction, input, 'your') : await ownAccount(interaction);
   if (!player) return;
   if (player.discordId !== interaction.user.id) {
     return interaction.editReply(player.discordId
@@ -68,6 +68,18 @@ async function link(interaction) {
     return interaction.editReply(`Already linked to ${player.tag}. Leave the player out of a command like \`/stats\` to look yourself up.`);
   }
   return interaction.editReply({ embeds: [embeds.linked(player, previous)] });
+}
+
+// /link with the profile left out, so nobody has to copy a link over. start.gg can't be searched by
+// discord, so it's the same search /profile does: accounts the bot has already seen. null and a reply if none
+async function ownAccount(interaction) {
+  const account = await findAccount(interaction.user.id);
+  const player = account && await startgg.getPlayer(account.slug);
+  if (!player) {
+    await interaction.editReply('Couldn\'t find a start.gg with this Discord connected among the accounts I\'ve seen. '
+      + 'Connect it on your start.gg profile if you haven\'t, then run `/link` with your profile link, like start.gg/user/f64a83c8.');
+  }
+  return player;
 }
 
 function noLinkNeeded(player) {
@@ -156,9 +168,12 @@ async function recent(interaction) {
   if (!choice) return replyNoPlayer(interaction);
 
   await interaction.deferReply();
-  // the latest 20 sets come from whoever played last, no need to ask about everyone
+  // the latest 20 sets come from whoever played last, no need to ask about everyone.
+  // the set check keeps lastSetAt fresh only for players with results on, so they go first
   const asking = choice === 'all'
-    ? Object.values(state.players).sort((a, b) => (b.lastSetAt ?? 0) - (a.lastSetAt ?? 0)).slice(0, RECENT_ALL_PLAYERS)
+    ? Object.values(state.players)
+      .sort((a, b) => resultsOn(b) - resultsOn(a) || (b.lastSetAt ?? 0) - (a.lastSetAt ?? 0))
+      .slice(0, RECENT_ALL_PLAYERS)
     : [choice];
   const perPlayer = choice === 'all' ? 3 : 5;
 
