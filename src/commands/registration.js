@@ -90,8 +90,8 @@ async function setRegReminder(interaction) {
     console.error(`tracking registrants for ${tournament.name} failed:`, err.message);
   }
   const tracked = added === 1
-    ? ` 1 player from ${tournament.name} is now tracked, with set results and stream alerts off.`
-    : added ? ` ${added} players from ${tournament.name} are now tracked, with set results and stream alerts off.` : '';
+    ? ` 1 player from ${tournament.name} is now tracked, with set results, stream alerts and match call pings off.`
+    : added ? ` ${added} players from ${tournament.name} are now tracked, with set results, stream alerts and match call pings off.` : '';
 
   if (firstAt <= secondsNow()) {
     return interaction.editReply(`Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`);

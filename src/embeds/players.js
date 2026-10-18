@@ -223,7 +223,7 @@ export function profile(account, member) {
 
 export function added(player) {
   const embed = baseEmbed(colors.brand)
-    .setDescription(`Now tracking ${playerLink(player)}. Their placements post here.\n-# Set results and stream alerts start off. \`/sets\` and \`/stream\` turn them on`);
+    .setDescription(`Now tracking ${playerLink(player)}. Their placements post here.\n-# Set results, stream alerts and match call pings start off. \`/sets\`, \`/stream\` and \`/calls\` turn them on`);
   if (player.image) embed.setThumbnail(player.image);
   return embed;
 }

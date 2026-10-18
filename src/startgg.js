@@ -26,6 +26,8 @@ let timer;
 // a command's queue also counts what it sent and how often start.gg said to slow down
 export const asCommand = (fn) => fromCommand.run(Object.assign([], { sent: 0, limited: 0 }), fn);
 export const inBackground = (fn) => fromCommand.run(background, fn);
+// slippi.js keeps its own line the same way
+export const isBackground = () => fromCommand.getStore() === background;
 export const queueLength = () => commandQueues.reduce((sum, queue) => sum + queue.length, background.length);
 
 // for the command that calls it, a function that says how many requests it has sent and has waiting, and
@@ -114,8 +116,8 @@ async function allPages(getPage) {
 
 // a bunch of lookups per request, aliased by id. start.gg's 1000 object limit counts what comes back
 // and most checks come back empty, so groups start big and get split in half when they go over
-async function lookupMany(ids, toQuery, variables) {
-  const results = await Promise.all(chunk(ids, 20).map((group) => lookupGroup(group, toQuery, variables)));
+async function lookupMany(ids, toQuery, variables, size = 20) {
+  const results = await Promise.all(chunk(ids, size).map((group) => lookupGroup(group, toQuery, variables)));
   return Object.assign({}, ...results);
 }
 
@@ -551,6 +553,12 @@ export async function getStreamedSets(playerIds) {
   return sets.filter((set) => set.stream?.streamName);
 }
 
+// called sets for match call pings. last hour only, since a set stays called until it starts
+export async function getCalledSets(playerIds) {
+  const since = Math.floor(Date.now() / 1000) - 60 * 60;
+  return getSets(playerIds, { since, perPage: 3, states: [6] });
+}
+
 function charactersPlayed(games, entrantId) {
   const names = new Set();
   for (const game of games ?? []) {
@@ -699,6 +707,29 @@ export async function getParticipants(tournamentId) {
   // TOs can add people who don't have an account
   return pages.flatMap((page) => page.nodes)
     .map((node) => ({ tag: node.gamerTag, userId: node.user?.id, discordId: node.user?.authorizations?.[0]?.externalId }));
+}
+
+// for /slippi: Map of playerId to the slippi connect code on their newest online singles sets. netplay
+// tournaments ask for it at registration and start.gg keeps it on the participant, so offline players
+// and ones who only play online in other games have none. a set here is about 9 objects, so 8 sets
+// each for 10 players stays under the limit
+export async function getConnectCodes(playerIds) {
+  const data = await lookupMany(playerIds, (group) => `{
+    ${group.map((id) => `p${id}: player(id: ${id}) { sets(perPage: 8, page: 1, filters: { state: [3], isEventOnline: true, entrantSize: [1] }) { nodes { slots { entrant { participants { player { id } connectedAccounts } } } } } }`).join('\n')}
+  }`, undefined, 10);
+
+  const codes = new Map();
+  for (const playerId of playerIds) {
+    for (const set of data[`p${playerId}`]?.sets?.nodes ?? []) {
+      const mine = set.slots?.flatMap((slot) => slot.entrant?.participants ?? []).find((participant) => String(participant.player?.id) === String(playerId));
+      const code = mine?.connectedAccounts?.slippi?.value;
+      if (code) {
+        codes.set(playerId, code);
+        break;
+      }
+    }
+  }
+  return codes;
 }
 
 // a TO can hide who's registered. start.gg then sends no participants and no count, which is only

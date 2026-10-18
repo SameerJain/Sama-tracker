@@ -63,12 +63,12 @@ export const commands = [
   },
   {
     name: 'track',
-    description: 'Players whose placements get posted here, plus sets and streams with /sets and /stream on',
+    description: 'Players whose placements get posted here, plus more with /sets, /stream and /calls on',
     options: [
       {
         type: Option.Subcommand,
         name: 'add',
-        description: 'Post a start.gg player\'s placements here. /sets and /stream turn on their sets and streams',
+        description: 'Post a start.gg player\'s placements here. /sets, /stream and /calls turn on more posts',
         options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
       },
       {
@@ -181,7 +181,46 @@ export const commands = [
       },
     ],
   },
-  { name: 'status', description: 'Uptime, when the latest version was deployed, and the last start.gg checks' },
+  {
+    name: 'calls',
+    description: 'Turn match call pings on or off. Newly tracked players start with them off',
+    options: [
+      playerOption('Tracked player, or all'),
+      {
+        type: Option.String,
+        name: 'pings',
+        description: 'on or off',
+        required: true,
+        choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
+      },
+    ],
+  },
+  {
+    name: 'slippi',
+    description: 'Slippi ranked: a watchlist with rank change posts, rank cards and a leaderboard',
+    options: [
+      {
+        type: Option.Subcommand,
+        name: 'add',
+        description: 'Add someone to the watchlist. Their rank changes get posted here',
+        options: [{ type: Option.String, name: 'code', description: 'Connect code like ABCD#123. Leave out to find yours on your start.gg', max_length: 60 }],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'remove',
+        description: 'Take someone off the watchlist',
+        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist', required: true, autocomplete: true }],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'rank',
+        description: 'Rank, rating, record, characters and past seasons',
+        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist or any connect code. Leave out for yourself', autocomplete: true }],
+      },
+      { type: Option.Subcommand, name: 'leaderboard', description: 'Everyone on the watchlist, best rank first' },
+    ],
+  },
+  { name: 'status', description: 'Uptime, when the latest version was deployed, and the last start.gg and Slippi checks' },
   {
     name: 'set_reg_reminder',
     description: 'Set a registration reminder and track everyone registered',

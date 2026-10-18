@@ -640,11 +640,12 @@ test('muted automatic messages are consumed without posting or replaying them la
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
   const channel = { send: async payload => sent.push(payload) };
-  state.players = { 1: { ...crewPlayer, lastCheck: now - 120 } };
-  state.messages = { sets: false, streams: false, rollcall: false, results: false, registration: false };
+  state.players = { 1: { ...crewPlayer, lastCheck: now - 120, callPings: true, discordId: 'crew-discord' } };
+  state.messages = { sets: false, streams: false, calls: false, rollcall: false, results: false, registration: false };
   state.posted = [];
   state.dqs = [];
   state.streamed = [];
+  state.called = [];
   state.tournaments = {};
   let current = { ...node('muted-set', now), state: 3 };
   mockApi(() => ({ p10: { sets: { nodes: [current] } } }));
@@ -662,6 +663,13 @@ test('muted automatic messages are consumed without posting or replaying them la
   assert.ok(state.streamed.includes('muted-stream'));
   state.messages.streams = true;
   await tracker.postStreamAlerts(channel);
+  assert.equal(sent.length, 1);
+
+  current = { ...node('muted-call', now), state: 6, updatedAt: now };
+  await tracker.postMatchCalls(channel);
+  assert.ok(state.called.includes('muted-call'));
+  state.messages.calls = true;
+  await tracker.postMatchCalls(channel);
   assert.equal(sent.length, 1);
 
   const upcoming = { startAt: now + 1800, entries: [1, 2, 3].map(userId => ({ userId })) };
@@ -793,17 +801,21 @@ test('re-enabling between polls skips events that became due before re-enabling'
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
   const channel = { send: async payload => sent.push(payload) };
-  state.messages = { enabledAt: Object.fromEntries(['sets', 'streams', 'rollcall', 'results', 'registration'].map(type => [type, now])) };
-  state.players = { 1: { ...crewPlayer, lastCheck: now - 120 } };
+  state.messages = { calls: true, enabledAt: Object.fromEntries(['sets', 'streams', 'calls', 'rollcall', 'results', 'registration'].map(type => [type, now])) };
+  state.players = { 1: { ...crewPlayer, lastCheck: now - 120, callPings: true, discordId: 'crew-discord' } };
   state.posted = [];
   state.dqs = [];
   state.streamed = [];
+  state.called = [];
   state.tournaments = {};
   let current = { ...node('unpolled-muted-set', now - 60), state: 3, updatedAt: now - 60 };
   mockApi(() => ({ p10: { sets: { nodes: [current] } } }));
   await tracker.postNewSets(channel);
   current = { ...current, id: 'unpolled-muted-stream', state: 2, stream: { streamName: 'example', streamSource: 'TWITCH' } };
   await tracker.postStreamAlerts(channel);
+  current = { ...current, id: 'unpolled-muted-call', state: 6, updatedAt: now - 60 };
+  await tracker.postMatchCalls(channel);
+  assert.ok(state.called.includes('unpolled-muted-call'));
   for (const userId of [2, 3]) state.players[userId] = { userId, playerId: userId * 10, tag: `Player ${userId}`, slug: `user/player${userId}` };
   await tracker.postRollCall({ name: 'Local', slug: 'tournament/local', startAt: now + 1800,
     entries: [1, 2, 3].map(userId => ({ userId, event: 'Singles', eventSlug: event.slug, entrants: 32 })) }, channel);
@@ -900,4 +912,147 @@ test('stream alerts start off, keeping a new player out of the stream check and 
   await tracker.postStreamAlerts(channel);
   assert.deepEqual(asked.slice(1).toSorted(), ['p10', 'p20', 'queue']);
   assert.equal(sent.length, 2);
+});
+
+test('match call pings start off and need the server switch too', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async payload => sent.push(payload) };
+  state.messages = { calls: true };
+  state.players = {
+    1: tracker.newTracked(crewPlayer),
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', discordId: 'rival-discord' },
+  };
+  state.called = [];
+  const called = (id, playerId) => ({ ...node(id, null, playerId), state: 6, updatedAt: now - 60 });
+  const asked = [];
+  mockApi(({ query }) => {
+    const aliases = [...query.matchAll(/(p\d+): player\(/g)].map(([, alias]) => alias);
+    asked.push(...aliases);
+    // newTracked starts with callPings off, and the old player never turned them on
+    return Object.fromEntries(aliases.map(alias => [alias, { sets: { nodes: [] } }]));
+  });
+  await tracker.postMatchCalls(channel);
+  assert.deepEqual(asked, []);
+  assert.equal(sent.length, 0);
+  assert.deepEqual(state.called, []);
+
+  // per-player on, but the server switch is off
+  state.players[1] = { ...state.players[1], callPings: true, discordId: 'crew-discord' };
+  state.messages = {};
+  mockApi(() => ({ p10: { sets: { nodes: [called('server-off', 10)] } } }));
+  await tracker.postMatchCalls(channel);
+  assert.ok(state.called.includes('server-off'));
+  assert.equal(sent.length, 0);
+});
+
+test('match call pings mention connected discords, one message per set', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async payload => sent.push(payload) };
+  state.messages = { calls: true };
+  state.players = {
+    1: { ...crewPlayer, callPings: true, discordId: 'crew-discord' },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', callPings: true, discordId: 'rival-discord' },
+    3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', callPings: true },
+  };
+  state.called = [];
+  // both tracked players in the same called set
+  const both = {
+    id: 'both-called', state: 6, completedAt: null, updatedAt: now - 60, fullRoundText: 'Winners round 1', winnerId: null, stream: null, event,
+    slots: [[1, 10, 'Active'], [2, 20, 'Rival']].map(([entrant, player, name]) => ({
+      entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] },
+      standing: null,
+    })),
+  };
+  const solo = {
+    id: 'solo-called', state: 6, completedAt: null, updatedAt: now - 60, fullRoundText: 'Losers round 1', winnerId: null, stream: null, event,
+    slots: [[3, 30, 'Quiet'], [4, 99, 'Opponent']].map(([entrant, player, name]) => ({
+      entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] },
+      standing: null,
+    })),
+  };
+  mockApi(({ query }) => {
+    if (query.includes('p10')) return { p10: { sets: { nodes: [both] } }, p20: { sets: { nodes: [both] } }, p30: { sets: { nodes: [solo] } } };
+    return { p20: { sets: { nodes: [both] } }, p30: { sets: { nodes: [solo] } } };
+  });
+  await tracker.postMatchCalls(channel);
+  assert.equal(sent.length, 2);
+  // one message for the shared set, with both pings in it
+  assert.match(sent[0].content, /<@crew-discord>.*<@rival-discord>|<@rival-discord>.*<@crew-discord>/);
+  assert.match(sent[0].content, /your match was called/);
+  assert.deepEqual(sent[0].allowedMentions, { users: ['crew-discord', 'rival-discord'] });
+  assert.match(sent[0].embeds[0].data.title, /Match call · /);
+  // no discord connected, so the announcement goes out without a ping
+  assert.equal(sent[1].content, undefined);
+  assert.deepEqual(sent[1].allowedMentions, { users: [] });
+  assert.deepEqual([...state.called].sort(), ['both-called', 'solo-called']);
+
+  // a second check sends nothing new
+  await tracker.postMatchCalls(channel);
+  assert.equal(sent.length, 2);
+});
+
+test('match call pings put all four doubles players in one message', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async payload => sent.push(payload) };
+  state.messages = { calls: true };
+  state.players = {
+    1: { ...crewPlayer, callPings: true, discordId: 'crew-discord' },
+    2: { userId: 2, playerId: 11, tag: 'Partner', slug: 'user/partner', callPings: true, discordId: 'partner-discord' },
+    3: { userId: 3, playerId: 20, tag: 'Rival', slug: 'user/rival', callPings: true, discordId: 'rival-discord' },
+    4: { userId: 4, playerId: 21, tag: 'Fourth', slug: 'user/fourth', callPings: true },
+  };
+  state.called = [];
+  const team = (entrant, name, seed, ids) => ({
+    entrant: { id: entrant, name, initialSeedNum: seed, participants: ids.map((id) => ({ player: { id } })) },
+    standing: null,
+  });
+  // all four tracked players in one 2v2 set. the fourth has no discord connected
+  const doubles = {
+    id: 'doubles-called', state: 6, completedAt: null, updatedAt: now - 60, fullRoundText: 'Winners semifinal', winnerId: null, stream: null, event,
+    slots: [team(1, 'Crew + Partner', 1, [10, 11]), team(2, 'Rival + Fourth', 2, [20, 21])],
+  };
+  // 99 is nobody tracked, so only the tracked players with discord in it get pinged
+  const mixed = {
+    id: 'mixed-called', state: 6, completedAt: null, updatedAt: now - 60, fullRoundText: 'Losers round 1', winnerId: null, stream: null, event,
+    slots: [team(3, 'Crew + Stranger', 1, [10, 99]), team(4, 'Rival + Fourth', 2, [20, 21])],
+  };
+  mockApi(() => ({
+    p10: { sets: { nodes: [doubles, mixed] } }, p11: { sets: { nodes: [doubles] } },
+    p20: { sets: { nodes: [doubles, mixed] } }, p21: { sets: { nodes: [doubles, mixed] } },
+  }));
+  await tracker.postMatchCalls(channel);
+  assert.equal(sent.length, 2);
+  // one message for the 2v2 set, with every connected discord in it
+  assert.deepEqual(sent[0].allowedMentions, { users: ['crew-discord', 'partner-discord', 'rival-discord'] });
+  assert.match(sent[0].content, /your match was called/);
+  assert.match(sent[0].embeds[0].data.title, /Match call · /);
+  // the untracked stranger adds no ping, still one message
+  assert.deepEqual(sent[1].allowedMentions, { users: ['crew-discord', 'rival-discord'] });
+  assert.deepEqual([...state.called].sort(), ['doubles-called', 'mixed-called']);
+
+  // a second check sends nothing new
+  await tracker.postMatchCalls(channel);
+  assert.equal(sent.length, 2);
+});
+
+test('/calls turns match call pings on or off for one player or everyone', async () => {
+  state.players = {
+    1: tracker.newTracked(crewPlayer),
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', callPings: true },
+  };
+  const calls = (values) => {
+    const interaction = {
+      commandName: 'calls', user: { id: 'someone' },
+      options: { getSubcommand: () => null, getString: name => values[name] ?? null },
+      reply: async r => { interaction.replied = r; },
+    };
+    return handleCommand(interaction).then(() => interaction.replied);
+  };
+  assert.equal(await calls({ player: '1', pings: 'on' }), 'Match call pings on for Active.');
+  assert.equal(state.players[1].callPings, true);
+  assert.equal(await calls({ player: 'all', pings: 'off' }), 'Match call pings off for everyone.');
+  assert.ok(Object.values(state.players).every(player => player.callPings === false));
 });

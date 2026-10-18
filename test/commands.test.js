@@ -32,6 +32,15 @@ const setNode = (id, completedAt, setState = 3) => ({
   games: [{ winnerId: 1, selections: [{ entrant: { id: 1 }, character: { name: 'Fox' } }, { entrant: { id: 2 }, character: { name: 'Falco' } }] }],
 });
 const sets = [setNode('s1', now - 600), setNode('s2', now - 7200)];
+// crew's slippi account. any other code or id has nobody
+const slippiUser = {
+  fbUid: 'crew-uid', displayName: 'Crew', connectCode: { code: 'CREW#1' },
+  rankedNetplayProfile: {
+    id: 'RANKED_SINGLES-crew-uid-season-5', ratingOrdinal: 1600, ratingUpdateCount: 20, wins: 12, losses: 8,
+    dailyGlobalPlacement: null, dailyRegionalPlacement: null, continent: 'NORTH_AMERICA', characters: [{ character: 'FOX', gameCount: 30 }],
+  },
+  rankedNetplayProfileHistory: [{ ratingOrdinal: 1500, wins: 30, losses: 20, season: { name: 'Season 4', status: 'COMPLETED', endedAt: '2026-04-20T17:07:46.817Z' } }],
+};
 const live = { id: 5, name: 'Local', slug: 'tournament/local', startAt: now - 3600, endAt: now + 3600, city: 'Buffalo', addrState: 'NY', isOnline: false, images: [] };
 const soon = { ...live, id: 6, name: 'Soon', slug: 'tournament/soon', startAt: now + 86400, endAt: now + 90000 };
 
@@ -67,6 +76,10 @@ function respond(query, variables) {
   if (query.includes('tournamentView')) return each({ tournaments: { nodes: [] } });
   if (query.includes('tournaments(query:')) return each({ tournaments: { nodes: [live] } });
   if (query.includes('authorizations')) return each({ slug: 'user/crew', images: [], player: { gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] });
+  // the connect code on crew's netplay registrations
+  if (query.includes('isEventOnline')) {
+    return each({ sets: { nodes: [{ slots: [{ entrant: { participants: [{ player: { id: 10 }, connectedAccounts: { slippi: { value: 'crew#1' } } }] } }] }] } });
+  }
   if (aliases.length) return each({ sets: { nodes: sets } });
   if (query.includes('player(id: $id)')) return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: sets } } };
   throw new Error(`no fake for ${query.slice(0, 80)}`);
@@ -92,6 +105,11 @@ globalThis.fetch = async (url, options) => {
       imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/bills.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Bills_Mafia.jpg' }],
     }] } }),
   };
+  if (String(url).includes('internal.slippi.gg')) {
+    const { variables } = JSON.parse(options.body);
+    const data = Object.fromEntries(Object.entries(variables).map(([name, value]) => [name.replace('v', 'u'), ['CREW#1', 'crew-uid'].includes(value) ? slippiUser : null]));
+    return { ok: true, json: async () => ({ data }) };
+  }
   // character art
   if (!String(url).includes('api.start.gg')) return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
   const { query, variables } = JSON.parse(options.body);
@@ -134,7 +152,7 @@ const runs = [
   ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
-  ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results and stream alerts start off/],
+  ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results, stream alerts and match call pings start off/],
   ['track', { subcommand: 'list' }, /Tracking 3/],
   ['track', { subcommand: 'remove', values: { player: '3' } }, /Stopped tracking Opponent/],
   ['link', { values: { profile: 'start.gg/user/opponent' }, user: 'opponent-discord' }, /Linked to Opponent/],
@@ -172,6 +190,15 @@ const runs = [
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
   ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
   ['sets', { values: { player: 'all', results: 'off' } }, /Set results off for everyone/],
+  ['calls', { values: { player: 'all', pings: 'off' } }, /Match call pings off for everyone/],
+  ['slippi', { subcommand: 'leaderboard' }, /Nobody on the watchlist yet/],
+  // left out, it's the code on crew's start.gg netplay registrations
+  ['slippi', { subcommand: 'add' }, /Added Crew to the Slippi watchlist.*Crew · CREW#1.*Gold 2/],
+  ['slippi', { subcommand: 'add', values: { code: 'not a code' } }, /isn't a connect code/],
+  ['slippi', { subcommand: 'rank' }, /Crew · CREW#1.*Gold 2\*\* · 1600\.0.*Fox 30 games.*start\.gg:.*Crew.*Past seasons.*Season 4 · 1500\.0 · 30-20/],
+  ['slippi', { subcommand: 'rank', values: { player: 'gone-1' } }, /Slippi has nobody with the code GONE#1/],
+  ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1.*Crew.*Gold 2\*\* · 1600\.0 · 12-8/],
+  ['slippi', { subcommand: 'remove', values: { player: 'crew-uid' } }, /Took Crew \(CREW#1\) off the Slippi watchlist/],
   ['set_reg_reminder', { values: { tournament: 'start.gg/tournament/soon' } }, /gets pinged 12 hours before registration for Soon ends/],
   ['delete_reg_reminder', { values: { tournament: 'soon' } }, /Deleted the reminder for Soon/],
   ['reg_admin', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Opponent is an admin of/],
@@ -192,8 +219,10 @@ test('every command and subcommand answers without throwing', async () => {
   state.tournaments = { 5: { ...live, entries: [{ userId: 1, event: event.name, eventSlug: event.slug, eventId: 50, started: true }], userIds: [1] } };
   state.links = {};
   state.socials = [];
+  state.slippi = {};
+  state.slippiSkipped = [];
   // checks that commands kick off run in the background, and shouldn't try to post here
-  state.messages = Object.fromEntries(['sets', 'streams', 'rollcall', 'results', 'registration', 'recap'].map((type) => [type, false]));
+  state.messages = Object.fromEntries(['sets', 'streams', 'calls', 'rollcall', 'results', 'registration', 'slippi', 'recap'].map((type) => [type, false]));
 
   const covered = new Set();
   for (const [name, options = {}, expected] of runs) {

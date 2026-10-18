@@ -248,11 +248,12 @@ test('set_reg_reminder tracks everyone registered for the tournament', async () 
   // the set and stream checks skip them until /sets and /stream turn those on
   assert.equal(state.players[1].streamAlerts, false);
   assert.equal(state.players[1].setResults, false);
+  assert.equal(state.players[1].callPings, false);
   assert.ok(state.players[1].lastCheck >= now);
   assert.ok(state.regReminders[5]);
   // the reminder's own channel send can land anywhere around the reply
   const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1], /sending the last call now\. 3 players from Local are now tracked, with set results and stream alerts off\./);
+  assert.match(edit[1], /sending the last call now\. 3 players from Local are now tracked, with set results, stream alerts and match call pings off\./);
 });
 
 test('set_reg_reminder still sets the reminder when the list is hidden, tracking nobody', async () => {

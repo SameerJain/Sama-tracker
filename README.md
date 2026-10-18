@@ -10,15 +10,17 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 
 ## Use the bot
 
-**Track a player** to post their placements in the channel. Anyone can add a player with `/track add`. Set results and stream alerts start off; `/sets` and `/stream` turn them on.
+**Track a player** to post their placements in the channel. Anyone can add a player with `/track add`. Set results, stream alerts and match call pings start off; `/sets`, `/stream` and `/calls` turn them on.
+
+**Follow Slippi ranked** with `/slippi`. Tracked and linked players get added on their own once their connect code shows up on start.gg, and rank changes get posted here.
 
 **Link yourself** to use player lookups without automatic posts. Connect Discord on your start.gg profile, then run `/link`. Tracked players with Discord connected can already use these lookups without linking.
 
 ### Shared inputs and options
 
 - `profile` accepts a start.gg profile link or its final ID, such as `start.gg/user/f64a83c8` or `f64a83c8`. `/scout` also accepts a tracked or linked player.
-- The `player` and `opponent` pickers include tracked and linked players. `/track remove`, `/stream`, and `/sets` accept tracked players only. Leave an optional `player` blank to look yourself up.
-- `player:all` works with `/upcoming`, `/recent`, `/stream`, and `/sets`, and includes everyone tracked.
+- The `player` and `opponent` pickers include tracked and linked players. `/track remove`, `/stream`, `/sets`, and `/calls` accept tracked players only. Leave an optional `player` blank to look yourself up.
+- `player:all` works with `/upcoming`, `/recent`, `/stream`, `/sets`, and `/calls`, and includes everyone tracked.
 - `verbose:True` adds the details shown in the stats table below. Leave it out for the short report, which has a **Full report** button that replaces it with the verbose report.
 - `melee:True` limits `/stats`, `/h2h`, `/predict`, `/scout`, and `/progress` to Melee. `/characters` uses `game:Melee` or `game:Ultimate` instead.
 
@@ -26,9 +28,9 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 
 | Command | What it does |
 | --- | --- |
-| `/track add profile:<link or ID>` | Start automatic posts for a player. Set results and stream alerts start off. |
+| `/track add profile:<link or ID>` | Start automatic posts for a player. Set results, stream alerts and match call pings start off. |
 | `/track remove player:<name>` | Stop tracking them. |
-| `/track list` | List tracked players, noting who has set results or stream alerts on. |
+| `/track list` | List tracked players, noting who has set results, stream alerts or match call pings on. |
 | `/link profile:<link or ID>` | Link your own start.gg account. Leave out `profile` to find it by the Discord connected on start.gg, among the accounts `/profile` searches. |
 | `/unlink` | Remove your link. This does not stop tracking. |
 | `/upcoming` | Show live and upcoming tournaments. |
@@ -36,8 +38,9 @@ See it running in [this Discord server](https://discord.gg/VuMz7Y2k2).
 | `/run` | Show your run and next opponent in each current bracket. |
 | `/stream player:<name or all> alerts:<on or off>` | Change stream alerts for tracked players. Newly tracked players start with them off. |
 | `/sets player:<name or all> results:<on or off>` | Change automatic set results for tracked players. Newly tracked players start with them off. Sets finished before you turn them on are not posted. |
+| `/calls player:<name or all> pings:<on or off>` | Change match call pings for tracked players. Newly tracked players start with them off. Pings players whose Discord is connected on start.gg, one message per called set. Doubles puts all four players in that one message. |
 
-Anyone can change `/stream` and `/sets` for tracked players. Use `/messages` for server-wide controls.
+Anyone can change `/stream`, `/sets`, and `/calls` for tracked players. Use `/messages` for server-wide controls.
 
 ### Stats and matchups
 
@@ -53,6 +56,19 @@ Anyone can change `/stream` and `/sets` for tracked players. Use `/messages` for
 Add `player:<name or link/ID>` to look up someone else, for example `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can also be a start.gg link or ID, tracked or not. `/h2h` odds run the same prediction as `/predict` but stay one line. `verbose:True` doesn't change them; the **Why these odds** button under the card posts the `/predict` reasoning. `/scout` always uses you as the comparison player and replies privately. Your Discord must be connected on start.gg.
 
 These reports count singles and leave DQs out of set records. Characters and stages appear only when the tournament organizer reports them. `/characters` defaults to whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
+
+### Slippi ranked
+
+| Command | What it does |
+| --- | --- |
+| `/slippi add code:<ABCD#123>` | Add a connect code to the watchlist. Leave out `code` to use the one on your start.gg, if you're tracked or linked. |
+| `/slippi remove player:<name>` | Take someone off the watchlist. The automatic search won't add them back; `/slippi add` will. |
+| `/slippi rank` | Show rank, rating, this season's record, daily leaderboard placement, top 3 characters and the last 3 seasons. `player:` takes someone on the watchlist or any connect code. Leave it out for yourself. |
+| `/slippi leaderboard` | List the watchlist by rank, then rating. Shows the top 50. |
+
+Netplay tournaments on start.gg ask for a connect code at registration, and start.gg keeps it. Once a day the bot looks for the codes of tracked and linked players who aren't on the watchlist yet, in their 8 newest online singles sets, and checks each player at most once a week. Anyone found goes on the watchlist with their start.gg tag. Offline-only players and people who play other games online have no code there, so add them with `code:`.
+
+Ranks use slippi.gg's cutoffs: Bronze 1 through Master 3 by rating, and Grandmaster for a Master rating with a placement on Slippi's daily leaderboards. Fewer than 5 ranked sets in the season is Pending. Slippi has no public API. The bot uses the one slippi.gg uses, so a change on Slippi's side can stop rank checks until the bot is updated, and `/status` shows when the last check failed. Slippi doesn't share ranked match results, so posts show the new rank and rating change, not who they played.
 
 ### Registration
 
@@ -70,7 +86,7 @@ These reports count singles and leave DQs out of set records. Characters and sta
 
 `tournament` takes a start.gg link, or pick a tournament the bot already knows: ones with reminders and ones tracked players are in, soonest first. `/set_reg_reminder` offers only upcoming ones without a reminder.
 
-Reminders go out 7 days, 3 days, 1 day, and 12 hours before registration closes. If registration extends past the tournament start, the start is the deadline. Past reminders are skipped; a last call set within 12 hours goes out immediately. Setting a reminder also tracks everyone registered for the tournament, with set results and stream alerts off.
+Reminders go out 7 days, 3 days, 1 day, and 12 hours before registration closes. If registration extends past the tournament start, the start is the deadline. Past reminders are skipped; a last call set within 12 hours goes out immediately. Setting a reminder also tracks everyone registered for the tournament, with set results, stream alerts and match call pings off.
 
 Connect Discord on start.gg so the bot can recognize your registration and skip your reminder pings. Hidden entrant lists can prevent these checks. `/reg_warn` sends no ping if registration is closed, the person is registered, or the list is hidden. `/registered` lists names without pinging anyone.
 
@@ -79,7 +95,7 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 | Command | What it does |
 | --- | --- |
 | `/help` | Show the commands. |
-| `/status` | Show uptime, when the latest version was deployed, and the last start.gg checks. A copy run on another computer also shows that computer's name. |
+| `/status` | Show uptime, when the latest version was deployed, and the last start.gg and Slippi checks. A copy run on another computer also shows that computer's name. |
 | `/profile` | Find a tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
 | `/messages` | Show or change automatic posts and the recap schedule. |
 | `/socials` | Show saved streams and social links. |
@@ -104,21 +120,23 @@ Connect Discord on start.gg so the bot can recognize your registration and skip 
 | --- | --- |
 | Set results | After a tracked player with `/sets` on finishes a set. Only their first DQ per event is posted. |
 | Stream alerts | When a tracked player with `/stream` on has a set on stream, called, or next in the stream queue. |
+| Match call pings | When a tracked player with `/calls` on has a set called. Pings their Discord when it is connected on start.gg, one message per set. Doubles puts all four players in that one message. |
 | Tournament roll calls | An hour before a tournament with at least 3 tracked players. |
 | Tournament placements | 12 hours after the tournament ends, or up to 24 hours if results are incomplete. Unfinished placements are marked as projected. |
 | Registration reminders | At the deadlines listed above, for people who enabled `/reg_role` pings. |
+| Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank, including their first rank of a season after Pending. A new season starting everyone over isn't posted. |
 | Weekly recap | Sunday at 9 pm New York time by default: results, highlights, and next week's entries. Only tracked players with a non-DQ singles set that week are included. |
 
-Set results and stream alerts start off for newly tracked players. The set and stream checks run every 2 minutes and ask start.gg about each player with that switch on, 20 players per request, so keeping them off keeps those checks small however many players are tracked.
+Set results, stream alerts and match call pings start off for newly tracked players. The set, stream and match call checks run every 2 minutes and ask start.gg about each player with that switch on, 20 players per request, so keeping them off keeps those checks small however many players are tracked.
 
-Run `/messages` without options to see the current settings. Change any combination of the six switches: `sets`, `streams`, `rollcall`, `results`, `registration`, and `recap`.
+Run `/messages` without options to see the current settings. Change any combination of the eight switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `registration`, `slippi`, and `recap`. Match call pings start off server-wide too; turn both that and `/calls` on to get them.
 
 ```text
 /messages sets:False streams:False
 /messages recap_day:Sunday recap_time:20:00 timezone:America/New_York
 ```
 
-Times use 24-hour `HH:MM` and the selected timezone, including daylight saving. Settings save immediately and survive restarts. Posts missed while a type is off are skipped when you turn it back on. Schedule changes apply to future recaps. Per-player `/sets` and `/stream` settings and personal `/reg_role` pings still apply.
+Times use 24-hour `HH:MM` and the selected timezone, including daylight saving. Settings save immediately and survive restarts. Posts missed while a type is off are skipped when you turn it back on. Schedule changes apply to future recaps. Per-player `/sets`, `/stream`, and `/calls` settings and personal `/reg_role` pings still apply.
 
 ## Setup
 
@@ -168,7 +186,7 @@ A push to master redeploys it automatically.
 Add everyone at a tournament to the track from the bot's host, without using Discord. Run `npm run track` (or `node tools/track-attendees.js` in the app folder) and paste a start.gg tournament link when it asks.
 
 - A link from the tournament's attendees page adds just the events that page is filtered to. A plain tournament link adds everyone registered. Example filter: `start.gg/tournament/smashcade-2-4/attendees?filter={"eventIds":["1682422"]}`.
-- Already tracked players are skipped, and attendees without a start.gg account are left out. New players start with set results and stream alerts off, as with `/track add`.
+- Already tracked players are skipped, and attendees without a start.gg account are left out. New players start with set results, stream alerts and match call pings off, as with `/track add`.
 - The bot adds queued players within 30 seconds on its host and the tool reports how many. Players queued while the bot is down are added on its next start.
 
 On Railway, run `railway ssh`, then `npm run track` or `node tools/track-attendees.js`.
@@ -176,6 +194,8 @@ On Railway, run `railway ssh`, then `npm run track` or `node tools/track-attende
 ## Data and report limits
 
 start.gg can omit scores, seeds, characters, and stages. Missing data stays unknown. Predictions estimate outcomes from head-to-head results, common opponents, and seeding; newer sets count more, and limited data pulls the odds toward 50%.
+
+Slippi rank checks ask about 20 watchlist players per request, one request a second. The connect code search asks start.gg about 10 players per request.
 
 First lookups can take tens of seconds or about a minute for a large report. start.gg limits requests, and commands share cached history where available. Long history lookups show progress while they load.
 

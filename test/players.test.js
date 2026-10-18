@@ -216,7 +216,7 @@ test('linked people can be picked in lookups, but not in the commands about what
   // by the id autocomplete sends, or typed out
   assert.equal((await run('stats', 'crew-discord', { player: '7' })).embeds[0].data.title, 'Me');
   assert.equal((await run('stats', 'crew-discord', { player: 'me' })).embeds[0].data.title, 'Me');
-  for (const [command, values] of [['stream', { alerts: 'off' }], ['sets', { results: 'off' }], ['track', {}]]) {
+  for (const [command, values] of [['stream', { alerts: 'off' }], ['sets', { results: 'off' }], ['calls', { pings: 'off' }], ['track', {}]]) {
     const reply = await run(command, 'crew-discord', { player: '7', ...values }, command === 'track' ? 'remove' : null);
     assert.match(reply.content, /Only tracked players can be picked here/, command);
   }
@@ -320,6 +320,15 @@ test('/stream for someone from /link says there are no alerts instead of pretend
   assert.equal(state.links['me-discord'].streamAlerts, undefined);
 });
 
+test('/calls for someone from /link says there are no pings to change instead of pretending', async () => {
+  state.players = { 1: crew };
+  state.links = { 'me-discord': me };
+  const reply = await run('calls', 'me-discord', { pings: 'off' });
+  assert.ok(reply.flags);
+  assert.match(reply.content, /aren't tracked/);
+  assert.equal(state.links['me-discord'].callPings, undefined);
+});
+
 test('/sets for someone from /link says there are no results to change instead of pretending', async () => {
   state.players = { 1: crew };
   state.links = { 'me-discord': me };
@@ -329,16 +338,17 @@ test('/sets for someone from /link says there are no results to change instead o
   assert.equal(state.links['me-discord'].setResults, undefined);
 });
 
-test('/track add starts set results and stream alerts off and says how to turn them on', async () => {
+test('/track add starts set results, stream alerts and match call pings off and says how to turn them on', async () => {
   state.players = {};
   state.links = {};
   state.tournaments = {};
   // the second answer is for the tournament check it kicks off
   mockApi(({ query }) => (query.includes('user(slug:') ? { user: { id: 8, slug: 'user/new', player: { id: 80, gamerTag: 'New' } } } : {}));
   const reply = await run('track', 'someone', { profile: 'start.gg/user/new' }, 'add');
-  assert.match(reply.embeds[0].data.description, /^Now tracking \[New\].*\. Their placements post here\.\n-# Set results and stream alerts start off\. `\/sets` and `\/stream` turn them on$/);
+  assert.match(reply.embeds[0].data.description, /^Now tracking \[New\].*\. Their placements post here\.\n-# Set results, stream alerts and match call pings start off\. `\/sets`, `\/stream` and `\/calls` turn them on$/);
   assert.equal(state.players[8].setResults, false);
   assert.equal(state.players[8].streamAlerts, false);
+  assert.equal(state.players[8].callPings, false);
   await settle();
 });
 
@@ -359,18 +369,23 @@ test('/recent all asks about players with set results on first, since only their
 
 test('/track list only notes what differs from a new player', () => {
   const [list] = embeds.trackedList({
-    1: { ...crew, setResults: false, streamAlerts: false },
+    1: { ...crew, setResults: false, streamAlerts: false, callPings: false },
     2: { userId: 2, playerId: 20, tag: 'Old', slug: 'user/old' },
-    3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', setResults: true, streamAlerts: false },
-    4: { userId: 4, playerId: 40, tag: 'Streamer', slug: 'user/streamer', setResults: false, streamAlerts: true },
+    3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', setResults: true, streamAlerts: false, callPings: false },
+    4: { userId: 4, playerId: 40, tag: 'Streamer', slug: 'user/streamer', setResults: false, streamAlerts: true, callPings: false },
+    5: { userId: 5, playerId: 50, tag: 'Called', slug: 'user/called', setResults: false, streamAlerts: false, callPings: true },
   });
-  const [crewLine, oldLine, quietLine, streamerLine] = list.data.description.split('\n');
-  assert.equal(crewLine, '[Crew](https://www.start.gg/user/crew)');
-  // saved before either started off, so both still count as on
-  assert.match(oldLine, /\[Old\].* · set results on · stream alerts on$/);
-  assert.match(quietLine, /\[Quiet\].* · set results on$/);
-  assert.match(streamerLine, /\[Streamer\].* · stream alerts on$/);
-  assert.match(list.data.description, /plus their sets and streams once `\/sets` and `\/stream` turn them on/);
+  const lines = Object.fromEntries(list.data.description.split('\n').slice(0, 5).map((line) => {
+    const tag = line.match(/^\[(.+?)\]/)?.[1];
+    return [tag, line];
+  }));
+  assert.equal(lines.Crew, '[Crew](https://www.start.gg/user/crew)');
+  // saved before either started off, so both still count as on. match call pings need an explicit on
+  assert.match(lines.Old, /\[Old\].* · set results on · stream alerts on$/);
+  assert.match(lines.Quiet, /\[Quiet\].* · set results on$/);
+  assert.match(lines.Streamer, /\[Streamer\].* · stream alerts on$/);
+  assert.match(lines.Called, /\[Called\].* · match call pings on$/);
+  assert.match(list.data.description, /plus their sets, streams and match calls once `\/sets`, `\/stream` and `\/calls` turn them on/);
 });
 
 test('autocomplete explains an empty list instead of showing nothing', async () => {
@@ -390,6 +405,7 @@ test('autocomplete explains an empty list instead of showing nothing', async () 
   state.links = { 'me-discord': { ...me, tag: 'Crewmate' } };
   assert.deepEqual(await choicesFor('cr'), [{ name: 'Crew', value: '1' }, { name: 'Crewmate (linked)', value: '7' }]);
   assert.deepEqual(await choicesFor('cr', 'sets'), [{ name: 'Crew', value: '1' }]);
+  assert.deepEqual(await choicesFor('cr', 'calls'), [{ name: 'Crew', value: '1' }]);
   assert.deepEqual(await choicesFor('mate', 'stream'), [{ name: 'Nobody tracked matches "mate"', value: 'mate' }]);
 });
 

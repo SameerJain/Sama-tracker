@@ -107,12 +107,12 @@ function socialsRemove(interaction) {
   return replyEphemeral(interaction, `Removed ${social.url} from ${social.name}.`);
 }
 
-// /stream and /sets: the same switch on a different field. onAt saves when it went from off to on
+// /stream, /sets and /calls: the same switch on a different field. onAt saves when it went from off to on
 function toggles({ option, field, label, onAt }) {
   return (interaction) => {
     const choice = readChoice(interaction, 'player', { trackedOnly: true });
     if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
-    // someone from /link, their streams and sets never get posted
+    // someone from /link, their streams, sets and match calls never get posted
     if (choice !== 'all' && !state.players[choice.userId]) {
       return replyEphemeral(interaction, `You aren't tracked, so there are no ${label.toLowerCase()} to change.`);
     }
@@ -132,5 +132,7 @@ function toggles({ option, field, label, onAt }) {
 const streamAlerts = toggles({ option: 'alerts', field: 'streamAlerts', label: 'Stream alerts' });
 // the set check doesn't ask about players with results off, so this is how their older sets stay out
 const setResults = toggles({ option: 'results', field: 'setResults', label: 'Set results', onAt: 'setResultsOnAt' });
+// match call pings go out while the set is still called, so there's no cutoff like /sets has
+const matchCalls = toggles({ option: 'pings', field: 'callPings', label: 'Match call pings' });
 
-export { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults };
+export { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults, matchCalls };

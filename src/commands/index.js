@@ -9,15 +9,16 @@ import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run } from './players.js';
 import { progress, scout, headToHead, stats, characters, predict, reports, NOT_LINKED } from './stats.js';
 import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, regRole, registered, regWarn, tournamentChoices } from './registration.js';
-import { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults } from './settings.js';
+import { configureMessages, socialsAdd, socialsRemove, streamAlerts, setResults, matchCalls } from './settings.js';
+import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { pickable, sendEmbeds, readButton, playerBySlug, replyEphemeralAfterDefer } from './shared.js';
 
 export { commands } from './definitions.js';
 
 // these change what gets posted, so only tracked players can be picked. the rest are lookups, where linked people can be too
-const TRACKED_ONLY = ['track remove', 'stream', 'sets'];
+const TRACKED_ONLY = ['track remove', 'stream', 'sets', 'calls'];
 // all means everyone tracked
-const TAKES_ALL = ['upcoming', 'recent', 'stream', 'sets'];
+const TAKES_ALL = ['upcoming', 'recent', 'stream', 'sets', 'calls'];
 // a tournament link, or one the bot already knows
 const TAKES_TOURNAMENT = ['set_reg_reminder', 'registered', 'reg_warn'];
 
@@ -50,6 +51,11 @@ const handlers = new Map([
   ['predict', predict],
   ['stream', streamAlerts],
   ['sets', setResults],
+  ['calls', matchCalls],
+  ['slippi add', slippiAdd],
+  ['slippi remove', slippiRemove],
+  ['slippi rank', slippiRank],
+  ['slippi leaderboard', slippiLeaderboard],
   ['status', status],
   ['set_reg_reminder', setRegReminder],
   ['delete_reg_reminder', deleteRegReminder],
@@ -113,6 +119,8 @@ export async function handleAutocomplete(interaction) {
 
   if (TAKES_TOURNAMENT.includes(name)) return interaction.respond(tournamentChoices(focused, { newReminder: name === 'set_reg_reminder' }));
 
+  if (name === 'slippi remove' || name === 'slippi rank') return interaction.respond(slippiChoices(focused, { anyCode: name === 'slippi rank' }));
+
   if (name === 'delete_reg_reminder') {
     for (const reminder of Object.values(state.regReminders)) {
       if (reminder.name.toLowerCase().includes(typed)) choices.push({ name: reminder.name.slice(0, 100), value: String(reminder.id) });
@@ -163,6 +171,7 @@ function status(interaction) {
     deployedAt: deployedAt(),
     avatar: interaction.client.user.displayAvatarURL(),
     players: Object.keys(state.players).length,
+    slippi: Object.keys(state.slippi).length,
     tournaments: tournaments.length,
     queued: startgg.queueLength(),
   };

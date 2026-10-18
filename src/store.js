@@ -5,15 +5,17 @@ import fs from 'node:fs';
 export const stateDir = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUNT_PATH ?? 'data';
 const FILE = `${stateDir}/state.json`;
 
-// players and regAdmins are keyed by start.gg user id, regReminders by tournament id. posted/streamed/dqs are ids already announced.
+// players and regAdmins are keyed by start.gg user id, regReminders by tournament id. posted/streamed/called/dqs are ids already announced.
 // regPings are discord ids that turned reg pings on. regSkipped are tournament ids whose reminder got deleted, so admins' don't come back.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
 // accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.
 // messages holds the /messages switches and recap schedule. weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
-// deploy is the railway deployment that last started: { id, at }, with at the first time it started
+// deploy is the railway deployment that last started: { id, at }, with at the first time it started.
+// slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from the last check and
+// userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back
 const empty = {
-  players: {}, tournaments: {}, posted: [], streamed: [], dqs: [], regReminders: {}, regPings: [], regAdmins: {}, regSkipped: [],
-  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null,
+  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], regAdmins: {}, regSkipped: [],
+  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [],
 };
 
 function load() {

@@ -1,4 +1,5 @@
 import * as startgg from './startgg.js';
+import * as slippi from './slippi.js';
 import * as embeds from './embeds/index.js';
 import { state, save } from './store.js';
 import { clearTrackRequest, readTrackRequest } from './track-request.js';
@@ -27,6 +28,11 @@ const MENTIONS_PER_MESSAGE = 80;
 export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
 // locals run late, so a tournament still counts as live this long after its end time
 export const RUNS_LATE_HOURS = 6;
+// slippi ranks only change after ranked sets, and its API isn't public, so it gets asked less than start.gg
+const SLIPPI_CHECK_MINUTES = 30;
+// players with no connect code on start.gg get looked at again this often, in case they play a netplay tournament since
+const SLIPPI_SEARCH_DAYS = 7;
+const SLIPPI_SKIPPED_KEPT = 1000;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -36,7 +42,9 @@ export function secondsNow() {
 }
 
 // for /status
-export const health = { startedAt: secondsNow(), downSince: null, skippedBefore: null, setCheck: null, setError: null, tournamentCheck: null };
+export const health = {
+  startedAt: secondsNow(), downSince: null, skippedBefore: null, setCheck: null, setError: null, tournamentCheck: null, slippiCheck: null, slippiError: null,
+};
 
 let channel;
 
@@ -77,20 +85,24 @@ export function startTracking(postChannel) {
   checkRegReminders();
   checkWeeklyRecap();
   importTrackRequest();
+  checkSlippiCodes();
+  checkSlippiRanks();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
+  setInterval(checkSlippiCodes, PROFILE_CHECK_HOURS * HOUR * 1000);
+  setInterval(checkSlippiRanks, SLIPPI_CHECK_MINUTES * 60 * 1000);
   setInterval(checkWeeklyRecap, 60 * 1000);
   // the tool at the other end waits on this, so it's checked more often than the tournaments
   setInterval(importTrackRequest, 30 * 1000);
 }
 
-// /track add, /set_reg_reminder and the host tool all save this. set results and stream alerts start
-// off since everyone with them on goes in the set or stream check every 2 minutes, and bulk adds made
-// that slow. /sets and /stream turn them on
+// /track add, /set_reg_reminder and the host tool all save this. set results, stream alerts and
+// match call pings start off since everyone with them on goes in a check every 2 minutes, and bulk
+// adds made that slow. /sets, /stream and /calls turn them on
 export function newTracked(player) {
-  return { ...player, lastCheck: secondsNow(), streamAlerts: false, setResults: false };
+  return { ...player, lastCheck: secondsNow(), streamAlerts: false, setResults: false, callPings: false };
 }
 
 // players queued by tools/track-attendees.js, added the same way /track add does and saved
@@ -142,11 +154,14 @@ async function post(list, type, dueAt, postChannel = channel) {
 const checkSets = queued(async () => {
   await postNewSets();
   await postStreamAlerts();
+  await postMatchCalls();
 });
 export const checkTournaments = queued(updateTournaments);
 const checkProfiles = queued(updateProfiles);
 export const checkRegReminders = queued(postRegReminders);
 const checkWeeklyRecap = queued(postWeeklyRecap);
+const checkSlippiCodes = queued(findSlippiCodes);
+const checkSlippiRanks = queued(postRankChanges);
 
 export async function postWeeklyRecap(postChannel = channel, now = secondsNow()) {
   const period = weeklyPeriod(now, messageSettings());
@@ -191,6 +206,79 @@ export async function postWeeklyRecap(postChannel = channel, now = secondsNow())
   }
   state.weeklyRecap.done = true;
   delete state.weeklyRecap.batches;
+  save();
+}
+
+// a /slippi watchlist entry from a slippi profile. rank is the one it's at as of this check. past
+// seasons are only for /slippi rank, which asks slippi again anyway
+export function slippiEntry(profile, entry = {}) {
+  const { seasons, ...current } = profile;
+  return { ...entry, ...current, rank: slippi.rankOf(profile).name, checkedAt: secondsNow() };
+}
+
+// tracked and linked players whose slippi isn't on the watchlist yet, looked for once a week in their
+// start.gg netplay registrations. anyone found goes on the watchlist with their start.gg attached
+export async function findSlippiCodes() {
+  const now = secondsNow();
+  const watched = new Set(Object.values(state.slippi).map((entry) => String(entry.userId)));
+  const records = [...Object.values(state.players), ...Object.values(state.links)];
+  const due = new Map();
+  for (const record of records) {
+    if (watched.has(String(record.userId)) || now - (record.slippiSearchedAt ?? 0) < SLIPPI_SEARCH_DAYS * DAY) continue;
+    // tracked comes first, and a link to the same account is the same person
+    if (!due.has(String(record.userId))) due.set(String(record.userId), record);
+  }
+  if (!due.size) return;
+
+  try {
+    const codes = await startgg.getConnectCodes([...due.values()].map((record) => record.playerId));
+    // typed by hand at registration, so some are lowercase or not codes at all
+    const readable = new Map([...codes].map(([playerId, code]) => [playerId, slippi.readCode(code)]).filter(([, code]) => code));
+    const profiles = readable.size ? await slippi.getProfilesByCode([...readable.values()]) : new Map();
+    for (const record of due.values()) {
+      const profile = profiles.get(readable.get(record.playerId));
+      if (!profile || state.slippiSkipped.includes(profile.uid)) continue;
+      // already on it from /slippi add. the rank check moves its numbers, or a rank change would go unposted
+      if (state.slippi[profile.uid]) state.slippi[profile.uid].userId = record.userId;
+      else state.slippi[profile.uid] = { ...slippiEntry(profile), userId: record.userId };
+    }
+    // only once it worked, so a failed search goes again tomorrow
+    for (const record of records) {
+      if (due.has(String(record.userId))) record.slippiSearchedAt = now;
+    }
+  } catch (err) {
+    console.error('finding slippi codes failed:', err.message);
+  }
+  save();
+}
+
+// everyone on the watchlist, 20 a request. a move to another rank this season gets posted. a new season
+// starts everyone over at pending, so the first rank after that is a placement and not a drop
+export async function postRankChanges(postChannel = channel) {
+  const entries = Object.values(state.slippi);
+  if (!entries.length) return;
+  const checkedAt = secondsNow();
+  try {
+    const latest = await slippi.getProfiles(entries.map((entry) => entry.uid));
+    for (const entry of entries) {
+      const profile = latest.get(entry.uid);
+      // removed while this was running, or gone from slippi. kept in case slippi only hiccuped
+      if (!profile || state.slippi[entry.uid] !== entry) continue;
+      const before = { ...entry };
+      Object.assign(entry, slippiEntry(profile));
+      if (!before.rank || before.season !== entry.season || before.rank === entry.rank) continue;
+      if (slippi.RANKS.indexOf(entry.rank) <= slippi.RANKS.indexOf('Pending')) continue;
+      if (messageEnabled('slippi', checkedAt)) {
+        await postChannel.send({ embeds: [embeds.rankChange(entry, before, state.players)], allowedMentions: { parse: [] } });
+      }
+    }
+    health.slippiCheck = checkedAt;
+    health.slippiError = null;
+  } catch (err) {
+    console.error('checking slippi ranks failed:', err.message);
+    health.slippiError = err.message;
+  }
+  state.slippiSkipped = state.slippiSkipped.slice(-SLIPPI_SKIPPED_KEPT);
   save();
 }
 
@@ -292,6 +380,35 @@ export async function postStreamAlerts(postChannel = channel) {
   save();
 }
 
+export async function postMatchCalls(postChannel = channel) {
+  try {
+    const players = Object.values(state.players).filter(callsOn);
+    if (!players.length) return;
+    const playerIds = new Set(players.map((player) => player.playerId));
+    for (const set of await startgg.getCalledSets([...playerIds])) {
+      if ((state.called ??= []).includes(set.id)) continue;
+      // both sides can be tracked with pings on, still one message for the set.
+      // doubles sides hold two player ids each, so all four land in the same message
+      const inSet = players.filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
+      if (!inSet.length) continue;
+      if (messageEnabled('calls', set.updatedAt)) {
+        const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(Boolean))];
+        await postChannel.send({
+          content: discordIds.length ? `${discordIds.map((id) => `<@${id}>`).join(' ')} your match was called` : undefined,
+          embeds: [embeds.matchCall(set, state.players)],
+          allowedMentions: { users: discordIds },
+        });
+      }
+      state.called.push(set.id);
+    }
+  } catch (err) {
+    console.error('checking match calls failed:', err.message);
+  }
+
+  state.called = (state.called ?? []).slice(-200);
+  save();
+}
+
 // a called or started set was last updated around when it went live. one only waiting
 // at the front of a queue was last touched when it got queued, so it has no time to go by
 function wentLiveAt(set) {
@@ -329,6 +446,11 @@ function alertsOn(player) {
 // /sets turns a player's automatic set results on. players saved before they started off have no field
 export function resultsOn(player) {
   return Boolean(player) && player.setResults !== false;
+}
+
+// /calls turns a player's match call pings on. these started off for everyone, so only an explicit on counts
+export function callsOn(player) {
+  return Boolean(player) && player.callPings === true;
 }
 
 async function updateTournaments() {

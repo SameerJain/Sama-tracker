@@ -29,7 +29,7 @@ test('message controls are registered for server managers', () => {
   const command = commands.find(c => c.name === 'messages');
   assert.equal(command?.default_member_permissions, PermissionFlagsBits.ManageGuild.toString());
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'rollcall', 'results', 'registration', 'recap']);
+    ['sets', 'streams', 'calls', 'rollcall', 'results', 'registration', 'slippi', 'recap']);
 });
 
 test('only managers can change settings', async () => {
@@ -68,6 +68,7 @@ test('running messages without options shows defaults without writing settings',
   state.messages = {};
   const reply = await configure();
   assert.match(reply.content, /Set results:\*\* on/);
+  assert.match(reply.content, /Match call pings:\*\* off/);
   assert.match(reply.content, /Sunday 21:00 EST/);
   assert.deepEqual(state.messages, {});
 });
@@ -90,6 +91,21 @@ test('re-enabling categories saves cutoffs even if no muted poll happened', asyn
   assert.ok(state.messages.enabledAt?.sets > 0);
   assert.ok(state.messages.enabledAt.streams > 0);
   assert.ok(state.messages.enabledAt.registration > 0);
+});
+
+test('match call pings start off server-wide and re-enabling skips what came due', async () => {
+  const { messageEnabled, messageSettings } = await import('../src/message-settings.js');
+  state.messages = {};
+  assert.equal(messageSettings().calls, false);
+  assert.equal(messageEnabled('calls', Math.floor(Date.now() / 1000)), false);
+  assert.equal(messageEnabled('calls'), false);
+  // other types still start on
+  assert.equal(messageSettings().sets, true);
+
+  state.messages = {};
+  await configure({ calls: true });
+  assert.equal(state.messages.calls, true);
+  assert.ok(state.messages.enabledAt?.calls > 0);
 });
 
 test('muting recap prevents fetches and pending message sends', async () => {

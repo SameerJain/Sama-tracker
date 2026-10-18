@@ -1,0 +1,122 @@
+import { escapeMarkdown } from 'discord.js';
+import * as startgg from '../startgg.js';
+import * as slippi from '../slippi.js';
+import * as embeds from '../embeds/index.js';
+import { state, save } from '../store.js';
+import { slippiEntry } from '../tracker.js';
+import { linkedPlayer, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds } from './shared.js';
+
+const NOT_A_CODE = 'That isn\'t a connect code. Use the one Slippi Launcher shows, like ABCD#123.';
+
+// a pick from the list sends the slippi id, typing sends a code or display name. undefined if nobody on the watchlist matches
+function watched(value) {
+  if (Object.hasOwn(state.slippi, value)) return state.slippi[value];
+  const code = slippi.readCode(value);
+  const typed = value.trim().toLowerCase();
+  return Object.values(state.slippi).find((entry) => (code && entry.code === code) || entry.name.toLowerCase() === typed);
+}
+
+// the connect code on a tracked or linked player's start.gg netplay registrations. called after deferring
+async function codeOnStartgg(player) {
+  const code = (await startgg.getConnectCodes([player.playerId])).get(player.playerId);
+  return code ? slippi.readCode(code) : null;
+}
+
+function noCodeOnStartgg(player) {
+  return `Couldn't find a connect code on ${player.tag}'s start.gg. It's saved when you register for a netplay tournament that asks for one. Use \`code:\` instead, like \`/slippi add code:ABCD#123\`.`;
+}
+
+// with the code left out, it's yours from start.gg. a code found there is tied to that start.gg player
+async function slippiAdd(interaction) {
+  const typed = interaction.options.getString('code');
+  const code = typed && slippi.readCode(typed);
+  if (typed && !code) return replyEphemeral(interaction, NOT_A_CODE);
+  const me = typed ? null : linkedPlayer(interaction.user.id);
+  if (!typed && !me) {
+    return replyEphemeral(interaction, 'Add a connect code, like `/slippi add code:ABCD#123`. Left out, it looks for yours on your start.gg, so `/link` that first.');
+  }
+
+  await interaction.deferReply();
+  const found = code ?? await codeOnStartgg(me);
+  if (!found) return replyEphemeralAfterDefer(interaction, noCodeOnStartgg(me));
+  const profile = await slippi.getProfileByCode(found);
+  if (!profile) return replyEphemeralAfterDefer(interaction, `Slippi has nobody with the code ${found}.`);
+
+  const existing = state.slippi[profile.uid];
+  // the rank check moves an existing entry's numbers, so a rank change can't go unposted
+  const entry = existing ?? slippiEntry(profile);
+  if (me) entry.userId = me.userId;
+  state.slippi[profile.uid] = entry;
+  state.slippiSkipped = state.slippiSkipped.filter((uid) => uid !== profile.uid);
+  save();
+
+  const name = escapeMarkdown(profile.name);
+  await interaction.editReply({
+    content: existing ? `${name} is already on the Slippi watchlist.` : `Added ${name} to the Slippi watchlist. Their rank changes get posted here.`,
+    embeds: embeds.slippiRank(profile, { entry, players: state.players }),
+    allowedMentions: { parse: [] },
+  });
+}
+
+// the daily search skips them after this, /slippi add brings them back
+function slippiRemove(interaction) {
+  const entry = watched(interaction.options.getString('player', true));
+  if (!entry) return replyEphemeral(interaction, 'They aren\'t on the Slippi watchlist. `/slippi leaderboard` shows who is.');
+  delete state.slippi[entry.uid];
+  state.slippiSkipped.push(entry.uid);
+  save();
+  return interaction.reply({ content: `Took ${escapeMarkdown(entry.name)} (${entry.code}) off the Slippi watchlist.`, allowedMentions: { parse: [] } });
+}
+
+// someone on the watchlist, any connect code, or whoever ran it: their watchlist entry, or the code on their start.gg
+async function slippiRank(interaction) {
+  const typed = interaction.options.getString('player');
+  const me = linkedPlayer(interaction.user.id);
+  let entry = typed
+    ? watched(typed)
+    : me && Object.values(state.slippi).find((each) => String(each.userId) === String(me.userId));
+  const code = typed && !entry ? slippi.readCode(typed) : null;
+  if (typed && !entry && !code) return replyEphemeral(interaction, 'Pick someone from the watchlist, or type a connect code like ABCD#123.');
+  if (!typed && !entry && !me) return replyEphemeral(interaction, 'Pick someone, or `/link` your start.gg so leaving it out finds your connect code.');
+
+  await interaction.deferReply();
+  let profile;
+  if (entry) {
+    profile = (await slippi.getProfiles([entry.uid])).get(entry.uid);
+    if (!profile) return replyEphemeralAfterDefer(interaction, `Slippi doesn't have ${entry.name} (${entry.code}) anymore.`);
+  } else {
+    const found = code ?? await codeOnStartgg(me);
+    if (!found) return replyEphemeralAfterDefer(interaction, noCodeOnStartgg(me));
+    profile = await slippi.getProfileByCode(found);
+    if (!profile) return replyEphemeralAfterDefer(interaction, `Slippi has nobody with the code ${found}.`);
+    // on the watchlist under a code they've since changed
+    entry = state.slippi[profile.uid] ?? null;
+  }
+  return sendEmbeds(interaction, embeds.slippiRank(profile, { entry, players: state.players }));
+}
+
+const slippiLeaderboard = (interaction) => sendEmbeds(interaction, embeds.slippiLeaderboard(state.slippi, state.players));
+
+// watchlist picks for remove and rank, matching names, codes and start.gg tags. rank also takes a typed code
+function slippiChoices(focused, { anyCode = false } = {}) {
+  const typed = focused.trim().toLowerCase();
+  const label = (entry) => {
+    const tag = entry.userId && state.players[entry.userId]?.tag;
+    return `${tag && tag !== entry.name ? `${tag} · ${entry.name}` : entry.name} · ${entry.code}`;
+  };
+  const matches = Object.values(state.slippi).filter((entry) => label(entry).toLowerCase().includes(typed));
+  const starts = (entry) => label(entry).toLowerCase().startsWith(typed);
+  matches.sort((a, b) => starts(b) - starts(a));
+  const choices = matches.map((entry) => ({ name: label(entry).slice(0, 100), value: entry.uid }));
+
+  const code = anyCode && slippi.readCode(focused);
+  if (code && !choices.some((choice) => state.slippi[choice.value].code === code)) choices.unshift({ name: `Look up ${code}`, value: code });
+  // an empty list looks broken, so say why. picking it gets the not found reply
+  if (!choices.length) {
+    const why = Object.keys(state.slippi).length ? `Nobody on the watchlist matches "${focused}"` : 'Nobody on the Slippi watchlist yet, /slippi add someone first';
+    choices.push({ name: why.slice(0, 100), value: focused.slice(0, 100) || 'nobody' });
+  }
+  return choices.slice(0, 25);
+}
+
+export { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices };

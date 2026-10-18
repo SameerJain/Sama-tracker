@@ -61,14 +61,27 @@ export function onStream(set, players) {
   const [me, them] = trackedA ? [a, b] : [b, a];
 
   // twitch is the only source with a url we can build, otherwise just the name
-  const { streamName, streamSource } = set.stream;
+  const { streamName, streamSource } = set.stream ?? {};
   const twitch = streamSource === 'TWITCH' ? `https://twitch.tv/${streamName}` : null;
-  const watch = twitch ? `[twitch.tv/${escapeMarkdown(streamName)}](${twitch})` : escapeMarkdown(streamName);
+  const watch = streamName ? (twitch ? `[twitch.tv/${escapeMarkdown(streamName)}](${twitch})` : escapeMarkdown(streamName)) : null;
 
-  return setEmbed(set, colors.stream, trackedA ?? findTracked(b, players))
+  const card = setEmbed(set, colors.stream, trackedA ?? findTracked(b, players))
     .setTitle(`On stream · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
-    .setURL(twitch ?? setUrl(set))
-    .addFields({ name: 'Watch', value: watch });
+    .setURL(twitch ?? setUrl(set));
+  if (watch) card.addFields({ name: 'Watch', value: watch });
+  return card;
+}
+
+// a called set for someone with match call pings on. both sides can be tracked, still one card.
+// doubles shows the team names the way start.gg reports them
+export function matchCall(set, players) {
+  const [a, b] = set.sides;
+  const trackedA = findTracked(a, players);
+  const [me, them] = trackedA ? [a, b] : [b, a];
+
+  return setEmbed(set, colors.live, trackedA ?? findTracked(b, players))
+    .setTitle(`Match call · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
+    .setURL(setUrl(set));
 }
 
 export function setResult(set, players) {

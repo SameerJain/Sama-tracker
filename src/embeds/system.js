@@ -5,13 +5,13 @@ import { colors, FOOTER, baseEmbed, withLines, withSections, playerLink, count }
 export function trackedList(players, linked = 0) {
   const all = Object.values(players).sort((a, b) => a.tag.localeCompare(b.tag));
   const embed = baseEmbed(colors.brand).setTitle(`Tracking ${all.length}`);
-  // only what differs from a new player, who has set results and stream alerts off. no field means on
+  // only what differs from a new player, who has set results, stream alerts and match call pings off. no field means on for the first two
   const lines = all.map((player) => {
-    const notes = [player.setResults !== false && 'set results on', player.streamAlerts !== false && 'stream alerts on'].filter(Boolean);
+    const notes = [player.setResults !== false && 'set results on', player.streamAlerts !== false && 'stream alerts on', player.callPings === true && 'match call pings on'].filter(Boolean);
     return notes.length ? `${playerLink(player)} · ${notes.join(' · ')}` : playerLink(player);
   });
   if (!all.length) lines.push('Nobody yet. Add someone with `/track add`.');
-  lines.push('', '-# Their placements get posted here, plus their sets and streams once `/sets` and `/stream` turn them on. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
+  lines.push('', '-# Their placements get posted here, plus their sets, streams and match calls once `/sets`, `/stream` and `/calls` turn them on. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
   if (linked) lines.push(`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
   return withLines(embed, lines);
 }
@@ -56,6 +56,11 @@ export function status(info) {
     `**Signups and placements updated:** ${ago(info.tournamentCheck)}`,
     `**Tracking:** ${count(info.players, 'player')} · ${count(info.tournaments, 'tournament')}`,
   );
+  if (info.slippi) {
+    let slippiCheck = ago(info.slippiCheck);
+    if (info.slippiError) slippiCheck += `, last try failed (${escapeMarkdown(info.slippiError)})`;
+    lines.push(`**Slippi ranks checked:** ${slippiCheck} · ${count(info.slippi, 'player')} on the watchlist`);
+  }
   if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
@@ -83,7 +88,7 @@ export function help() {
     [
       '**General**',
       '`/help` this list',
-      '`/status` uptime, when the latest version was deployed, and the last start.gg checks',
+      '`/status` uptime, when the latest version was deployed, and the last start.gg and Slippi checks',
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
@@ -96,10 +101,11 @@ export function help() {
       '`/track list` everyone tracked',
       '`/sets` automatic set results on or off',
       '`/stream` stream alerts on or off',
+      '`/calls` match call pings on or off',
       '`/upcoming` live and upcoming tournaments',
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first',
-      '-# New players start with set results and stream alerts off. `player:all` works with sets, stream, upcoming and recent',
+      '-# New players start with set results, stream alerts and match call pings off. `player:all` works with sets, stream, calls, upcoming and recent',
     ],
     [
       '**Linking yourself**',
@@ -117,6 +123,14 @@ export function help() {
       '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more',
       '-# `verbose:True` shows more, same as the Full report button on short reports. `melee:True` sticks to Melee',
       '-# `/h2h`, `/predict` and `/scout` also take a start.gg link or ID, for players nobody tracks',
+    ],
+    [
+      '**Slippi ranked**',
+      '`/slippi add` add a connect code to the watchlist. Leave it out to find yours on your start.gg',
+      '`/slippi remove` take someone off the watchlist',
+      '`/slippi rank` rank, rating, record, characters and past seasons. Takes any connect code',
+      '`/slippi leaderboard` everyone on the watchlist, best rank first',
+      '-# Tracked and linked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it',
     ],
     [
       '**Registration**',
@@ -145,9 +159,11 @@ export function help() {
       '**Posted here automatically**',
       '• finished sets of players with `/sets` on, and their first DQ in an event',
       '• sets on stream or up next in the stream queue, for players with `/stream` on',
+      '• called sets, pinging players with `/calls` on whose Discord is on start.gg, all four in one message for doubles',
       '• a roll call an hour before a tournament with 3+ of the crew',
       '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
       '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting',
+      '• Slippi rank changes for the watchlist, checked every 30 minutes',
       '• a weekly recap of players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
     ],
   ];
