@@ -91,6 +91,14 @@ export function status(info) {
   return baseEmbed(colors.brand).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
 
+// a /matchmaking ping. a mention in a card never pings, so this one is just a name to click
+export function matchmaking({ label, color, discordId, avatar, message }) {
+  const lines = [`<@${discordId}> is looking for ${label} games.`];
+  if (message) lines.push(`> ${message}`);
+  lines.push(`-# \`/matchmaking_role game:${label}\` gets you these pings, or stops them`);
+  return baseEmbed(color).setTitle(`${label} matchmaking`).setThumbnail(avatar).setDescription(lines.join('\n'));
+}
+
 export function fun(name, title, { text, screenshot, image }) {
   return baseEmbed(colors[name], `${FOOTER} · ${screenshot.name}`)
     .setTitle(title)
@@ -134,6 +142,12 @@ export function help() {
       '**Your pings**',
       '`/notify` your pings. `calls` when your match is called, `streams` for every stream alert, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. Leave them out to see yours',
       '-# Only ever changes you. `calls` needs you linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
+    ],
+    [
+      '**Matchmaking**',
+      '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it',
+      '`/matchmaking` ping that role to find games. `message:` says what you want, like your connect code. Only people with the role can',
+      '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it',
     ],
     [
       '**Linking yourself**',

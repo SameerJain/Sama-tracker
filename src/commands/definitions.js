@@ -33,6 +33,20 @@ function switchOption(name, description) {
 const MEMBER_H2H = 'H2H with me';
 const MEMBER_SCOUT = 'Scout them';
 
+// a role per game that people give themselves and anyone can ping, keyed by the game option's value.
+// role is the name it gets made with
+const MATCHMAKING = {
+  ult: { label: 'Ultimate', role: 'Ultimate Matchmaking' },
+  melee: { label: 'Melee', role: 'Melee Matchmaking' },
+};
+
+function matchmakingGame(description) {
+  return {
+    type: Option.String, name: 'game', description, required: true,
+    choices: Object.entries(MATCHMAKING).map(([value, { label }]) => ({ name: label, value })),
+  };
+}
+
 function verboseOption(description) {
   return { type: Option.Boolean, name: 'verbose', description };
 }
@@ -134,6 +148,20 @@ export const commands = [
       switchOption('dm_registration', 'DM 1 hour before registration closes, with link, location and image'),
       switchOption('dm_start', 'DM 1 hour before the tournament starts, with link, location and image'),
       switchOption('all', 'All five at once'),
+    ],
+  },
+  // not under /notify: these are roles people ping each other with, not posts the bot sends
+  {
+    name: 'matchmaking_role',
+    description: 'Get the Ultimate or Melee Matchmaking role, or take it off if you have it',
+    options: [matchmakingGame('Which role')],
+  },
+  {
+    name: 'matchmaking',
+    description: 'Ping Ultimate or Melee Matchmaking to find games. Only people with that role can',
+    options: [
+      matchmakingGame('Which role to ping'),
+      { type: Option.String, name: 'message', description: 'What you want, like netplay with your connect code or where you\'re playing', max_length: 300 },
     ],
   },
   {
@@ -343,4 +371,4 @@ export const commands = [
   { type: ApplicationCommandType.User, name: MEMBER_SCOUT },
 ];
 
-export { PICKABLE_GAMES, MEMBER_H2H, MEMBER_SCOUT };
+export { PICKABLE_GAMES, MEMBER_H2H, MEMBER_SCOUT, MATCHMAKING };

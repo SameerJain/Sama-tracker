@@ -154,13 +154,13 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
     guild: {
       id: 'guild-1',
       members: { fetch: async ({ user: ids }) => { beforeAnswer(run, 'discord members'); return new Map(ids.map((id) => [id, {}])); } },
-      roles: { cache: { find: () => undefined }, create: discord('discord role create', {}) },
+      roles: { cache: { get: () => undefined, find: () => undefined }, create: discord('discord role create', { id: 'role-1', mentionable: true }) },
       scheduledEvents: {
         fetch: async () => { beforeAnswer(run, 'discord events'); return new Map(); },
         create: async (options) => { beforeAnswer(run, 'discord events'); return { id: 'event-1', url: 'https://discord.com/events/guild-1/event-1', ...options }; },
       },
     },
-    member: { displayName: 'Crew', displayAvatarURL: () => 'https://cdn.example/crew.png', roles: { add: discord('discord role add'), remove: discord('discord role remove') } },
+    member: { displayName: 'Crew', displayAvatarURL: () => 'https://cdn.example/crew.png', roles: { cache: { has: () => false }, add: discord('discord role add'), remove: discord('discord role remove') } },
     memberPermissions: { has: () => true },
     client: { user: { displayAvatarURL: () => 'https://cdn.example/avatar.png' } },
     options: {
@@ -266,6 +266,8 @@ const runs = [
   ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off for the whole server/],
   ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged for every stream alert.*pinged for reg reminders.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['notify', { values: { dm_registration: 'on', dm_start: 'on' } }, /DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
+  ['matchmaking_role', { values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
+  ['matchmaking', { values: { game: 'ult' } }, /You need the \*\*Ultimate Matchmaking\*\* role to ping it\. `\/matchmaking_role game:Ultimate`/],
   ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1","thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}/],
   // left out, it's the code on crew's start.gg netplay registrations
   ['slippi', { subcommand: 'add' }, /Crew is already on the Slippi watchlist.*Crew · CREW#1.*Gold 2/],

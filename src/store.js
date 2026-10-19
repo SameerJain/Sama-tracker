@@ -31,10 +31,11 @@ const FILE = `${stateDir}/state.json`;
 // an empty top8 list with top8Posted unset means nothing was reported yet, and the final goes out as a new message once every event is finished.
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
+// matchmaking is the discord role id of each game's matchmaking role, keyed ult and melee, so a role renamed in server settings still counts
 const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [], regAdmins: {}, regSkipped: [],
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
-  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [],
+  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {},
 };
 
 function load() {

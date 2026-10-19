@@ -12,6 +12,7 @@ import { bracket, streamLink, registered, regWarn, tournamentChoices } from './r
 import { tournamentAdd, tournamentRemove, tournamentPosts, discordEvent, adminAdd, adminRemove, adminList } from './tournaments.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
+import { matchmakingRole, matchmaking } from './matchmaking.js';
 import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
@@ -45,6 +46,8 @@ const handlers = new Map([
   ['track posts', trackPosts],
   ['track cleanup', trackCleanup],
   ['notify', notify],
+  ['matchmaking_role', matchmakingRole],
+  ['matchmaking', matchmaking],
   ['link', link],
   ['unlink', unlink],
   ['profile', profile],
