@@ -113,6 +113,8 @@ export function setResult(set, players) {
   const trackedWon = Boolean(bWon ? trackedB : trackedA);
   let color = trackedWon ? colors.win : colors.loss;
   if (clash) color = colors.clash;
+  // nobody tracked, from a tracked tournament, so it's nobody's win or loss
+  if (!trackedA && !trackedB) color = colors.brand;
 
   const embed = setEmbed(set, color, player)
     .setTitle(`W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
@@ -285,7 +287,8 @@ export function bracket(tournament) {
   const now = Math.floor(Date.now() / 1000);
   const started = tournament.startAt <= now;
   const lines = [`${started ? 'Started' : 'Starts'} <t:${tournament.startAt}:R>`, ''];
-  for (const event of tournament.events) lines.push(`[${escapeMarkdown(event.name)}](${startggUrl(`${event.slug}/brackets`)})`);
+  // a tracked tournament gets its events at the first tournament check
+  for (const event of tournament.events ?? []) lines.push(`[${escapeMarkdown(event.name)}](${startggUrl(`${event.slug}/brackets`)})`);
   return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? 'Live' : 'Starting soon', tournament), lines);
 }
 
@@ -340,7 +343,8 @@ function upcomingCard(tournament, players, label, color) {
   const lines = [
     `**Time:** ${timeText(tournament.startAt)}`,
     `**Location:** ${locationText(tournament)}`,
-    '**Players:**',
+    // a tracked tournament shows before anyone from the crew signs up
+    eventsByUser.size ? '**Players:**' : 'Nobody from the crew registered yet.',
   ];
   for (const [userId, events] of eventsByUser) {
     lines.push(`${playerLink(players[userId])}: ${events.join(', ')}`);

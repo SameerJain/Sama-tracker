@@ -1,24 +1,16 @@
-import { MessageFlags, escapeMarkdown } from 'discord.js';
+import { escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { BULK_TRACK_MAX } from '../track-request.js';
-import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, newTracked, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
-import { rememberAccounts } from '../accounts.js';
-import { findPlayer, lookup, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag } from './shared.js';
-import { askFirst, confirmable } from './confirm.js';
+import { RUNS_LATE_HOURS, endTime, regDeadline, secondsNow } from '../tracker.js';
+import { rememberAccounts, serverMembers } from '../accounts.js';
+import { replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag } from './shared.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
 
 // /reg_warn pings someone once per tournament in this long
 const REG_WARN_COOLDOWN_HOURS = 12;
-
-// discord takes this many ids a request when checking who's in the server
-const MEMBERS_PER_FETCH = 100;
-
-// shows who has reg pings on
-const REG_ROLE = 'Reg Reminders';
 
 // start.gg/tournament/genesis-x/details, a short link like start.gg/genesis, or just the slug
 function tournamentSlug(input) {
@@ -31,141 +23,29 @@ function tournamentNotFound(input) {
   return { content: `Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`, allowedMentions: { parse: [] } };
 }
 
-// autocomplete, so nobody has to paste a link for a tournament the bot already knows: ones with reminders
-// and ones tracked players are in, soonest first. a new reminder only offers upcoming ones without one.
-// a pasted link of one of them shows its name, and anything else typed is offered back as it is
-function tournamentChoices(typed, { newReminder = false } = {}) {
+// autocomplete, so nobody has to paste a link for a tournament the bot already knows: tracked ones and ones
+// tracked players are in, soonest first. only says which: new is the ones /tournament add can still track, tracked
+// the ones it already does. a pasted link of one of them shows its name, and anything else typed is offered back as it is
+function tournamentChoices(typed, { only = 'known' } = {}) {
   const now = secondsNow();
   const search = typed.trim().toLowerCase();
-  const known = new Map();
-  for (const tournament of [...Object.values(state.regReminders), ...Object.values(state.tournaments)]) {
-    if (!tournament.slug || known.has(tournament.id)) continue;
-    // a reg admin's reminder has no dates until the next reminder check
-    if (tournament.startAt && endTime(tournament) < now) continue;
-    if (newReminder && (state.regReminders[tournament.id] || !(tournament.startAt > now))) continue;
-    known.set(tournament.id, tournament);
-  }
-  const choices = [...known.values()]
+  const known = Object.values(state.tournaments).filter((tournament) => {
+    if (!tournament.slug || !tournament.name) return false;
+    if (only === 'tracked') return Boolean(tournament.tracked);
+    // a reg admin's has no dates until the next tournament check
+    if (tournament.startAt && endTime(tournament) < now) return false;
+    return only !== 'new' || !tournament.tracked;
+  });
+  const choices = known
     .filter((tournament) => tournament.name.toLowerCase().includes(search) || tournament.slug === `tournament/${tournamentSlug(search)}`)
     .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity))
     .map((tournament) => ({ name: tournament.name.slice(0, 100), value: tournament.slug }));
   if (choices.length) return choices.slice(0, 25);
   // picking the empty one gets the not found reply
-  if (!search) return [{ name: 'No tournaments to pick yet, paste a start.gg link', value: 'none' }];
+  if (!search) {
+    return [{ name: only === 'tracked' ? 'No tracked tournaments yet, /tournament add one' : 'No tournaments to pick yet, paste a start.gg link', value: 'none' }];
+  }
   return [{ name: typed.trim().slice(0, 100), value: typed.trim().slice(0, 100) }];
-}
-
-async function setRegReminder(interaction) {
-  const input = interaction.options.getString('tournament', true).trim();
-
-  await interaction.deferReply();
-  const tournament = await startgg.getRegistration(tournamentSlug(input));
-  if (!tournament) return interaction.editReply(tournamentNotFound(input));
-
-  if (state.regReminders[tournament.id]) {
-    return interaction.editReply({ content: `${tournament.name} already has reminders set. \`/delete_reg_reminder\` cancels them.`, allowedMentions: { parse: [] } });
-  }
-
-  const deadline = regDeadline(tournament);
-  const next = nextRegReminder(deadline);
-  const firstAt = deadline - REG_REMINDER_HOURS[next] * 60 * 60;
-  // further out it might just not be open yet
-  if (deadline <= secondsNow() || (firstAt <= secondsNow() && !tournament.isRegistrationOpen)) {
-    return interaction.editReply({ content: `Registration for ${tournament.name} is closed.`, allowedMentions: { parse: [] } });
-  }
-
-  state.regReminders[tournament.id] = { id: tournament.id, slug: tournament.slug, name: tournament.name, deadline, next };
-  save();
-  // inside the last call window it goes out now
-  checkRegReminders();
-
-  // everyone registered gets tracked too, the same as /track add, unless it's a big
-  // tournament. the count comes with the registration lookup, so a major skips the attendee pages
-  let added = 0;
-  let skipped = 0;
-  try {
-    if (tournament.numAttendees > BULK_TRACK_MAX) {
-      skipped = tournament.numAttendees;
-    } else {
-      const attendees = await startgg.getAttendees(tournament.id);
-      if (attendees.length > BULK_TRACK_MAX) {
-        skipped = attendees.length;
-      } else {
-        const adding = attendees
-          .filter((attendee) => attendee.userId && attendee.playerId && !state.players[attendee.userId]);
-        for (const player of adding) state.players[player.userId] = newTracked(player);
-        if (adding.length) {
-          save();
-          // don't wait 15 min for their tournaments to show up
-          checkTournaments();
-        }
-        added = adding.length;
-      }
-    }
-  } catch (err) {
-    // the reminder is already saved, tracking just missed this one
-    console.error(`tracking registrants for ${tournament.name} failed:`, err.message);
-  }
-  const tracked = added === 1
-    ? ` 1 player from ${tournament.name} is now tracked, with set results, stream alerts and match call pings off.`
-    : added ? ` ${added} players from ${tournament.name} are now tracked, with set results, stream alerts and match call pings off.`
-    : skipped ? ` ${skipped} are registered for ${tournament.name}, over ${BULK_TRACK_MAX}, so nobody was tracked.` : '';
-
-  if (firstAt <= secondsNow()) {
-    return interaction.editReply({ content: `Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`, allowedMentions: { parse: [] } });
-  }
-  const duration = (hours) => (hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`);
-  const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(duration));
-  return interaction.editReply({ content: `Everyone with reg pings on gets pinged ${when} before registration for ${tournament.name} ends, starting <t:${firstAt}:R>. \`/reg_role\` to turn yours on.${tracked}`, allowedMentions: { parse: [] } });
-}
-
-// asks first, there's no undo and a reg admin's reminder doesn't come back
-function deleteRegReminder(interaction) {
-  const value = interaction.options.getString('tournament', true).toLowerCase();
-  const reminder = lookup(state.regReminders, value, 'name');
-  if (!reminder) return replyEphemeral(interaction, 'No reminder set for that.');
-  return askFirst(interaction, 'unremind', reminder.id, `Delete the reg reminders for ${reminder.name}? Nobody gets pinged for it after this, and \`/set_reg_reminder\` is the only way to bring them back.`, 'Delete');
-}
-
-confirmable('unremind', {
-  command: '/delete_reg_reminder',
-  run: (id) => {
-    const reminder = state.regReminders[id];
-    if (!reminder) return { content: 'That reminder is already gone.' };
-    delete state.regReminders[id];
-    // so a reg admin's doesn't get added back
-    state.regSkipped = [...state.regSkipped, reminder.id].slice(-200);
-    save();
-    return { content: `Deleted the reminder for ${reminder.name}.` };
-  },
-  cancel: (id) => (state.regReminders[id] ? `Kept the reminder for ${state.regReminders[id].name}.` : 'That reminder is already gone.'),
-});
-
-async function regAdminAdd(interaction) {
-  const input = interaction.options.getString('profile', true);
-
-  await interaction.deferReply();
-  const admin = await findPlayer(interaction, input);
-  if (!admin) return;
-  if (state.regAdmins[admin.userId]) {
-    return interaction.editReply({ content: `${admin.tag} is already a reg admin.`, allowedMentions: { parse: [] } });
-  }
-
-  state.regAdmins[admin.userId] = { userId: admin.userId, slug: admin.slug, tag: admin.tag };
-  save();
-  await interaction.editReply({ content: `Tournaments ${admin.tag} is an admin of on start.gg get reg reminders now. \`/delete_reg_reminder\` skips one.`, allowedMentions: { parse: [] } });
-
-  // don't wait 15 min for theirs to show up
-  checkRegReminders();
-}
-
-function regAdminRemove(interaction) {
-  const admin = lookup(state.regAdmins, interaction.options.getString('admin', true).toLowerCase(), 'tag');
-  if (!admin) return replyEphemeral(interaction, 'That\'s not a reg admin. See `/reg_admin list`.');
-
-  delete state.regAdmins[admin.userId];
-  save();
-  return interaction.reply({ content: `No more automatic reminders for ${admin.tag}'s tournaments. Ones already set stay, \`/delete_reg_reminder\` cancels them.`, allowedMentions: { parse: [] } });
 }
 
 // from a little before the start until well after the end, since locals run late. soonest first, each tournament once
@@ -178,21 +58,21 @@ function goingOn(tournaments) {
     .sort((a, b) => a.startAt - b.startAt);
 }
 
-// reg reminder tournaments only, they're the ones the server cares about
+// tracked tournaments only, they're the ones the server cares about
 function bracket(interaction) {
-  const live = goingOn(Object.values(state.regReminders));
+  const live = goingOn(Object.values(state.tournaments).filter((tournament) => tournament.tracked));
   if (!live.length) {
-    return interaction.reply('No tournaments set as active. Check the other channels if you\'re expecting one.');
+    return interaction.reply('No tracked tournaments going on right now. Check the other channels if you\'re expecting one.');
   }
-  return sendEmbeds(interaction, live.flatMap((reminder) => embeds.bracket(reminder)));
+  return sendEmbeds(interaction, live.flatMap((tournament) => embeds.bracket(tournament)));
 }
 
 const ASK_A_TO = 'If you were expecting a stream, ask a TO in another channel. `/socials` has the server\'s saved streams.';
 
-// reminder tournaments and the ones tracked players are in. start.gg only has the streams a TO added on the
+// tracked tournaments and the ones tracked players are in. start.gg only has the streams a TO added on the
 // tournament page, so a tournament with none is left out and named instead
 async function streamLink(interaction) {
-  const live = goingOn([...Object.values(state.regReminders), ...Object.values(state.tournaments).filter((tournament) => !tournament.resultsPosted)]);
+  const live = goingOn(Object.values(state.tournaments).filter((tournament) => !tournament.resultsPosted));
   if (!live.length) return interaction.reply(`No tracked tournaments are going on right now. ${ASK_A_TO}`);
 
   await interaction.deferReply();
@@ -210,53 +90,6 @@ async function streamLink(interaction) {
     return interaction.editReply({ content: `No stream links on start.gg for ${new Intl.ListFormat('en').format(names)}. ${ASK_A_TO}`, allowedMentions: { parse: [] } });
   }
   return sendEmbeds(interaction, shown.flatMap((tournament) => embeds.streamLinks(tournament, streams.get(String(tournament.id)))));
-}
-
-// only ever changes the person who ran it. pings go off this list, not the role,
-// so people already registered can be left out
-async function regRole(interaction) {
-  const on = interaction.options.getString('ping', true) === 'on';
-  const { guild, member, user } = interaction;
-
-  state.regPings = state.regPings.filter((id) => id !== user.id);
-  if (on) state.regPings.push(user.id);
-  save();
-
-  let content = on
-    ? 'You\'ll get pinged for reg reminders. If your Discord is connected on start.gg, not for ones you\'re already registered for.'
-    : 'No more reg reminder pings.';
-  // making the role or handing it out can take discord past the 3 seconds a command gets to answer
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  try {
-    let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
-    if (on) {
-      role ??= await guild.roles.create({ name: REG_ROLE, reason: 'shows who has /reg_role on' });
-      await member.roles.add(role);
-    } else if (role) {
-      await member.roles.remove(role);
-    }
-  } catch (err) {
-    // missing permissions. the pings still work without the role
-    if (err.code !== 50013) throw err;
-    content += ` I couldn't change your ${REG_ROLE} role though, that needs Manage Roles and my role above it.`;
-  }
-  return interaction.editReply(content);
-}
-
-// the ones of these discord ids that are in the server, id to member. asking by id doesn't need
-// the server members intent. discord can say to slow down, then it gets one more try after waiting
-async function serverMembers(guild, ids) {
-  const found = new Map();
-  for (let i = 0; i < ids.length; i += MEMBERS_PER_FETCH) {
-    const user = ids.slice(i, i + MEMBERS_PER_FETCH);
-    const members = await guild.members.fetch({ user }).catch(async (err) => {
-      if (!err.data?.retry_after) throw err;
-      await new Promise((resolve) => setTimeout(resolve, err.data.retry_after * 1000));
-      return guild.members.fetch({ user });
-    });
-    for (const [id, member] of members) found.set(id, member);
-  }
-  return found;
 }
 
 // like /upcoming for one tournament, but anyone in the server instead of the tracked list
@@ -331,4 +164,4 @@ async function regWarn(interaction) {
   if (!sent) return interaction.followUp(warning);
 }
 
-export { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, streamLink, regRole, registered, regWarn, tournamentChoices };
+export { bracket, streamLink, registered, regWarn, tournamentChoices, tournamentSlug, tournamentNotFound };

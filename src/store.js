@@ -5,8 +5,13 @@ import fs from 'node:fs';
 export const stateDir = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUNT_PATH ?? 'data';
 const FILE = `${stateDir}/state.json`;
 
-// players and regAdmins are keyed by start.gg user id, regReminders by tournament id. posted/streamed/called/dqs are ids already announced.
-// regPings and streamPings are discord ids that turned reg pings or stream alert pings on. regSkipped are tournament ids whose reminder got deleted, so admins' don't come back.
+// players and regAdmins are keyed by start.gg user id. regAdmins are TOs whose upcoming tournaments get tracked on their own. posted/streamed/called/dqs are ids already announced.
+// regPings, streamPings and callPings are discord ids that turned on /notify registration, streams or calls. regSkipped are tournament ids /tournament remove
+// untracked, so an admin's doesn't come back.
+// tournaments are keyed by id: the ones tracked players are in, and tracked ones. tracked: { by, at, sets, stream, top8, reminders } says it's tracked,
+// by being 'manual' or 'admin' and the rest its /tournament posts switches. reminder: { deadline, next } is its reg reminder progress, next being the
+// index into REG_REMINDER_HOURS. events are all its events from start.gg. crew is the registered server members and linked players who aren't tracked,
+// keyed by user id as { userId, slug, tag }, so cards can name them. lastCheck is when its sets were last checked, the way it is on a player.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
 // accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.
 // messages holds the /messages switches and recap schedule. weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
@@ -24,7 +29,7 @@ const FILE = `${stateDir}/state.json`;
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
 const empty = {
-  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], streamPings: [], regAdmins: {}, regSkipped: [],
+  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regAdmins: {}, regSkipped: [],
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
   resultPosts: [], callPosts: [], regWarned: [], billsPosted: [],
 };

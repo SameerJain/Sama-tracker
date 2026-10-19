@@ -139,7 +139,8 @@ test('a set result the TO corrects gets edited, a reset one gets marked, and an 
 });
 
 test('a match call that goes back to waiting is taken back, and one not started after 5 minutes pings once more', async () => {
-  state.players = { 1: { ...crew, callPings: true } };
+  state.players = { 1: crew };
+  state.callPings = ['crew-discord'];
   state.messages = { calls: true };
   state.called = [];
   state.callPosts = [];
@@ -194,7 +195,7 @@ test('a match call that goes back to waiting is taken back, and one not started 
 
 test('the DQ warning stays quiet with match call pings switched off, or nobody to ping', async () => {
   const channel = fakeChannel();
-  state.messages = {};
+  state.messages = { calls: false };
   state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: ['crew-discord'], warned: false }];
   mockStartgg(() => ({ s802: { state: 6 } }));
   await tracker.followCalls(channel);
@@ -266,15 +267,17 @@ test('an event named for Melee but tagged as Ultimate counts as Melee, and the o
   assert.match(asked[0], /event \{ name slug videogame/);
 });
 
-// a slash command, recording what it answers
+// a slash command run by someone with Manage Server, recording what it answers
 function command(commandName, { subcommand = null, values = {}, user = 'runner' } = {}) {
   const calls = [];
-  return {
-    calls, commandName, user: { id: user },
-    options: { getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: () => null, getInteger: () => null },
+  const run = {
+    calls, commandName, user: { id: user }, memberPermissions: { has: () => true },
+    options: { getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null, getInteger: () => null },
     reply: async (result) => calls.push(['reply', result]),
+    deferReply: async () => { run.deferred = true; },
     editReply: async (result) => calls.push(['edit', result]),
   };
+  return run;
 }
 
 // pressing a button on the message something answered with
@@ -304,7 +307,7 @@ test('/track remove asks first, only whoever ran it can answer, and Undo puts th
   };
 
   let asked = await ask();
-  assert.equal(asked.content, 'Stop tracking Rival? Their set result, stream alert and match call settings go with them.');
+  assert.equal(asked.content, 'Stop tracking Rival? Their set result and stream alert settings go with them.');
   assert.deepEqual(labels(asked), ['Stop tracking', 'Cancel']);
   assert.deepEqual(asked.allowedMentions, { parse: [] });
   assert.ok(state.players[2], 'removed before anyone answered');
@@ -384,38 +387,87 @@ test('/unlink has an Undo that brings the link back, unless they linked someone 
   assert.equal(nobody.calls[0][1].components, undefined);
 });
 
-test('/sets for everyone off and /delete_reg_reminder ask first, and /sets goes straight through when nothing would change', async () => {
+test('/track posts for everyone off and /tournament remove ask first, and /track posts goes straight through when nothing would change', async () => {
   state.players = {
     1: { ...crew, setResults: true },
     2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', setResults: false },
   };
-  const sets = command('sets', { values: { player: 'all', results: 'off' } });
+  const sets = command('track', { subcommand: 'posts', values: { player: 'all', sets: 'off', stream: 'on' } });
   await handleCommand(sets);
   const asked = sets.calls[0][1];
   assert.match(asked.content, /^Turn set results off for all 2 tracked players\?/);
   assert.deepEqual(labels(asked), ['Turn off', 'Cancel']);
   assert.equal(state.players[1].setResults, true);
-  assert.equal((await press(asked, 'Turn off')).calls[0][1].content, 'Set results off for everyone.');
-  assert.ok(Object.values(state.players).every((player) => player.setResults === false));
+  // the stream alerts asked for along with it go through on the same press
+  assert.equal((await press(asked, 'Turn off')).calls[0][1].content, 'Set results off and stream alerts on for everyone.');
+  assert.ok(Object.values(state.players).every((player) => player.setResults === false && player.streamAlerts === true));
 
-  const already = command('sets', { values: { player: 'all', results: 'off' } });
+  const already = command('track', { subcommand: 'posts', values: { player: 'all', sets: 'off' } });
   await handleCommand(already);
   assert.equal(already.calls[0][1].content, 'Set results off for everyone.');
   assert.equal(already.calls[0][1].components, undefined);
 
-  state.regReminders = { 6: { id: 6, slug: 'tournament/soon', name: 'Soon' } };
+  // a tournament admin's stays untracked after, until Undo or /tournament add
+  const switches = { by: 'admin', at: now, sets: true, stream: true, top8: true, reminders: true };
+  state.tournaments = { 6: { id: 6, slug: 'tournament/soon', name: 'Soon', entries: [], userIds: [], tracked: switches, reminder: { next: 1 } } };
   state.regSkipped = [];
-  const remove = command('delete_reg_reminder', { values: { tournament: 'soon' } });
+  const remove = command('tournament', { subcommand: 'remove', values: { tournament: 'soon' } });
   await handleCommand(remove);
   const question = remove.calls[0][1];
-  assert.match(question.content, /^Delete the reg reminders for Soon\?/);
-  assert.equal((await press(question, 'Cancel')).calls[0][1].content, 'Kept the reminder for Soon.');
-  assert.ok(state.regReminders[6]);
-  assert.equal((await press(question, 'Delete')).calls[0][1].content, 'Deleted the reminder for Soon.');
-  assert.equal(state.regReminders[6], undefined);
+  assert.match(question.content, /^Stop tracking Soon\? Its sets, stream alerts, top 8s and reg reminders stop\. It came from a tournament admin/);
+  assert.equal((await press(question, 'Cancel')).calls[0][1].content, 'Still tracking Soon.');
+  assert.ok(state.tournaments[6].tracked);
+  const stopped = (await press(question, 'Stop tracking')).calls[0][1];
+  assert.equal(stopped.content, 'Stopped tracking Soon.');
+  assert.deepEqual(labels(stopped), ['Undo']);
+  assert.equal(state.tournaments[6].tracked, undefined);
   assert.deepEqual(state.regSkipped, [6]);
   // the prompt's still there, so a late press finds it gone
-  assert.equal((await press(question, 'Delete')).calls[0][1].content, 'That reminder is already gone.');
+  assert.equal((await press(question, 'Stop tracking')).calls[0][1].content, 'It isn\'t tracked anymore.');
+  assert.equal((await press(stopped, 'Undo')).calls[0][1].content, 'Tracking Soon again, with the same settings as before.');
+  assert.deepEqual(state.tournaments[6].tracked, switches);
+  assert.deepEqual(state.tournaments[6].reminder, { next: 1 });
+  assert.deepEqual(state.regSkipped, []);
+});
+
+test('/track cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {
+  state.players = {
+    1: { ...crew },
+    2: { userId: 2, playerId: 20, tag: 'Away', slug: 'user/away', discordId: 'away-discord' },
+    3: { userId: 3, playerId: 30, tag: 'Unknown', slug: 'user/unknown' },
+  };
+  const cleanup = async (values = {}) => {
+    const run = command('track', { subcommand: 'cleanup', values });
+    run.guild = { members: { fetch: async ({ user: ids }) => new Map(ids.filter((id) => id === 'crew-discord').map((id) => [id, {}])) } };
+    await handleCommand(run);
+    return run.calls.find(([kind]) => kind === 'edit')[1];
+  };
+
+  const asked = await cleanup();
+  assert.equal(asked.content, 'Untrack 1 player whose start.gg Discord isn\'t in this server? Away.\n-# 1 player has no Discord on start.gg and stays. `no_discord:True` untracks them too');
+  assert.deepEqual(asked.allowedMentions, { parse: [] });
+  assert.ok(state.players[2], 'removed before anyone answered');
+  const removed = (await press(asked, 'Untrack them')).calls[0][1];
+  assert.equal(removed.content, 'Untracked 1 player.');
+  assert.deepEqual(Object.keys(state.players).sort(), ['1', '3']);
+  assert.equal((await press(removed, 'Undo')).calls[0][1].content, 'Tracking 1 player again, with the same settings as before.');
+  assert.equal(state.players[2].discordId, 'away-discord');
+
+  const both = await cleanup({ no_discord: true });
+  assert.equal(both.content, 'Untrack 2 players whose start.gg Discord isn\'t in this server or who have none? Away and Unknown.');
+  assert.equal((await press(both, 'Cancel')).calls[0][1].content, 'Everyone stays tracked.');
+  assert.equal(Object.keys(state.players).length, 3);
+  // cancelled, so a press after has nothing to go on
+  assert.match((await press(both, 'Untrack them')).calls[0][1].content, /doesn't work anymore/);
+
+  state.players = { 1: { ...crew } };
+  assert.equal((await cleanup()).content, 'Everyone tracked has their start.gg Discord in this server.');
+
+  // without Manage Server it doesn't look
+  const refused = command('track', { subcommand: 'cleanup' });
+  refused.memberPermissions = { has: () => false };
+  await handleCommand(refused);
+  assert.match(refused.calls[0][1].content, /You need Manage Server permission/);
 });
 
 test('a name that matches nobody suggests the closest tracked, linked or watchlisted one', async () => {

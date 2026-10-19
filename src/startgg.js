@@ -503,6 +503,44 @@ export async function getRunSets(eventId, playerId) {
   return pages.flatMap((page) => page.nodes).map(toSet).filter(Boolean);
 }
 
+// a set with its games is about 55 objects, so 10 an event a page comes to about 550
+const EVENT_SETS_PER_PAGE = 10;
+
+// every set finished in these events since then, whoever played, for a tracked tournament's set results. most
+// checks find a few sets or none, so the events share a request that splits when it runs over, and an event
+// with more than a page gets the rest on its own
+export async function getEventSets(eventIds, since) {
+  const filters = { state: [3], updatedAfter: since, showByes: false };
+  const data = await lookupMany(eventIds, (group) => `
+    query ($filters: SetFilters) {
+      ${group.map((id) => `e${cleanId(id)}: event(id: ${cleanId(id)}) { sets(perPage: ${EVENT_SETS_PER_PAGE}, page: 1, sortType: RECENT, filters: $filters) { pageInfo { totalPages } nodes { ${SET_FIELDS} } } }`).join('\n')}
+    }
+  `, { filters });
+
+  const nodes = [];
+  const rest = [];
+  for (const id of eventIds) {
+    const sets = data[`e${id}`]?.sets;
+    nodes.push(...(sets?.nodes ?? []));
+    for (let page = 2; page <= (sets?.pageInfo?.totalPages ?? 0); page++) rest.push(eventSetsPage(id, page, filters));
+  }
+  for (const page of await Promise.all(rest)) nodes.push(...page.nodes);
+  return nodes.map(toSet).filter(Boolean);
+}
+
+function eventSetsPage(eventId, page, filters) {
+  return fitPage(async (page, perPage) => connectionPage((await query(`
+    query ($id: ID!, $page: Int!, $perPage: Int!, $filters: SetFilters) {
+      event(id: $id) {
+        sets(page: $page, perPage: $perPage, sortType: RECENT, filters: $filters) {
+          pageInfo { totalPages }
+          nodes { ${SET_FIELDS} }
+        }
+      }
+    }
+  `, { id: cleanId(eventId), page, perPage, filters })).event?.sets), page, EVENT_SETS_PER_PAGE);
+}
+
 // every finished singles event they entered, newest first. an event is ~7 objects, so 120 a page
 export async function getEventHistory(userId) {
   const pages = await allPages((page) => fitPage(async (page, perPage) => connectionPage((await query(`
@@ -836,7 +874,8 @@ export async function getTournament(tournamentId, userIds) {
     if (!tournament) return null;
 
     const { events, ...rest } = tournament;
-    info = rest;
+    // every event, crew in it or not, for a tracked tournament's top 8 and /bracket
+    info = { ...rest, events: (events ?? []).map(({ id, name, slug, state, numEntrants }) => ({ id, name, slug, state, numEntrants })) };
     for (const event of events ?? []) {
       for (const userId of group) {
         const entrant = event[`u${userId}`];
@@ -925,15 +964,15 @@ export async function getRegistration(slug) {
   return data.tournament;
 }
 
-// everyone registered, with the discord they connected on start.gg if they did.
-// a participant is ~3 objects, so 200 a page stays under the limit
+// everyone registered, with the discord they connected on start.gg if they did, and the slug a tracked
+// tournament's crew card links them by. a participant is ~3 objects, so 200 a page stays under the limit
 export async function getParticipants(tournamentId) {
   const pages = await allPages((page) => fitPage(async (page, perPage) => connectionPage((await query(`
     query ($id: ID!, $page: Int!, $perPage: Int!) {
       tournament(id: $id) {
         participants(query: { page: $page, perPage: $perPage }) {
           pageInfo { totalPages }
-          nodes { gamerTag user { id authorizations(types: [DISCORD]) { externalId } } }
+          nodes { gamerTag user { id slug authorizations(types: [DISCORD]) { externalId } } }
         }
       }
     }
@@ -941,7 +980,7 @@ export async function getParticipants(tournamentId) {
 
   // TOs can add people who don't have an account
   return pages.flatMap((page) => page.nodes)
-    .map((node) => ({ tag: node.gamerTag, userId: node.user?.id, discordId: node.user?.authorizations?.[0]?.externalId }));
+    .map((node) => ({ tag: node.gamerTag, userId: node.user?.id, slug: node.user?.slug, discordId: node.user?.authorizations?.[0]?.externalId }));
 }
 
 // for /slippi: Map of playerId to the slippi connect code on their newest online singles sets. netplay
@@ -971,40 +1010,4 @@ export async function getConnectCodes(playerIds) {
 // different from nobody being registered yet because that has a count of 0
 export function attendeesHidden(tournament, participants) {
   return !participants.length && tournament.numAttendees !== 0;
-}
-
-// everyone registered, with the account behind each one, for tools/track-attendees.js. eventIds
-// narrows to those events, the way the attendees page's filter does. a participant with its
-// player and user is about 6 objects, so 100 a page stays under the limit
-export async function getAttendees(tournamentId, { eventIds } = {}) {
-  const filtered = eventIds?.length > 0;
-  const pages = await allPages((page) => fitPage(async (page, perPage) => connectionPage((await query(`
-    query ($id: ID!, $page: Int!, $perPage: Int!${filtered ? ', $eventIds: [ID]' : ''}) {
-      tournament(id: $id) {
-        participants(query: { page: $page, perPage: $perPage${filtered ? ', filter: { eventIds: $eventIds }' : ''} }) {
-          pageInfo { totalPages }
-          nodes {
-            gamerTag
-            player { id gamerTag }
-            user {
-              id
-              slug
-              images(type: "profile") { url }
-              authorizations(types: [DISCORD]) { externalId }
-            }
-          }
-        }
-      }
-    }
-  `, { id: tournamentId, page, perPage, ...(filtered && { eventIds }) })).tournament?.participants), page, 100));
-
-  // user and player are missing on people a TO added without an account
-  return pages.flatMap((page) => page.nodes).map((node) => ({
-    userId: node.user?.id,
-    playerId: node.player?.id,
-    slug: node.user?.slug,
-    tag: node.player?.gamerTag ?? node.gamerTag,
-    image: node.user?.images?.[0]?.url,
-    discordId: node.user?.authorizations?.[0]?.externalId,
-  }));
 }

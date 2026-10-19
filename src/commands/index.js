@@ -6,10 +6,11 @@ import { state } from '../store.js';
 import { deployedAt, health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
-import { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run } from './players.js';
+import { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, recent, run } from './players.js';
 import { progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
-import { setRegReminder, deleteRegReminder, regAdminAdd, regAdminRemove, bracket, streamLink, regRole, registered, regWarn, tournamentChoices } from './registration.js';
-import { configureMessages, socialsAdd, socialsRemove, streamAlerts, streamPings, setResults, matchCalls } from './settings.js';
+import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
+import { tournamentAdd, tournamentRemove, tournamentPosts, adminAdd, adminRemove, adminList } from './tournaments.js';
+import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
@@ -19,16 +20,17 @@ import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 export { commands } from './definitions.js';
 
 // these change what gets posted, so only tracked players can be picked. the rest are lookups, where linked people can be too
-const TRACKED_ONLY = ['track remove', 'stream', 'sets', 'calls'];
+const TRACKED_ONLY = ['track remove', 'track posts'];
 // all means everyone tracked
-const TAKES_ALL = ['upcoming', 'recent', 'stream', 'sets', 'calls'];
-// a tournament link, or one the bot already knows
-const TAKES_TOURNAMENT = ['set_reg_reminder', 'registered', 'reg_warn'];
+const TAKES_ALL = ['upcoming', 'recent', 'track posts'];
+// a tournament link, or one the bot already knows. new is the ones /tournament add can still track, tracked the ones it does
+const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', registered: 'known', reg_warn: 'known' };
 
-// "track add", or just the command for the ones without subcommands
+// "track add", "tournament admin add", or just the command for the ones without subcommands
 function commandName(interaction) {
+  const group = interaction.options.getSubcommandGroup?.(false);
   const subcommand = interaction.options.getSubcommand(false);
-  return subcommand ? `${interaction.commandName} ${subcommand}` : interaction.commandName;
+  return [interaction.commandName, group, subcommand].filter(Boolean).join(' ');
 }
 
 const handlers = new Map([
@@ -39,7 +41,10 @@ const handlers = new Map([
   ['socials_edit remove', socialsRemove],
   ['track add', trackAdd],
   ['track remove', trackRemove],
-  ['track list', (interaction) => sendEmbeds(interaction, embeds.trackedList(state.players, Object.keys(pickable()).length - Object.keys(state.players).length))],
+  ['track list', (interaction) => sendEmbeds(interaction, embeds.trackedList(state.players, Object.keys(pickable()).length - Object.keys(state.players).length, state.tournaments))],
+  ['track posts', trackPosts],
+  ['track cleanup', trackCleanup],
+  ['notify', notify],
   ['link', link],
   ['unlink', unlink],
   ['profile', profile],
@@ -53,23 +58,19 @@ const handlers = new Map([
   ['doubles', doubles],
   ['characters', characters],
   ['predict', predict],
-  ['stream', streamAlerts],
-  ['stream_pings', streamPings],
-  ['sets', setResults],
-  ['calls', matchCalls],
   ['slippi add', slippiAdd],
   ['slippi remove', slippiRemove],
   ['slippi rank', slippiRank],
   ['slippi leaderboard', slippiLeaderboard],
   ['status', status],
-  ['set_reg_reminder', setRegReminder],
-  ['delete_reg_reminder', deleteRegReminder],
-  ['reg_admin add', regAdminAdd],
-  ['reg_admin remove', regAdminRemove],
-  ['reg_admin list', (interaction) => interaction.reply({ embeds: embeds.withImage([embeds.regAdmins(state.regAdmins)]) })],
+  ['tournament add', tournamentAdd],
+  ['tournament remove', tournamentRemove],
+  ['tournament posts', tournamentPosts],
+  ['tournament admin add', adminAdd],
+  ['tournament admin remove', adminRemove],
+  ['tournament admin list', adminList],
   ['bracket', bracket],
   ['stream_link', streamLink],
-  ['reg_role', regRole],
   ['registered', registered],
   ['reg_warn', regWarn],
   ['view_pfp', viewPfp],
@@ -187,18 +188,11 @@ export async function handleAutocomplete(interaction) {
   const name = commandName(interaction);
   const choices = [];
 
-  if (TAKES_TOURNAMENT.includes(name)) return interaction.respond(tournamentChoices(focused, { newReminder: name === 'set_reg_reminder' }));
+  if (Object.hasOwn(TAKES_TOURNAMENT, name)) return interaction.respond(tournamentChoices(focused, { only: TAKES_TOURNAMENT[name] }));
 
   if (name === 'slippi remove' || name === 'slippi rank') return interaction.respond(slippiChoices(focused, { anyCode: name === 'slippi rank' }));
 
-  if (name === 'delete_reg_reminder') {
-    for (const reminder of Object.values(state.regReminders)) {
-      if (reminder.name.toLowerCase().includes(typed)) choices.push({ name: reminder.name.slice(0, 100), value: String(reminder.id) });
-    }
-    return interaction.respond(choices.slice(0, 25));
-  }
-
-  if (name === 'reg_admin remove') {
+  if (name === 'tournament admin remove') {
     for (const admin of Object.values(state.regAdmins)) {
       if (nameMatches(admin.tag, focused)) choices.push({ name: admin.tag, value: String(admin.userId) });
     }
@@ -239,7 +233,7 @@ export async function handleAutocomplete(interaction) {
 }
 
 function status(interaction) {
-  const tournaments = Object.values(state.tournaments).filter((tournament) => !tournament.resultsPosted && tournament.entries.length);
+  const tournaments = Object.values(state.tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted);
   const info = {
     ...health,
     // only off the server, to spot a copy running somewhere it shouldn't. the server's is a random container id

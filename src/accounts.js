@@ -36,9 +36,29 @@ function participantsOf(tournamentId) {
 // for tests, which change who's registered between cases
 export const forgetParticipants = () => participantLists.clear();
 
+// discord takes this many ids a request when checking who's in the server
+const MEMBERS_PER_FETCH = 100;
+
+// the ones of these discord ids that are in the server, id to member. asking by id doesn't need
+// the server members intent. discord can say to slow down, then it gets one more try after waiting
+export async function serverMembers(guild, ids) {
+  const found = new Map();
+  if (!guild) return found;
+  for (let i = 0; i < ids.length; i += MEMBERS_PER_FETCH) {
+    const user = ids.slice(i, i + MEMBERS_PER_FETCH);
+    const members = await guild.members.fetch({ user }).catch(async (err) => {
+      if (!err.data?.retry_after) throw err;
+      await new Promise((resolve) => setTimeout(resolve, err.data.retry_after * 1000));
+      return guild.members.fetch({ user });
+    });
+    for (const [id, member] of members) found.set(id, member);
+  }
+  return found;
+}
+
 // start.gg can't be searched by discord, so this tries the accounts the bot already has for it, then
-// everyone registered for a reg reminder tournament. a match only counts if start.gg still has this
-// discord connected to it. null if nothing does
+// everyone registered for a tracked tournament that isn't over. a match only counts if start.gg still has
+// this discord connected to it. null if nothing does
 export async function findAccount(discordId) {
   const saved = [
     ...Object.values(state.players).filter((player) => player.discordId === discordId).map((player) => player.userId),
@@ -53,7 +73,8 @@ export async function findAccount(discordId) {
     save();
   }
 
-  const participants = (await Promise.all(Object.values(state.regReminders).map((reminder) => participantsOf(reminder.id)))).flat();
+  const tracked = Object.values(state.tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted);
+  const participants = (await Promise.all(tracked.map((tournament) => participantsOf(tournament.id)))).flat();
   rememberAccounts(participants);
   return connected(discordId, participants.filter((participant) => participant.discordId === discordId).map((participant) => participant.userId));
 }

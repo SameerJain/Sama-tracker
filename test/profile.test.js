@@ -31,7 +31,7 @@ beforeEach(() => {
   state.players = {};
   state.links = {};
   state.accounts = {};
-  state.regReminders = {};
+  state.tournaments = {};
   users = {};
   registered = [];
   asked = [];
@@ -92,8 +92,8 @@ test('leaving the user out looks up whoever ran it, through /link', async () => 
   assert.equal(calls[1][1].embeds[0].data.author.name, 'Me');
 });
 
-test('someone only registered for a reg reminder tournament gets found, then remembered', async () => {
-  state.regReminders = { 5: { id: 5, slug: 'tournament/local', name: 'Local' } };
+test('someone only registered for a tracked tournament gets found, then remembered', async () => {
+  state.tournaments = { 5: { id: 5, slug: 'tournament/local', name: 'Local', tracked: { by: 'manual' } } };
   registered = [
     { gamerTag: 'Herbert', user: { id: 8, authorizations: [{ externalId: HERB }] } },
     { gamerTag: 'No Discord', user: { id: 9, authorizations: [] } },
@@ -108,8 +108,8 @@ test('someone only registered for a reg reminder tournament gets found, then rem
   assert.deepEqual(asked, ['profiles']);
 });
 
-test('someone nobody can find costs one read of the reminder tournaments in 10 minutes, however often they ask', async () => {
-  state.regReminders = { 5: { id: 5, slug: 'tournament/local', name: 'Local' } };
+test('someone nobody can find costs one read of the tracked tournaments in 10 minutes, however often they ask', async () => {
+  state.tournaments = { 5: { id: 5, slug: 'tournament/local', name: 'Local', tracked: { by: 'manual' } } };
   registered = [{ gamerTag: 'No Discord', user: { id: 9, authorizations: [] } }];
   await profile();
   await profile();
@@ -186,7 +186,7 @@ test('reg reminders remember who registered with discord connected', async () =>
   state.messages = {};
   state.regAdmins = {};
   state.regPings = [];
-  state.regReminders = { 5: { id: 5, slug: 'tournament/local', name: 'Local', next: 0 } };
+  state.tournaments = { 5: { id: 5, slug: 'tournament/local', name: 'Local', tracked: { by: 'manual' }, reminder: { next: 0 } } };
   registered = [{ gamerTag: 'Herbert', user: { id: 8, authorizations: [{ externalId: HERB }] } }, { gamerTag: 'Added by the TO', user: null }];
   await tracker.postRegReminders({ send: async () => ({}) });
   assert.deepEqual(state.accounts, { [HERB]: 8 });

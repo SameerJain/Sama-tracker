@@ -92,7 +92,8 @@ function respond(query, variables) {
   if (query.includes('event(id:')) return { event: { sets: { pageInfo: { totalPages: 1 }, nodes: [setNode('r1', now - 900), setNode('r2', null, 6)] } } };
   if (query.includes('tournament(id: $id)')) {
     const entrant = { id: 9, isDisqualified: false, standing: { placement: 3, isFinal: false } };
-    return { tournament: { ...live, events: [{ id: 50, name: event.name, slug: event.slug, state: 'ACTIVE', numEntrants: 32, ...each(entrant) }] } };
+    const tournament = String(variables.id) === String(soon.id) ? soon : live;
+    return { tournament: { ...tournament, events: [{ id: 50, name: event.name, slug: event.slug, state: 'ACTIVE', numEntrants: 32, ...each(entrant) }] } };
   }
   if (query.includes('tournamentView')) return each({ tournaments: { nodes: [] } });
   if (query.includes('tournaments(query:')) return each({ tournaments: { nodes: [live] } });
@@ -142,7 +143,7 @@ globalThis.fetch = async (url, options) => {
 };
 
 // target is the member an Apps menu command was used on
-function interaction(commandName, { subcommand = null, values = {}, user = 'crew-discord', target = null } = {}) {
+function interaction(commandName, { group = null, subcommand = null, values = {}, user = 'crew-discord', target = null } = {}) {
   const calls = [];
   const discord = (what, result) => async () => { beforeAnswer(run, what); return result; };
   const run = {
@@ -157,6 +158,7 @@ function interaction(commandName, { subcommand = null, values = {}, user = 'crew
     memberPermissions: { has: () => true },
     client: { user: { displayAvatarURL: () => 'https://cdn.example/avatar.png' } },
     options: {
+      getSubcommandGroup: () => group,
       getSubcommand: () => subcommand,
       getString: (name) => values[name] ?? null,
       getBoolean: (name) => values[name] ?? null,
@@ -179,8 +181,8 @@ const runs = [
   ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
-  ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results, stream alerts and match call pings start off/],
-  ['track', { subcommand: 'list' }, /Tracking 3/],
+  ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results and stream alerts start off/],
+  ['track', { subcommand: 'list' }, /Tracking 3.*Tracked tournaments · 0/],
   // press answers the Are you sure the command asked
   ['track', { subcommand: 'remove', values: { player: '3' }, press: 'Stop tracking' }, /Stop tracking Opponent\?.*"update",\{"content":"Stopped tracking Opponent\.".*"label":"Undo"/],
   ['link', { values: { profile: 'start.gg/user/opponent' }, user: 'opponent-discord' }, /Linked to Opponent/],
@@ -240,10 +242,15 @@ const runs = [
   ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
   ['predict', { values: { opponent: '2', verbose: true, since: '2026-01-01', venue: 'offline' } }, /How it adds up.*Offline only/],
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
-  ['stream', { values: { player: 'all', alerts: 'off' } }, /Stream alerts off for everyone/],
-  ['stream_pings', { values: { ping: 'on' } }, /pinged for every stream alert/],
-  ['sets', { values: { player: 'all', results: 'off' }, press: 'Turn off' }, /Turn set results off for all 2 tracked players\?.*"update",\{"content":"Set results off for everyone\."/],
-  ['calls', { values: { player: 'all', pings: 'off' } }, /Match call pings off for everyone/],
+  // crew has no set results field, which counts as on
+  ['track', { subcommand: 'posts', values: { player: '1' } }, /Crew: set results on, stream alerts on\./],
+  ['track', { subcommand: 'posts', values: { player: 'all', stream: 'off' } }, /Stream alerts off for everyone\./],
+  ['track', { subcommand: 'posts', values: { player: 'all', sets: 'off' }, press: 'Turn off' }, /Turn set results off for all 2 tracked players\?.*"update",\{"content":"Set results off for everyone\."/],
+  // everyone tracked has their discord in the fake server
+  ['track', { subcommand: 'cleanup' }, /Everyone tracked has their start\.gg Discord in this server/],
+  ['notify', {}, /Your pings.*Match calls:\*\* off/],
+  ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off for the whole server/],
+  ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged for every stream alert.*pinged for reg reminders/],
   ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1","thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}/],
   // left out, it's the code on crew's start.gg netplay registrations
   ['slippi', { subcommand: 'add' }, /Crew is already on the Slippi watchlist.*Crew · CREW#1.*Gold 2/],
@@ -254,13 +261,16 @@ const runs = [
   ['slippi', { subcommand: 'remove', values: { player: 'crew-uid' } }, /Took Crew \(CREW#1\) off the Slippi watchlist/],
   ['slippi', { subcommand: 'leaderboard' }, /"thumbnail":\{"url":"attachment:\/\/slippi\.png"\}.*Nobody on the watchlist yet.*"files":\[\{"attachment":"[^"]+slippi\.png","name":"slippi\.png"\}\]/],
   ['slippi', { subcommand: 'add', values: { code: 'crew-1' } }, /Added Crew to the Slippi watchlist/],
-  ['set_reg_reminder', { values: { tournament: 'start.gg/tournament/soon' } }, /gets pinged 12 hours before registration for Soon ends/],
-  ['delete_reg_reminder', { values: { tournament: 'soon' }, press: 'Delete' }, /Delete the reg reminders for Soon\?.*"update",\{"content":"Deleted the reminder for Soon\."/],
-  ['reg_admin', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Opponent is an admin of/],
-  ['reg_admin', { subcommand: 'list' }, /Reg admins · 1/],
-  ['reg_admin', { subcommand: 'remove', values: { admin: '3' } }, /No more automatic reminders/],
-  ['bracket', {}, /No tournaments set as active/], ['stream_link', {}, /twitch\.tv\/localstream/],
-  ['reg_role', { values: { ping: 'on' } }, /pinged for reg reminders/],
+  ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 12 hours before registration ends/],
+  ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on.*Tracked by hand/],
+  ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
+  ['track', { subcommand: 'list' }, /Tracked tournaments · 1.*Soon.*top 8s off/],
+  ['bracket', {}, /No tracked tournaments going on right now/],
+  ['tournament', { subcommand: 'remove', values: { tournament: 'soon' }, press: 'Stop tracking' }, /Stop tracking Soon\?.*"update",\{"content":"Stopped tracking Soon\."/],
+  ['tournament', { group: 'admin', subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Upcoming tournaments Opponent is an admin of/],
+  ['tournament', { group: 'admin', subcommand: 'list' }, /Tournament admins · 1/],
+  ['tournament', { group: 'admin', subcommand: 'remove', values: { admin: '3' } }, /won't get tracked on their own/],
+  ['stream_link', {}, /twitch\.tv\/localstream/],
   ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /Registered from this server · 1/],
   ['reg_warn', { values: { tournament: 'start.gg/tournament/soon', user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /"content":"<@someone>"/],
   ['sm4sh'], ['melee'], ['ult'], ['64'], ['brawl'], ['pplus'], ['bills', {}, /Wikimedia Commons|Imgflip|GIPHY/], ['view_pfp', {}, /pfp\.png/],
@@ -286,26 +296,33 @@ test('every command and subcommand answers without throwing', async () => {
 
   const covered = new Set();
   for (const [name, options = {}, expected] of runs) {
-    const label = `/${name} ${options.subcommand ?? ''}`;
+    const key = [name, options.group, options.subcommand].filter(Boolean).join(' ');
+    const label = `/${key}`;
     const run = interaction(name, options);
     await runningCommand.run(run, () => handleCommand(run));
     if (options.press) {
-      const asked = run.calls.find(([kind]) => kind === 'reply')?.[1];
+      // a command that looked something up first asks in its deferred reply
+      const asked = run.calls.find(([kind, result]) => ['reply', 'edit'].includes(kind) && result?.components?.length)?.[1];
       const button = asked?.components?.flatMap((row) => row.toJSON().components).find((each) => each.label === options.press);
       assert.ok(button, `${label} has no ${options.press} button`);
       await handleButton({ customId: button.custom_id, user: run.user, update: async (result) => run.calls.push(['update', result]), editReply: async () => {} });
     }
-    covered.add(options.subcommand ? `${name} ${options.subcommand}` : name);
+    covered.add(key);
     assert.deepEqual(run.waitedOn, [], `${label} waits on ${run.waitedOn.join(', ')} before answering, so discord can give up on it`);
     const answers = run.calls.filter(([kind]) => kind !== 'defer');
     assert.ok(answers.length, `${label} never answered`);
     if (expected) assert.match(JSON.stringify(answers), expected, label);
   }
 
-  // user commands run from the Apps menu, not chat, so the runs table only covers slash commands
+  // user commands run from the Apps menu, not chat, so the runs table only covers slash commands.
+  // a subcommand group's subcommands count one by one, like /tournament admin add
   const every = commands.flatMap((command) => {
-    const subcommands = (command.options ?? []).filter((option) => option.type === 1);
-    return subcommands.length ? subcommands.map((sub) => `${command.name} ${sub.name}`) : [command.name];
+    const nested = (command.options ?? []).flatMap((option) => {
+      if (option.type === 1) return [`${command.name} ${option.name}`];
+      if (option.type === 2) return option.options.map((sub) => `${command.name} ${option.name} ${sub.name}`);
+      return [];
+    });
+    return nested.length ? nested : [command.name];
   });
   assert.deepEqual(every.filter((name) => !covered.has(name)), []);
 
@@ -323,7 +340,7 @@ test('command replies naming a player never ping, even for a tag like @everyone'
   assert.deepEqual(said.allowedMentions, { parse: [] });
 
   state.players = { 9: { userId: 9, playerId: 90, tag: '@everyone', slug: 'user/evil' } };
-  const toggled = interaction('sets', { values: { player: '9', results: 'off' } });
+  const toggled = interaction('track', { subcommand: 'posts', values: { player: '9', sets: 'off' } });
   await runningCommand.run(toggled, () => handleCommand(toggled));
   const switched = toggled.calls.find(([kind]) => kind === 'reply')?.[1];
   assert.match(switched.content, /Set results off/);

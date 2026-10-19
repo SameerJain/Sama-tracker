@@ -1,26 +1,42 @@
 import { escapeMarkdown } from 'discord.js';
+import { startggUrl } from '../startgg.js';
 import { colors, FOOTER, baseEmbed, withLines, withSections, playerLink, count } from './shared.js';
 
-// linked is how many people linked their own start.gg without being tracked
-export function trackedList(players, linked = 0) {
+// /tournament posts switches a tracked tournament can have off, named for the list
+const TOURNAMENT_POSTS = { sets: 'sets off', stream: 'stream alerts off', top8: 'top 8s off', reminders: 'reg reminders off' };
+
+// tracked players, then tracked tournaments that aren't over. linked is how many people linked their own start.gg without being tracked
+export function trackedList(players, linked = 0, tournaments = {}) {
   const all = Object.values(players).sort((a, b) => a.tag.localeCompare(b.tag));
   const embed = baseEmbed(colors.brand).setTitle(`Tracking ${all.length}`);
-  // only what differs from a new player, who has set results, stream alerts and match call pings off. no field means on for the first two
+  // only what differs from a new player, who has set results and stream alerts off. no field means on
   const lines = all.map((player) => {
-    const notes = [player.setResults !== false && 'set results on', player.streamAlerts !== false && 'stream alerts on', player.callPings === true && 'match call pings on'].filter(Boolean);
+    const notes = [player.setResults !== false && 'set results on', player.streamAlerts !== false && 'stream alerts on'].filter(Boolean);
     return notes.length ? `${playerLink(player)} · ${notes.join(' · ')}` : playerLink(player);
   });
   if (!all.length) lines.push('Nobody yet. Add someone with `/track add`.');
-  lines.push('', '-# Their placements get posted here, plus their sets, streams and match calls once `/sets`, `/stream` and `/calls` turn them on. Players with no reported sets in 6 months come off the list on their own. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
+  lines.push('', '-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Players with no reported sets in 6 months come off the list on their own, and `/track cleanup` untracks anyone whose start.gg Discord isn\'t in this server. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
   if (linked) lines.push(`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
-  return withLines(embed, lines);
+
+  // only what's off, since everything starts on
+  const tracked = Object.values(tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted)
+    .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
+  const tournamentLines = tracked.map((tournament) => {
+    const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => tournament.tracked[name] === false).map(([, note]) => note);
+    if (tournament.tracked.by === 'admin') notes.push('from a tournament admin');
+    const when = tournament.startAt ? ` · <t:${tournament.startAt}:d>` : '';
+    return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
+  });
+  if (!tracked.length) tournamentLines.push('None yet. `/tournament add` tracks one, and tournament admins\' upcoming ones get tracked on their own.');
+  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders. `/tournament posts` changes that, and needs Manage Server');
+  return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(`Tracked tournaments · ${tracked.length}`), tournamentLines)];
 }
 
 export function regAdmins(admins) {
   const all = Object.values(admins).sort((a, b) => a.tag.localeCompare(b.tag));
-  const embed = baseEmbed(colors.brand).setTitle(`Reg admins · ${all.length}`);
-  if (!all.length) return embed.setDescription('Nobody yet. Add a TO with `/reg_admin add`.');
-  return embed.setDescription(`Their tournaments get reg reminders automatically.\n\n${all.map(playerLink).join('\n')}`);
+  const embed = baseEmbed(colors.brand).setTitle(`Tournament admins · ${all.length}`);
+  if (!all.length) return embed.setDescription('Nobody yet. Add a TO with `/tournament admin add`.');
+  return embed.setDescription(`Their upcoming start.gg tournaments get tracked on their own.\n\n${all.map(playerLink).join('\n')}`);
 }
 
 const SITES = {
@@ -97,18 +113,21 @@ export function help() {
     ],
     [
       '**Tracking players**',
-      '`/track add` track someone by start.gg link or ID',
+      '`/track add` track someone by start.gg link or ID. Their placements post here',
       '`/track remove` stop tracking someone. Asks first, then Undo puts them back with their settings for a minute',
-      '`/track list` everyone tracked',
-      '`/sets` automatic set results on or off. Off for everyone asks first',
-      '`/stream` stream alerts on or off',
-      '`/stream_pings` get pinged for every stream alert, on or off. Just for you, no tracking needed',
-      '`/calls` match call pings on or off',
-      '`/upcoming` live and upcoming tournaments with 3 or more of the crew',
+      '`/track list` everyone tracked, and the tracked tournaments',
+      '`/track posts` someone\'s set results and stream alerts on or off. Off for everyone asks first',
+      '`/track cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. Needs Manage Server',
+      '`/upcoming` tracked tournaments, and any other with 3 or more of the crew',
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
-      '-# New players start with set results, stream alerts and match call pings off. `player:all` works with sets, stream, calls, upcoming and recent',
+      '-# New players start with set results and stream alerts off. `player:all` works with posts, upcoming and recent',
       '-# Players with no reported sets in 6 months come off the track list on their own',
+    ],
+    [
+      '**Your pings**',
+      '`/notify` your pings. `calls` when your match is called, `streams` for every stream alert, `registration` for reg reminders, `all` for all three. Leave them out to see yours',
+      '-# Only ever changes you. `calls` needs you linked, or tracked with Discord on start.gg. Reg reminders skip you once you\'re registered, if start.gg has your Discord',
     ],
     [
       '**Linking yourself**',
@@ -142,16 +161,16 @@ export function help() {
       '-# Cards show the rank badge and their most played character. Tracked and linked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it',
     ],
     [
-      '**Registration**',
-      '`/set_reg_reminder` remind people to register, and track everyone registered (80 or fewer)',
-      '`/delete_reg_reminder` cancel one. Asks first',
-      '`/reg_admin` TOs whose start.gg tournaments get reminders automatically',
-      '`/reg_role` reminder pings on or off. Skipped once you\'re registered, if start.gg has your Discord',
+      '**Tournaments**',
+      '`/tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders',
+      '`/tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute',
+      '`/tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off',
+      '`/tournament admin` TOs whose upcoming start.gg tournaments get tracked on their own',
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
       '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours',
-      '`/bracket` bracket links for reminder tournaments that are live or start within 30 min',
-      '`/stream_link` stream links for tracked and reminder tournaments that are live or start within 30 min',
-      '-# `tournament:` takes a link or one the bot knows',
+      '`/bracket` bracket links for tracked tournaments that are live or start within 30 min',
+      '`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min',
+      '-# `/tournament` needs Manage Server, which can hand it to other roles under Server Settings > Integrations. `tournament:` takes a link or one the bot knows',
     ],
     [
       '**Fun**',
@@ -167,17 +186,17 @@ export function help() {
     ],
     [
       '**Posted here automatically**',
-      '• finished sets of players with `/sets` on, and their first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked',
-      '• sets on stream or up next in the stream queue for 30 seconds, for players with `/stream` on, pinging everyone with `/stream_pings` on',
-      '• called sets, pinging players with `/calls` on whose Discord is on start.gg, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
-      '• a roll call an hour before a tournament with 3+ of the crew',
-      '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
-      '• where everyone placed, 12 hours after it ends. Projected placements get edited once start.gg has them final',
-      '• with `/messages top8` on, the full top 8 of each event the crew played in, as soon as the bracket is finished',
+      '• every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked',
+      '• sets on stream or up next in the stream queue for 30 seconds, at tracked tournaments and for tracked players with stream alerts on, pinging everyone with `/notify streams` on',
+      '• called sets, pinging whoever has `/notify calls` on, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
+      '• a roll call an hour before a tournament with 3+ of the crew. At a tracked tournament that counts linked players and anyone registered whose start.gg Discord is in this server',
+      '• reg reminders for tracked tournaments a week, 3 days and a day out, then a last call 12 hours before',
+      '• where the crew placed, 12 hours after it ends. Projected placements get edited once start.gg has them final',
+      '• the full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
       '• Slippi rank changes for the watchlist, checked every 30 minutes',
       '• Bills final scores with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',
       '• a weekly recap of players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
-      '-# `/messages threads` has three modes for set results and stream alerts: off, one thread per tournament, or one thread per event. One per tournament pins its channel card until the tournament ends. If a thread can\'t be used, they post here',
+      '-# Tracked tournaments post their set results and stream alerts in a thread. `/messages threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. One per tournament pins its channel card until the tournament ends. If a thread can\'t be used, they post here',
     ],
   ];
   return withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections);

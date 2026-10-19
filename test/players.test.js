@@ -224,11 +224,12 @@ test('linked people can be picked in lookups, but not in the commands about what
   // by the id autocomplete sends, or typed out
   assert.equal((await run('stats', 'crew-discord', { player: '7' })).embeds[0].data.title, 'Me');
   assert.equal((await run('stats', 'crew-discord', { player: 'me' })).embeds[0].data.title, 'Me');
-  for (const [command, values] of [['stream', { alerts: 'off' }], ['sets', { results: 'off' }], ['calls', { pings: 'off' }], ['track', {}]]) {
-    const reply = await run(command, 'crew-discord', { player: '7', ...values }, command === 'track' ? 'remove' : null);
-    assert.match(reply.content, /Only tracked players can be picked here/, command);
+  for (const subcommand of ['posts', 'remove']) {
+    const reply = await run('track', 'crew-discord', { player: '7', sets: 'off', stream: 'off' }, subcommand);
+    assert.match(reply.content, /Only tracked players can be picked here/, subcommand);
   }
   assert.equal(state.links['me-discord'].streamAlerts, undefined);
+  assert.equal(state.links['me-discord'].setResults, undefined);
 });
 
 test('/scout works for someone linked, as long as start.gg still has their discord', async () => {
@@ -296,7 +297,7 @@ test('/link to a different profile says what it replaced', async () => {
 test('/link with the profile left out finds your start.gg by the Discord connected there', async () => {
   state.players = {};
   state.links = {};
-  state.regReminders = {};
+  state.tournaments = {};
   // seen in a tournament's participant list
   state.accounts = { 'me-discord': 7 };
   const requests = [];
@@ -319,44 +320,79 @@ test('/link with the profile left out finds your start.gg by the Discord connect
   state.accounts = {};
 });
 
-test('/stream for someone from /link says there are no alerts instead of pretending', async () => {
+test('/track posts for someone from /link says they aren\'t tracked instead of pretending', async () => {
   state.players = { 1: crew };
   state.links = { 'me-discord': me };
-  const reply = await run('stream', 'me-discord', { alerts: 'off' });
+  const reply = await run('track', 'me-discord', { sets: 'off', stream: 'off' }, 'posts');
   assert.ok(reply.flags);
-  assert.match(reply.content, /aren't tracked/);
+  assert.match(reply.content, /^Me isn't tracked, so nothing about them gets posted\. `\/track add` them first\.$/);
   assert.equal(state.links['me-discord'].streamAlerts, undefined);
-});
-
-test('/calls for someone from /link says there are no pings to change instead of pretending', async () => {
-  state.players = { 1: crew };
-  state.links = { 'me-discord': me };
-  const reply = await run('calls', 'me-discord', { pings: 'off' });
-  assert.ok(reply.flags);
-  assert.match(reply.content, /aren't tracked/);
-  assert.equal(state.links['me-discord'].callPings, undefined);
-});
-
-test('/sets for someone from /link says there are no results to change instead of pretending', async () => {
-  state.players = { 1: crew };
-  state.links = { 'me-discord': me };
-  const reply = await run('sets', 'me-discord', { results: 'off' });
-  assert.ok(reply.flags);
-  assert.match(reply.content, /aren't tracked/);
   assert.equal(state.links['me-discord'].setResults, undefined);
 });
 
-test('/track add starts set results, stream alerts and match call pings off and says how to turn them on', async () => {
+test('/track posts changes one or both switches, and with none says where they\'re at', async () => {
+  state.players = { 1: { ...crew, setResults: false, streamAlerts: false }, 2: { userId: 2, playerId: 20, tag: 'Old', slug: 'user/old' } };
+  state.links = {};
+  const shown = await run('track', 'someone', { player: '1' }, 'posts');
+  assert.ok(shown.flags);
+  assert.equal(shown.content, 'Crew: set results off, stream alerts off.');
+  // saved before either started off, so both count as on
+  assert.equal((await run('track', 'someone', { player: 'all' }, 'posts')).content, 'Set results are on for 1 and stream alerts for 1 of the 2 tracked players.');
+
+  assert.equal((await run('track', 'someone', { player: '1', sets: 'on', stream: 'on' }, 'posts')).content, 'Set results and stream alerts on for Crew.');
+  assert.ok(state.players[1].setResultsOnAt > 0);
+  assert.equal(state.players[1].streamAlerts, true);
+  assert.equal((await run('track', 'someone', { player: '1', sets: 'off', stream: 'on' }, 'posts')).content, 'Set results off and stream alerts on for Crew.');
+  // stream alerts save no on time: they're about sets live right now
+  assert.equal(state.players[1].streamAlertsOnAt, undefined);
+  assert.equal((await run('track', 'someone', { player: 'all', stream: 'off' }, 'posts')).content, 'Stream alerts off for everyone.');
+  assert.ok(Object.values(state.players).every((player) => player.streamAlerts === false));
+});
+
+test('/notify only changes whoever ran it, and match calls need their start.gg', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = { 'me-discord': me };
+  state.callPings = [];
+  state.streamPings = [];
+  state.regPings = [];
+  state.messages = {};
+  globalThis.fetch = async () => assert.fail('no start.gg lookup');
+
+  // nobody to look up, so calls stay off and the rest still go through
+  const stranger = await run('notify', 'stranger', { calls: 'on', streams: 'on' });
+  assert.ok(stranger.flags);
+  assert.match(stranger.content, /^Match call pings need your start\.gg, so `\/link` first\..*\nYou'll get pinged for every stream alert posted here\.$/);
+  assert.deepEqual(state.callPings, []);
+  assert.deepEqual(state.streamPings, ['stranger']);
+
+  // linked, or tracked with this discord on start.gg
+  assert.match((await run('notify', 'me-discord', { calls: 'on' })).content, /^You'll get pinged when your match is called\.$/);
+  assert.match((await run('notify', 'crew-discord', { calls: 'on' })).content, /^You'll get pinged when your match is called\.$/);
+  assert.deepEqual(state.callPings, ['me-discord', 'crew-discord']);
+
+  // nothing given shows where theirs are at, and a tracked player's own posts
+  const mine = await run('notify', 'crew-discord');
+  assert.ok(mine.flags);
+  assert.match(mine.content, /\*\*Match calls:\*\* on\n\*\*Stream alerts:\*\* off\n\*\*Reg reminders:\*\* off\n-# You're tracked as Crew, with set results on and stream alerts on/);
+  assert.doesNotMatch((await run('notify', 'me-discord')).content, /You're tracked/);
+
+  assert.match((await run('notify', 'me-discord', { calls: 'off' })).content, /^No more match call pings\.$/);
+  assert.deepEqual(state.callPings, ['crew-discord']);
+  state.callPings = [];
+  state.streamPings = [];
+});
+
+test('/track add starts set results and stream alerts off and says how to turn them on', async () => {
   state.players = {};
   state.links = {};
   state.tournaments = {};
   // the second answer is for the tournament check it kicks off
   mockApi(({ query }) => (query.includes('user(slug:') ? { user: { id: 8, slug: 'user/new', player: { id: 80, gamerTag: 'New' } } } : {}));
   const reply = await run('track', 'someone', { profile: 'start.gg/user/new' }, 'add');
-  assert.match(reply.embeds[0].data.description, /^Now tracking \[New\].*\. Their placements post here\.\n-# Set results, stream alerts and match call pings start off\. `\/sets`, `\/stream` and `\/calls` turn them on$/);
+  assert.match(reply.embeds[0].data.description, /^Now tracking \[New\].*\. Their placements post here\.\n-# Set results and stream alerts start off\. `\/track posts` turns them on$/);
   assert.equal(state.players[8].setResults, false);
   assert.equal(state.players[8].streamAlerts, false);
-  assert.equal(state.players[8].callPings, false);
+  assert.equal(state.players[8].callPings, undefined);
   await settle();
 });
 
@@ -375,25 +411,35 @@ test('/recent all asks about players with set results on first, since only their
   assert.ok(asked.includes('p10'));
 });
 
-test('/track list only notes what differs from a new player', () => {
-  const [list] = embeds.trackedList({
-    1: { ...crew, setResults: false, streamAlerts: false, callPings: false },
+test('/track list only notes what differs from a new player, then lists tracked tournaments', () => {
+  const now = Math.floor(Date.now() / 1000);
+  const [list, tournaments] = embeds.trackedList({
+    1: { ...crew, setResults: false, streamAlerts: false },
     2: { userId: 2, playerId: 20, tag: 'Old', slug: 'user/old' },
-    3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', setResults: true, streamAlerts: false, callPings: false },
-    4: { userId: 4, playerId: 40, tag: 'Streamer', slug: 'user/streamer', setResults: false, streamAlerts: true, callPings: false },
-    5: { userId: 5, playerId: 50, tag: 'Called', slug: 'user/called', setResults: false, streamAlerts: false, callPings: true },
+    3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', setResults: true, streamAlerts: false },
+    4: { userId: 4, playerId: 40, tag: 'Streamer', slug: 'user/streamer', setResults: false, streamAlerts: true },
+  }, 0, {
+    5: { id: 5, name: 'Weekly', slug: 'tournament/weekly', startAt: now + 86400, tracked: { by: 'admin', sets: true, stream: true, top8: false, reminders: true } },
+    6: { id: 6, name: 'Local', slug: 'tournament/local', startAt: now + 3600, tracked: { by: 'manual', sets: true, stream: true, top8: true, reminders: true } },
+    // the crew's, not tracked, and one that's over
+    7: { id: 7, name: 'Major', slug: 'tournament/major', startAt: now },
+    8: { id: 8, name: 'Done', slug: 'tournament/done', startAt: now - 86400, resultsPosted: true, tracked: { by: 'manual' } },
   });
-  const lines = Object.fromEntries(list.data.description.split('\n').slice(0, 5).map((line) => {
+  const lines = Object.fromEntries(list.data.description.split('\n').slice(0, 4).map((line) => {
     const tag = line.match(/^\[(.+?)\]/)?.[1];
     return [tag, line];
   }));
   assert.equal(lines.Crew, '[Crew](https://www.start.gg/user/crew)');
-  // saved before either started off, so both still count as on. match call pings need an explicit on
+  // saved before either started off, so both still count as on
   assert.match(lines.Old, /\[Old\].* · set results on · stream alerts on$/);
   assert.match(lines.Quiet, /\[Quiet\].* · set results on$/);
   assert.match(lines.Streamer, /\[Streamer\].* · stream alerts on$/);
-  assert.match(lines.Called, /\[Called\].* · match call pings on$/);
-  assert.match(list.data.description, /plus their sets, streams and match calls once `\/sets`, `\/stream` and `\/calls` turn them on/);
+  assert.match(list.data.description, /plus their sets and streams once `\/track posts` turns them on/);
+
+  assert.equal(tournaments.data.title, 'Tracked tournaments · 2');
+  const [first, second] = tournaments.data.description.split('\n');
+  assert.equal(first, `[Local](https://www.start.gg/tournament/local) · <t:${now + 3600}:d>`);
+  assert.equal(second, `[Weekly](https://www.start.gg/tournament/weekly) · <t:${now + 86400}:d> · top 8s off · from a tournament admin`);
 });
 
 test('autocomplete puts recent picks first and matches names loosely', async () => {
@@ -431,9 +477,9 @@ test('autocomplete puts recent picks first and matches names loosely', async () 
 });
 
 test('autocomplete explains an empty list instead of showing nothing', async () => {
-  const choicesFor = async (typed, commandName = 'stats') => {
+  const choicesFor = async (typed, commandName = 'stats', subcommand = null) => {
     let choices;
-    await handleAutocomplete({ commandName, user: { id: 'anyone' }, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async c => { choices = c; } });
+    await handleAutocomplete({ commandName, user: { id: 'anyone' }, options: { getSubcommand: () => subcommand, getFocused: () => typed }, respond: async c => { choices = c; } });
     return choices;
   };
   state.players = {};
@@ -446,9 +492,9 @@ test('autocomplete explains an empty list instead of showing nothing', async () 
   // linked people come after the tracked ones, marked, and only where they can be picked
   state.links = { 'me-discord': { ...me, tag: 'Crewmate' } };
   assert.deepEqual(await choicesFor('cr'), [{ name: 'Crew', value: '1' }, { name: 'Crewmate (linked)', value: '7' }]);
-  assert.deepEqual(await choicesFor('cr', 'sets'), [{ name: 'Crew', value: '1' }]);
-  assert.deepEqual(await choicesFor('cr', 'calls'), [{ name: 'Crew', value: '1' }]);
-  assert.deepEqual(await choicesFor('mate', 'stream'), [{ name: 'Nobody tracked matches "mate"', value: 'mate' }]);
+  assert.deepEqual(await choicesFor('cr', 'track', 'posts'), [{ name: 'Crew', value: '1' }]);
+  assert.deepEqual(await choicesFor('cr', 'track', 'remove'), [{ name: 'Crew', value: '1' }]);
+  assert.deepEqual(await choicesFor('mate', 'track', 'posts'), [{ name: 'Nobody tracked matches "mate"', value: 'mate' }]);
 });
 
 // a won, b lost. seeds and rounds vary so every verbose line has something to show

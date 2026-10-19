@@ -18,8 +18,16 @@ const MATCHUP = 'Tracked or linked player to compare with, or a start.gg profile
 const MATCHUP_YOU = 'Tracked or linked player, or a start.gg profile link or ID. Leave out for yourself';
 
 // picking one saves pasting a link, which is slow on a phone
-const KNOWN_TOURNAMENT = 'start.gg tournament link, or pick one with a reminder or tracked players in it';
+const KNOWN_TOURNAMENT = 'start.gg tournament link, or pick one that\'s tracked or has tracked players in it';
 const UPCOMING_TOURNAMENT = 'start.gg tournament link, or pick an upcoming one tracked players are in';
+const TRACKED_TOURNAMENT = 'Tracked tournament';
+
+const ON_OFF = [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }];
+
+// an on or off switch. left out means leave it as it is
+function switchOption(name, description) {
+  return { type: Option.String, name, description, choices: ON_OFF };
+}
 
 // long-press a member, then Apps. these names are what the menu shows, so they can have capitals and spaces
 const MEMBER_H2H = 'H2H with me';
@@ -83,12 +91,12 @@ export const commands = [
   },
   {
     name: 'track',
-    description: 'Players whose placements get posted here, plus more with /sets, /stream and /calls on',
+    description: 'Players whose placements get posted here, plus their sets and streams with /track posts',
     options: [
       {
         type: Option.Subcommand,
         name: 'add',
-        description: 'Post a start.gg player\'s placements here. /sets, /stream and /calls turn on more posts',
+        description: 'Post a start.gg player\'s placements here. /track posts turns on their sets and streams',
         options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
       },
       {
@@ -97,7 +105,33 @@ export const commands = [
         description: 'Stop tracking a player. Asks first, then Undo puts them back for a minute',
         options: [playerOption('Tracked player')],
       },
-      { type: Option.Subcommand, name: 'list', description: 'List tracked players' },
+      { type: Option.Subcommand, name: 'list', description: 'List tracked players and tournaments' },
+      {
+        type: Option.Subcommand,
+        name: 'posts',
+        description: 'A tracked player\'s set results and stream alerts on or off. Leave both out to see them',
+        options: [
+          playerOption('Tracked player, or all'),
+          switchOption('sets', 'Their finished sets. Off for everyone asks first'),
+          switchOption('stream', 'Their sets on stream or up next in the stream queue'),
+        ],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'cleanup',
+        description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. Manage Server',
+        options: [{ type: Option.Boolean, name: 'no_discord', description: 'Also untrack players with no Discord connected on start.gg' }],
+      },
+    ],
+  },
+  {
+    name: 'notify',
+    description: 'What pings you: match calls, stream alerts and reg reminders. Leave all out to see yours',
+    options: [
+      switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
+      switchOption('streams', 'Every stream alert posted here'),
+      switchOption('registration', 'Reg reminders for tracked tournaments, skipped once you\'re registered'),
+      switchOption('all', 'All three at once'),
     ],
   },
   {
@@ -187,59 +221,6 @@ export const commands = [
     ],
   },
   {
-    name: 'stream',
-    description: 'Turn on-stream alerts on or off. Newly tracked players start with them off',
-    options: [
-      playerOption('Tracked player, or all'),
-      {
-        type: Option.String,
-        name: 'alerts',
-        description: 'on or off',
-        required: true,
-        choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
-      },
-    ],
-  },
-  {
-    name: 'stream_pings',
-    description: 'Get pinged for every stream alert, whoever is on stream. On or off, for yourself',
-    options: [{
-      type: Option.String,
-      name: 'ping',
-      description: 'on or off',
-      required: true,
-      choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
-    }],
-  },
-  {
-    name: 'sets',
-    description: 'Turn automatic set results on or off. Newly tracked players start off. All off asks first',
-    options: [
-      playerOption('Tracked player, or all'),
-      {
-        type: Option.String,
-        name: 'results',
-        description: 'on or off',
-        required: true,
-        choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
-      },
-    ],
-  },
-  {
-    name: 'calls',
-    description: 'Turn match call pings on or off. Newly tracked players start with them off',
-    options: [
-      playerOption('Tracked player, or all'),
-      {
-        type: Option.String,
-        name: 'pings',
-        description: 'on or off',
-        required: true,
-        choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
-      },
-    ],
-  },
-  {
     name: 'slippi',
     description: 'Slippi ranked: a watchlist with rank change posts, rank cards and a leaderboard',
     options: [
@@ -266,47 +247,61 @@ export const commands = [
   },
   { name: 'status', description: 'Uptime, when the latest version was deployed, and the last start.gg and Slippi checks' },
   {
-    name: 'set_reg_reminder',
-    description: 'Set a registration reminder and track everyone registered (80 or fewer)',
-    options: [{ type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true }],
-  },
-  {
-    name: 'delete_reg_reminder',
-    description: 'Cancel a registration reminder. Asks first',
-    options: [{ type: Option.String, name: 'tournament', description: 'Tournament with a reminder', required: true, autocomplete: true }],
-  },
-  {
-    name: 'reg_admin',
-    description: 'TOs whose tournaments get reg reminders automatically',
+    name: 'tournament',
+    description: 'Tournaments whose every set, stream alert and top 8 post here, plus their reg reminders',
+    default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
     options: [
       {
         type: Option.Subcommand,
         name: 'add',
-        description: 'Set reminders for every tournament a start.gg user is an admin of',
-        options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
+        description: 'Track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders',
+        options: [
+          { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
+          switchOption('reminders', 'Reg reminders for people with /notify registration on. On unless you turn them off'),
+        ],
       },
       {
         type: Option.Subcommand,
         name: 'remove',
-        description: 'Stop setting reminders for their tournaments',
-        options: [{ type: Option.String, name: 'admin', description: 'Reg admin', required: true, autocomplete: true }],
+        description: 'Stop tracking a tournament. Asks first, then Undo puts it back for a minute',
+        options: [{ type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true }],
       },
-      { type: Option.Subcommand, name: 'list', description: 'List reg admins' },
+      {
+        type: Option.Subcommand,
+        name: 'posts',
+        description: 'What a tracked tournament posts, on or off. Leave them all out to see them',
+        options: [
+          { type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true },
+          switchOption('sets', 'Every finished set, whoever played'),
+          switchOption('stream', 'Every set on stream or up next in the stream queue'),
+          switchOption('top8', 'Each event\'s top 8 once the bracket is finished'),
+          switchOption('reminders', 'Reg reminders for people with /notify registration on'),
+        ],
+      },
+      {
+        type: Option.SubcommandGroup,
+        name: 'admin',
+        description: 'TOs whose start.gg tournaments get tracked on their own',
+        options: [
+          {
+            type: Option.Subcommand,
+            name: 'add',
+            description: 'Track every upcoming tournament a start.gg user is an admin of',
+            options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
+          },
+          {
+            type: Option.Subcommand,
+            name: 'remove',
+            description: 'Stop tracking their new tournaments. Ones already tracked stay',
+            options: [{ type: Option.String, name: 'admin', description: 'Tournament admin', required: true, autocomplete: true }],
+          },
+          { type: Option.Subcommand, name: 'list', description: 'List tournament admins' },
+        ],
+      },
     ],
   },
-  { name: 'bracket', description: 'Bracket links for reg reminder tournaments that are live or start within 30 min' },
-  { name: 'stream_link', description: 'Stream links for tracked and reminder tournaments that are live or start within 30 min' },
-  {
-    name: 'reg_role',
-    description: 'Reg reminder pings for yourself, on or off',
-    options: [{
-      type: Option.String,
-      name: 'ping',
-      description: 'on or off',
-      required: true,
-      choices: [{ name: 'on', value: 'on' }, { name: 'off', value: 'off' }],
-    }],
-  },
+  { name: 'bracket', description: 'Bracket links for tracked tournaments that are live or start within 30 min' },
+  { name: 'stream_link', description: 'Stream links for tournaments that are tracked or have tracked players, live or starting soon' },
   {
     name: 'registered',
     description: 'Who in this server is registered for a tournament, going by the Discord on their start.gg',

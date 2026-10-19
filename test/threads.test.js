@@ -375,3 +375,96 @@ test('missingThreadPermissions names what the channel lacks', () => {
   assert.equal(tracker.missingThreadPermissions({ ...fakeChannel(), isThread: () => true }), null);
   assert.equal(tracker.missingThreadPermissions(undefined), null);
 });
+
+// a tracked tournament going on now, with one event and everything it can post on
+const trackedLocal = (more = {}) => ({
+  id: 5, name: 'Local', slug: 'tournament/local', startAt: now() - 3600, endAt: now() + 3600, entries: [], userIds: [],
+  events: [{ id: 601, name: 'Singles', slug: 'tournament/local/event/singles', state: 'ACTIVE', numEntrants: 32 }],
+  tracked: { by: 'manual', at: now(), sets: true, stream: true, top8: true, reminders: true }, lastCheck: now() - 120, ...more,
+});
+// a set between two people nobody tracks. a score of -1 is a DQ
+const strangers = (id, at, inTournament, scores = [2, 1]) => ({
+  ...node(id, at, inTournament),
+  slots: [50, 60].map((id, i) => ({
+    entrant: { id, name: i ? 'Guest' : 'Visitor', initialSeedNum: i + 1, participants: [{ player: { id } }] },
+    standing: { stats: { score: { value: scores[i] } } },
+  })),
+});
+
+test('a tracked tournament posts every finished set in its thread even with threads off, and one both checks find posts once', async () => {
+  state.messages = {};
+  const local = tournament('Local');
+  state.tournaments = { 5: trackedLocal() };
+  const lastCheck = state.tournaments[5].lastCheck;
+  const channel = fakeChannel();
+  // nobody tracked in the first, the crew's set comes back from both checks, and a no-show DQ
+  const eventSets = [strangers('t1', now() - 30, local), node('t2', now() - 20, local), strangers('t3', now() - 10, local, [-1, 0])];
+  const asked = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    if (query.includes('e601: event')) {
+      asked.push(`event since ${variables.filters.updatedAfter}`);
+      return { ok: true, json: async () => ({ data: { e601: { sets: { pageInfo: { totalPages: 1 }, nodes: eventSets } } } }) };
+    }
+    asked.push('players');
+    return { ok: true, json: async () => ({ data: { p10: { sets: { nodes: [node('t2', now() - 20, local)] } } } }) };
+  };
+  await tracker.postNewSets(channel);
+
+  // from its own last check, with the 2 minutes of overlap
+  assert.deepEqual(asked.toSorted(), [`event since ${lastCheck - 120}`, 'players']);
+  // one card starts the thread, and the two sets go in it. the DQ'd one isn't tracked, so it stays out
+  assert.deepEqual(channel.sent.map((message) => message.embeds[0].data.author.name), ['Tournament thread']);
+  const [thread] = channel.threads.all.values();
+  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.title), ['W · Visitor 2-1 Guest · L', 'W · Active 2-1 Opponent · L']);
+  // nobody tracked is the brand color, a tracked winner is green
+  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.color), [0x5b21b6, 0x22c55e]);
+  assert.ok(state.tournaments[5].lastCheck > lastCheck);
+
+  // a later check skips what's posted
+  await tracker.postNewSets(channel);
+  assert.equal(thread.sent.length, 2);
+
+  // switched off for the tournament, the crew's sets still post where /messages threads says
+  state.tournaments[5].tracked.sets = false;
+  asked.length = 0;
+  sets = [node('t4', now() - 5, local)];
+  globalThis.fetch = async () => {
+    asked.push('players');
+    return { ok: true, json: async () => ({ data: { p10: { sets: { nodes: sets } } } }) };
+  };
+  await tracker.postNewSets(channel);
+  assert.deepEqual(asked, ['players']);
+  // still tracked, so it still goes in the tournament's thread
+  assert.equal(thread.sent.length, 3);
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { sets: { nodes: sets } } } }) });
+});
+
+test('a tracked tournament announces everything in its stream queue, with nobody tracked in it', async () => {
+  state.messages = {};
+  state.players = {};
+  const local = tournament('Local');
+  state.tournaments = { 5: trackedLocal() };
+  const channel = fakeChannel();
+  const queued = { ...strangers('q1', null, local), state: 2, updatedAt: now(), stream: null };
+  const asked = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query } = JSON.parse(options.body);
+    asked.push(query.includes('streamQueue') ? 'queue' : 'players');
+    return { ok: true, json: async () => ({ data: { tournament: { streamQueue: [{ stream: { streamName: 'local', streamSource: 'TWITCH' }, sets: [queued] }] } } }) };
+  };
+  await tracker.postStreamAlerts(channel, 0);
+  // nobody has alerts on, so only the queue gets asked about, again for the confirm
+  assert.deepEqual(asked, ['queue', 'queue']);
+  const [thread] = channel.threads.all.values();
+  assert.equal(thread.sent.length, 1);
+  assert.match(thread.sent[0].embeds[0].data.title, /^On stream · /);
+
+  // switched off for the tournament, its queue isn't asked about
+  state.tournaments[5].tracked.stream = false;
+  state.streamed = [];
+  asked.length = 0;
+  await tracker.postStreamAlerts(channel, 0);
+  assert.deepEqual(asked, []);
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { sets: { nodes: sets } } } }) });
+});

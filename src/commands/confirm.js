@@ -30,14 +30,16 @@ function choiceButton(choice, kind, target, discordId, label, style) {
   return new ButtonBuilder().setCustomId([choice, kind, target, discordId].join(':')).setLabel(label).setStyle(style);
 }
 
-// the question goes in the channel like the answer would have, with label on the button that goes ahead
+// the question goes in the channel like the answer would have, with label on the button that goes ahead.
+// a command that had to look something up first already deferred, so it edits that in
 function askFirst(interaction, kind, target, question, label) {
   const { id } = interaction.user;
-  return interaction.reply({
+  const asking = {
     content: question,
     components: buttonRow(choiceButton('confirm', kind, target, id, label, ButtonStyle.Danger), choiceButton('cancel', kind, target, id, 'Cancel', ButtonStyle.Secondary)),
     allowedMentions: { parse: [] },
-  });
+  };
+  return interaction.deferred ? interaction.editReply(asking) : interaction.reply(asking);
 }
 
 // an Undo button that puts record back, and comes off the message once the minute is up. reply is the

@@ -1,14 +1,18 @@
-import { MessageFlags, escapeMarkdown } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { ROLL_CALL_MIN_PLAYERS, RUNS_LATE_HOURS, checkTournaments, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
-import { findAccount } from '../accounts.js';
-import { buttonRow, findPlayer, h2hButton, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
+import { ROLL_CALL_MIN_PLAYERS, RUNS_LATE_HOURS, checkTournaments, crewOf, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
+import { findAccount, serverMembers } from '../accounts.js';
+import { count } from '../embeds/shared.js';
+import { buttonRow, findPlayer, flag, h2hButton, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
 import { askFirst, confirmable, undoRow } from './confirm.js';
 
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
+
+// /track cleanup's Are you sure names this many, then says how many more
+const CLEANUP_NAMED = 10;
 
 async function trackAdd(interaction) {
   const input = interaction.options.getString('profile', true);
@@ -32,7 +36,7 @@ async function trackAdd(interaction) {
 function trackRemove(interaction) {
   const player = readPlayer(interaction, 'player', { trackedOnly: true });
   if (!player) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
-  return askFirst(interaction, 'untrack', player.userId, `Stop tracking ${player.tag}? Their set result, stream alert and match call settings go with them.`, 'Stop tracking');
+  return askFirst(interaction, 'untrack', player.userId, `Stop tracking ${player.tag}? Their set result and stream alert settings go with them.`, 'Stop tracking');
 }
 
 confirmable('untrack', {
@@ -51,7 +55,59 @@ confirmable('untrack', {
     save();
     return `Tracking ${player.tag} again, with the same settings as before.`;
   },
-  tooLate: 'Too late to undo. `/track add` them again, with set results, stream alerts and match call pings starting off.',
+  tooLate: 'Too late to undo. `/track add` them again, with set results and stream alerts starting off.',
+});
+
+// who /track cleanup asked about, by the id its buttons carry, until someone presses one. a restart in between
+// loses it, and the button says to run it again
+const cleanups = new Map();
+
+// tracked players whose start.gg discord isn't in this server, which is most of a track list that grew from bulk
+// adds. no discord on start.gg says nothing about where someone is, so they stay unless no_discord says otherwise.
+// asks first, then Undo puts everyone back for a minute
+async function trackCleanup(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return replyEphemeral(interaction, 'You need Manage Server permission to clean up the track list.');
+  const noDiscord = flag(interaction, 'no_discord');
+
+  await interaction.deferReply();
+  const players = Object.values(state.players);
+  const members = await serverMembers(interaction.guild, [...new Set(players.map((player) => player.discordId).filter(Boolean))]);
+  const away = players.filter((player) => player.discordId && !members.has(player.discordId));
+  const unknown = players.filter((player) => !player.discordId);
+  const going = noDiscord ? [...away, ...unknown] : away;
+  const kept = noDiscord || !unknown.length ? '' : `\n-# ${count(unknown.length, 'player has', 'players have')} no Discord on start.gg and stay${unknown.length === 1 ? 's' : ''}. \`no_discord:True\` untracks them too`;
+  if (!going.length) return interaction.editReply({ content: `Everyone tracked has their start.gg Discord in this server.${kept}`, allowedMentions: { parse: [] } });
+
+  const target = String(interaction.id ?? Date.now());
+  cleanups.set(target, going.map((player) => player.userId));
+  const names = going.slice(0, CLEANUP_NAMED).map((player) => escapeMarkdown(player.tag));
+  if (going.length > CLEANUP_NAMED) names.push(`${going.length - CLEANUP_NAMED} more`);
+  const question = `Untrack ${count(going.length, 'player')} whose start.gg Discord isn't in this server${noDiscord ? ' or who have none' : ''}? ${new Intl.ListFormat('en').format(names)}.${kept}`;
+  return askFirst(interaction, 'cleanup', target, question, 'Untrack them');
+}
+
+confirmable('cleanup', {
+  command: '/track cleanup',
+  run: (target) => {
+    const userIds = cleanups.get(target);
+    cleanups.delete(target);
+    if (!userIds) return { content: 'That button doesn\'t work anymore. Run `/track cleanup` again.' };
+    const removed = userIds.map((userId) => state.players[userId]).filter(Boolean);
+    for (const player of removed) delete state.players[player.userId];
+    save();
+    return { content: `Untracked ${count(removed.length, 'player')}.`, undo: removed };
+  },
+  cancel: (target) => {
+    cleanups.delete(target);
+    return 'Everyone stays tracked.';
+  },
+  undo: (removed) => {
+    const back = removed.filter((player) => !state.players[player.userId]);
+    for (const player of back) state.players[player.userId] = player;
+    save();
+    return `Tracking ${count(back.length, 'player')} again, with the same settings as before.`;
+  },
+  tooLate: 'Too late to undo. `/track add` anyone you want back.',
 });
 
 // only lets commands default to them, they don't get tracked.
@@ -157,6 +213,7 @@ async function profile(interaction) {
   });
 }
 
+// tracked tournaments with whoever from the crew is going, and any other one 3 or more tracked players are in
 async function upcoming(interaction) {
   const choice = readChoice(interaction);
   if (!choice) return replyNoPlayer(interaction);
@@ -165,22 +222,28 @@ async function upcoming(interaction) {
 
   const now = secondsNow();
   const tournaments = [];
+  const people = { ...state.players };
   for (const tournament of Object.values(state.tournaments)) {
-    if (tournament.resultsPosted || now > endTime(tournament)) continue;
-    // only where the crew shows up, the same 3 as a roll call
-    const crew = new Set(tournament.entries.map((entry) => entry.userId).filter((id) => state.players[id]));
-    if (crew.size < ROLL_CALL_MIN_PLAYERS) continue;
+    if (tournament.resultsPosted || !tournament.startAt || now > endTime(tournament)) continue;
+    const crew = crewOf(tournament);
+    // otherwise only where the crew shows up, the same 3 as a roll call
+    const going = new Set(tournament.entries.map((entry) => entry.userId).filter((id) => state.players[id]));
+    if (!tournament.tracked && going.size < ROLL_CALL_MIN_PLAYERS) continue;
 
     const entries = tournament.entries.filter((entry) => {
-      if (!state.players[entry.userId]) return false;
-      return choice === 'all' || entry.userId === choice.userId;
+      if (!crew[entry.userId]) return false;
+      return choice === 'all' || String(entry.userId) === String(choice.userId);
     });
-    if (entries.length) tournaments.push({ ...tournament, entries });
+    // a tracked one shows for everyone even before anyone registers
+    if (entries.length || (tournament.tracked && choice === 'all')) {
+      tournaments.push({ ...tournament, entries });
+      Object.assign(people, tournament.crew, state.players);
+    }
   }
   tournaments.sort((a, b) => a.startAt - b.startAt);
 
   const who = choice === 'all' ? 'everyone' : choice.tag;
-  return sendEmbeds(interaction, embeds.upcoming(tournaments, state.players, who, { minimum: ROLL_CALL_MIN_PLAYERS }));
+  return sendEmbeds(interaction, embeds.upcoming(tournaments, people, who, { minimum: ROLL_CALL_MIN_PLAYERS }));
 }
 
 // someone from /link, straight from start.gg
@@ -278,4 +341,4 @@ async function run(interaction) {
   return sendEmbeds(interaction, cards, h2hButtons(player, nextSets));
 }
 
-export { trackAdd, trackRemove, link, unlink, profile, upcoming, recent, run };
+export { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, recent, run };

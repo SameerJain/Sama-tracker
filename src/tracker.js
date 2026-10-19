@@ -5,11 +5,10 @@ import * as slippi from './slippi.js';
 import * as bills from './bills.js';
 import * as embeds from './embeds/index.js';
 import { state, save } from './store.js';
-import { clearTrackRequest, readTrackRequest } from './track-request.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
 import { messageEnabled, messageSettings } from './message-settings.js';
-import { rememberAccounts } from './accounts.js';
-import { buttonRow, h2hButton } from './commands/shared.js';
+import { rememberAccounts, serverMembers } from './accounts.js';
+import { buttonRow, h2hButton, linkedPlayer } from './commands/shared.js';
 
 const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
@@ -116,13 +115,14 @@ export function startTracking(postChannel) {
   for (const player of Object.values(state.players)) {
     player.trackedAt ??= player.lastSetAt ?? secondsNow();
   }
+  migrateTracking();
+  save();
 
   checkTournaments();
   checkSets();
   checkProfiles();
   checkRegReminders();
   checkWeeklyRecap();
-  importTrackRequest();
   checkSlippiCodes();
   checkSlippiRanks();
   loopBills();
@@ -135,39 +135,68 @@ export function startTracking(postChannel) {
   setInterval(checkSlippiRanks, SLIPPI_CHECK_MINUTES * 60 * 1000);
   setInterval(checkPrune, PRUNE_CHECK_DAYS * DAY * 1000);
   setInterval(checkWeeklyRecap, 60 * 1000);
-  // the tool at the other end waits on this, so it's checked more often than the tournaments
-  setInterval(importTrackRequest, 30 * 1000);
 }
 
-// /track add, /set_reg_reminder and the host tool all save this. set results, stream alerts and
-// match call pings start off since everyone with them on goes in a check every 2 minutes, and bulk
-// adds made that slow. /sets, /stream and /calls turn them on. trackedAt is when they were added,
-// so the prune knows a player with no sets yet isn't inactive
-export function newTracked(player) {
-  return { ...player, lastCheck: secondsNow(), trackedAt: secondsNow(), streamAlerts: false, setResults: false, callPings: false };
-}
-
-// players queued by tools/track-attendees.js, added the same way /track add does and saved
-// before the request is cleared. ids are numeric from start.gg, so anything else is a bad file and stays out
-const numericId = (id) => /^\d+$/.test(String(id));
-export function importTrackRequest() {
-  try {
-    const request = readTrackRequest();
-    if (!request) return;
-
-    const adding = (request.players ?? []).filter((player) => numericId(player.userId) && numericId(player.playerId) && !state.players[player.userId] && !Object.hasOwn(Object.prototype, player.userId));
-    for (const player of adding) state.players[player.userId] = newTracked(player);
-    if (adding.length) {
-      save();
-      console.log(`${adding.length} player${adding.length === 1 ? '' : 's'} from ${request.source ?? 'a track request'} added to the track`);
-      // don't wait 15 min for their tournaments to show up
-      checkTournaments();
-    }
-    // saved first, so a crash here just means it gets read again. adding is skipped when they're already tracked
-    clearTrackRequest();
-  } catch (err) {
-    console.error('adding queued players failed:', err.message);
+// saved from before tournaments could be tracked. a reg reminder becomes a tracked tournament with reminders
+// on. match call pings were a switch anyone could flip on a player, now they're each person's own, so a player's
+// discord keeps them only if the server switch was on and they were actually getting pinged
+export function migrateTracking(now = secondsNow()) {
+  for (const reminder of Object.values(state.regReminders ?? {})) {
+    const { id, name, slug, startAt, endAt, images } = reminder;
+    const tournament = state.tournaments[id] ??= { id, name, slug, startAt, endAt, images: images ?? [], entries: [], userIds: [] };
+    if (!tournament.tracked) trackTournament(tournament, 'manual', now);
+    tournament.reminder = { deadline: reminder.deadline, next: reminder.next };
   }
+  delete state.regReminders;
+
+  const pinging = state.messages?.calls === true;
+  for (const player of Object.values(state.players)) {
+    if (player.callPings === true && pinging && player.discordId && !state.callPings.includes(player.discordId)) state.callPings.push(player.discordId);
+    delete player.callPings;
+  }
+}
+
+// /track add saves this. set results and stream alerts start off since everyone with them on goes in a
+// check every 2 minutes. /track posts turns them on. trackedAt is when they were added, so the prune knows
+// a player with no sets yet isn't inactive
+export function newTracked(player) {
+  return { ...player, lastCheck: secondsNow(), trackedAt: secondsNow(), streamAlerts: false, setResults: false };
+}
+
+// /tournament add, a reg admin's tournament, or a reminder from before. everything it posts starts on and
+// /tournament posts turns parts off. its sets are looked at from now on, so tracking one partway through
+// doesn't flood its thread with what already happened. reminder fills in at the next reminder check
+export function trackTournament(tournament, by, now = secondsNow()) {
+  tournament.tracked = { by, at: now, sets: true, stream: true, top8: true, reminders: true };
+  tournament.reminder ??= {};
+  tournament.lastCheck = now;
+  // looked at on the next check even when it's far off, for its events and crew
+  tournament.checkedAt = 0;
+  return tournament;
+}
+
+// whether a tracked tournament has this /tournament posts switch on. untracked ones have none
+function posting(tournament, kind) {
+  return Boolean(tournament?.tracked) && tournament.tracked[kind] !== false;
+}
+
+// the tracked tournament a set is from. sets don't come with the tournament id, so it goes by slug
+function trackedFor(set) {
+  const slug = set.event?.tournament?.slug;
+  return Object.values(state.tournaments).find((tournament) => tournament.tracked && tournament.slug === slug);
+}
+
+// who the cards at a tournament can name: its crew from the server, then tracked players
+export function crewOf(tournament) {
+  return { ...tournament.crew, ...state.players };
+}
+
+// the user ids a tournament check asks start.gg about: tracked players who signed up, then the rest of the crew
+function crewIds(tournament) {
+  const ids = new Map();
+  for (const id of tournament.userIds ?? []) if (state.players[id]) ids.set(String(id), id);
+  for (const member of Object.values(tournament.crew ?? {})) ids.set(String(member.userId), member.userId);
+  return [...ids.values()];
 }
 
 // one run at a time so nothing posts twice. if a run is already waiting, extra calls
@@ -463,21 +492,51 @@ export async function pruneInactive(now = secondsNow()) {
   return pruned;
 }
 
+// tracked tournaments going on now with this switch on. sets keep getting looked at for one check after every
+// event finished, since the tournament check can notice that before the set check sees the last set
+function trackedLive(kind, now = secondsNow()) {
+  return Object.values(state.tournaments).filter((tournament) => posting(tournament, kind) && !tournament.resultsPosted
+    && tournament.startAt <= now && now <= endTime(tournament) + RUNS_LATE_HOURS * HOUR
+    && !(tournament.doneAt && tournament.lastCheck >= tournament.doneAt));
+}
+
 export async function postNewSets(postChannel = channel) {
   const players = Object.values(state.players);
   const playerIds = players.map((player) => player.playerId);
-  // only players with results on get asked about, by playerId to when /sets turned them on
+  // only players with results on get asked about, by playerId to when /track posts turned them on
   const showingSince = new Map(players.filter(resultsOn).map((player) => [player.playerId, player.setResultsOnAt ?? 0]));
   const checkedAt = secondsNow();
   // one request for everyone, so go from the oldest lastCheck
   const lastCheck = Math.min(checkedAt, ...players.map((player) => player.lastCheck));
   const since = Math.max(lastCheck, checkedAt - CATCH_UP_HOURS * HOUR);
   try {
+    const sets = new Map();
+    // when each set's check window started, so an old set an edit brought back stays out
+    const windows = new Map();
     // 2 min overlap for sets reported during the last check
-    const sets = await startgg.getSets([...showingSince.keys()], { since: since - 120 });
-    sets.sort((a, b) => a.completedAt - b.completedAt);
+    for (const set of await startgg.getSets([...showingSince.keys()], { since: since - 120 })) {
+      sets.set(set.id, set);
+      windows.set(set.id, since);
+    }
+    // every set at a tracked tournament, whoever played, from that tournament's own last check
+    const covered = new Set();
+    const checked = [];
+    for (const tournament of trackedLive('sets', checkedAt)) {
+      const from = Math.max(tournament.lastCheck ?? checkedAt, checkedAt - CATCH_UP_HOURS * HOUR);
+      const eventIds = [...new Set(eventsOf(tournament).map((entry) => entry.eventId).filter(Boolean))];
+      try {
+        for (const set of await startgg.getEventSets(eventIds, from - 120)) {
+          sets.set(set.id, set);
+          covered.add(set.id);
+          windows.set(set.id, Math.min(windows.get(set.id) ?? Infinity, from));
+        }
+        checked.push(tournament);
+      } catch (err) {
+        console.error(`checking sets at ${tournament.name ?? tournament.id} failed:`, err.message);
+      }
+    }
 
-    for (const set of sets) {
+    for (const set of [...sets.values()].sort((a, b) => a.completedAt - b.completedAt)) {
       // for /recent all. results-off players only get it from a set against someone with them on
       for (const player of players) {
         if (!set.sides.some((side) => side.playerIds.includes(player.playerId))) continue;
@@ -486,15 +545,15 @@ export async function postNewSets(postChannel = channel) {
       }
       if (state.posted.includes(set.id)) continue;
       // editing an old set brings it back
-      if (set.completedAt < since - HOUR) continue;
-      // one DQ takes them out of the rest of the bracket, so only post the first.
-      // DQ wins never get posted
+      if (set.completedAt < windows.get(set.id) - HOUR) continue;
+      // one DQ takes them out of the rest of the bracket, so only post the first. DQ wins never get posted,
+      // and neither do no-shows at a tracked tournament unless they're tracked
       const dqed = set.sides.find((side) => side.score === -1);
       if (dqed && (!dqed.playerIds.some((id) => playerIds.includes(id)) || state.dqs.includes(dqed.id))) continue;
 
-      // finished before /sets turned results on for everyone tracked in it, so it stays out of the channel.
-      // it still counts as posted so the next check doesn't look at it again
-      const showing = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
+      // every set at a tracked tournament. otherwise one finished before /track posts turned results on for
+      // everyone tracked in it stays out of the channel. it still counts as posted so the next check doesn't look at it again
+      const showing = covered.has(set.id) || set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
       if (showing && messageEnabled('sets', set.completedAt)) {
         // no head to head button, the set's over
         const sent = await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players)]) });
@@ -507,6 +566,7 @@ export async function postNewSets(postChannel = channel) {
     }
     // only on success so a failed check gets covered next time
     for (const player of players) player.lastCheck = checkedAt;
+    for (const tournament of checked) tournament.lastCheck = checkedAt;
     health.setCheck = checkedAt;
     health.setError = null;
   } catch (err) {
@@ -580,11 +640,13 @@ async function streamedNow() {
     console.error('checking streams failed:', err.message);
   }
 
-  // lots of TOs never hit "call", but they still use the stream queue for their overlay
+  // lots of TOs never hit "call", but they still use the stream queue for their overlay. a tracked tournament
+  // announces everything on its stream, the rest only sets with someone who has alerts on
   for (const tournament of liveTournaments()) {
     try {
+      const everyone = posting(tournament, 'stream');
       for (const queue of await startgg.getStreamQueues(tournament.id)) {
-        for (const set of setsToAnnounce(queue.sets).filter(hasPlayerWithAlerts)) found.set(set.id, set);
+        for (const set of setsToAnnounce(queue.sets).filter((each) => everyone || hasPlayerWithAlerts(each))) found.set(set.id, set);
       }
     } catch (err) {
       console.error(`checking stream queue at ${tournament.name} failed:`, err.message);
@@ -605,7 +667,7 @@ export async function postStreamAlerts(postChannel = channel, confirmAfter = STR
       const set = still.get(id);
       // taken off stream or moved to another one. the next check looks again once it settles
       if (!set || set.stream.streamName !== stream.streamName || state.streamed.includes(id)) continue;
-      // everyone with /stream_pings on, for every alert whoever is on stream
+      // everyone with /notify streams on, for every alert whoever is on stream
       if (messageEnabled('streams', wentLiveAt(set))) {
         const components = h2hRow(set);
         const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', state.streamPings, 'on stream', embeds.onStream(set, state.players), components);
@@ -647,10 +709,12 @@ export function missingThreadPermissions(postChannel = channel) {
 }
 
 // stands in for the channel when posting a set. with /messages threads on it sends to the tournament's
-// or the event's thread, and to the channel when the thread can't be used, so a permission change never loses a post
+// or the event's thread, and to the channel when the thread can't be used, so a permission change never loses a post.
+// a tracked tournament posts every set, so it gets its own thread even with threads off
 function tournamentPosts(set, postChannel) {
   const send = async (message) => {
-    const mode = messageSettings().threads;
+    const setting = messageSettings().threads;
+    const mode = setting === 'off' && trackedFor(set) ? 'tournament' : setting;
     if (mode === 'off') return postChannel.send(message);
     const { tournament } = set.event;
     try {
@@ -796,24 +860,37 @@ function threadName(event, byEvent) {
   return `${name.slice(0, 100 - suffix.length)}${suffix}`;
 }
 
+// everyone with /notify calls on, as the start.gg account commands know them by: their /link, or the tracked
+// player with their discord on start.gg. someone with neither has nothing to look up and waits for one
+function callers() {
+  const found = [];
+  for (const discordId of state.callPings) {
+    const player = linkedPlayer(discordId);
+    if (player?.playerId) found.push({ ...player, discordId });
+  }
+  return found;
+}
+
 export async function postMatchCalls(postChannel = channel) {
   try {
-    const players = Object.values(state.players).filter(callsOn);
+    const players = callers();
     if (!players.length) return;
     const playerIds = new Set(players.map((player) => player.playerId));
     for (const set of await startgg.getCalledSets([...playerIds])) {
       if ((state.called ??= []).includes(set.id)) continue;
-      // both sides can be tracked with pings on, still one message for the set.
+      // both sides can have pings on, still one message for the set.
       // doubles sides hold two player ids each, so all four land in the same message
       const inSet = players.filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
       if (!inSet.length) continue;
       if (messageEnabled('calls', set.updatedAt)) {
-        // discord ids come from start.gg, so anything with mention syntax stays out
+        // discord ids come from discord, but the filter stays so nothing with mention syntax gets through
         const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(mentionable))];
-        const components = h2hRow(set);
+        const components = h2hRow(set, inSet[0]);
+        // the card goes by whoever it's for, tracked or only linked
+        const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
         const sent = await postChannel.send({
           content: discordIds.length ? `${mentions(discordIds)} your match was called` : undefined,
-          embeds: embeds.withImage([embeds.matchCall(set, state.players)]),
+          embeds: embeds.withImage([embeds.matchCall(set, people)]),
           components,
           allowedMentions: { users: discordIds },
         });
@@ -907,10 +984,10 @@ function setsToAnnounce(queueSets) {
 function liveTournaments() {
   const now = secondsNow();
   return Object.values(state.tournaments).filter((tournament) => {
-    // doneAt means every event they're in has finished
-    if (tournament.resultsPosted || tournament.doneAt || now < tournament.startAt) return false;
+    // doneAt means every event they're in has finished, or every event at a tracked one
+    if (tournament.resultsPosted || tournament.doneAt || !(tournament.startAt <= now)) return false;
     if (now > endTime(tournament) + RUNS_LATE_HOURS * HOUR) return false;
-    return tournament.entries.some((entry) => alertsOn(state.players[entry.userId]));
+    return posting(tournament, 'stream') || tournament.entries.some((entry) => alertsOn(state.players[entry.userId]));
   });
 }
 
@@ -919,15 +996,16 @@ function hasPlayerWithAlerts(set) {
   return set.sides.some((side) => players.some((player) => side.playerIds.includes(player.playerId)));
 }
 
-// /stream turns a player's stream alerts on. players saved before they started off have no field
+// /track posts turns a player's stream alerts on. players saved before they started off have no field
 function alertsOn(player) {
   return Boolean(player) && player.streamAlerts !== false;
 }
 
-// a Head to head button under a match call or stream alert, about the first tracked player in it. finished sets
-// don't get one. it answers only whoever pressed it, so the channel doesn't fill up with reports
-function h2hRow(set) {
-  const player = Object.values(state.players).find((each) => set.sides.some((side) => side.playerIds.includes(each.playerId)));
+// a Head to head button under a match call or stream alert, about the first tracked player in it, or fallback, the
+// linked player a match call is for. finished sets don't get one. it answers only whoever pressed it, so the
+// channel doesn't fill up with reports
+function h2hRow(set, fallback) {
+  const player = Object.values(state.players).find((each) => set.sides.some((side) => side.playerIds.includes(each.playerId))) ?? fallback;
   return player ? buttonRow(h2hButton(set, player, { label: 'Head to head', action: 'private' })) : [];
 }
 
@@ -964,14 +1042,49 @@ export async function clearFinishedButtons(postChannel = channel) {
   save();
 }
 
-// /sets turns a player's automatic set results on. players saved before they started off have no field
+// /track posts turns a player's automatic set results on. players saved before they started off have no field
 export function resultsOn(player) {
   return Boolean(player) && player.setResults !== false;
 }
 
-// /calls turns a player's match call pings on. these started off for everyone, so only an explicit on counts
-export function callsOn(player) {
-  return Boolean(player) && player.callPings === true;
+// reg admins' upcoming tournaments get tracked without anyone adding them, except ones /tournament remove untracked
+async function addAdminTournaments() {
+  try {
+    for (const found of await startgg.getAdminTournaments(Object.keys(state.regAdmins))) {
+      // bad end dates make old tournaments show up as upcoming
+      if (state.regSkipped.some((id) => String(id) === String(found.id)) || secondsNow() > endTime(found)) continue;
+      const tournament = state.tournaments[found.id] ??= { ...found, entries: [], userIds: [] };
+      if (!tournament.tracked) trackTournament(tournament, 'admin');
+    }
+  } catch (err) {
+    console.error('finding reg admins\' tournaments failed:', err.message);
+  }
+}
+
+// a tracked tournament's crew is everyone registered who's tracked, linked, or has the discord on their start.gg in
+// this server. the ones who aren't tracked get saved with their tag so the roll call and placements can name them.
+// tracked players it finds go in userIds, in case their own upcoming list missed it. a hidden list, or start.gg or
+// discord failing, keeps whoever it had
+export async function refreshCrew(tournament, guild = channel?.guild) {
+  try {
+    const participants = await startgg.getParticipants(tournament.id);
+    rememberAccounts(participants);
+    if (!participants.length) return;
+    const linked = new Set(Object.values(state.links).map((link) => String(link.userId)));
+    const members = await serverMembers(guild, [...new Set(participants.map((participant) => participant.discordId).filter(Boolean))]);
+    const crew = {};
+    for (const { userId, slug, tag, discordId } of participants) {
+      if (!userId) continue;
+      if (state.players[userId]) {
+        if (!tournament.userIds.some((id) => String(id) === String(userId))) tournament.userIds.push(userId);
+      } else if (slug && (linked.has(String(userId)) || members.has(discordId))) {
+        crew[userId] = { userId, slug, tag };
+      }
+    }
+    tournament.crew = crew;
+  } catch (err) {
+    console.error(`finding the crew at ${tournament.name ?? tournament.id} failed:`, err.message);
+  }
 }
 
 async function updateTournaments() {
@@ -993,6 +1106,7 @@ async function updateTournaments() {
   } catch (err) {
     console.error('finding tournaments failed:', err.message);
   }
+  await addAdminTournaments();
 
   for (const tournament of Object.values(state.tournaments)) {
     if (tournament.resultsPosted) {
@@ -1018,9 +1132,10 @@ async function updateTournaments() {
     if (secondsNow() > overAt(tournament) && secondsNow() - (tournament.checkedAt ?? 0) < HOUR) continue;
 
     try {
-      // only the people who signed up. everyone at every tournament gets slow with a big crew
-      const userIds = tournament.userIds.filter((id) => state.players[id]);
-      const latest = await startgg.getTournament(tournament.id, userIds);
+      // only the crew who signed up. everyone at every tournament gets slow. nobody signs up once it's over,
+      // so the hourly checks for placements after that keep the crew they had
+      if (tournament.tracked && secondsNow() <= endTime(tournament)) await refreshCrew(tournament);
+      const latest = await startgg.getTournament(tournament.id, crewIds(tournament));
       // deleted or unpublished
       if (!latest) {
         await unpinTournamentThread(channel, tournament);
@@ -1055,7 +1170,7 @@ export async function postRollCall(tournament, postChannel = channel) {
   const entered = new Set(tournament.entries.map((entry) => entry.userId));
   if (entered.size < ROLL_CALL_MIN_PLAYERS) return;
 
-  if (messageEnabled('rollcall', dueAt)) await post(embeds.rollCall(tournament, state.players), 'rollcall', dueAt, postChannel);
+  if (messageEnabled('rollcall', dueAt)) await post(embeds.rollCall(tournament, crewOf(tournament)), 'rollcall', dueAt, postChannel);
   tournament.rollCallPosted = true;
 }
 
@@ -1063,9 +1178,11 @@ export async function postResults(tournament, postChannel = channel) {
   const now = secondsNow();
   if (now < tournament.startAt) return;
 
-  if (tournament.entries.length && tournament.entries.every((entry) => entry.done)) tournament.doneAt ??= now;
-  // the top 8 goes out as soon as every event is finished, without waiting 12 hours for placements
-  if (!tournament.top8Posted) await postEarlyTopEight(tournament, postChannel, now);
+  const scope = eventsOf(tournament);
+  if (scope.length && scope.every((entry) => entry.done)) tournament.doneAt ??= now;
+  // only tracked tournaments get a top 8. it goes out as soon as every event is finished, without waiting 12 hours for placements
+  const topEightOn = posting(tournament, 'top8');
+  if (!tournament.top8Posted && topEightOn) await postEarlyTopEight(tournament, postChannel, now);
 
   const waited = now - overAt(tournament);
   if (waited < RESULTS_WAIT_HOURS * HOUR) return;
@@ -1079,15 +1196,15 @@ export async function postResults(tournament, postChannel = channel) {
   // fetched before anything posts, so a start.gg error retries both next hour instead of repeating placements.
   // skipped when the top 8 already went out early
   let events = [];
-  if (!tournament.top8Posted && messageEnabled('top8', dueAt)) {
+  if (!tournament.top8Posted && topEightOn && messageEnabled('top8', dueAt)) {
     try {
-      events = await topEightEvents(entries);
+      events = await topEightEvents(scope.filter((entry) => entry.started));
     } catch (err) {
       if (now < dueAt + TOP8_RETRY_HOURS * HOUR) throw err;
       console.error(`top 8 for ${tournament.name ?? tournament.id} failed, posting placements without it:`, err.message);
     }
   }
-  const results = messageEnabled('results', dueAt) ? await post(embeds.results({ ...tournament, entries }, state.players), 'results', dueAt, postChannel) : [];
+  const results = messageEnabled('results', dueAt) ? await post(embeds.results({ ...tournament, entries }, crewOf(tournament)), 'results', dueAt, postChannel) : [];
   // marked before the top 8 goes, so discord failing on it can't post the placements again
   tournament.resultsPosted = true;
   let topEight = [];
@@ -1104,8 +1221,8 @@ export async function postResults(tournament, postChannel = channel) {
       tournament.top8Failed = true;
       tournament.top8FailedAt ??= now;
     }
-  } else if (!tournament.top8Posted && !messageEnabled('top8', dueAt)) {
-    // switched off counts as posted, so the fail-safe doesn't replay it
+  } else if (!tournament.top8Posted && (!topEightOn || !messageEnabled('top8', dueAt))) {
+    // switched off, or not tracked, counts as posted, so the fail-safe doesn't replay it
     tournament.top8Posted = true;
   }
   // projected ones get edited once start.gg has them final, see correctPlacements.
@@ -1114,11 +1231,14 @@ export async function postResults(tournament, postChannel = channel) {
   if (projected.results.length || projected.top8.length || !tournament.top8Posted) tournament.projected = projected;
 }
 
-// posts the top 8 as soon as every event the crew played in is finished, before placements are due.
+// posts the top 8 as soon as every event is finished, before placements are due.
 // true once it went out or was consumed while switched off, so later placements skip it
 async function postEarlyTopEight(tournament, postChannel, now) {
-  const entries = tournament.entries.filter((entry) => entry.started);
-  if (!entries.length || !entries.every((entry) => entry.done)) return false;
+  const scope = eventsOf(tournament);
+  const started = scope.filter((entry) => entry.started);
+  if (!started.length || !started.every((entry) => entry.done)) return false;
+  // one that hasn't started might still run, like doubles after singles, so it waits for those until the end time
+  if (started.length < scope.length && now <= endTime(tournament)) return false;
   // switched off counts as posted, so turning it back on doesn't replay it
   if (!messageEnabled('top8', now)) {
     tournament.top8Posted = true;
@@ -1126,7 +1246,7 @@ async function postEarlyTopEight(tournament, postChannel, now) {
   }
   let events;
   try {
-    events = await fetchDoneTopEight(entries);
+    events = await fetchDoneTopEight(started);
   } catch (err) {
     console.error(`early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
     return false;
@@ -1142,7 +1262,7 @@ async function postEarlyTopEight(tournament, postChannel, now) {
   return true;
 }
 
-// every event the crew played in, once all of them are finished. null while the bracket
+// every event that started, once all of them are finished. null while the bracket
 // is still running. the entries gate the fetch, so live tournaments cost nothing extra
 async function fetchDoneTopEight(entries) {
   const started = entries.filter((entry) => entry.started);
@@ -1171,7 +1291,7 @@ export async function verifyTopEight(tournament, postChannel = channel, now = se
   if (!messageEnabled('top8')) return false;
   let events;
   try {
-    events = await fetchDoneTopEight(tournament.entries);
+    events = await fetchDoneTopEight(eventsOf(tournament));
   } catch (err) {
     console.error(`retrying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
     return false;
@@ -1207,24 +1327,24 @@ export async function correctPlacements(tournament, postChannel = channel) {
   projected.checkedAt = now;
 
   if (projected.results.length) {
-    const latest = await startgg.getTournament(tournament.id, tournament.userIds.filter((id) => state.players[id]));
+    const latest = await startgg.getTournament(tournament.id, crewIds(tournament));
     const entries = latest?.entries.filter((entry) => entry.started) ?? [];
     if (entries.length && entries.every(placed)) {
       tournament.entries = latest.entries;
-      await editPosts(postChannel, projected.results, embeds.results({ ...tournament, entries }, state.players), 'results', 'Final placements, the ones above were projected');
+      await editPosts(postChannel, projected.results, embeds.results({ ...tournament, entries }, crewOf(tournament)), 'results', 'Final placements, the ones above were projected');
       projected.results = [];
     }
   }
   if (projected.top8.length) {
-    const events = await topEightEvents(tournament.entries.filter((entry) => entry.started));
+    const events = await topEightEvents(eventsOf(tournament).filter((entry) => entry.started));
     if (events.length && events.every((event) => event.done)) {
       await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', 'Final top 8, the one above was projected');
       projected.top8 = [];
     }
-  } else if (!tournament.top8Posted && messageEnabled('top8')) {
+  } else if (!tournament.top8Posted && posting(tournament, 'top8') && messageEnabled('top8')) {
     // nothing went out at 12 hours, so the final goes out as a new message once it's reported.
     // switched off waits for it to come back on instead of replaying later
-    const events = await fetchDoneTopEight(tournament.entries);
+    const events = await fetchDoneTopEight(eventsOf(tournament));
     if (events) {
       await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
       tournament.top8Posted = true;
@@ -1246,7 +1366,17 @@ async function editPosts(postChannel, refs, list, type, label) {
   }
 }
 
-// every event the crew played in, with the whole top 8 and not just them
+// the events a tournament's top 8 and finish go by, shaped like entries: every event of a tracked one once
+// start.gg's list is saved, otherwise the ones the crew entered
+function eventsOf(tournament) {
+  if (!tournament.tracked || !tournament.events?.length) return tournament.entries ?? [];
+  return tournament.events.map((event) => ({
+    eventId: event.id, event: event.name, eventSlug: event.slug, entrants: event.numEntrants,
+    done: event.state === 'COMPLETED', started: event.state !== 'CREATED',
+  }));
+}
+
+// every one of these events, with the whole top 8 and not just the crew
 async function topEightEvents(entries) {
   const events = [...new Map(entries.filter((entry) => entry.eventId).map((entry) => [entry.eventId, entry])).values()];
   if (!events.length) return [];
@@ -1275,40 +1405,21 @@ export function nextRegReminder(deadline) {
   return next === -1 ? REG_REMINDER_HOURS.length - 1 : next;
 }
 
-// reg admins' tournaments get reminders without anyone setting them
-async function addAdminTournaments() {
-  try {
-    for (const found of await startgg.getAdminTournaments(Object.keys(state.regAdmins))) {
-      // bad end dates make old tournaments show up as upcoming
-      if (state.regReminders[found.id] || state.regSkipped.includes(found.id) || secondsNow() > endTime(found)) continue;
-      state.regReminders[found.id] = { id: found.id, slug: found.slug, name: found.name };
-    }
-  } catch (err) {
-    console.error('finding reg admins\' tournaments failed:', err.message);
-  }
-}
-
+// reminders for tracked tournaments with reminders on, pinging everyone with /notify registration on
+// who isn't registered yet. the tournament check finds reg admins' tournaments and tracks them
 export async function postRegReminders(postChannel = channel) {
-  await addAdminTournaments();
-
-  for (const reminder of Object.values(state.regReminders)) {
+  for (const tournament of Object.values(state.tournaments)) {
+    const { reminder } = tournament;
+    if (!posting(tournament, 'reminders') || !reminder) continue;
+    // past the last call, or started, means none are left
+    if (reminder.next >= REG_REMINDER_HOURS.length || secondsNow() > tournament.startAt) continue;
     try {
-      // TOs move the close time, so always go off the latest
-      const tournament = await startgg.getRegistration(reminder.slug);
-      // kept until it's over for /bracket
-      if (!tournament || secondsNow() > endTime(tournament) + RUNS_LATE_HOURS * HOUR) {
-        delete state.regReminders[reminder.id];
-        continue;
-      }
-      const deadline = regDeadline(tournament);
-      Object.assign(reminder, {
-        deadline,
-        startAt: tournament.startAt,
-        endAt: tournament.endAt,
-        events: tournament.events ?? [],
-        images: tournament.images?.filter((image) => image.type === 'profile'),
-      });
-      // set back when there was only the last call, or added for a reg admin
+      // TOs move the close time, so always go off the latest. a deleted one is the tournament check's to drop
+      const latest = await startgg.getRegistration(tournament.slug);
+      if (!latest) continue;
+      const deadline = regDeadline(latest);
+      reminder.deadline = deadline;
+      // tracked for a reg admin, or reminders just turned back on
       reminder.next ??= nextRegReminder(deadline);
       // it closed, maybe while the bot was down
       if (deadline <= secondsNow()) continue;
@@ -1320,18 +1431,17 @@ export async function postRegReminders(postChannel = channel) {
 
       // not open means it filled up, or for the early ones that it hasn't opened yet
       const dueAt = deadline - REG_REMINDER_HOURS[due] * HOUR;
-      if (tournament.isRegistrationOpen && messageEnabled('registration', dueAt)) {
+      if (latest.isRegistrationOpen && messageEnabled('registration', dueAt)) {
         // people one by one, a role ping would hit the ones already registered
-        const participants = await startgg.getParticipants(tournament.id);
+        const participants = await startgg.getParticipants(latest.id);
         rememberAccounts(participants);
         const registered = new Set(participants.map((participant) => participant.discordId));
         const ping = state.regPings.filter((id) => !registered.has(id));
-        await sendPinging(postChannel, 'registration', ping, lastCall ? 'last call' : 'registration reminder', embeds.regReminder(tournament, deadline, lastCall));
+        await sendPinging(postChannel, 'registration', ping, lastCall ? 'last call' : 'registration reminder', embeds.regReminder(latest, deadline, lastCall));
       }
-      // past the last call means none are left
       reminder.next = due + 1;
     } catch (err) {
-      console.error(`reg reminder for ${reminder.name} failed:`, err.message);
+      console.error(`reg reminder for ${tournament.name ?? tournament.id} failed:`, err.message);
     }
   }
   save();

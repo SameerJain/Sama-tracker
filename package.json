@@ -8,8 +8,7 @@
   "scripts": {
     "test": "node --test",
     "start": "node --env-file-if-exists=.env src/index.js",
-    "dev": "node --watch --env-file=.env src/index.js",
-    "track": "node --env-file-if-exists=.env tools/track-attendees.js"
+    "dev": "node --watch --env-file=.env src/index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

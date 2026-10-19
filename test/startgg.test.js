@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
-import { getActivePlayers, getCharacterSets, getEventHistory, getHeadToHead, getSetHistory, getStats, queueLength } from '../src/startgg.js';
+import { getActivePlayers, getCharacterSets, getEventHistory, getEventSets, getHeadToHead, getSetHistory, getStats, queueLength } from '../src/startgg.js';
 import { predict } from '../src/predict.js';
 
 const originalFetch = globalThis.fetch;
@@ -298,4 +298,25 @@ test('the recap first asks which players played, 50 a request, about singles set
   assert.deepEqual(asked[0].filters, { state: [3], entrantSize: [1], updatedAfter: 999 });
   assert.equal(played.size, 60);
   assert.ok(played.has(2) && !played.has(1));
+});
+
+test('a tracked tournament\'s events share one request for new sets, and an event with more gets its other pages on its own', async () => {
+  const set = (id) => ({ id, completedAt: 100, winnerId: 10, event, slots });
+  const asked = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    if (query.includes('e601: event')) {
+      asked.push(`events ${[...query.matchAll(/\be(\d+): event/g)].map(([, id]) => id).join(',')} since ${variables.filters.updatedAfter}`);
+      return { ok: true, json: async () => ({ data: {
+        e601: { sets: { pageInfo: { totalPages: 2 }, nodes: Array.from({ length: 10 }, (_, i) => set(`a${i}`)) } },
+        e602: { sets: { pageInfo: { totalPages: 0 }, nodes: [] } },
+      } }) };
+    }
+    asked.push(`event ${variables.id} page ${variables.page} of ${variables.perPage}`);
+    return { ok: true, json: async () => ({ data: { event: { sets: { pageInfo: { totalPages: 2 }, nodes: [set('a10')] } } } }) };
+  };
+  const sets = await settle(getEventSets([601, 602], 500));
+  assert.deepEqual(asked, ['events 601,602 since 500', 'event 601 page 2 of 10']);
+  assert.equal(sets.length, 11);
+  assert.deepEqual(sets.map((each) => each.id).slice(-2), ['a9', 'a10']);
 });

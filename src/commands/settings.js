@@ -1,8 +1,9 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import { state, save } from '../store.js';
 import { missingThreadPermissions, secondsNow } from '../tracker.js';
-import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS, messageSettings } from '../message-settings.js';
-import { readChoice, replyEphemeral, replyNoPlayer } from './shared.js';
+import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS, messageEnabled, messageSettings } from '../message-settings.js';
+import { count } from '../embeds/shared.js';
+import { linkedPlayer, readChoice, replyEphemeral, replyNoPlayer } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
 
 // remove autocompletes with the link as the value, which discord caps at 100
@@ -74,7 +75,7 @@ function configureMessages(interaction) {
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
-    '-# `threads` has three modes for set results and stream alerts. Off posts them here, one per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. One per tournament pins its channel card until the tournament ends.');
+    '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. One per tournament pins its channel card until the tournament ends.');
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
@@ -122,70 +123,161 @@ function socialsRemove(interaction) {
   return replyEphemeral(interaction, `Removed ${social.url} from ${social.name}.`);
 }
 
-// /stream, /sets and /calls: the same switch on a different field. onAt saves when it went from off to on.
-// confirmAllOff asks first before turning it off for everyone
-function toggles({ option, field, label, onAt, confirmAllOff }) {
-  // returns what to reply
-  const flip = (choice, on) => {
-    const now = secondsNow();
-    for (const player of choice === 'all' ? Object.values(state.players) : [choice]) {
+// /track posts switches, the player field each one sets and how the reply names it. onAt saves when set results
+// went from off to on, since the set check never asked start.gg about sets from while they were off
+const POST_SWITCHES = {
+  sets: { field: 'setResults', label: 'set results', onAt: 'setResultsOnAt' },
+  stream: { field: 'streamAlerts', label: 'stream alerts' },
+};
+// players saved before set results and stream alerts started off have no field, which counts as on
+const isOn = (player, field) => player[field] !== false;
+
+// Set results on and stream alerts off, or Set results and stream alerts on when they match
+function switchesText(changes) {
+  const parts = Object.entries(changes).map(([name, on]) => ({ label: POST_SWITCHES[name].label, on }));
+  const text = parts.length === 2 && parts[0].on === parts[1].on
+    ? `${parts[0].label} and ${parts[1].label} ${parts[0].on ? 'on' : 'off'}`
+    : parts.map(({ label, on }) => `${label} ${on ? 'on' : 'off'}`).join(' and ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// returns what to reply
+function flipPosts(choice, changes) {
+  const now = secondsNow();
+  for (const player of choice === 'all' ? Object.values(state.players) : [choice]) {
+    for (const [name, on] of Object.entries(changes)) {
+      const { field, onAt } = POST_SWITCHES[name];
       if (on && onAt && player[field] === false) player[onAt] = now;
       player[field] = on;
     }
-    save();
-    return `${label} ${on ? 'on' : 'off'} for ${choice === 'all' ? 'everyone' : choice.tag}.`;
-  };
+  }
+  save();
+  return `${switchesText(changes)} for ${choice === 'all' ? 'everyone' : choice.tag}.`;
+}
 
-  if (confirmAllOff) {
-    confirmable(confirmAllOff.kind, {
-      command: `/${confirmAllOff.command}`,
-      run: () => ({ content: flip('all', false) }),
-      cancel: () => `${label} stay the way they were.`,
-    });
+// set results off for everyone asks first, since sets finished while they're off never get posted. the target
+// says what the same command did to stream alerts, so pressing it changes both
+confirmable('sets_off', {
+  command: '/track posts player:all sets:off',
+  run: (target) => {
+    const stream = { 'all-stream-on': true, 'all-stream-off': false }[target];
+    return { content: flipPosts('all', { sets: false, ...(stream !== undefined && { stream }) }) };
+  },
+  cancel: () => 'Set results stay the way they were.',
+});
+
+// where a player's or everyone's are at, for /track posts with no switches
+function postsText(choice) {
+  if (choice !== 'all') {
+    return `${escapeMarkdown(choice.tag)}: set results ${isOn(choice, 'setResults') ? 'on' : 'off'}, stream alerts ${isOn(choice, 'streamAlerts') ? 'on' : 'off'}.`;
+  }
+  const players = Object.values(state.players);
+  const on = (field) => players.filter((player) => isOn(player, field)).length;
+  return `Set results are on for ${on('setResults')} and stream alerts for ${on('streamAlerts')} of the ${count(players.length, 'tracked player')}.`;
+}
+
+// /track posts: a tracked player's set results and stream alerts, or everyone's with all. anyone can change them
+function trackPosts(interaction) {
+  const choice = readChoice(interaction, 'player', { trackedOnly: true });
+  if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
+  // someone from /link, their sets and streams never get posted
+  if (choice !== 'all' && !state.players[choice.userId]) {
+    return replyEphemeral(interaction, `${escapeMarkdown(choice.tag)} isn't tracked, so nothing about them gets posted. \`/track add\` them first.`);
   }
 
-  return (interaction) => {
-    const choice = readChoice(interaction, 'player', { trackedOnly: true });
-    if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
-    // someone from /link, their streams, sets and match calls never get posted
-    if (choice !== 'all' && !state.players[choice.userId]) {
-      return replyEphemeral(interaction, `You aren't tracked, so there are no ${label.toLowerCase()} to change.`);
-    }
+  const changes = {};
+  for (const name of Object.keys(POST_SWITCHES)) {
+    const value = interaction.options.getString(name);
+    if (value) changes[name] = value === 'on';
+  }
+  if (!Object.keys(changes).length) return interaction.reply({ content: postsText(choice), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 
-    const on = interaction.options.getString(option, true) === 'on';
-    // nothing to lose when it's already off for everyone
-    const players = Object.values(state.players);
-    if (choice === 'all' && !on && confirmAllOff && players.some((player) => player[field] !== false)) {
-      return askFirst(interaction, confirmAllOff.kind, 'all', confirmAllOff.question(players.length), 'Turn off');
-    }
-    return interaction.reply({ content: flip(choice, on), allowedMentions: { parse: [] } });
-  };
+  // nothing to lose when it's already off for everyone
+  const players = Object.values(state.players);
+  if (choice === 'all' && changes.sets === false && players.some((player) => isOn(player, 'setResults'))) {
+    const target = { true: 'all-stream-on', false: 'all-stream-off' }[changes.stream] ?? 'all';
+    return askFirst(interaction, 'sets_off', target, `Turn set results off for all ${players.length} tracked players? Sets they finish while it's off never get posted, even after it's back on.`, 'Turn off');
+  }
+  return interaction.reply({ content: flipPosts(choice, changes), allowedMentions: { parse: [] } });
 }
 
-const streamAlerts = toggles({ option: 'alerts', field: 'streamAlerts', label: 'Stream alerts' });
-// the set check doesn't ask about players with results off, so this is how their older sets stay out.
-// turning them back on skips everything finished while they were off, so everyone at once asks first
-const setResults = toggles({
-  option: 'results', field: 'setResults', label: 'Set results', onAt: 'setResultsOnAt',
-  confirmAllOff: {
-    kind: 'sets_off', command: 'sets player:all results:off',
-    question: (count) => `Turn set results off for all ${count} tracked players? Sets they finish while it's off never get posted, even after it's back on.`,
+// what each /notify switch keeps a list of, and what the reply says about it
+const PINGS = {
+  calls: { list: 'callPings', on: 'You\'ll get pinged when your match is called.', off: 'No more match call pings.' },
+  streams: { list: 'streamPings', on: 'You\'ll get pinged for every stream alert posted here.', off: 'No more stream alert pings.' },
+  registration: {
+    list: 'regPings',
+    on: 'You\'ll get pinged for reg reminders. If your Discord is connected on start.gg, not for ones you\'re already registered for.',
+    off: 'No more reg reminder pings.',
   },
-});
-// match call pings go out while the set is still called, so there's no cutoff like /sets has
-const matchCalls = toggles({ option: 'pings', field: 'callPings', label: 'Match call pings' });
+};
 
-// only ever changes the person who ran it, who doesn't have to be tracked or linked. pings go
-// out with every stream alert, so /stream on each player still decides what gets posted
-function streamPings(interaction) {
-  const on = interaction.options.getString('ping', true) === 'on';
-  const { id } = interaction.user;
-  state.streamPings = state.streamPings.filter((each) => each !== id);
-  if (on) state.streamPings.push(id);
-  save();
-  return replyEphemeral(interaction, on
-    ? 'You\'ll get pinged for every stream alert posted here. Alerts go out for tracked players with `/stream` on.'
-    : 'No more stream alert pings.');
+// the role that shows who has reg pings on. pings go off the list, not the role, so people already
+// registered can be left out
+const REG_ROLE = 'Reg Reminders';
+
+// where someone's pings are at, plus their own posts if they're tracked
+function notifyText(discordId, me) {
+  const has = (name) => state[PINGS[name].list].includes(discordId);
+  let calls = has('calls') ? 'on' : 'off';
+  if (has('calls') && !me) calls += ', but nothing to go by until you `/link`';
+  const lines = [
+    '**Your pings**',
+    `**Match calls:** ${calls}`,
+    `**Stream alerts:** ${has('streams') ? 'on' : 'off'}`,
+    `**Reg reminders:** ${has('registration') ? 'on' : 'off'}`,
+  ];
+  if (me && state.players[me.userId]) {
+    lines.push(`-# You're tracked as ${escapeMarkdown(me.tag)}, with set results ${isOn(me, 'setResults') ? 'on' : 'off'} and stream alerts ${isOn(me, 'streamAlerts') ? 'on' : 'off'}. \`/track posts\` changes those`);
+  }
+  return lines.join('\n');
 }
 
-export { configureMessages, socialsAdd, socialsRemove, streamAlerts, streamPings, setResults, matchCalls };
+// /notify: only ever changes whoever ran it. match calls go by their start.gg, so those need them linked or
+// tracked with their discord on start.gg. registration hands out the Reg Reminders role too, which can take
+// discord past the 3 seconds a command gets, so that one defers first
+async function notify(interaction) {
+  const { id } = interaction.user;
+  const all = interaction.options.getString('all');
+  const changes = {};
+  for (const name of Object.keys(PINGS)) {
+    const value = interaction.options.getString(name) ?? all;
+    if (value) changes[name] = value === 'on';
+  }
+  const me = linkedPlayer(id);
+  if (!Object.keys(changes).length) return replyEphemeral(interaction, notifyText(id, me));
+
+  const lines = [];
+  for (const [name, on] of Object.entries(changes)) {
+    if (name === 'calls' && on && !me) {
+      lines.push('Match call pings need your start.gg, so `/link` first. Leave out the link and it finds yours.');
+      continue;
+    }
+    const list = PINGS[name].list;
+    state[list] = state[list].filter((each) => each !== id);
+    if (on) state[list].push(id);
+    lines.push(PINGS[name][on ? 'on' : 'off']);
+  }
+  save();
+  if (changes.calls && me && !messageEnabled('calls')) lines.push('-# Match calls are off for the whole server, `/messages calls` turns them on.');
+  if (!Object.hasOwn(changes, 'registration')) return replyEphemeral(interaction, lines.join('\n'));
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const { guild, member } = interaction;
+  try {
+    let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
+    if (changes.registration) {
+      role ??= await guild.roles.create({ name: REG_ROLE, reason: 'shows who has /notify registration on' });
+      await member.roles.add(role);
+    } else if (role) {
+      await member.roles.remove(role);
+    }
+  } catch (err) {
+    // missing permissions. the pings still work without the role
+    if (err.code !== 50013) throw err;
+    lines.push(`-# I couldn't change your ${REG_ROLE} role though, that needs Manage Roles and my role above it.`);
+  }
+  return interaction.editReply(lines.join('\n'));
+}
+
+export { configureMessages, socialsAdd, socialsRemove, trackPosts, notify };

@@ -40,7 +40,8 @@ function mockStartgg(closesAt, { hidden = false } = {}) {
     else if (query.includes('tournaments(query:')) {
       data = Object.fromEntries([...query.matchAll(/\bu(\d+): user/g)].map(([, id]) => [`u${id}`, { tournaments: { nodes: [] } }]));
     }
-    else if (query.includes('userEntrant')) {
+    // a tracked tournament nobody from the crew is in yet gets asked about with no users
+    else if (query.includes('tournament(id: $id)')) {
       data = { tournament: { ...tournament(closesAt), events: [
         { id: 50, name: 'Ultimate Singles', slug: 'tournament/local/event/singles', state: 'CREATED', numEntrants: 40, u1: { id: 9, standing: null } },
         { id: 51, name: 'Melee Singles', slug: 'tournament/local/event/melee', state: 'CREATED', numEntrants: 12, u1: null },
@@ -50,16 +51,17 @@ function mockStartgg(closesAt, { hidden = false } = {}) {
   };
 }
 
-// records every reply, edit, delete, follow-up and channel message in order
-function interaction(commandName, values, user, send = async () => ({})) {
+// records every reply, edit, delete, follow-up and channel message in order. manager is Manage Server
+function interaction(commandName, values, user, send = async () => ({}), { subcommand = null, manager = true } = {}) {
   const calls = [];
   return {
     calls,
     commandName,
     guild: { members: { fetch: async ({ user: ids }) => new Map(ids.filter(id => id === 'in-server').map(id => [id, { displayName: 'Herb' }])) } },
     channel: { send: async r => { calls.push(['send', r]); return send(r); } },
+    memberPermissions: { has: () => manager },
     options: {
-      getSubcommand: () => null, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null,
+      getSubcommand: () => subcommand, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null,
       getUser: () => user, getMember: () => user && { displayName: user.displayName },
     },
     reply: async r => calls.push(['reply', r]),
@@ -80,10 +82,10 @@ test('participants come from every page, including ones with no account', async 
   };
   const { getParticipants } = await import('../src/startgg.js');
   assert.deepEqual(await getParticipants(5), [
-    { tag: 'Here', userId: 1, discordId: 'in-server' },
-    { tag: 'Elsewhere', userId: 2, discordId: 'not-in-server' },
-    { tag: 'No Discord', userId: 3, discordId: undefined },
-    { tag: 'Added by the TO', userId: undefined, discordId: undefined },
+    { tag: 'Here', userId: 1, slug: 'user/here', discordId: 'in-server' },
+    { tag: 'Elsewhere', userId: 2, slug: 'user/elsewhere', discordId: 'not-in-server' },
+    { tag: 'No Discord', userId: 3, slug: 'user/no-discord', discordId: undefined },
+    { tag: 'Added by the TO', userId: undefined, slug: undefined, discordId: undefined },
   ]);
   assert.deepEqual(pagesAsked.sort(), [1, 2]);
 });
@@ -261,142 +263,81 @@ test('reg_warn does not ping once registration closed, or for bots', async () =>
   assert.deepEqual(bot.calls.map(([kind]) => kind), ['reply']);
 });
 
-test('set_reg_reminder tracks everyone registered for the tournament', async () => {
+test('tournament add tracks the tournament with everything on and its reminders set, tracking nobody', async () => {
   state.players = {};
-  state.regReminders = {};
+  state.tournaments = {};
+  // untracked before, so a reg admin's would have stayed out
+  state.regSkipped = [5];
   // the reminder's own send is covered elsewhere, here it would post to no channel
   state.messages = { registration: false };
   mockStartgg();
-  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
-  await handleCommand(run);
-  // the TO-added entry has no account, so there's nothing to track
-  assert.deepEqual(Object.keys(state.players).sort(), ['1', '2', '3']);
-  assert.equal(state.players[1].playerId, 10);
-  // the set and stream checks skip them until /sets and /stream turn those on
-  assert.equal(state.players[1].streamAlerts, false);
-  assert.equal(state.players[1].setResults, false);
-  assert.equal(state.players[1].callPings, false);
-  assert.ok(state.players[1].lastCheck >= now);
-  assert.ok(state.regReminders[5]);
-  // the reminder's own channel send can land anywhere around the reply
-  const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1].content, /sending the last call now\. 3 players from Local are now tracked, with set results, stream alerts and match call pings off\./);
-});
-
-test('set_reg_reminder still sets the reminder when the list is hidden, tracking nobody', async () => {
-  state.players = {};
-  state.regReminders = {};
-  state.messages = { registration: false };
-  mockStartgg(undefined, { hidden: true });
-  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
+  const run = interaction('tournament', { tournament: 'start.gg/tournament/local' }, undefined, undefined, { subcommand: 'add' });
   await handleCommand(run);
   assert.deepEqual(state.players, {});
-  assert.ok(state.regReminders[5]);
+  const tracked = state.tournaments[5];
+  assert.equal(tracked.name, 'Local');
+  assert.deepEqual({ ...tracked.tracked, at: undefined }, { by: 'manual', at: undefined, sets: true, stream: true, top8: true, reminders: true });
+  // sets from before it was tracked stay out of its thread
+  assert.ok(tracked.lastCheck >= now);
+  // closes in an hour, so the last call is all that's left
+  assert.equal(tracked.reminder.deadline, now + 3600);
+  assert.ok(tracked.reminder.next >= 3);
+  assert.deepEqual(state.regSkipped, []);
   const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.doesNotMatch(edit[1].content, /now tracked/);
+  assert.match(edit[1].content, /^Tracking Local\. Every set and stream alert from it posts in its own thread.*\nRegistration ends <t:\d+:R>, sending the last call now\./);
+  assert.deepEqual(edit[1].allowedMentions, { parse: [] });
+
+  // a second time just says so
+  const again = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add' });
+  await handleCommand(again);
+  assert.match(again.calls.find(([kind]) => kind === 'edit')[1].content, /Local is already tracked/);
 });
 
-test('set_reg_reminder tracks nobody when over 80 are registered, without reading the list', async () => {
-  state.players = {};
-  state.regReminders = {};
+test('tournament add with reminders off or registration closed still tracks it, without reminders', async () => {
+  state.tournaments = {};
   state.messages = { registration: false };
-  let attendeePages = 0;
-  globalThis.fetch = async (_url, options) => {
-    const { query } = JSON.parse(options.body);
-    let data;
-    if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(), numAttendees: 120 } };
-    else if (query.includes('participants(')) {
-      attendeePages++;
-      data = { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [] } } };
-    }
-    else if (query.includes('tournaments(query:')) data = {};
-    else if (query.includes('userEntrant')) data = { tournament: { ...tournament(), events: [] } };
-    else data = {};
-    return { ok: true, json: async () => ({ data }) };
-  };
-  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
-  await handleCommand(run);
-  assert.deepEqual(state.players, {});
-  assert.ok(state.regReminders[5]);
-  assert.equal(attendeePages, 0);
-  const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1].content, /120 are registered for Local, over 80, so nobody was tracked\./);
+  mockStartgg();
+  const off = interaction('tournament', { tournament: 'local', reminders: 'off' }, undefined, undefined, { subcommand: 'add' });
+  await handleCommand(off);
+  assert.equal(state.tournaments[5].tracked.reminders, false);
+  assert.match(off.calls.find(([kind]) => kind === 'edit')[1].content, /\nNo reg reminders\./);
+
+  state.tournaments = {};
+  mockStartgg(now - 60);
+  const closed = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add' });
+  await handleCommand(closed);
+  assert.ok(state.tournaments[5].tracked);
+  assert.match(closed.calls.find(([kind]) => kind === 'edit')[1].content, /Registration is closed, so no reg reminders\./);
 });
 
-test('set_reg_reminder tracks nobody when the attendee pages run over 80', async () => {
-  state.players = {};
-  state.regReminders = {};
-  state.messages = { registration: false };
-  // no count from start.gg, so the pages decide
-  const nodes = Array.from({ length: 85 }, (_, i) => ({
-    gamerTag: `Player${i}`, player: { id: 1000 + i, gamerTag: `Player${i}` },
-    user: { id: 2000 + i, slug: `user/player${i}`, images: [], authorizations: [] },
-  }));
-  globalThis.fetch = async (_url, options) => {
-    const { query } = JSON.parse(options.body);
-    let data;
-    if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(), numAttendees: null } };
-    else if (query.includes('participants(')) data = { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes } } };
-    else if (query.includes('tournaments(query:')) data = {};
-    else if (query.includes('userEntrant')) data = { tournament: { ...tournament(), events: [] } };
-    else data = {};
-    return { ok: true, json: async () => ({ data }) };
-  };
-  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
-  await handleCommand(run);
-  assert.deepEqual(state.players, {});
-  assert.ok(state.regReminders[5]);
-  const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1].content, /85 are registered for Local, over 80, so nobody was tracked\./);
+test('tournament commands need Manage Server, even if discord shows them to someone without it', async () => {
+  mockStartgg();
+  // it answers before anything else, so nothing waits on start.gg
+  for (const subcommand of ['add', 'remove', 'posts']) {
+    const run = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand, manager: false });
+    await handleCommand(run);
+    assert.deepEqual(run.calls.map(([kind]) => kind), ['reply']);
+    assert.match(run.calls[0][1].content, /You need Manage Server permission/);
+  }
 });
 
-test('set_reg_reminder still tracks exactly 80 registered', async () => {
-  state.players = {};
-  state.regReminders = {};
-  state.messages = { registration: false };
-  const nodes = Array.from({ length: 80 }, (_, i) => ({
-    gamerTag: `Player${i}`, player: { id: 1000 + i, gamerTag: `Player${i}` },
-    user: { id: 2000 + i, slug: `user/player${i}`, images: [], authorizations: [] },
-  }));
-  globalThis.fetch = async (_url, options) => {
-    const { query } = JSON.parse(options.body);
-    let data;
-    if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(), numAttendees: nodes.length } };
-    else if (query.includes('participants(')) data = { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes } } };
-    else if (query.includes('tournaments(query:')) data = {};
-    else if (query.includes('userEntrant')) data = { tournament: { ...tournament(), events: [] } };
-    else data = {};
-    return { ok: true, json: async () => ({ data }) };
-  };
-  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
-  await handleCommand(run);
-  assert.equal(Object.keys(state.players).length, 80);
-  assert.ok(state.regReminders[5]);
-  const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1].content, /80 players from Local are now tracked, with set results, stream alerts and match call pings off\./);
-  state.players = {};
-});
-
-async function autocomplete(commandName, typed) {
+async function autocomplete(commandName, typed, subcommand = null) {
   let choices;
-  await handleAutocomplete({ commandName, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async (result) => { choices = result; } });
+  await handleAutocomplete({ commandName, options: { getSubcommand: () => subcommand, getFocused: () => typed }, respond: async (result) => { choices = result; } });
   return choices;
 }
 
-test('tournament options offer reminders and tracked players\' tournaments, soonest first, without finished ones', async () => {
+test('tournament options offer tracked ones and tracked players\' tournaments, soonest first, without finished ones', async () => {
   const day = 86400;
-  state.regReminders = {
-    5: { id: 5, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600 },
-    // a reg admin's, before the reminder check fills in its dates
-    8: { id: 8, slug: 'tournament/admin-weekly', name: 'Admin Weekly' },
-  };
   state.tournaments = {
-    5: { id: 5, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600 },
+    5: { id: 5, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600, tracked: { by: 'manual' } },
     6: { id: 6, slug: 'tournament/live', name: 'Live Now', startAt: now - 3600, endAt: now + 3600 },
-    7: { id: 7, slug: 'tournament/last-week', name: 'Last Week', startAt: now - 8 * day, endAt: now - 7 * day },
+    7: { id: 7, slug: 'tournament/last-week', name: 'Last Week', startAt: now - 8 * day, endAt: now - 7 * day, tracked: { by: 'manual' } },
+    // a reg admin's, before the tournament check fills in its dates
+    8: { id: 8, slug: 'tournament/admin-weekly', name: 'Admin Weekly', tracked: { by: 'admin' } },
     9: { id: 9, slug: 'tournament/next-month', name: 'Next Month', startAt: now + 30 * day, endAt: now + 30 * day + 3600 },
   };
-  const names = async (commandName, typed) => (await autocomplete(commandName, typed)).map(({ name }) => name);
+  const names = async (commandName, typed, subcommand) => (await autocomplete(commandName, typed, subcommand)).map(({ name }) => name);
   assert.deepEqual(await autocomplete('registered', ''), [
     { name: 'Live Now', value: 'tournament/live' }, { name: 'Local', value: 'tournament/local' },
     { name: 'Next Month', value: 'tournament/next-month' }, { name: 'Admin Weekly', value: 'tournament/admin-weekly' },
@@ -404,19 +345,22 @@ test('tournament options offer reminders and tracked players\' tournaments, soon
   assert.deepEqual(await names('reg_warn', 'LOC'), ['Local']);
   // a pasted link to one it knows shows its name
   assert.deepEqual(await names('registered', 'https://www.start.gg/tournament/live/details'), ['Live Now']);
-  // a new reminder only for ones that haven't started and don't have one
-  assert.deepEqual(await names('set_reg_reminder', ''), ['Next Month']);
+  // tracking one offers only the ones that aren't tracked or over
+  assert.deepEqual(await names('tournament', '', 'add'), ['Live Now', 'Next Month']);
+  // and untracking or changing one only the tracked ones, over or not
+  assert.deepEqual(await names('tournament', '', 'remove'), ['Last Week', 'Local', 'Admin Weekly']);
+  assert.deepEqual(await names('tournament', 'week', 'posts'), ['Last Week', 'Admin Weekly']);
 
   // anything else typed comes back as it is, so a pasted link still goes through
   assert.deepEqual(await autocomplete('registered', ' start.gg/tournament/genesis-x '), [{ name: 'start.gg/tournament/genesis-x', value: 'start.gg/tournament/genesis-x' }]);
-  state.regReminders = {};
   state.tournaments = {};
-  assert.deepEqual(await autocomplete('set_reg_reminder', ''), [{ name: 'No tournaments to pick yet, paste a start.gg link', value: 'none' }]);
+  assert.deepEqual(await autocomplete('tournament', '', 'add'), [{ name: 'No tournaments to pick yet, paste a start.gg link', value: 'none' }]);
+  assert.deepEqual(await autocomplete('tournament', '', 'posts'), [{ name: 'No tracked tournaments yet, /tournament add one', value: 'none' }]);
 });
 
 test('a picked tournament goes to start.gg by its slug, the same as a pasted link', async () => {
   state.players = {};
-  state.regReminders = {};
+  state.tournaments = {};
   mockStartgg();
   // start.gg only knows it as local here. a reminder check from the tests above can still be asking in the background
   const answer = globalThis.fetch;
@@ -440,8 +384,7 @@ test('background checks finish before the fake goes away', async () => {
 });
 
 // /stream_link with these tournaments going on and start.gg answering streams. records each answer
-async function streamLink({ reminders = {}, tournaments = {}, streams = () => [] } = {}) {
-  state.regReminders = reminders;
+async function streamLink({ tournaments = {}, streams = () => [] } = {}) {
   state.tournaments = tournaments;
   const asked = [];
   globalThis.fetch = async (_url, options) => {
@@ -464,10 +407,9 @@ async function streamLink({ reminders = {}, tournaments = {}, streams = () => []
 
 const going = (id, name, extra = {}) => ({ id, name, slug: `tournament/${name.toLowerCase()}`, startAt: now - 3600, endAt: now + 3600, images: [], ...extra });
 
-test('stream_link links each going-on tournament\'s streams, a reminder and a tracked one counted once', async () => {
+test('stream_link links each going-on tournament\'s streams, tracked or with tracked players in it', async () => {
   const { calls, asked } = await streamLink({
-    reminders: { 5: going(5, 'Local') },
-    tournaments: { 5: going(5, 'Local', { entries: [] }), 6: going(6, 'Weekly', { entries: [] }), 7: going(7, 'Over', { resultsPosted: true }) },
+    tournaments: { 5: going(5, 'Local', { entries: [], tracked: { by: 'manual' } }), 6: going(6, 'Weekly', { entries: [] }), 7: going(7, 'Over', { resultsPosted: true }) },
     streams: (id) => (id === 5 ? [{ streamName: 'localstream', streamSource: 'TWITCH' }, { streamName: 'LocalTube', streamSource: 'YOUTUBE' }] : []),
   });
   // one request for the lot, and finished ones aren't asked about

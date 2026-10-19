@@ -89,8 +89,9 @@ test('running messages without options shows defaults without writing settings',
   const reply = await configure();
   assert.equal(reply.flags, undefined);
   assert.match(reply.content, /Set results:\*\* on/);
-  assert.match(reply.content, /Match call pings:\*\* off/);
-  assert.match(reply.content, /Top 8s:\*\* off/);
+  // each person turns their own match calls on, and top 8s only come from tracked tournaments
+  assert.match(reply.content, /Match call pings:\*\* on/);
+  assert.match(reply.content, /Top 8s:\*\* on/);
   assert.match(reply.content, /Bills final results:\*\* off/);
   assert.match(reply.content, /Sunday 21:00 EST/);
   assert.deepEqual(state.messages, {});
@@ -116,19 +117,21 @@ test('re-enabling categories saves cutoffs even if no muted poll happened', asyn
   assert.ok(state.messages.enabledAt.registration > 0);
 });
 
-test('match call pings start off server-wide and re-enabling skips what came due', async () => {
+test('only Bills finals start off server-wide, and turning match calls back on skips what came due', async () => {
   const { messageEnabled, messageSettings } = await import('../src/message-settings.js');
   state.messages = {};
-  assert.equal(messageSettings().calls, false);
-  assert.equal(messageEnabled('calls', Math.floor(Date.now() / 1000)), false);
-  assert.equal(messageEnabled('calls'), false);
-  // other types still start on
+  assert.equal(messageSettings().calls, true);
+  assert.equal(messageSettings().top8, true);
+  assert.equal(messageSettings().bills, false);
+  assert.equal(messageEnabled('bills'), false);
   assert.equal(messageSettings().sets, true);
 
-  state.messages = {};
+  state.messages = { calls: false };
   await configure({ calls: true });
   assert.equal(state.messages.calls, true);
   assert.ok(state.messages.enabledAt?.calls > 0);
+  assert.equal(messageEnabled('calls', state.messages.enabledAt.calls - 60), false);
+  assert.equal(messageEnabled('calls', state.messages.enabledAt.calls), true);
 });
 
 test('muting recap prevents fetches and pending message sends', async () => {

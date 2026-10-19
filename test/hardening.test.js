@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,7 +12,6 @@ const { state } = await import('../src/store.js');
 const startgg = await import('../src/startgg.js');
 const tracker = await import('../src/tracker.js');
 const { confirmable, handleChoice } = await import('../src/commands/confirm.js');
-const { writeTrackRequest } = await import('../src/track-request.js');
 const { post } = await import('../src/fun/index.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -54,22 +53,6 @@ function fakeChannel({ editThrows = null } = {}) {
     client: { channels: { fetch: async () => ({ messages }) } },
   };
 }
-
-test('a track request with __proto__ or bad ids adds nobody and pollutes nothing', () => {
-  state.players = {};
-  writeTrackRequest({
-    source: 'evil host file',
-    players: [
-      { userId: '__proto__', playerId: 10, tag: 'Evil' },
-      { userId: 1, playerId: '1; evil', tag: 'Evil' },
-      { userId: 2, playerId: 20, tag: 'Good' },
-    ],
-  });
-  tracker.importTrackRequest();
-  assert.deepEqual(Object.keys(state.players), ['2']);
-  assert.equal({}.polluted, undefined);
-  assert.equal(state.players.polluted, undefined);
-});
 
 test('a start.gg id with graphql in it never reaches the query', async () => {
   mockStartgg(() => assert.fail('bad id reached start.gg'));
