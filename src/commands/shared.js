@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, escapeMarkdown } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
@@ -12,6 +12,10 @@ const WAIT_FIRST_SECONDS = 5;
 const WAIT_UPDATE_SECONDS = 15;
 // a public answer later than this pings whoever asked, see sendLate
 const LATE_SECONDS = 60;
+// start.gg pictures uploaded with a reply, see withPictures. discord takes 10 files and 10MB a message
+const MESSAGE_FILES = 10;
+const PICTURE_BYTES = 8 * 1024 * 1024;
+const PICTURE_SECONDS = 10;
 
 // players each person picked last, so autocomplete can put them first before anything's typed
 const RECENT_PICKS = 5;
@@ -98,35 +102,82 @@ const swapsReport = (interaction) => Boolean(interaction.isButton?.()) && readBu
 // a public answer this long after the command scrolled up the channel with nobody watching, and discord
 // stops taking edits 15 minutes in. it goes out as a new message that pings whoever asked instead, and
 // the old reply goes. false when it can't, so the usual reply goes out
-async function sendLate(interaction, batches, components, files) {
+async function sendLate(interaction, messages, components) {
   const waited = (Date.now() - interaction.createdTimestamp) / 1000;
   if (!interaction.deferred || !(waited >= LATE_SECONDS) || isEphemeral(interaction) || !interaction.channel?.send) return false;
-  const [first, ...rest] = batches;
+  const [first, ...rest] = messages;
   const { id } = interaction.user;
   try {
-    await interaction.channel.send({ content: `<@${id}> here's your ${commandLabel(interaction)}.`, embeds: first, components, files, allowedMentions: { users: [id] } });
+    await interaction.channel.send({ content: `<@${id}> here's your ${commandLabel(interaction)}.`, embeds: first.batch, components, files: first.files, allowedMentions: { users: [id] } });
   } catch (err) {
     console.error(`late ${commandLabel(interaction)} couldn't be posted as a new message:`, err.message);
     return false;
   }
-  for (const batch of rest) await interaction.channel.send({ embeds: batch, allowedMentions: { parse: [] } });
+  for (const { batch, files } of rest) await interaction.channel.send({ embeds: batch, files, allowedMentions: { parse: [] } });
   // the report a Full report press was swapping stays, just without its greyed out buttons
   if (swapsReport(interaction)) await interaction.editReply({ content: null, components: [] }).catch(() => {});
   else await interaction.deleteReply().catch(() => {});
   return true;
 }
 
+// where a card can have a picture, and how to change it. null takes it off, and the author keeps its name
+const PICTURE_SPOTS = [
+  [(card) => card.data.thumbnail?.url, (card, url) => card.setThumbnail(url)],
+  [(card) => card.data.image?.url, (card, url) => card.setImage(url)],
+  [(card) => card.data.author?.icon_url, (card, url) => card.setAuthor({ name: card.data.author.name, url: card.data.author.url, iconURL: url ?? undefined })],
+];
+
+const startggPictures = (card) => PICTURE_SPOTS.map(([get]) => get(card)).filter(startgg.isStartggImage);
+
+// discord can't always load images.start.gg from a link, and a card whose picture doesn't load shows nothing
+// there, not even the avatar. so a message's start.gg pictures go up with it as files, like character art. one
+// that won't download comes off its card so the avatar can stand in, and one past discord's file limits stays
+// a link. [{ batch, files }] for each message, the caller's files going with the first
+async function withPictures(interaction, batches, files) {
+  // without Attach Files a message with files fails, so the links are the best there is
+  const canUpload = interaction.appPermissions?.has(PermissionFlagsBits.AttachFiles) !== false;
+  const urls = canUpload ? [...new Set(batches.flat().flatMap(startggPictures))] : [];
+  // one download each, since the same player's picture can be on every card
+  const downloads = new Map(urls.map((url, i) => [url, startgg.getImage(url, `picture-${i}`, PICTURE_SECONDS * 1000).catch(() => null)]));
+  return Promise.all(batches.map(async (batch, i) => {
+    const uploads = i ? [] : [...files];
+    let bytes = 0;
+    for (const card of batch) {
+      for (const [get, set] of PICTURE_SPOTS) {
+        const download = downloads.get(get(card));
+        if (!download) continue;
+        const file = await download;
+        if (!file) {
+          set(card, null);
+          continue;
+        }
+        if (!uploads.includes(file)) {
+          if (uploads.length >= MESSAGE_FILES || bytes + file.attachment.length > PICTURE_BYTES) continue;
+          uploads.push(file);
+          bytes += file.attachment.length;
+        }
+        set(card, `attachment://${file.name}`);
+      }
+    }
+    return { batch: embeds.withImage(batch), files: uploads };
+  }));
+}
+
 // whatever doesn't fit in the reply goes in follow-ups, which are only ephemeral when the reply is.
 // buttons and files go with the reply, and leaving buttons out clears the ones a pressed button's message had.
+// start.gg pictures go with whichever message has them, see withPictures.
 // mentions stay off on every branch, so a start.gg tag can't ping: only sendLate pings on purpose
 async function sendEmbeds(interaction, list, components = [], files = []) {
   const batches = embeds.messages(list);
-  if (await sendLate(interaction, batches, components, files)) return;
-  for (const [i, batch] of batches.entries()) {
-    if (i > 0) await interaction.followUp({ embeds: batch, allowedMentions: { parse: [] }, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
+  // the downloads can take longer than the 3 seconds discord gives a reply
+  if (!interaction.deferred && !interaction.replied && batches.flat().some((card) => startggPictures(card).length)) await interaction.deferReply();
+  const outgoing = await withPictures(interaction, batches, files);
+  if (await sendLate(interaction, outgoing, components)) return;
+  for (const [i, { batch, files: uploads }] of outgoing.entries()) {
+    if (i > 0) await interaction.followUp({ embeds: batch, files: uploads, allowedMentions: { parse: [] }, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
     // null clears a countdown from withCountdown
-    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components, files, allowedMentions: { parse: [] } });
-    else await interaction.reply({ embeds: batch, components, files, allowedMentions: { parse: [] } });
+    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components, files: uploads, allowedMentions: { parse: [] } });
+    else await interaction.reply({ embeds: batch, components, files: uploads, allowedMentions: { parse: [] } });
   }
 }
 

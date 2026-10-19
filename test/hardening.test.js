@@ -74,7 +74,7 @@ test('a bad discord id from start.gg never becomes a mention or a ping', async (
   state.callPosts[0].messageId = 'm1';
   await tracker.followCalls(channel);
   assert.equal(channel.sent.length, 1);
-  assert.equal(channel.sent[0].content, `<@123> You're still up — 6 min later, TOs usually DQ at 10`);
+  assert.equal(channel.sent[0].content, `<@123> You're still up, 6 min in. TOs usually DQ at 10`);
   assert.deepEqual(channel.sent[0].allowedMentions, { users: ['123'] });
 });
 

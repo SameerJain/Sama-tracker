@@ -1,14 +1,14 @@
-import { GuildScheduledEventEntityType, GuildScheduledEventPrivacyLevel, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
+import { PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
-import { startggUrl } from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { findAccount, verifiedCaller } from '../accounts.js';
+import { isRegAdmin } from '../accounts.js';
+import { ensureDiscordEvent } from '../discord-events.js';
 import {
   REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, missingThreadPermissions, nextRegReminder, regDeadline,
   secondsNow, trackTournament,
 } from '../tracker.js';
-import { findPlayer, lookup, replyEphemeral } from './shared.js';
+import { findPlayer, lookup, replyEphemeral, replyEphemeralAfterDefer } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
 import { tournamentNotFound, tournamentSlug } from './registration.js';
 
@@ -17,10 +17,7 @@ const HOUR = 60 * 60;
 // /tournament posts switches, named the way the replies list them
 const POSTS = { sets: 'Every set', stream: 'Stream alerts', top8: 'Top 8s', reminders: 'Reg reminders' };
 
-// discord hides /tournament from anyone without Manage Server unless a server hands it to a role, and this
-// covers a server that changed that by mistake
-const allowed = (interaction) => Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
-const NOT_ALLOWED = 'You need Manage Server permission to change tracked tournaments.';
+// who can run /tournament is discord's to say: Manage Server by default, or any role a server hands it to
 
 // 7 days, 3 days, 1 day and 12 hours
 function inWords(hours) {
@@ -51,40 +48,41 @@ function threadWarning(interaction) {
   return null;
 }
 
-// a found tournament tracked by hand, the same from /tournament add and /tournament event.
-// already tracked ones keep their switches
-function ensureTracked(found, { reminders }, now = secondsNow()) {
+// tracks a tournament from getRegistration by hand for /tournament add, and says what that set up. one
+// already tracked keeps its switches and reminder schedule
+function trackLines(interaction, found, reminders, now = secondsNow()) {
+  const name = escapeMarkdown(found.name);
+  if (state.tournaments[found.id]?.tracked) return [`Already tracking ${name}.`];
+
   const { id, slug, startAt, endAt, city, addrState, isOnline } = found;
   const images = (found.images ?? []).filter((image) => image.type === 'profile').map(({ url }) => ({ url }));
   const tournament = state.tournaments[id] ??= { id, name: found.name, slug, startAt, endAt, city, addrState, isOnline, images, entries: [], userIds: [] };
-  const isNew = !tournament.tracked;
-  if (isNew) {
-    trackTournament(tournament, 'manual', now);
-    tournament.tracked.reminders = reminders;
-    // tracking it by hand again lets a reg admin's be found again later
-    state.regSkipped = state.regSkipped.filter((each) => String(each) !== String(id));
-  }
-  return { tournament, isNew };
-}
+  trackTournament(tournament, 'manual', now);
+  tournament.tracked.reminders = reminders;
+  // tracking it by hand again lets a reg admin's be found again later
+  state.regSkipped = state.regSkipped.filter((each) => String(each) !== String(id));
 
-// registry lines about reg reminders, shared by both paths that track. only newly
-// tracked ones get here, so already tracked ones keep their schedule
-function reminderLines(found, tournament, reminders, now = secondsNow()) {
+  const lines = [`Tracking ${name}. Every set and stream alert from it posts in its own thread, and each event's top 8 once the bracket is finished.`];
   const deadline = regDeadline(found);
   const next = nextRegReminder(deadline);
   const firstAt = deadline - REG_REMINDER_HOURS[next] * HOUR;
   // further out it might just not be open yet
   const open = deadline > now && (firstAt > now || found.isRegistrationOpen);
   if (open) tournament.reminder = { deadline, next };
-  if (!reminders) return ['No reg reminders.'];
-  if (!open) return ['Registration is closed, so no reg reminders.'];
-  if (firstAt <= now) return [`Registration ends <t:${deadline}:R>, sending the last call now.`];
-  const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(inWords));
-  return [`Everyone with \`/notify registration\` on gets pinged ${when} before registration ends, starting <t:${firstAt}:R>.`];
+  if (!reminders) lines.push('No reg reminders.');
+  else if (!open) lines.push('Registration is closed, so no reg reminders.');
+  else if (firstAt <= now) lines.push(`Registration ends <t:${deadline}:R>, sending the last call now.`);
+  else {
+    const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(inWords));
+    lines.push(`Everyone with \`/notify registration\` on gets pinged ${when} before registration ends, starting <t:${firstAt}:R>.`);
+  }
+  const warning = threadWarning(interaction);
+  if (warning) lines.push(warning);
+  lines.push('-# `/tournament posts` turns any of it off');
+  return lines;
 }
 
 async function tournamentAdd(interaction) {
-  if (!allowed(interaction)) return replyEphemeral(interaction, NOT_ALLOWED);
   const input = interaction.options.getString('tournament', true).trim();
   const reminders = interaction.options.getString('reminders') !== 'off';
   const addEvent = interaction.options.getString('add_event') === 'on';
@@ -95,21 +93,12 @@ async function tournamentAdd(interaction) {
   const name = escapeMarkdown(found.name);
   const now = secondsNow();
   if (now > endTime(found) + RUNS_LATE_HOURS * HOUR) return interaction.editReply({ content: `${name} is already over.`, allowedMentions: { parse: [] } });
-
-  const lines = [];
-  if (state.tournaments[found.id]?.tracked) {
-    if (!addEvent) {
-      return interaction.editReply({ content: `${name} is already tracked. \`/tournament posts\` changes what it posts.`, allowedMentions: { parse: [] } });
-    }
-    lines.push(`Already tracking ${name}.`);
-  } else {
-    const { tournament } = ensureTracked(found, { reminders }, now);
-    lines.push(`Tracking ${name}. Every set and stream alert from it posts in its own thread, and each event's top 8 once the bracket is finished.`);
-    lines.push(...reminderLines(found, tournament, reminders, now));
-    const warning = threadWarning(interaction);
-    if (warning) lines.push(warning);
-    lines.push('-# `/tournament posts` turns any of it off');
+  // with add_event it still makes the event
+  if (state.tournaments[found.id]?.tracked && !addEvent) {
+    return interaction.editReply({ content: `${name} is already tracked. \`/tournament posts\` changes what it posts.`, allowedMentions: { parse: [] } });
   }
+
+  const lines = trackLines(interaction, found, reminders, now);
   if (addEvent) lines.push(...await eventLines(interaction, found));
   save();
   await interaction.editReply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
@@ -122,7 +111,6 @@ async function tournamentAdd(interaction) {
 // asks first, then has an Undo button for a minute. it stays saved while tracked players are in it, or until its
 // placements are over, so the thread card still gets unpinned. a reg admin's stays untracked
 function tournamentRemove(interaction) {
-  if (!allowed(interaction)) return replyEphemeral(interaction, NOT_ALLOWED);
   const tournament = trackedPick(interaction);
   if (!tournament) return replyEphemeral(interaction, 'That tournament isn\'t tracked. `/track list` shows the ones that are.');
   const again = tournament.tracked.by === 'admin' ? ' It came from a tournament admin, so it won\'t get tracked again on its own.' : '';
@@ -159,7 +147,6 @@ confirmable('untrack_tournament', {
 // with no switches it says what's on. sets turned back on start from now, the way a newly tracked tournament does,
 // and reminders turned back on start from the next one still to come, so nothing missed goes out late
 function tournamentPosts(interaction) {
-  if (!allowed(interaction)) return replyEphemeral(interaction, NOT_ALLOWED);
   const tournament = trackedPick(interaction);
   if (!tournament) return replyEphemeral(interaction, 'That tournament isn\'t tracked. `/tournament add` it first.');
   const changes = {};
@@ -183,7 +170,6 @@ function tournamentPosts(interaction) {
 }
 
 async function adminAdd(interaction) {
-  if (!allowed(interaction)) return replyEphemeral(interaction, NOT_ALLOWED);
   const input = interaction.options.getString('profile', true);
 
   await interaction.deferReply();
@@ -204,7 +190,6 @@ async function adminAdd(interaction) {
 }
 
 function adminRemove(interaction) {
-  if (!allowed(interaction)) return replyEphemeral(interaction, NOT_ALLOWED);
   const admin = lookup(state.regAdmins, interaction.options.getString('admin', true).toLowerCase(), 'tag');
   if (!admin) return replyEphemeral(interaction, 'That\'s not a tournament admin. See `/tournament admin list`.');
 
@@ -217,46 +202,16 @@ function adminRemove(interaction) {
 }
 
 function adminList(interaction) {
-  return interaction.reply({ embeds: embeds.withImage([embeds.regAdmins(state.regAdmins)]) });
+  return interaction.reply({ embeds: embeds.withImage([embeds.regAdmins(state.regAdmins)]), allowedMentions: { parse: [] } });
 }
 
-// whoever ran this, as a start.gg user id in the admin list: their /link or tracked account with discord
-// still connected, or any account the bot has seen for their discord. managers skip the check
-async function eventCaller(interaction) {
-  const caller = await verifiedCaller(interaction.user.id).catch(() => null);
-  if (caller && state.regAdmins[caller.userId]) return caller;
-  const found = await findAccount(interaction.user.id).catch(() => null);
-  return found && state.regAdmins[found.userId] ? found : null;
-}
-
-async function allowedEvent(interaction) {
-  if (allowed(interaction)) return true;
-  return Boolean(await eventCaller(interaction));
-}
-
-const EVENT_NOT_ALLOWED = 'Only tournament admins and Manage Server can make Discord events. `/tournament admin list` shows the admins.';
-
-// discord external events need a location and an end time. a missing end becomes a 6 hour local
-function eventLocation(tournament) {
-  if (tournament.isOnline) return 'Online';
-  return ([tournament.city, tournament.addrState].filter(Boolean).join(', ') || 'See the start.gg link').slice(0, 100);
-}
-
-function eventDescription(tournament) {
-  const lines = [`${tournament.name} on start.gg`, startggUrl(tournament.slug), eventLocation(tournament)];
-  if (tournament.registrationClosesAt) lines.push(`Registration closes <t:${tournament.registrationClosesAt}:F>`);
-  const names = (tournament.events ?? []).map((event) => event.name).filter(Boolean).slice(0, 10);
-  if (names.length) lines.push(`Events: ${names.join(', ')}`);
-  return lines.join('\n').slice(0, 1000);
-}
+const EVENT_NOT_ALLOWED = 'Only tournament admins and people with Manage Server can make Discord events. `/tournament admin list` shows the admins.';
 
 // one line about the discord event, made or found. errors go in the reply the same way
 async function eventLines(interaction, found) {
   const name = escapeMarkdown(found.name);
   if (!found.startAt) return [`${name} has no start time on start.gg, so Discord can't schedule it.`];
-  if (found.startAt <= secondsNow()) {
-    return [`${name} already started <t:${found.startAt}:R>. Discord events have to start in the future.`];
-  }
+  if (found.startAt <= secondsNow()) return [`${name} already started <t:${found.startAt}:R>. Discord events have to start in the future.`];
   const result = await ensureDiscordEvent(found, interaction.guild);
   if (result.error) return [result.error];
   return result.isNew
@@ -264,79 +219,23 @@ async function eventLines(interaction, found) {
     : [`${name} already has a Discord event: ${result.url}`];
 }
 
-// the discord event for a tournament, made or found. the saved id goes first, then the slug in
-// its description, so either path lands on the same one instead of doubling
-async function ensureDiscordEvent(found, guild) {
-  if (!guild?.scheduledEvents?.create) return { error: `Couldn't make a Discord event here.` };
-  const me = guild.members?.me;
-  if (me?.permissions?.has && !me.permissions.has(PermissionFlagsBits.ManageEvents) && !me.permissions.has(PermissionFlagsBits.CreateEvents)) {
-    return { error: 'I need Manage Events permission to make Discord events.' };
-  }
-
-  const savedId = state.tournaments[found.id]?.discordEventId;
-  try {
-    const existing = await guild.scheduledEvents.fetch().catch(() => null);
-    const all = [...(existing?.values?.() ?? [])];
-    const dup = (savedId && all.find((each) => String(each.id) === String(savedId)))
-      ?? all.find((each) => each.description?.includes(found.slug));
-    if (dup) return { url: dup.url ?? `https://discord.com/events/${guild.id ?? ''}/${dup.id}`, isNew: false };
-  } catch (err) {
-    console.error(`checking discord events for ${found.name ?? found.id} failed:`, err.message);
-  }
-
-  let created;
-  try {
-    created = await guild.scheduledEvents.create({
-      name: found.name.slice(0, 100),
-      scheduledStartTime: new Date(found.startAt * 1000),
-      scheduledEndTime: new Date((found.endAt > found.startAt ? found.endAt : found.startAt + 6 * HOUR) * 1000),
-      privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
-      entityType: GuildScheduledEventEntityType.External,
-      description: eventDescription(found),
-      entityMetadata: { location: eventLocation(found) },
-    });
-  } catch (err) {
-    if (err.code === 50013) return { error: 'I need Manage Events permission to make Discord events.' };
-    throw err;
-  }
-  const tournament = state.tournaments[found.id];
-  if (tournament) tournament.discordEventId = created.id;
-  return { url: created.url ?? `https://discord.com/events/${guild.id ?? ''}/${created.id}`, isNew: true };
-}
-
-// paste a start.gg link, get a discord scheduled event and a tracked tournament, the same
-// one /tournament add tracks. one already tracked keeps its settings
-async function tournamentEvent(interaction) {
+// paste a start.gg link, get a discord event. it doesn't track the tournament, /tournament add does that.
+// its own command because discord hides /tournament from anyone without Manage Server, and tournament
+// admins are start.gg accounts, not a discord role
+async function discordEvent(interaction) {
   const input = interaction.options.getString('tournament', true).trim();
+  const manager = Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
+  // with no admins there's nobody to check for, so no start.gg request
+  if (!manager && !Object.keys(state.regAdmins).length) return replyEphemeral(interaction, EVENT_NOT_ALLOWED);
 
   await interaction.deferReply();
-  if (!(await allowedEvent(interaction))) return interaction.editReply({ content: EVENT_NOT_ALLOWED, allowedMentions: { parse: [] } });
+  if (!manager && !(await isRegAdmin(interaction.user.id))) return replyEphemeralAfterDefer(interaction, EVENT_NOT_ALLOWED);
   const found = await startgg.getRegistration(tournamentSlug(input));
   if (!found) return interaction.editReply(tournamentNotFound(input));
-  const name = escapeMarkdown(found.name);
-  const now = secondsNow();
-  // without a start nothing else can be scheduled or timed, so this stays out entirely
-  if (!found.startAt) return interaction.editReply({ content: `${name} has no start time on start.gg, so Discord can't schedule it.`, allowedMentions: { parse: [] } });
-  if (now > endTime(found) + RUNS_LATE_HOURS * HOUR) return interaction.editReply({ content: `${name} is already over.`, allowedMentions: { parse: [] } });
-
-  const lines = [];
-  if (state.tournaments[found.id]?.tracked) {
-    lines.push(`Already tracking ${name}.`);
-  } else {
-    const { tournament } = ensureTracked(found, { reminders: true }, now);
-    lines.push(`Tracking ${name}. Every set and stream alert from it posts in its own thread, and each event's top 8 once the bracket is finished.`);
-    lines.push(...reminderLines(found, tournament, true, now));
-    const warning = threadWarning(interaction);
-    if (warning) lines.push(warning);
-    lines.push('-# `/tournament posts` turns any of it off');
-  }
-  lines.push(...await eventLines(interaction, found));
+  const lines = await eventLines(interaction, found);
+  // the event id, when the tournament is one the bot already has
   save();
   await interaction.editReply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
-
-  // its events and crew, and a last call that's due now
-  checkTournaments();
-  checkRegReminders();
 }
 
-export { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, adminAdd, adminRemove, adminList };
+export { tournamentAdd, tournamentRemove, tournamentPosts, discordEvent, adminAdd, adminRemove, adminList };

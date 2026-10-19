@@ -696,6 +696,49 @@ test('tournament roll calls and placements disable mentions', async () => {
   assert.equal(sent[1].embeds[0].data.title, 'Tournament placements · Local');
 });
 
+test('roll calls link the streams on the tournament page, and post without them if that fails', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.messages = {};
+  state.players = Object.fromEntries([1, 2, 3].map((userId) => [userId, {
+    userId, playerId: userId * 10, tag: `Player ${userId}`, slug: `user/player-${userId}`,
+  }]));
+  const entries = [1, 2, 3].map((userId) => ({ userId, event: 'Singles', eventSlug: event.slug, entrants: 32 }));
+  const tournament = () => ({ id: 4, name: 'Local', slug: 'tournament/local', startAt: now + 1800, entries });
+  let asked = 0;
+  mockApi(({ query }) => {
+    asked++;
+    assert.match(query, /t4: tournament\(id: 4\) \{ streams/);
+    return { t4: { streams: [{ streamName: 'localstream', streamSource: 'TWITCH' }, { streamName: 'backup', streamSource: 'YOUTUBE' }] } };
+  });
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+  await tracker.postRollCall(tournament(), channel);
+  assert.equal(asked, 1);
+  assert.match(sent[0].embeds[0].data.description, /\*\*Streams:\*\* \[twitch\.tv\/localstream\]\(https:\/\/twitch\.tv\/localstream\) · backup \(Youtube\)/);
+
+  // start.gg failing leaves the streams out, not the roll call
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({ message: 'down' }) });
+  const logged = console.error;
+  console.error = () => {};
+  try {
+    await tracker.postRollCall(tournament(), channel);
+  } finally {
+    console.error = logged;
+  }
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].embeds[0].data.title, 'Tournament roll call · Local');
+  assert.doesNotMatch(sent[1].embeds[0].data.description, /Streams/);
+
+  // turned off, it doesn't ask
+  state.messages = { rollcall: false };
+  asked = 0;
+  mockApi(() => { asked++; return {}; });
+  await tracker.postRollCall(tournament(), channel);
+  assert.equal(asked, 0);
+  assert.equal(sent.length, 2);
+  state.messages = {};
+});
+
 test('top 8s only come from tracked tournaments, every event with everyone in it', async () => {
   const now = Math.floor(Date.now() / 1000);
   state.players = { 1: { ...crewPlayer }, 2: { userId: 2, playerId: 20, tag: 'Second', slug: 'user/second' } };

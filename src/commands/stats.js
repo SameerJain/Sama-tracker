@@ -129,10 +129,9 @@ async function progressReport(interaction, { player, verbose, melee }) {
   const played = only(sets);
   const finishes = only(events);
   for (const period of periods) period.summary = periodSummary(player, played, finishes, period.since, period.until);
-  // the full report looks back 180 days, so it's worth a look even when the last 60 had nothing
-  const more = verbose ? [] : buttonRow(fullReport('progress', { player, melee }));
+  // no Full report button, verbose:True is the way to the longer one
   const cards = embeds.progress(player, periods, { verbose, characterSets: characterSets && only(characterSets), melee });
-  return sendEmbeds(interaction, embeds.withSlippi(cards, [player], await ranked(allMelee(melee, sets, events)), { seasons: true }), more);
+  return sendEmbeds(interaction, embeds.withSlippi(cards, [player], await ranked(allMelee(melee, sets, events)), { seasons: true }));
 }
 
 async function scout(interaction) {
@@ -381,16 +380,16 @@ async function predictExplained(interaction) {
   return predictExplainedReport(interaction, { player, opponent, melee: flag(interaction, 'melee'), ...filters });
 }
 
-async function predictReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
+// meetings go back past the histories, usually in one request, so head-to-head matches /h2h.
+// events say how big each bracket was, which helps seeding count. null when the lookup
+// failed, and the odds still work without events. doing is the countdown line
+async function oddsFor(interaction, a, b, { melee, since, venue, doing }) {
   const only = onlyMelee(melee);
   const filters = { since, venue };
   const inScope = (list) => scopeSets(filters)(only(list));
   const inScopeEvents = (list) => scopeEntries(filters)(only(list));
   const ranked = slippiLookup([a, b], melee);
-  // meetings go back past the histories, usually in one request, so head-to-head matches /h2h. events say how
-  // big each bracket was, which helps seeding count. the histories have the recent meetings and the odds still
-  // work without events, so either failing doesn't sink it
-  const [historyA, historyB, meetings, eventsA, eventsB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
+  const [historyA, historyB, meetings, eventsA, eventsB] = await withCountdown(interaction, doing,
     Promise.all([
       setHistory(a.playerId), setHistory(b.playerId), h2hHistory(a.playerId, b.playerId).catch(() => []),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
@@ -400,40 +399,34 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
   const scopedA = scopeSets(filters)(historyA ?? []);
   const scopedB = scopeSets(filters)(historyB ?? []);
   const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: inScope(meetings) };
-  const { odds, profiles } = await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, melee);
+  const found = await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, melee);
+  return { ...found, filters, scopedA, scopedB, historyA, historyB };
+}
+
+// nothing to predict with: says why, with their slippi ranks when they have them
+async function noPredictions(interaction, a, b, { melee, filters, profiles, scopedA, scopedB, historyA, historyB }) {
+  const ranks = embeds.slippiMatchup([a, b], profiles);
+  const hinted = noOdds(a, b, scopedA, scopedB, melee, filters, scopeSets(filters)(historyA), scopeSets(filters)(historyB));
+  await interaction.editReply(ranks.length ? { content: hinted, embeds: ranks, files: [slippiLogo], allowedMentions: { parse: [] } } : { content: hinted, allowedMentions: { parse: [] } });
+  return null;
+}
+
+async function predictReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
+  const doing = `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`;
+  const { odds, profiles, filters, ...rest } = await oddsFor(interaction, a, b, { melee, since, venue, doing });
   // netplay players can have a rank without a melee set on start.gg, which is when it says the most
-  if (!odds) {
-    const ranks = embeds.slippiMatchup([a, b], profiles);
-    const hinted = noOdds(a, b, scopedA, scopedB, melee, filters, scopeSets(filters)(historyA), scopeSets(filters)(historyB));
-    return interaction.editReply(ranks.length ? { content: hinted, embeds: ranks, files: [slippiLogo], allowedMentions: { parse: [] } } : { content: hinted, allowedMentions: { parse: [] } });
-  }
+  if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
 
   const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee, since: sinceText, venue }));
   await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, filters), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }), more);
 }
 
 async function predictExplainedReport(interaction, { player: a, opponent: b, melee, since, venue }) {
-  const only = onlyMelee(melee);
-  const filters = { since, venue };
-  const inScope = (list) => scopeSets(filters)(only(list));
-  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
-  const ranked = slippiLookup([a, b], melee);
-  const [historyA, historyB, meetings, eventsA, eventsB] = await withCountdown(interaction, `Explaining ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s odds`,
-    Promise.all([
-      setHistory(a.playerId), setHistory(b.playerId), h2hHistory(a.playerId, b.playerId).catch(() => []),
-      eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
-    ]));
-  const scopedA = scopeSets(filters)(historyA ?? []);
-  const scopedB = scopeSets(filters)(historyB ?? []);
-  const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: inScope(meetings) };
-  const { odds, profiles } = await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, melee);
-  if (!odds) {
-    const ranks = embeds.slippiMatchup([a, b], profiles);
-    const hinted = noOdds(a, b, scopedA, scopedB, melee, filters, scopeSets(filters)(historyA), scopeSets(filters)(historyB));
-    return interaction.editReply(ranks.length ? { content: hinted, embeds: ranks, files: [slippiLogo], allowedMentions: { parse: [] } } : { content: hinted, allowedMentions: { parse: [] } });
-  }
+  const doing = `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets for the full breakdown`;
+  const { odds, profiles, filters, ...rest } = await oddsFor(interaction, a, b, { melee, since, venue, doing });
+  if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
 
-  // already the fullest report, so no Full report button
+  // no Full report button, this is the full one
   await sendEmbeds(interaction, embeds.withSlippi(embeds.predictionExplained(a, b, odds, filters), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }));
 }
 
@@ -487,7 +480,7 @@ async function memberScout(interaction) {
   return scoutReport(interaction, { player, opponent, verbose: false, melee: false });
 }
 
-// what each report button runs
+// what each report button runs. /progress has no button anymore, but older messages in the channel still do
 const reports = {
   progress: progressReport, scout: scoutReport, h2h: headToHeadReport, stats: statsReport, doubles: doublesReport, characters: charactersReport, predict: predictReport,
 };

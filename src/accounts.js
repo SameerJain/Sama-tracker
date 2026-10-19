@@ -94,6 +94,12 @@ export async function verifiedCaller(discordId) {
   return state.players[found.userId] ?? (String(link?.userId) === found.userId ? link : null);
 }
 
+// whether this discord user is one of the tournament admins, by the discord on their start.gg. one
+// request per 20 admins, and admins don't have to be linked or tracked
+export async function isRegAdmin(discordId) {
+  return Boolean(await connected(discordId, Object.keys(state.regAdmins)));
+}
+
 // the first of these start.gg users with this discord connected, checked live
 async function connected(discordId, userIds) {
   const ids = [...new Set(userIds.filter(Boolean).map(String))];

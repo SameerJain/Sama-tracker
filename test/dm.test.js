@@ -74,7 +74,7 @@ test('reg DMs go 1 hour before close with the image, skipping registered users',
   state.tournaments = {
     1: {
       id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 90000,
-      entries: [], userIds: [], tracked: { ...tracked }, reminder: {},
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: { deadline: now + 1800, next: 4 },
     },
   };
   mockApi(({ query }) => {
@@ -157,7 +157,7 @@ test('separate reg and start windows send two DMs', async () => {
   state.tournaments = {
     1: {
       id: 1, name: 'Local', slug: 'tournament/local', startAt, endAt: startAt + 3600,
-      entries: [], userIds: [], tracked: { ...tracked }, reminder: {},
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: { deadline, next: 4 },
     },
   };
   mockApi(({ query }) => {
@@ -201,53 +201,67 @@ test('separate reg and start windows send two DMs', async () => {
   assert.match(later[0].embeds[0].data.title, /Starts soon/);
 });
 
-test('DMs stay skipped when the tournament or server switch is off', async () => {
+test('only /notify and the tournament reminders switch decide, not /messages', async () => {
   reset();
   const now = Math.floor(Date.now() / 1000);
   state.regDmPings = ['fan'];
   state.startDmPings = ['fan'];
-  const reg = () => ({
+  const latest = {
     tournament: {
       id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
-      registrationClosesAt: now - 3600, isRegistrationOpen: true, images, numAttendees: 0, events: [],
+      registrationClosesAt: now + 1800, isRegistrationOpen: true, images, numAttendees: 0, events: [],
       city: 'Buffalo', addrState: 'NY', isOnline: false,
     },
-  });
+  };
   // tournament reminders off: nothing asked, nothing sent
   state.tournaments = {
     1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, entries: [], userIds: [], tracked: { ...tracked, reminders: false }, reminder: {} },
   };
   let asked = 0;
-  mockApi(() => { asked++; return reg(); });
+  mockApi(() => { asked++; return latest; });
   const off = [];
   await tracker.postDmReminders(dmChannel(off));
   assert.equal(asked, 0);
   assert.equal(off.length, 0);
 
-  // server registration off skips the reg DM but the start DM still goes when rollcall is on
+  // the server's registration and roll call posts being off doesn't stop anyone's own DMs
   state.tournaments[1].tracked.reminders = true;
-  state.tournaments[1].dmRegSentFor = undefined;
-  state.tournaments[1].dmStartSentFor = undefined;
-  state.messages = { registration: false };
-  mockApi(({ query }) => {
-    if (query.includes('participants(')) return { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [] } } };
-    return reg();
-  });
-  // separate the deadline from the start so the reg DM is its own
-  state.tournaments[1].startAt = now + 86400;
-  mockApi(({ query }) => {
-    if (query.includes('participants(')) return { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [] } } };
-    return {
-      tournament: {
-        id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 90000,
-        registrationClosesAt: now + 1800, isRegistrationOpen: true, images, numAttendees: 0, events: [],
-        city: 'Buffalo', addrState: 'NY', isOnline: false,
-      },
-    };
-  });
-  const skipped = [];
-  await tracker.postDmReminders(dmChannel(skipped));
-  assert.equal(skipped.length, 0);
-  // marked so turning it back on doesn't send it late
-  assert.ok(state.tournaments[1].dmRegSentFor);
+  state.messages = { registration: false, rollcall: false };
+  const sent = [];
+  await tracker.postDmReminders(dmChannel(sent));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].data.title, /Starts soon/);
+});
+
+test('a tournament with no DM due soon costs no request', async () => {
+  reset();
+  const now = Math.floor(Date.now() / 1000);
+  state.regDmPings = ['fan'];
+  state.startDmPings = ['fan'];
+  state.tournaments = {
+    1: {
+      id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 7 * 86400, endAt: now + 7 * 86400 + 3600,
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: { deadline: now + 3 * 86400, next: 1 },
+    },
+    // both already went out for these times, and it's still going
+    2: {
+      id: 2, name: 'Done', slug: 'tournament/done', startAt: now + 1800, endAt: now + 5400,
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: { deadline: now + 1800 }, dmRegSentFor: now + 1800, dmStartSentFor: now + 1800,
+    },
+  };
+  let asked = 0;
+  mockApi(() => { asked++; return {}; });
+  const sent = [];
+  await tracker.postDmReminders(dmChannel(sent));
+  assert.equal(asked, 0);
+  assert.equal(sent.length, 0);
+});
+
+test('the start DM drops the register link once registration is closed', () => {
+  const now = Math.floor(Date.now() / 1000);
+  const tournament = { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 3600, city: 'Buffalo', addrState: 'NY', images };
+  assert.match(embeds.startReminder({ ...tournament, isRegistrationOpen: true }).data.description, /Register on start\.gg/);
+  const closed = embeds.startReminder({ ...tournament, isRegistrationOpen: false }).data.description;
+  assert.doesNotMatch(closed, /Register on start\.gg/);
+  assert.match(closed, /Tournament page on start\.gg/);
 });

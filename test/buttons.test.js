@@ -12,6 +12,7 @@ delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleButton, buttonFailed } = await import('../src/commands/index.js');
 const { reportButton, readButton, parseSince, buttonRow, sendEmbeds } = await import('../src/commands/shared.js');
+const { setFallbackImage } = await import('../src/embeds/index.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
@@ -273,4 +274,78 @@ test('a quick, private or unpostable answer edits the reply the usual way', asyn
     console.error = logged;
   }
   assert.deepEqual(blocked.calls.map(([kind]) => kind), ['edit']);
+});
+
+// images.start.gg, where good.jpg downloads and gone.jpg is a 404. fetched lists every download
+function mockPictures() {
+  const fetched = [];
+  globalThis.fetch = async (url) => {
+    fetched.push(String(url));
+    if (String(url).endsWith('gone.jpg')) return { ok: false, status: 404 };
+    return { ok: true, headers: new Headers({ 'content-type': 'image/jpeg' }), arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
+  };
+  return fetched;
+}
+const good = 'https://images.start.gg/images/user/1/good.jpg';
+const gone = 'https://images.start.gg/images/user/2/gone.jpg';
+const pictured = (n, url) => cards(n).map((card) => card.setThumbnail(url));
+
+test('start.gg pictures go up as files with each message that has them, downloaded once', async () => {
+  const fetched = mockPictures();
+  const run = waited(5);
+  const [first, ...rest] = pictured(11, good);
+  first.setAuthor({ name: 'Crew', iconURL: good });
+  await sendEmbeds(run, [first, ...rest]);
+  assert.deepEqual(fetched, [good]);
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['edit', 'followUp']);
+  for (const [, sent] of run.calls) {
+    assert.deepEqual(sent.files.map((file) => file.name), ['picture-0.jpg']);
+    assert.ok(sent.embeds.every((card) => card.data.thumbnail.url === 'attachment://picture-0.jpg'));
+  }
+  assert.equal(first.data.author.icon_url, 'attachment://picture-0.jpg');
+});
+
+test('a start.gg picture that won\'t download comes off so the avatar stands in, and other links stay links', async () => {
+  const avatar = 'https://cdn.discordapp.com/avatars/1/bot.png';
+  setFallbackImage(avatar);
+  try {
+    const fetched = mockPictures();
+    const run = waited(5);
+    const [broken] = pictured(1, gone);
+    broken.setAuthor({ name: 'Crew', iconURL: gone, url: 'https://start.gg/user/crew' });
+    await sendEmbeds(run, [broken]);
+    const [[, sent]] = run.calls;
+    assert.deepEqual(sent.files, []);
+    assert.equal(sent.embeds[0].data.thumbnail.url, avatar);
+    // the author keeps its name and link
+    assert.deepEqual(JSON.parse(JSON.stringify(sent.embeds[0])).author, { name: 'Crew', url: 'https://start.gg/user/crew' });
+
+    const elsewhere = waited(5);
+    await sendEmbeds(elsewhere, pictured(1, 'https://images.example/crew.png'));
+    assert.equal(elsewhere.calls[0][1].embeds[0].data.thumbnail.url, 'https://images.example/crew.png');
+    assert.deepEqual(fetched, [gone]);
+  } finally {
+    setFallbackImage(null);
+  }
+});
+
+test('a reply that hasn\'t deferred does before downloading, and one without Attach Files keeps the link', async () => {
+  const fetched = mockPictures();
+  const calls = [];
+  const quick = {
+    user: { id: '300' },
+    deferReply: async () => { calls.push(['defer']); quick.deferred = true; },
+    reply: async (result) => calls.push(['reply', result]),
+    editReply: async (result) => calls.push(['edit', result]),
+  };
+  await sendEmbeds(quick, pictured(1, good));
+  assert.deepEqual(calls.map(([kind]) => kind), ['defer', 'edit']);
+  assert.equal(calls[1][1].files.length, 1);
+
+  fetched.length = 0;
+  const blocked = { ...waited(5), appPermissions: { has: () => false } };
+  await sendEmbeds(blocked, pictured(1, good));
+  assert.deepEqual(fetched, []);
+  assert.deepEqual(blocked.calls[0][1].files, []);
+  assert.equal(blocked.calls[0][1].embeds[0].data.thumbnail.url, good);
 });

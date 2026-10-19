@@ -291,14 +291,6 @@ export const commands = [
         ],
       },
       {
-        type: Option.Subcommand,
-        name: 'event',
-        description: 'Make a Discord event from a start.gg link, and track the tournament',
-        options: [
-          { type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true },
-        ],
-      },
-      {
         type: Option.SubcommandGroup,
         name: 'admin',
         description: 'TOs whose start.gg tournaments get tracked on their own',
@@ -319,6 +311,12 @@ export const commands = [
         ],
       },
     ],
+  },
+  // not under /tournament, which discord hides without Manage Server. tournament admins are checked when it runs
+  {
+    name: 'discord_event',
+    description: 'Make a Discord event from a start.gg link. For tournament admins and Manage Server',
+    options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
   },
   { name: 'bracket', description: 'Bracket links for tracked tournaments, 30 min before start to 6 hours after the end' },
   { name: 'stream_link', description: 'Stream links for tournaments that are tracked or have tracked players, live or starting soon' },

@@ -40,11 +40,14 @@ client.once(Events.ClientReady, async () => {
     PermissionFlagsBits.ViewChannel,
     PermissionFlagsBits.SendMessages,
     PermissionFlagsBits.EmbedLinks,
-    PermissionFlagsBits.AttachFiles,
   ]);
   if (missing.length) quit(`missing permissions in #${channel.name}: ${missing.join(', ')}`);
 
   console.log(`logged in as ${client.user.tag}, posting in #${channel.name}`);
+  // not worth quitting over either, cards without an uploaded picture still post
+  if (!channel.permissionsFor(client.user).has(PermissionFlagsBits.AttachFiles)) {
+    console.error(`missing Attach Files in #${channel.name}, so messages that upload character art, rank badges or the Slippi logo will fail`);
+  }
   // not worth quitting over, those posts go in the channel until it's fixed
   const threadsMissing = missingThreadPermissions(channel);
   if (messageSettings().threads !== 'off' && threadsMissing?.length !== 0) {

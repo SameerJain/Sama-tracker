@@ -26,7 +26,7 @@ async function trackAdd(interaction) {
 
   state.players[player.userId] = newTracked(player);
   save();
-  await interaction.editReply({ content: null, embeds: embeds.withImage([embeds.added(player)]) });
+  await interaction.editReply({ content: null, embeds: embeds.withImage([embeds.added(player)]), allowedMentions: { parse: [] } });
 
   // don't wait 15 min for their tournaments to show up
   checkTournaments();
@@ -141,7 +141,7 @@ async function link(interaction) {
   if (previous?.userId === player.userId) {
     return interaction.editReply({ content: `Already linked to ${player.tag}. Leave the player out of a command like \`/stats\` to look yourself up.`, allowedMentions: { parse: [] } });
   }
-  return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.linked(player, previous)]) });
+  return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.linked(player, previous)]), allowedMentions: { parse: [] } });
 }
 
 // /link with the profile left out, so nobody has to copy a link over. start.gg can't be searched by
@@ -192,7 +192,7 @@ async function profile(interaction) {
     const player = readPlayer(interaction);
     if (!player) return replyNoPlayer(interaction);
     await interaction.deferReply();
-    return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.profile(player, { name: player.tag })]) });
+    return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.profile(player, { name: player.tag })]), allowedMentions: { parse: [] } });
   }
   const picked = interaction.options.getUser('user');
   const user = picked ?? interaction.user;
@@ -202,7 +202,7 @@ async function profile(interaction) {
 
   await interaction.deferReply();
   const account = await findAccount(user.id);
-  if (account) return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })]) });
+  if (account) return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })]), allowedMentions: { parse: [] } });
   if (user.id === interaction.user.id) {
     return interaction.editReply('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.');
   }

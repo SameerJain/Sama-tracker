@@ -1,6 +1,6 @@
 import { escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
-import { FORM_SETS } from '../predict.js';
+import { FORM_SETS, chanceOf } from '../predict.js';
 import { colors, FOOTER, baseEmbed, withLines, percent, topText, count, gameName, gameCount, recordOf, winsOf, GRAND_FINALS, bold, setLink, vodLink, filterLine, filtersOn, section, OPPONENTS_SHOWN, CHARACTERS_SHOWN, characterRank, meetingLine, playerLink } from './shared.js';
 
 // sets is newest first. verbose lists every set and adds splits, streaks and when they first played.
@@ -103,9 +103,75 @@ export function commonOpponentLines(odds, tagA, tagB) {
     .map(({ name, a: x, b: y }) => `${bold(name)}: ${tagA} ${x.wins}-${x.total - x.wins} · ${tagB} ${y.wins}-${y.total - y.wins}`);
 }
 
-// verbose shows how much each part counted and what it says on its own, plus what's behind them.
+// the short summary both prediction cards start from. tagA/tagB come back too since the rest names them
+function summaryLines(a, b, odds) {
+  const tagA = bold(a.tag);
+  const tagB = bold(b.tag);
+  const { h2h, common, seeding, level, form, slippi } = odds;
+  const lines = [];
+
+  const losses = h2h.total - h2h.wins;
+  if (!h2h.total) lines.push('**Head-to-head:** never played, so it comes down to the rest');
+  else if (h2h.wins === losses) lines.push(`**Head-to-head:** even at ${h2h.wins}-${losses}`);
+  else lines.push(`**Head-to-head:** ${h2h.wins > losses ? `${tagA} leads ${h2h.wins}-${losses}` : `${tagB} leads ${losses}-${h2h.wins}`}`);
+
+  if (common.total) {
+    // equal records against someone count for neither, so the rest get named
+    const even = common.total - common.better - common.worse;
+    const rest = even ? `, even against the other ${even}` : '';
+    lines.push(`**Common opponents:** ${common.total} shared. ${tagA} did better against ${common.better}, ${tagB} against ${common.worse}${rest}`);
+  }
+  if (seeding.total) {
+    const [leader, trailing, times, higher] = seeding.ratio >= 1 ? [tagA, tagB, seeding.ratio, seeding.higher] : [tagB, tagA, 1 / seeding.ratio, seeding.lower];
+    // the ratio is the trailing player's average seed number over the leader's
+    const by = times < 1.15 ? 'their average seed numbers were about the same' : `${trailing}'s average seed number was ${times.toFixed(1)}x ${leader}'s`;
+    lines.push(`**Seeding:** ${leader} got the better seed in ${higher} of ${seeding.total} shared brackets, ${by}`);
+  } else if (level.a && level.b) {
+    lines.push(`**Usual seed:** ${tagA} ${topText(level.a.share)} of their brackets · ${tagB} ${topText(level.b.share)}`);
+  }
+  if (slippi) lines.push(`**Slippi ranked:** ${tagA} ${escapeMarkdown(slippi.aRank)} ${slippi.aRating.toFixed(1)} · ${tagB} ${escapeMarkdown(slippi.bRank)} ${slippi.bRating.toFixed(1)}`);
+  lines.push(`**Form, last ${FORM_SETS} sets:** ${formText(tagA, form.a)} · ${formText(tagB, form.b)}`);
+  return { tagA, tagB, lines };
+}
+
+// what's behind the odds, same on both cards. filters only narrowed the sets behind them,
+// so the card names those on its small line
+function detailLines(lines, odds, tagA, tagB, filters = {}) {
+  section(lines, 'Common opponents', commonOpponentLines(odds, tagA, tagB));
+  section(lines, 'Shared brackets', odds.seeding.brackets.slice(0, OPPONENTS_SHOWN)
+    .map(({ slug, name, a: x, b: y }) => `[${escapeMarkdown(name)}](${startggUrl(slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
+  // seedEdge is an estimate that starts at 67% and moves with their seeded sets, not a count of what happened
+  const game = escapeMarkdown(odds.game);
+  const basis = odds.seededSets ? `Going by the ${count(odds.seededSets, 'seeded set')} the two of them played in ${game}` : `With none of their ${game} sets seeded`;
+  lines.push(`-# Newer sets count more, a year old counts half. ${basis}, when one seed number is double the other's, `
+    + `the player with the lower one wins about ${percent(odds.seedEdge, 1)}. That's how much seeding counts`);
+  if (odds.slippi) lines.push('-# Slippi ratings are netplay Elo, so they count conservatively and only for Melee when both players are ranked');
+  const line = filterLine(filters);
+  if (line) lines.push(line);
+}
+
+function predictionCard(a, b, odds) {
+  const chanceA = chancePercent(odds);
+  const embed = baseEmbed(colors.clash, `${FOOTER} · ${odds.game}`)
+    .setAuthor({ name: odds.game === 'Melee' ? `${a.tag} · Melee` : a.tag, iconURL: a.image, url: startggUrl(a.slug) })
+    .setTitle(`${escapeMarkdown(a.tag)} ${chanceA}% · ${100 - chanceA}% ${escapeMarkdown(b.tag)}`);
+  if (b.image) embed.setThumbnail(b.image);
+  return embed;
+}
+
+// what each part counted, by the sets, opponents, brackets or rating behind it
+const UNITS = { h2h: 'set', common: 'opponent', seeding: 'bracket', slippi: 'rating' };
+
+// a bar for a share 0-1, 10 blocks wide. higher means it counted more
+export function shareBar(share) {
+  const filled = Math.min(10, Math.max(0, Math.round(share * 10)));
+  return `${'█'.repeat(filled)}${'░'.repeat(10 - filled)}`;
+}
+
+// verbose shows how much each part counted and what it says on its own, plus what's behind them. explained, for
+// /predict_explained, adds bars, how much each part had to go on, and how sure the model is.
 // filters only narrowed the sets behind the odds, so the card names them on its small line
-export function prediction(a, b, odds, verbose, filters = {}) {
+export function prediction(a, b, odds, verbose, filters = {}, explained = false) {
   const chanceA = chancePercent(odds);
   const embed = baseEmbed(colors.clash, `${FOOTER} · ${odds.game}`)
     .setAuthor({ name: odds.game === 'Melee' ? `${a.tag} · Melee` : a.tag, iconURL: a.image, url: startggUrl(a.slug) })
@@ -139,11 +205,12 @@ export function prediction(a, b, odds, verbose, filters = {}) {
   if (slippi) lines.push(`**Slippi ranked:** ${tagA} ${escapeMarkdown(slippi.aRank)} ${slippi.aRating.toFixed(1)} · ${tagB} ${escapeMarkdown(slippi.bRank)} ${slippi.bRating.toFixed(1)}`);
   lines.push(`**Form, last ${FORM_SETS} sets:** ${formText(tagA, form.a)} · ${formText(tagB, form.b)}`);
   const line = filterLine(filters);
-  if (!verbose) {
+  if (!verbose && !explained) {
     if (line) lines.push(line);
     return [embed.setDescription(lines.join('\n'))];
   }
 
+  const counted = (share) => (explained ? `${shareBar(share)} ${percent(share, 1)}` : `counts for ${percent(share, 1)}`);
   section(lines, 'How it adds up', [
     ...odds.factors.map(({ key, n, share, chance }) => {
       if (!n) return `**${FACTORS[key]}:** nothing to go on, so it doesn't count`;
@@ -151,10 +218,11 @@ export function prediction(a, b, odds, verbose, filters = {}) {
       let says = 'even';
       if (lean > 50) says = `${tagA} ${lean}%`;
       if (lean < 50) says = `${tagB} ${100 - lean}%`;
-      return `**${FACTORS[key]}:** counts for ${percent(share, 1)} · on its own, ${says}`;
+      return `**${FACTORS[key]}:** ${counted(share)} · on its own, ${says}${explained ? ` (${count(n, UNITS[key])})` : ''}`;
     }),
-    `**Starting from even:** counts for ${percent(odds.prior, 1)}, so the less there is to go on, the closer it stays to 50%`,
+    `**Starting from even:** ${counted(odds.prior)}, so the less there is to go on, the closer it stays to 50%`,
   ]);
+  if (explained) section(lines, 'How sure it is', sureLines(odds, tagA, tagB));
   section(lines, 'Common opponents', commonOpponentLines(odds, tagA, tagB));
   section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
     .map(({ slug, name, a: x, b: y }) => `[${escapeMarkdown(name)}](${startggUrl(slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
@@ -168,75 +236,27 @@ export function prediction(a, b, odds, verbose, filters = {}) {
   return withLines(embed, lines);
 }
 
-// a bar for a share 0-1, 10 blocks wide. higher means it counted more
-function shareBar(share) {
-  const filled = Math.min(10, Math.max(0, Math.round(share * 10)));
-  return `${'█'.repeat(filled)}${'░'.repeat(10 - filled)}`;
+export function predictionExplained(a, b, odds, filters = {}) {
+  return prediction(a, b, odds, true, filters, true);
 }
 
-// the full breakdown, for /predict_explained. verbose stays as it was, this has the model
-// numbers, form details and bars behind each share, plus room for future graphs
-export function predictionExplained(a, b, odds, filters = {}) {
-  const chanceA = chancePercent(odds);
-  const embed = baseEmbed(colors.clash, `${FOOTER} · ${odds.game}`)
-    .setAuthor({ name: odds.game === 'Melee' ? `${a.tag} · Melee` : a.tag, iconURL: a.image, url: startggUrl(a.slug) })
-    .setTitle(`${escapeMarkdown(a.tag)} ${chanceA}% · ${100 - chanceA}% ${escapeMarkdown(b.tag)}`);
-  if (b.image) embed.setThumbnail(b.image);
-
-  const tagA = bold(a.tag);
-  const tagB = bold(b.tag);
-  const { h2h, common, seeding, level, form, slippi, gap, variance } = odds;
-  const lines = [];
-
-  const losses = h2h.total - h2h.wins;
-  if (!h2h.total) lines.push('**Head-to-head:** never played, so it comes down to the rest');
-  else if (h2h.wins === losses) lines.push(`**Head-to-head:** even at ${h2h.wins}-${losses}`);
-  else lines.push(`**Head-to-head:** ${h2h.wins > losses ? `${tagA} leads ${h2h.wins}-${losses}` : `${tagB} leads ${losses}-${h2h.wins}`}`);
-
-  if (common.total) {
-    const even = common.total - common.better - common.worse;
-    const rest = even ? `, even against the other ${even}` : '';
-    lines.push(`**Common opponents:** ${common.total} shared. ${tagA} did better against ${common.better}, ${tagB} against ${common.worse}${rest}`);
+// the odds before and after the model's doubt pulls them toward even, plus what the short lines leave out
+function sureLines(odds, tagA, tagB) {
+  const { gap, variance, form, level, seeding, slippi } = odds;
+  const certain = chancePercent({ chance: chanceOf(gap, 0) });
+  const lines = [
+    `**If the evidence were certain:** ${tagA} ${certain}%. How thin or mixed it is brings that to ${chancePercent(odds)}%`,
+    `-# The gap is ${gap.toFixed(2)} in log-odds, give or take ${Math.sqrt(variance).toFixed(2)}`,
+  ];
+  // the form line above already shows these when neither had a seeded set
+  if (form.a.seeded || form.b.seeded) {
+    lines.push(`**Last ${FORM_SETS} sets, seeded or not:** ${tagA} ${form.a.wins}-${form.a.total - form.a.wins} · ${tagB} ${form.b.wins}-${form.b.total - form.b.wins}`);
   }
-  if (seeding.total) {
-    const [leader, trailing, times, higher] = seeding.ratio >= 1 ? [tagA, tagB, seeding.ratio, seeding.higher] : [tagB, tagA, 1 / seeding.ratio, seeding.lower];
-    const by = times < 1.15 ? 'their average seed numbers were about the same' : `${trailing}'s average seed number was ${times.toFixed(1)}x ${leader}'s`;
-    lines.push(`**Seeding:** ${leader} got the better seed in ${higher} of ${seeding.total} shared brackets, ${by}`);
-  } else if (level.a && level.b) {
-    lines.push(`**Usual seed:** ${tagA} ${topText(level.a.share)} of their brackets · ${tagB} ${topText(level.b.share)}`);
+  if (seeding.total && level.a && level.b) {
+    lines.push(`**Usual seed:** ${tagA} ${topText(level.a.share)} over ${count(level.a.brackets, 'bracket')} · ${tagB} ${topText(level.b.share)} over ${count(level.b.brackets, 'bracket')}`);
   }
-  if (slippi) lines.push(`**Slippi ranked:** ${tagA} ${escapeMarkdown(slippi.aRank)} ${slippi.aRating.toFixed(1)} · ${tagB} ${escapeMarkdown(slippi.bRank)} ${slippi.bRating.toFixed(1)}`);
-  lines.push(`**Form, last ${FORM_SETS} sets:** ${formText(tagA, form.a)} · ${formText(tagB, form.b)}`);
-
-  section(lines, 'How it adds up', [
-    ...odds.factors.map(({ key, n, share, chance }) => {
-      if (!n) return `**${FACTORS[key]}:** nothing to go on, so it doesn't count`;
-      const lean = Math.round(chance * 100);
-      let says = 'even';
-      if (lean > 50) says = `${tagA} ${lean}%`;
-      if (lean < 50) says = `${tagB} ${100 - lean}%`;
-      const unit = key === 'h2h' ? 'set' : key === 'common' ? 'opponent' : key === 'seeding' ? 'bracket' : 'rating';
-      return `**${FACTORS[key]}:** ${shareBar(share)} ${percent(share, 1)} · on its own, ${says} (${count(n, unit)})`;
-    }),
-    `**Starting from even:** ${shareBar(odds.prior)} ${percent(odds.prior, 1)}, so the less there is to go on, the closer it stays to 50%`,
-  ]);
-  section(lines, 'Model', [
-    `**Gap:** ${gap.toFixed(2)} log-odds · **Uncertainty:** ${Math.sqrt(variance).toFixed(2)}`,
-    `**Form detail:** ${tagA} ${form.a.wins}-${form.a.total - form.a.wins} overall · ${tagB} ${form.b.wins}-${form.b.total - form.b.wins} overall`,
-    level.a && level.b ? `**Usual seed:** ${tagA} ${topText(level.a.share)} over ${level.a.brackets} brackets · ${tagB} ${topText(level.b.share)} over ${level.b.brackets} brackets` : null,
-    slippi ? `**Slippi gap:** ${slippi.diff.toFixed(1)} rating points` : null,
-  ].filter(Boolean));
-  section(lines, 'Common opponents', commonOpponentLines(odds, tagA, tagB));
-  section(lines, 'Shared brackets', seeding.brackets.slice(0, OPPONENTS_SHOWN)
-    .map(({ slug, name, a: x, b: y }) => `[${escapeMarkdown(name)}](${startggUrl(slug)}) · ${tagA} seed ${x} · ${tagB} seed ${y}`));
-  const game = escapeMarkdown(odds.game);
-  const basis = odds.seededSets ? `Going by the ${count(odds.seededSets, 'seeded set')} the two of them played in ${game}` : `With none of their ${game} sets seeded`;
-  lines.push(`-# Newer sets count more, a year old counts half. ${basis}, when one seed number is double the other's, `
-    + `the player with the lower one wins about ${percent(odds.seedEdge, 1)}. That's how much seeding counts`);
-  if (slippi) lines.push('-# Slippi ratings are netplay Elo, so they count conservatively and only for Melee when both players are ranked');
-  const line = filterLine(filters);
-  if (line) lines.push(line);
-  return withLines(embed, lines);
+  if (slippi) lines.push(`**Slippi gap:** ${Math.abs(slippi.diff).toFixed(1)} rating points`);
+  return lines;
 }
 
 // file is the uploaded art of their main. no game means it covers every game. note goes at the bottom.

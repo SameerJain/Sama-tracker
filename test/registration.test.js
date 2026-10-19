@@ -310,15 +310,13 @@ test('tournament add with reminders off or registration closed still tracks it, 
   assert.match(closed.calls.find(([kind]) => kind === 'edit')[1].content, /Registration is closed, so no reg reminders\./);
 });
 
-test('tournament commands need Manage Server, even if discord shows them to someone without it', async () => {
+test('tournament commands go by discord, so a role handed /tournament can use it without Manage Server', async () => {
   mockStartgg();
-  // it answers before anything else, so nothing waits on start.gg
-  for (const subcommand of ['add', 'remove', 'posts']) {
-    const run = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand, manager: false });
-    await handleCommand(run);
-    assert.deepEqual(run.calls.map(([kind]) => kind), ['reply']);
-    assert.match(run.calls[0][1].content, /You need Manage Server permission/);
-  }
+  state.tournaments = {};
+  const run = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add', manager: false });
+  await handleCommand(run);
+  assert.ok(state.tournaments[5].tracked);
+  assert.doesNotMatch(JSON.stringify(run.calls), /Manage Server/);
 });
 
 async function autocomplete(commandName, typed, subcommand = null) {

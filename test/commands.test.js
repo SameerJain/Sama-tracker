@@ -13,6 +13,7 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleButton, handleCommand } = await import('../src/commands/index.js');
+const { buttonRow, fullReport } = await import('../src/commands/shared.js');
 const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
@@ -183,7 +184,9 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
 
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
-  ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/], ['socials', {}, /Nothing yet/],
+  ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/],
+  ['messages', { values: { events: true } }, /Discord events for admin tournaments:\*\* on/],
+  ['messages', { values: { events: false } }, /Discord events for admin tournaments:\*\* off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
   ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results and stream alerts start off/],
@@ -247,9 +250,12 @@ const runs = [
   ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
   ['predict', { values: { opponent: '2', verbose: true, since: '2026-01-01', venue: 'offline' } }, /How it adds up.*Offline only/],
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
-  ['predict_explained', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival.*How it adds up.*Gap:/],
+  ['predict_explained', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival.*How it adds up.*How sure it is/],
   ['predict_explained', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles/],
-  ['predict_explained', { values: { opponent: '2', since: '2026-01-01', venue: 'offline' } }, /Gap:.*Offline only/],
+  ['predict_explained', { values: { opponent: '2', since: '2026-01-01', venue: 'offline' } }, /give or take.*Offline only/],
+  ['predict_explained', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
+  ['predict_explained', { values: { opponent: '2', since: 'someday' } }, /Couldn't read `someday` as a date/],
+  ['predict_explained', { values: { opponent: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
   // crew has no set results field, which counts as on
   ['track', { subcommand: 'posts', values: { player: '1' } }, /Crew: set results on, stream alerts on\./],
   ['track', { subcommand: 'posts', values: { player: 'all', stream: 'off' } }, /Stream alerts off for everyone\./],
@@ -273,7 +279,7 @@ const runs = [
   ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 12 hours before registration ends/],
   ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on.*Tracked by hand/],
   ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
-  ['tournament', { subcommand: 'event', values: { tournament: 'start.gg/tournament/soon' } }, /Already tracking Soon.*Made a Discord event for Soon/],
+  ['discord_event', { values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
   ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon', add_event: 'on' } }, /Already tracking Soon.*Made a Discord event for Soon/],
   ['track', { subcommand: 'list' }, /Tracked tournaments · 1.*Soon.*top 8s off/],
   ['bracket', {}, /No tracked tournaments going on right now/],
@@ -388,7 +394,6 @@ function press(message, label) {
 const presses = [
   ['stats', {}, 'Full report', /Lifetime stats/],
   ['doubles', {}, 'Full report', /Full doubles stats/],
-  ['progress', {}, 'Full report', /Every 30 days, newest first/],
   ['characters', {}, 'Full report', /Fox/],
   ['scout', { values: { profile: '2' } }, 'Full report', /Crew vs Rival/],
   ['h2h', { values: { opponent: '2' } }, 'Full report', /First played/],
@@ -432,16 +437,26 @@ test('every report button answers the way its command would, and the full report
       assert.match(buttons, /Full report/, what);
     }
   }
+  // short /progress has no Full report button, but one on a message from before still swaps in the full report
+  const progress = interaction('progress', {});
+  await runningCommand.run(progress, () => handleCommand(progress));
+  const short = progress.calls.findLast(([kind, result]) => kind === 'edit' && result.embeds?.length)?.[1];
+  assert.match(JSON.stringify(short.embeds), /Last 30 days/);
+  assert.deepEqual(short.components, []);
+  const old = press({ embeds: [], components: buttonRow(fullReport('progress', { player: state.players[1] })) }, 'Full report');
+  await runningCommand.run(old, () => handleButton(old));
+  assert.match(JSON.stringify(old.calls.findLast(([kind]) => kind === 'edit')[1]), /Every 30 days, newest first/);
   // /recent sets are over, so they get no head to head buttons
   const recent = interaction('recent', {});
   await runningCommand.run(recent, () => handleCommand(recent));
   const sent = recent.calls.filter(([kind]) => kind === 'edit' || kind === 'followUp').map(([, result]) => result);
   assert.ok(sent.some((result) => result.embeds?.length), '/recent never answers');
   assert.ok(sent.every((result) => !result.components?.length), '/recent has buttons');
-  // verbose is the full report, so it never offers another one
+  // verbose is the full report, so it never offers another one. explained is always the full one
   const verboseRuns = [
     ['stats', {}], ['doubles', {}], ['progress', {}], ['characters', {}],
     ['scout', { values: { profile: '2' } }], ['h2h', { values: { opponent: '2' } }], ['predict', { values: { opponent: '2' } }],
+    ['predict_explained', { values: { opponent: '2' } }],
   ];
   for (const [name, options] of verboseRuns) {
     const what = `/${name} verbose`;

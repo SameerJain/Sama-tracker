@@ -2,6 +2,7 @@ import { MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import { state, save } from '../store.js';
 import { missingThreadPermissions, secondsNow } from '../tracker.js';
 import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS, messageEnabled, messageSettings } from '../message-settings.js';
+import { cantMakeEvents } from '../discord-events.js';
 import { count } from '../embeds/shared.js';
 import { linkedPlayer, readChoice, replyEphemeral, replyNoPlayer } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
@@ -41,6 +42,11 @@ function configureMessages(interaction) {
       return fail('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
     }
   }
+  // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
+  if (changes.events && !previous.events) {
+    const cant = cantMakeEvents(interaction.guild);
+    if (cant) return fail(cant);
+  }
   const threads = interaction.options.getString('threads');
   if (threads !== null) {
     // checked when it's turned on so it doesn't wait for the next tournament to find out
@@ -75,6 +81,7 @@ function configureMessages(interaction) {
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
+    '-# `events` makes a Discord event for each upcoming tournament tracked from `/tournament admin`, once each. Needs Manage Events',
     '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. One per tournament pins its channel card until the tournament ends.');
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
@@ -94,12 +101,9 @@ function socialUrl(input) {
   return url.href.replaceAll('(', '%28').replaceAll(')', '%29');
 }
 
-// ephemeral so edits don't clutter the channel and a name can't ping anyone.
-// code-level check too, since the discord permission can be handed to other roles
+// ephemeral so edits don't clutter the channel and a name can't ping anyone. who can run it is discord's
+// to say: Manage Server by default, or any role a server hands it to
 function socialsAdd(interaction) {
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    return replyEphemeral(interaction, 'You need Manage Server permission to change the socials.');
-  }
   const reply = (content) => replyEphemeral(interaction, content);
   const typed = interaction.options.getString('name', true).trim();
   const url = socialUrl(interaction.options.getString('link', true));
@@ -117,9 +121,6 @@ function socialsAdd(interaction) {
 }
 
 function socialsRemove(interaction) {
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    return replyEphemeral(interaction, 'You need Manage Server permission to change the socials.');
-  }
   // autocomplete sends the saved link, typing it out might leave off the https
   const url = socialUrl(interaction.options.getString('link', true));
   const social = state.socials.find((each) => each.url === url);

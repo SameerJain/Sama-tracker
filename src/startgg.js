@@ -759,6 +759,27 @@ export async function getCharacterArt(name, videogameId) {
   return { attachment: Buffer.from(await res.arrayBuffer()), name: `character-${videogameId}.${extension}` };
 }
 
+// discord goes by the file's extension, so it comes from what start.gg says it sent
+const PICTURE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+
+export function isStartggImage(url) {
+  try {
+    return new URL(url).hostname === 'images.start.gg';
+  } catch {
+    return false;
+  }
+}
+
+// a profile or tournament picture, downloaded to upload with the message for the same reason as the art.
+// name is the file's name without its extension
+export async function getImage(url, name, timeout) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+  if (!res.ok) throw new Error(`start.gg image returned ${res.status}`);
+  const extension = PICTURE_TYPES[res.headers.get('content-type')?.split(';')[0].trim()];
+  if (!extension) throw new Error(`start.gg image came back as ${res.headers.get('content-type')}`);
+  return { attachment: Buffer.from(await res.arrayBuffer()), name: `${name}.${extension}` };
+}
+
 export async function getStreamQueues(tournamentId) {
   const data = await query(`
     query ($id: ID!) {

@@ -59,11 +59,18 @@ test('single-player options are optional, and h2h and predict take the opponent 
     assert.equal(verbose.name, 'verbose');
     assert.ok(!verbose.required);
   }
+  // explained takes the same pair with no verbose, since it's always the full breakdown
+  {
+    const [opponent, player, ...rest] = commands.find(c => c.name === 'predict_explained').options;
+    assert.deepEqual([opponent.name, opponent.required], ['opponent', true]);
+    assert.deepEqual([player.name, player.required], ['player', false]);
+    assert.ok(rest.every((option) => option.name !== 'verbose'));
+  }
   for (const name of ['progress']) {
     const melee = commands.find(c => c.name === name).options.at(-1);
     assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined], name);
   }
-  for (const name of ['h2h', 'stats', 'scout', 'predict']) {
+  for (const name of ['h2h', 'stats', 'scout', 'predict', 'predict_explained']) {
     const [melee, since, venue] = commands.find(c => c.name === name).options.slice(-3);
     assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined], name);
     assert.deepEqual([since.name, since.required], ['since', undefined], name);

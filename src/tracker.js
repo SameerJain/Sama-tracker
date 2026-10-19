@@ -8,6 +8,7 @@ import { state, save } from './store.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
 import { messageEnabled, messageSettings } from './message-settings.js';
 import { rememberAccounts, serverMembers } from './accounts.js';
+import { cantMakeEvents, ensureDiscordEvent } from './discord-events.js';
 import { buttonRow, h2hButton, linkedPlayer } from './commands/shared.js';
 
 const SET_CHECK_MINUTES = 2;
@@ -34,6 +35,8 @@ const MENTIONS_PER_MESSAGE = 80;
 export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
 // DMs go out this long before registration closes and before the start
 export const DM_HOURS_BEFORE = 1;
+// the saved times can be a little stale, so start.gg gets asked this much before a DM is due. further out costs no request
+const DM_LOOKAHEAD_HOURS = 2;
 // locals run late, so a tournament still counts as live this long after its end time
 export const RUNS_LATE_HOURS = 6;
 // slippi ranks only change after ranked sets, and its API isn't public, so it gets asked less than start.gg
@@ -726,6 +729,8 @@ export function missingThreadPermissions(postChannel = channel) {
 // a tracked tournament posts every set, so it gets its own thread even with threads off
 function tournamentPosts(set, postChannel) {
   const send = async (message) => {
+    // embeds never ping, but a start.gg name in content would, so default mentions off
+    message.allowedMentions ??= { parse: [] };
     const setting = messageSettings().threads;
     const mode = setting === 'off' && trackedFor(set) ? 'tournament' : setting;
     if (mode === 'off') return postChannel.send(message);
@@ -959,7 +964,7 @@ export async function followCalls(postChannel = channel) {
           const users = each.discordIds.filter(mentionable);
           const still = (each.text ?? `You're up`).replace(`You're up`, `You're still up`);
           await postChannel.send({
-            content: `${mentions(each.discordIds)} ${still} — ${minutes} min later, TOs usually DQ at ${CALL_DQ_MINUTES}`,
+            content: `${mentions(each.discordIds)} ${still}, ${minutes} min in. TOs usually DQ at ${CALL_DQ_MINUTES}`,
             reply: { messageReference: each.messageId, failIfNotExists: false },
             allowedMentions: { users },
           });
@@ -1079,6 +1084,29 @@ async function addAdminTournaments() {
   }
 }
 
+// with /messages events on, each upcoming tournament tracked for a reg admin gets a discord event, once.
+// discordEventId is saved either way, so an event a mod deleted stays deleted. no due time like the posts,
+// since turning it on is asking for events at the tournaments already coming up
+export async function makeAdminEvents(guild = channel?.guild) {
+  if (!messageEnabled('events')) return;
+  const waiting = Object.values(state.tournaments)
+    .filter((tournament) => tournament.tracked?.by === 'admin' && !tournament.discordEventId && tournament.startAt > secondsNow());
+  // the switch checks the permission when it's turned on, this catches it being taken away after
+  if (!waiting.length || cantMakeEvents(guild)) return;
+  for (const tournament of waiting) {
+    try {
+      // the description wants the close time and the events, which the saved tournament doesn't have
+      const found = await startgg.getRegistration(tournament.slug);
+      if (!found || !(found.startAt > secondsNow())) continue;
+      const { error } = await ensureDiscordEvent(found, guild);
+      if (error) console.error(`discord event for ${tournament.name ?? tournament.id}: ${error}`);
+    } catch (err) {
+      console.error(`discord event for ${tournament.name ?? tournament.id} failed:`, err.message);
+    }
+  }
+  save();
+}
+
 // a tracked tournament's crew is everyone registered who's tracked, or has the discord on their start.gg in this
 // server. the ones who aren't tracked get saved with their tag so the roll call and placements can name them.
 // tracked players it finds go in userIds, in case their own upcoming list missed it. a hidden list, or start.gg or
@@ -1124,6 +1152,7 @@ async function updateTournaments() {
     console.error('finding tournaments failed:', err.message);
   }
   await addAdminTournaments();
+  await makeAdminEvents().catch((err) => console.error('making discord events failed:', err.message));
 
   for (const tournament of Object.values(state.tournaments)) {
     if (tournament.resultsPosted) {
@@ -1192,7 +1221,16 @@ export async function postRollCall(tournament, postChannel = channel) {
   const entered = new Set(tournament.entries.map((entry) => entry.userId));
   if (entered.size < ROLL_CALL_MIN_PLAYERS) return;
 
-  if (messageEnabled('rollcall', dueAt)) await post(embeds.rollCall(tournament, crewOf(tournament)), 'rollcall', dueAt, postChannel);
+  if (messageEnabled('rollcall', dueAt)) {
+    // the streams on its start.gg page, since the roll call is when people start looking for them. failing leaves them out
+    const streams = tournament.id
+      ? await startgg.getTournamentStreams([tournament.id]).then((found) => found.get(String(tournament.id)) ?? []).catch((err) => {
+        console.error(`streams for ${tournament.name ?? tournament.id}'s roll call failed:`, err.message);
+        return [];
+      })
+      : [];
+    await post(embeds.rollCall(tournament, crewOf(tournament), streams), 'rollcall', dueAt, postChannel);
+  }
   tournament.rollCallPosted = true;
 }
 
@@ -1469,68 +1507,75 @@ export async function postRegReminders(postChannel = channel) {
   save();
 }
 
-// 1-hour DMs for tracked tournaments with reminders on. reg DMs go to /notify dm_registration on
-// who isn't registered yet, start DMs to everyone with /notify dm_start on. when registration
-// closes within an hour of the start there's one DM, the start one, since it carries the register link too
+// 1-hour DMs for tracked tournaments with reminders on, to whoever turned them on with /notify, and nothing else
+// decides. reg DMs skip anyone registered. when registration closes within an hour of the start there's one DM,
+// the start one, since it carries the register link too. each goes once per close time and start time, so a
+// TO moving one sends it again for the new time
 export async function postDmReminders(postChannel = channel) {
-  const client = (postChannel ?? channel)?.client;
-  if (!client) return;
-  state.regDmPings ??= [];
-  state.startDmPings ??= [];
-  if (!state.regDmPings.length && !state.startDmPings.length) return;
+  const client = postChannel?.client;
+  if (!client || (!state.regDmPings.length && !state.startDmPings.length)) return;
 
   for (const tournament of Object.values(state.tournaments)) {
-    if (!posting(tournament, 'reminders')) continue;
-    // over means neither DM is left
-    if (secondsNow() > endTime(tournament)) continue;
+    if (!posting(tournament, 'reminders') || !dmSoon(tournament)) continue;
     let latest;
     try {
-      // TOs move the close time and the start, so always go off the latest
+      // TOs move the close time and the start, so the DM goes off the latest
       latest = await startgg.getRegistration(tournament.slug);
       if (!latest) continue;
     } catch (err) {
-      console.error(`DM reminder for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`DM reminders for ${tournament.name ?? tournament.id} failed:`, err.message);
       continue;
     }
     const deadline = regDeadline(latest);
     const { startAt } = latest;
+    // saved for dmSoon, since the reg reminders stop saving it after their last call
+    if (tournament.reminder) tournament.reminder.deadline = deadline;
 
     try {
       // registration closes more than an hour before the start, so the start DM can't cover it
-      const separateReg = deadline < startAt - DM_HOURS_BEFORE * HOUR;
-      if (state.regDmPings.length && separateReg && tournament.dmRegSentFor !== deadline
-        && secondsNow() >= deadline - DM_HOURS_BEFORE * HOUR && secondsNow() < deadline) {
-        const dueAt = deadline - DM_HOURS_BEFORE * HOUR;
-        // came due while off stays skipped after it's back on
+      const separate = deadline < startAt - DM_HOURS_BEFORE * HOUR;
+      if (state.regDmPings.length && separate && tournament.dmRegSentFor !== deadline && dmDue(deadline)) {
         tournament.dmRegSentFor = deadline;
-        if (latest.isRegistrationOpen && messageEnabled('registration', dueAt)) {
+        // not open means it filled up
+        if (latest.isRegistrationOpen) {
           const participants = await startgg.getParticipants(latest.id);
           rememberAccounts(participants);
           const registered = new Set(participants.map((participant) => participant.discordId));
-          const targets = state.regDmPings.filter((id) => !registered.has(id) && mentionable(id));
           const embed = embeds.regReminder(latest, deadline, true);
-          for (const discordId of targets) await dmUser(client, discordId, embed);
+          for (const discordId of state.regDmPings.filter((id) => !registered.has(id) && mentionable(id))) await dmUser(client, discordId, embed);
         }
       }
     } catch (err) {
-      console.error(`registration DM for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`registration DMs for ${tournament.name ?? tournament.id} failed:`, err.message);
     }
 
     try {
-      if (state.startDmPings.length && tournament.dmStartSentFor !== startAt
-        && secondsNow() >= startAt - DM_HOURS_BEFORE * HOUR && secondsNow() < startAt) {
-        const dueAt = startAt - DM_HOURS_BEFORE * HOUR;
+      if (state.startDmPings.length && tournament.dmStartSentFor !== startAt && dmDue(startAt)) {
         tournament.dmStartSentFor = startAt;
-        if (messageEnabled('rollcall', dueAt)) {
-          const embed = embeds.startReminder(latest);
-          for (const discordId of state.startDmPings.filter(mentionable)) await dmUser(client, discordId, embed);
-        }
+        const embed = embeds.startReminder(latest);
+        for (const discordId of state.startDmPings.filter(mentionable)) await dmUser(client, discordId, embed);
       }
     } catch (err) {
-      console.error(`start DM for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`start DMs for ${tournament.name ?? tournament.id} failed:`, err.message);
     }
   }
   save();
+}
+
+// within the hour before this time
+function dmDue(at, now = secondsNow()) {
+  return now >= at - DM_HOURS_BEFORE * HOUR && now < at;
+}
+
+// whether a DM not sent yet comes due soon, by the saved start and the close time the reg reminders saved.
+// the tournament check refreshes the start every 15 minutes in its last day
+function dmSoon(tournament, now = secondsNow()) {
+  const { startAt } = tournament;
+  const deadline = Math.min(tournament.reminder?.deadline ?? startAt, startAt);
+  const pending = [];
+  if (state.regDmPings.length && tournament.dmRegSentFor !== deadline) pending.push(deadline);
+  if (state.startDmPings.length && tournament.dmStartSentFor !== startAt) pending.push(startAt);
+  return pending.some((at) => at > now && at - now <= (DM_HOURS_BEFORE + DM_LOOKAHEAD_HOURS) * HOUR);
 }
 
 // one DM, skipped when DMs are closed or the user left. failures stay in the logs, the rest still go out

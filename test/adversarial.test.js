@@ -92,17 +92,18 @@ test('a profile link with backticks asks again without breaking the code span', 
   assert.ok(!edits[0].content.includes('a`b`c'));
 });
 
-test('/socials_edit needs Manage Server in code, not just in discord', async () => {
+test('/socials_edit goes by discord, so a role handed it can use it without Manage Server', async () => {
   state.socials = [];
-  const denied = await new Promise((resolve) => {
+  const handed = await new Promise((resolve) => {
     settings.socialsAdd({
       memberPermissions: { has: () => false },
-      options: { getString: (name) => (name === 'name' ? 'Evil' : 'https://evil.example/x') },
+      options: { getString: (name) => (name === 'name' ? 'Handed' : 'https://example.com/handed') },
       reply: async (payload) => resolve(payload),
     });
   });
-  assert.match(denied.content, /Manage Server/);
-  assert.equal(state.socials.length, 0);
+  assert.match(handed.content, /^Added/);
+  assert.equal(state.socials.length, 1);
+  state.socials = [];
 
   const allowed = await new Promise((resolve) => {
     settings.socialsAdd({
@@ -114,7 +115,7 @@ test('/socials_edit needs Manage Server in code, not just in discord', async () 
   assert.match(allowed.content, /^Added/);
   assert.equal(state.socials.length, 1);
 
-  const deniedRemove = await new Promise((resolve) => {
+  const handedRemove = await new Promise((resolve) => {
     settings.socialsRemove({
       memberPermissions: { has: () => false },
       options: { getString: () => 'https://example.com/good' },
@@ -122,8 +123,8 @@ test('/socials_edit needs Manage Server in code, not just in discord', async () 
       followUp: async (payload) => resolve(payload),
     });
   });
-  assert.match(deniedRemove.content, /Manage Server/);
-  assert.equal(state.socials.length, 1);
+  assert.match(handedRemove.content, /Removed/);
+  assert.equal(state.socials.length, 0);
 });
 
 test('a corrupt saved social link renders as text instead of throwing /socials', async () => {

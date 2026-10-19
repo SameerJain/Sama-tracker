@@ -163,7 +163,7 @@ test('a match call that goes back to waiting is taken back, and one not started 
   await tracker.followCalls(channel);
   assert.equal(channel.sent.length, 2);
   const warning = channel.sent[1];
-  assert.equal(warning.content, `<@crew-discord> You're still up — 6 min later, TOs usually DQ at 10`);
+  assert.equal(warning.content, `<@crew-discord> You're still up, 6 min in. TOs usually DQ at 10`);
   assert.deepEqual(warning.allowedMentions, { users: ['crew-discord'] });
   assert.equal(warning.reply.messageReference, 'm1');
   await tracker.followCalls(channel);

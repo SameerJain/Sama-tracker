@@ -3,7 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PermissionFlagsBits } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-messages-'));
 process.env.STATE_DIR = directory;
@@ -14,10 +14,10 @@ const { commands, handleCommand } = await import('../src/commands/index.js');
 const { postWeeklyRecap } = await import('../src/tracker.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 
-async function configure(values = {}, allowed = true) {
+async function configure(values = {}, allowed = true, guild = undefined) {
   let reply;
   await handleCommand({
-    commandName: 'messages', memberPermissions: { has: permission => allowed && permission === PermissionFlagsBits.ManageGuild },
+    commandName: 'messages', guild, memberPermissions: { has: permission => allowed && permission === PermissionFlagsBits.ManageGuild },
     options: { getSubcommand: () => null, getBoolean: name => values[name] ?? null,
       getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
     reply: async result => { reply = result; },
@@ -29,7 +29,7 @@ test('message controls are registered for server managers', () => {
   const command = commands.find(c => c.name === 'messages');
   assert.equal(command?.default_member_permissions, PermissionFlagsBits.ManageGuild.toString());
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'slippi', 'recap', 'bills']);
+    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills']);
   // three modes, picked by name
   const threads = command.options.find(o => o.name === 'threads');
   assert.equal(threads.type, 3);
@@ -117,13 +117,15 @@ test('re-enabling categories saves cutoffs even if no muted poll happened', asyn
   assert.ok(state.messages.enabledAt.registration > 0);
 });
 
-test('only Bills finals start off server-wide, and turning match calls back on skips what came due', async () => {
+test('only Bills finals and Discord events start off server-wide, and turning match calls back on skips what came due', async () => {
   const { messageEnabled, messageSettings } = await import('../src/message-settings.js');
   state.messages = {};
   assert.equal(messageSettings().calls, true);
   assert.equal(messageSettings().top8, true);
   assert.equal(messageSettings().bills, false);
   assert.equal(messageEnabled('bills'), false);
+  assert.equal(messageSettings().events, false);
+  assert.equal(messageEnabled('events'), false);
   assert.equal(messageSettings().sets, true);
 
   state.messages = { calls: false };
@@ -132,6 +134,26 @@ test('only Bills finals start off server-wide, and turning match calls back on s
   assert.ok(state.messages.enabledAt?.calls > 0);
   assert.equal(messageEnabled('calls', state.messages.enabledAt.calls - 60), false);
   assert.equal(messageEnabled('calls', state.messages.enabledAt.calls), true);
+});
+
+test('turning Discord events on checks for Manage Events first', async () => {
+  state.messages = {};
+  const guild = (allowed) => ({
+    scheduledEvents: { create: async () => ({}) },
+    members: { me: { permissions: { has: () => allowed } } },
+  });
+  const refused = await configure({ events: true }, true, guild(false));
+  assert.match(refused.content, /Manage Events/);
+  assert.equal(refused.flags, MessageFlags.Ephemeral);
+  assert.equal(state.messages.events, undefined);
+
+  const turnedOn = await configure({ events: true }, true, guild(true));
+  assert.match(turnedOn.content, /Discord events for admin tournaments:\*\* on/);
+  assert.equal(state.messages.events, true);
+  // already on, so turning something else on doesn't check again
+  const other = await configure({ sets: true }, true, guild(false));
+  assert.match(other.content, /Set results:\*\* on/);
+  state.messages = {};
 });
 
 test('muting recap prevents fetches and pending message sends', async () => {

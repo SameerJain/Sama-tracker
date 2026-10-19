@@ -202,7 +202,8 @@ test('the gap and variance match the chance, and thin evidence stays near 50%', 
   assert.ok(Math.abs(odds.chance - 0.5) < 0.1, `${odds.chance}`);
   assert.ok(odds.prior > 0.1, `${odds.prior}`);
   const text = embeds.predictionExplained(a, b, odds).map((embed) => embed.data.description).join('\n');
-  assert.match(text, /\*\*Gap:\*\* -?\d+\.\d+ log-odds · \*\*Uncertainty:\*\* \d+\.\d+/);
+  assert.match(text, /\*\*If the evidence were certain:\*\* .*\d+%\. How thin or mixed it is brings that to \d+%/);
+  assert.match(text, /The gap is -?\d+\.\d+ in log-odds, give or take \d+\.\d+/);
   assert.match(text, /Starting from even:/);
 });
 
@@ -224,9 +225,28 @@ test('explained shows bars and model numbers behind the same odds', () => {
   assert.equal(embeds.predictionExplained(a, b, odds)[0].data.title, embeds.prediction(a, b, odds, false)[0].data.title);
   assert.match(text, /How it adds up/);
   assert.match(text, /█.*░.*Head-to-head|Head-to-head.*█/);
-  assert.match(text, /\*\*Form detail:\*\*/);
-  assert.match(text, /\*\*Gap:\*\*/);
-  assert.doesNotMatch(short, /Gap:/);
+  assert.match(text, /How sure it is/);
+  // neither played anyone else, so the form line already says it all
+  assert.doesNotMatch(text, /seeded or not/);
+  assert.doesNotMatch(short, /How sure it is|░/);
+  // with seeded sets against other people, the record behind the form line shows too
+  const others = Array.from({ length: 6 }, (_, i) => set(1, 100 + i, i < 4, { mySeed: 3, theirSeed: 5, event: `o${i}`, daysAgo: i + 1 }));
+  const withForm = predict(a, b, [...sets, ...others], mirror(sets), { now });
+  const formText = embeds.predictionExplained(a, b, withForm).map((embed) => embed.data.description).join('\n');
+  assert.match(formText, /\*\*Last \d+ sets, seeded or not:\*\* \*\*A\*\* 4-2 · \*\*B\*\* 0-0/);
+  // the shares add up: every factor plus starting from even is the whole answer
+  const shares = odds.factors.reduce((sum, { share }) => sum + share, odds.prior);
+  assert.ok(Math.abs(shares - 1) < 1e-9, `${shares}`);
+});
+
+test('chanceOf pulls unsure odds toward 50%, and share bars fill by share', async () => {
+  assert.equal(chanceOf(0, 0), 0.5);
+  assert.ok(Math.abs(chanceOf(2, 10) - 0.5) < Math.abs(chanceOf(2, 0.1) - 0.5));
+  const { shareBar } = await import('../src/embeds/players.js');
+  assert.equal(shareBar(0), '░'.repeat(10));
+  assert.equal(shareBar(1), '█'.repeat(10));
+  assert.equal(shareBar(0.36).length, 10);
+  assert.equal(shareBar(0.36), `${'█'.repeat(4)}${'░'.repeat(6)}`);
 });
 
 test('slippi alone predicts melee when both are ranked with no sets on start.gg', () => {

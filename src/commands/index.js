@@ -9,7 +9,7 @@ import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, recent, run } from './players.js';
 import { progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
-import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, adminAdd, adminRemove, adminList } from './tournaments.js';
+import { tournamentAdd, tournamentRemove, tournamentPosts, discordEvent, adminAdd, adminRemove, adminList } from './tournaments.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
@@ -24,7 +24,7 @@ const TRACKED_ONLY = ['track remove', 'track posts'];
 // all means everyone tracked
 const TAKES_ALL = ['upcoming', 'recent', 'track posts'];
 // a tournament link, or one the bot already knows. new is the ones /tournament add can still track, tracked the ones it does
-const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', 'tournament event': 'known', registered: 'known', reg_warn: 'known' };
+const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', discord_event: 'known', registered: 'known', reg_warn: 'known' };
 
 // "track add", "tournament admin add", or just the command for the ones without subcommands
 function commandName(interaction) {
@@ -67,7 +67,7 @@ const handlers = new Map([
   ['tournament add', tournamentAdd],
   ['tournament remove', tournamentRemove],
   ['tournament posts', tournamentPosts],
-  ['tournament event', tournamentEvent],
+  ['discord_event', discordEvent],
   ['tournament admin add', adminAdd],
   ['tournament admin remove', adminRemove],
   ['tournament admin list', adminList],
@@ -180,7 +180,7 @@ function disabled(message) {
 export async function buttonFailed(interaction, content) {
   if (readButton(interaction.customId).action !== 'more' || !interaction.deferred) return replyEphemeralAfterDefer(interaction, content);
   const { message } = interaction;
-  await interaction.editReply({ content: message.content || null, embeds: message.embeds, components: message.components });
+  await interaction.editReply({ content: message.content || null, embeds: message.embeds, components: message.components, allowedMentions: { parse: [] } });
   return interaction.followUp({ content, flags: MessageFlags.Ephemeral });
 }
 
@@ -249,7 +249,7 @@ function status(interaction) {
     stateSize: Buffer.byteLength(JSON.stringify(state)),
     saves: saveCount,
   };
-  return interaction.reply({ embeds: [embeds.status(info)] });
+  return interaction.reply({ embeds: [embeds.status(info)], allowedMentions: { parse: [] } });
 }
 
 // just the picture, as big as discord has it
