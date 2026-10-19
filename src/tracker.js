@@ -32,7 +32,7 @@ const TOURNAMENT_FORGOTTEN_DAYS = 30;
 // discord allows 100 mentions a message, and 2000 chars fits about 80
 const MENTIONS_PER_MESSAGE = 80;
 // hours before registration closes. the last one is the last call
-export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
+export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 6];
 // DMs go out this long before registration closes and before the start
 export const DM_HOURS_BEFORE = 1;
 // the saved times can be a little stale, so start.gg gets asked this much before a DM is due. further out costs no request

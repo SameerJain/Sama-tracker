@@ -159,7 +159,7 @@ A tracked tournament posts every set, whoever played, plus its stream alerts and
 
 At a tracked tournament, the crew for the roll call and the placements post is tracked players and anyone registered whose start.gg Discord is in this server. Linking alone does not add someone. A hidden entrant list leaves just the tracked players.
 
-Reminders go out 7 days, 3 days, 1 day and 12 hours before registration closes. If registration stays open past the tournament start, the start is the deadline. Past reminders are skipped, and a last call set within 12 hours goes out right away. Turning reminders back on with `/tournament posts` starts from the next one still to come.
+Reminders go out 7 days, 3 days, 1 day and 6 hours before registration closes. If registration stays open past the tournament start, the start is the deadline. Past reminders are skipped, and a last call set within 6 hours goes out right away. Turning reminders back on with `/tournament posts` starts from the next one still to come.
 
 `/notify dm_registration` DMs you 1 hour before registration closes, and `/notify dm_start` DMs you 1 hour before the tournament starts. Both carry the tournament link, location and image, and need the tournament's reg reminders on. Registration DMs skip you once you're registered, if start.gg has your Discord. When registration closes within an hour of the start there's one DM, the start one, since it carries the register link too.
 

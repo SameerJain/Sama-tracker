@@ -1881,6 +1881,34 @@ test('reg reminders come from tracked tournaments with reminders on', async () =
   state.tournaments = {};
 });
 
+test('the last call waits until 6 hours before registration closes', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.messages = {};
+  state.regPings = ['fan'];
+  let closesAt = now + 8 * 3600;
+  state.tournaments = { 1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, entries: [], tracked, reminder: { next: 3 } } };
+  mockApi(({ query }) => {
+    if (query.includes('participants(')) return { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { tournament: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 90000, registrationClosesAt: closesAt, isRegistrationOpen: true, images: [], events: [] } };
+  });
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+
+  // 8 hours out is past where the old 12 hour last call went, but not due yet
+  await tracker.postRegReminders(channel);
+  assert.equal(sent.length, 0);
+  assert.equal(state.tournaments[1].reminder.next, 3);
+  assert.equal(tracker.nextRegReminder(closesAt), 3);
+
+  closesAt = now + 5 * 3600;
+  await tracker.postRegReminders(channel);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].content, '<@fan> last call');
+  assert.equal(state.tournaments[1].reminder.next, 4);
+  state.regPings = [];
+  state.tournaments = {};
+});
+
 test('newly tracked players save when they were added, so the prune knows they are not inactive', () => {
   const before = Math.floor(Date.now() / 1000);
   const player = tracker.newTracked(crewPlayer);

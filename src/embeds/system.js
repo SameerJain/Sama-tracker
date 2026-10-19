@@ -214,7 +214,7 @@ export function help() {
       '**Tournament roll calls.** An hour before a tournament with 3+ of the crew, with the streams from its start.gg page. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server',
       '**Tournament placements.** Where the crew placed, 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
-      '**Registration reminders.** Tracked tournaments a week, 3 days and a day out, then a last call 12 hours before. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start. When registration closes within an hour of the start there\'s one DM, the start one',
+      '**Registration reminders.** Tracked tournaments a week, 3 days and a day out, then a last call 6 hours before. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start. When registration closes within an hour of the start there\'s one DM, the start one',
       '**Discord events.** Each upcoming tournament tracked from `/tournament admin` gets a Discord event, once. Off unless `/messages events` turns it on',
       '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg',
       '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',

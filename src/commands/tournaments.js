@@ -19,7 +19,7 @@ const POSTS = { sets: 'Every set', stream: 'Stream alerts', top8: 'Top 8s', remi
 
 // who can run /tournament is discord's to say: Manage Server by default, or any role a server hands it to
 
-// 7 days, 3 days, 1 day and 12 hours
+// 7 days, 3 days, 1 day and 6 hours
 function inWords(hours) {
   return hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`;
 }

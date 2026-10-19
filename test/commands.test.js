@@ -278,7 +278,7 @@ const runs = [
   ['slippi', { subcommand: 'remove', values: { player: 'crew-uid' } }, /Took Crew \(CREW#1\) off the Slippi watchlist/],
   ['slippi', { subcommand: 'leaderboard' }, /"thumbnail":\{"url":"attachment:\/\/slippi\.png"\}.*Nobody on the watchlist yet.*"files":\[\{"attachment":"[^"]+slippi\.png","name":"slippi\.png"\}\]/],
   ['slippi', { subcommand: 'add', values: { code: 'crew-1' } }, /Added Crew to the Slippi watchlist/],
-  ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 12 hours before registration ends/],
+  ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 6 hours before registration ends/],
   ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on.*Tracked by hand/],
   ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
   ['discord_event', { values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
