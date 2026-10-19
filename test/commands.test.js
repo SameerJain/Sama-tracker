@@ -179,6 +179,7 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
     deferReply: async () => { calls.push(['defer']); run.deferred = true; },
     editReply: async (result) => calls.push(['edit', result]),
     deleteReply: async () => calls.push(['delete']),
+    fetchReply: async () => ({ startThread: async () => ({}) }),
     followUp: async (result) => calls.push(['followUp', result]),
     channel: { send: async (result) => { calls.push(['send', result]); return {}; } },
   };

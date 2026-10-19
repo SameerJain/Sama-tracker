@@ -1,4 +1,4 @@
-import { MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits, ThreadAutoArchiveDuration } from 'discord.js';
 import * as embeds from '../embeds/index.js';
 import { colors } from '../embeds/shared.js';
 import { state, save } from '../store.js';
@@ -60,8 +60,8 @@ async function matchmakingRole(interaction) {
 }
 
 // /matchmaking_search: pings the role with a card saying who's looking. only people with the role can, so it can't
-// be used to ping a group someone isn't in
-function matchmakingSearch(interaction) {
+// be used to ping a group someone isn't in. thread:True starts a thread on the ping to arrange games
+async function matchmakingSearch(interaction) {
   const game = interaction.options.getString('game', true);
   const { label } = MATCHMAKING[game];
   const role = findRole(interaction.guild, game);
@@ -80,7 +80,17 @@ function matchmakingSearch(interaction) {
     message: interaction.options.getString('message')?.trim(),
   });
   // the role is the only thing that pings, not a name or @everyone typed into the message
-  return interaction.reply({ content: `<@&${role.id}>`, embeds: [card], allowedMentions: { roles: [role.id] } });
+  await interaction.reply({ content: `<@&${role.id}>`, embeds: [card], allowedMentions: { roles: [role.id] } });
+  if (!interaction.options.getBoolean?.('thread')) return;
+  // the ping stays even when the thread can't start, so a permission change never loses the search
+  try {
+    const message = await interaction.fetchReply();
+    const name = interaction.member?.displayName ?? interaction.user?.username ?? 'someone';
+    await message.startThread({ name: `${label} games with ${name}`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
+  } catch (err) {
+    console.error('starting a matchmaking thread failed:', err.message);
+    await interaction.followUp({ content: 'Posted your search, but I couldn\'t start a thread here. A server admin can turn on **Create Public Threads** and **Send Messages in Threads** for this channel.', flags: MessageFlags.Ephemeral }).catch(() => {});
+  }
 }
 
 export { matchmakingRole, matchmakingSearch };

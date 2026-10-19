@@ -91,9 +91,9 @@ The bot makes the TO role the first time it's needed. A role named `TO` made by 
 | Command | What it does |
 | --- | --- |
 | `/matchmaking_role game:<Ultimate or Melee>` | Give yourself the **Ultimate Matchmaking** or **Melee Matchmaking** role, or take it off if you have it. Only you see the reply. |
-| `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role here, with a card naming you and your message, like a netplay connect code or where you're playing. `message` is optional. Only people with the role can use it. |
+| `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role here, with a card naming you and your message, like a netplay connect code or where you're playing. `message` is optional. `thread:True` starts a thread on your search to arrange games. Only people with the role can use it. |
 
-The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets.
+The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets. Threads need **Create Public Threads** and **Send Messages in Threads** in the channel, and the search still posts when they are missing.
 
 ### Stats and matchups
 

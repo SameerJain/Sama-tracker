@@ -157,7 +157,7 @@ export function help() {
     [
       '**Matchmaking**',
       '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it',
-      '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. Only people with the role can',
+      '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them. Only people with the role can',
       '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it',
     ],
     [

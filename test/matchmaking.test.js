@@ -44,12 +44,16 @@ function person(held = [], fail = null) {
   };
 }
 
-async function run(commandName, { guild = server(), member = person(), values = {}, appPermissions } = {}) {
+async function run(commandName, { guild = server(), member = person(), values = {}, appPermissions, user, threadFail = null } = {}) {
   const calls = [];
+  const threads = [];
   const interaction = {
     commandName, guild, member, appPermissions,
-    user: { id: 'me-discord' },
-    options: { getSubcommandGroup: () => null, getSubcommand: () => null, getString: (name) => values[name] ?? null },
+    user: user ?? { id: 'me-discord', username: 'Me' },
+    options: {
+      getSubcommandGroup: () => null, getSubcommand: () => null,
+      getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null,
+    },
     deferReply: async (options) => {
       calls.push(['defer', options]);
       interaction.deferred = true;
@@ -59,8 +63,19 @@ async function run(commandName, { guild = server(), member = person(), values = 
       interaction.replied = true;
     },
     editReply: async (result) => calls.push(['edit', result]),
+    fetchReply: async () => ({
+      startThread: async (options) => {
+        if (threadFail) throw threadFail;
+        threads.push(options);
+        return {};
+      },
+    }),
+    followUp: async (result) => {
+      calls.push(['followUp', result]);
+    },
   };
   await handleCommand(interaction);
+  calls.threads = threads;
   return calls;
 }
 
@@ -69,7 +84,7 @@ const lastText = (calls) => {
   return typeof result === 'string' ? result : result.content;
 };
 
-test('both commands take a required game first, and only the ping takes a message', () => {
+test('both commands take a required game first, and only the ping takes a message and an optional thread', () => {
   const toggle = commands.find((command) => command.name === 'matchmaking_role');
   const ping = commands.find((command) => command.name === 'matchmaking_search');
   for (const command of [toggle, ping]) {
@@ -78,7 +93,8 @@ test('both commands take a required game first, and only the ping takes a messag
     assert.deepEqual(command.options[0].choices, [{ name: 'Ultimate', value: 'ult' }, { name: 'Melee', value: 'melee' }]);
   }
   assert.deepEqual(toggle.options.map((option) => option.name), ['game']);
-  assert.deepEqual(ping.options.map((option) => [option.name, option.required ?? false]), [['game', true], ['message', false]]);
+  assert.deepEqual(ping.options.map((option) => [option.name, option.required ?? false]), [['game', true], ['message', false], ['thread', false]]);
+  assert.equal(ping.options.find((option) => option.name === 'thread').type, 5);
 });
 
 test('the first toggle makes a mentionable role that grants nothing, saves its id and hands it out', async () => {
@@ -207,5 +223,38 @@ test('any other discord failure says to try again instead of blaming start.gg', 
   const calls = await run('matchmaking_role', { member: person([], fail), values: { game: 'melee' } });
 
   assert.match(lastText(calls), /Discord didn't let me change your \*\*Melee Matchmaking\*\* role just now\. Try again in a minute\./);
+  assert.equal(logged.mock.callCount(), 1);
+});
+
+test('thread:True starts a thread on the ping, left out it sends none', async () => {
+  state.matchmaking = { melee: 'melee-role' };
+  const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }]);
+  const member = { ...person(['melee-role']), displayName: 'Sam' };
+
+  const withThread = await run('matchmaking_search', { guild, member, values: { game: 'melee', thread: true }, user: { id: 'me-discord', username: 'Sam' } });
+  assert.equal(withThread[0][1].content, '<@&melee-role>');
+  assert.equal(withThread.threads.length, 1);
+  assert.equal(withThread.threads[0].name, 'Melee games with Sam');
+
+  const withoutThread = await run('matchmaking_search', { guild, member, values: { game: 'melee' } });
+  assert.equal(withoutThread[0][1].content, '<@&melee-role>');
+  assert.equal(withoutThread.threads.length, 0);
+});
+
+test('a thread that cannot start still posts the ping and says so privately', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  state.matchmaking = { ult: 'ult-role' };
+  const guild = server([{ id: 'ult-role', name: 'Ultimate Matchmaking', mentionable: true }]);
+  const member = { ...person(['ult-role']), displayName: 'Sam' };
+  const calls = await run('matchmaking_search', {
+    guild, member, values: { game: 'ult', thread: true },
+    user: { id: 'me-discord', username: 'Sam' }, threadFail: new Error('Missing Permissions'),
+  });
+
+  assert.equal(calls[0][1].content, '<@&ult-role>');
+  assert.equal(calls.threads.length, 0);
+  assert.equal(calls[1][0], 'followUp');
+  assert.equal(calls[1][1].flags, MessageFlags.Ephemeral);
+  assert.match(calls[1][1].content, /couldn't start a thread/);
   assert.equal(logged.mock.callCount(), 1);
 });

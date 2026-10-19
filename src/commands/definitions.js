@@ -229,6 +229,7 @@ export const commands = [
     options: [
       matchmakingGame('Which role to ping'),
       { type: Option.String, name: 'message', description: 'What you want, like netplay with your connect code or where you\'re playing', max_length: 300 },
+      { type: Option.Boolean, name: 'thread', description: 'Start a thread on your search to arrange games' },
     ],
   },
   {
