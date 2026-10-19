@@ -12,11 +12,11 @@ const TO_ROLE = 'TO';
 const FIRST_TO = 'user/f64a83c8';
 // discord's code for missing permissions, which includes a role sitting above the bot's
 const MISSING_PERMISSIONS = 50013;
-// /to list goes by the TOs the bot has seen, since listing everyone with a role needs a privileged intent
+// /t-o role list goes by the TOs the bot has seen, since listing everyone with a role needs a privileged intent
 const KNOWN_KEPT = 100;
 
 // what the role lets someone do, for the replies that hand it out
-const TO_POWERS = 'TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and run `/tournament` and `/track cleanup`.';
+const TO_POWERS = 'TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.';
 
 // the saved id first, so renaming it in server settings keeps it, then the name. whichever turns up gets saved
 function findRole(guild) {
@@ -57,7 +57,7 @@ function forget(discordId) {
 }
 
 // whoever ran it has the TO role. until the server has one, Manage Server counts, so a bot that can't make the
-// role doesn't lock everyone out. someone handed the role in server settings gets remembered for /to list
+// role doesn't lock everyone out. someone handed the role in server settings gets remembered for /t-o role list
 function isTO(interaction) {
   const role = findRole(interaction.guild);
   if (!role) return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
@@ -68,7 +68,7 @@ function isTO(interaction) {
 
 // the private no for someone who isn't a TO. doing finishes "Only TOs can", like "untrack someone else"
 function notTO(interaction, doing) {
-  return replyEphemeral(interaction, `Only TOs can ${doing}. \`/to list\` shows who they are.`);
+  return replyEphemeral(interaction, `Only TOs can ${doing}. \`/t-o role list\` shows who they are.`);
 }
 
 // the member picked in user:, or a reply saying why there's nobody to change. null when it replied
@@ -86,7 +86,7 @@ async function pickedMember(interaction) {
   return { user, member, name: escapeMarkdown(member.displayName ?? user.displayName) };
 }
 
-// /to add: TOs hand each other the role. it gets made the first time, which can take discord past the 3 seconds
+// /t-o role add: TOs hand each other the role. it gets made the first time, which can take discord past the 3 seconds
 async function toAdd(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'add TOs');
   const picked = await pickedMember(interaction);
@@ -100,7 +100,7 @@ async function toAdd(interaction) {
 
   await interaction.deferReply();
   try {
-    await member.roles.add(role ?? await makeRole(interaction.guild), 'added with /to add');
+    await member.roles.add(role ?? await makeRole(interaction.guild), 'added with /t-o role add');
   } catch (err) {
     if (err.code !== MISSING_PERMISSIONS) throw err;
     return interaction.editReply({ content: `I couldn't give ${name} the TO role. That needs Manage Roles, with my role above TO.`, allowedMentions: { parse: [] } });
@@ -109,7 +109,7 @@ async function toAdd(interaction) {
   return interaction.editReply({ content: `${name} is a TO now. ${TO_POWERS}`, allowedMentions: { parse: [] } });
 }
 
-// /to remove: any TO can take it off another, or off themselves
+// /t-o role remove: any TO can take it off another, or off themselves
 async function toRemove(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'remove TOs');
   const picked = await pickedMember(interaction);
@@ -123,7 +123,7 @@ async function toRemove(interaction) {
 
   await interaction.deferReply();
   try {
-    await member.roles.remove(role, 'removed with /to remove');
+    await member.roles.remove(role, 'removed with /t-o role remove');
   } catch (err) {
     if (err.code !== MISSING_PERMISSIONS) throw err;
     return interaction.editReply({ content: `I couldn't take the TO role off ${name}. That needs Manage Roles, with my role above TO.`, allowedMentions: { parse: [] } });
@@ -133,7 +133,7 @@ async function toRemove(interaction) {
   return interaction.editReply({ content: `${name} isn't a TO anymore.${self}`, allowedMentions: { parse: [] } });
 }
 
-// /to list: anyone can see who the TOs are. each one the bot has seen gets checked against the server, so
+// /t-o role list: anyone can see who the TOs are. each one the bot has seen gets checked against the server, so
 // someone who left or lost the role drops off
 async function toList(interaction) {
   isTO(interaction);

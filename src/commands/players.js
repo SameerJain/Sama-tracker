@@ -15,7 +15,7 @@ import { isTO, notTO } from './to.js';
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
 
-// /track cleanup's Are you sure names this many, then says how many more
+// /t-o cleanup's Are you sure names this many, then says how many more
 const CLEANUP_NAMED = 10;
 
 // anyone can track themselves: profile left out finds theirs, and a link counts when it has their discord
@@ -72,7 +72,7 @@ confirmable('untrack', {
   tooLate: 'Too late to undo. `/track add` them again, with set results and stream alerts starting off.',
 });
 
-// who /track cleanup asked about, by the id its buttons carry, until someone presses one. a restart in between
+// who /t-o cleanup asked about, by the id its buttons carry, until someone presses one. a restart in between
 // loses it, and the button says to run it again
 const cleanups = new Map();
 
@@ -101,11 +101,11 @@ async function trackCleanup(interaction) {
 }
 
 confirmable('cleanup', {
-  command: '/track cleanup',
+  command: '/t-o cleanup',
   run: (target) => {
     const userIds = cleanups.get(target);
     cleanups.delete(target);
-    if (!userIds) return { content: 'That button doesn\'t work anymore. Run `/track cleanup` again.' };
+    if (!userIds) return { content: 'That button doesn\'t work anymore. Run `/t-o cleanup` again.' };
     const removed = userIds.map((userId) => state.players[userId]).filter(Boolean);
     for (const player of removed) delete state.players[player.userId];
     save();

@@ -264,7 +264,7 @@ const runs = [
   ['track', { subcommand: 'posts', values: { player: 'all', stream: 'off' } }, /Stream alerts off for everyone\./],
   ['track', { subcommand: 'posts', values: { player: 'all', sets: 'off' }, press: 'Turn off' }, /Turn set results off for all 2 tracked players\?.*"update",\{"content":"Set results off for everyone\."/],
   // everyone tracked has their discord in the fake server
-  ['track', { subcommand: 'cleanup' }, /Everyone tracked has their start\.gg Discord in this server/],
+  ['t-o', { subcommand: 'cleanup' }, /Everyone tracked has their start\.gg Discord in this server/],
   ['notify', {}, /Your pings.*Match calls:\*\* off.*Registration DMs:\*\* off.*Start DMs:\*\* off/],
   ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off for the whole server/],
   ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged for every stream alert.*pinged for reg reminders.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
@@ -281,18 +281,18 @@ const runs = [
   ['slippi', { subcommand: 'remove', values: { player: 'crew-uid' } }, /Took Crew \(CREW#1\) off the Slippi watchlist/],
   ['slippi', { subcommand: 'leaderboard' }, /"thumbnail":\{"url":"attachment:\/\/slippi\.png"\}.*Nobody on the watchlist yet.*"files":\[\{"attachment":"[^"]+slippi\.png","name":"slippi\.png"\}\]/],
   ['slippi', { subcommand: 'add', values: { code: 'crew-1' } }, /Added Crew to the Slippi watchlist/],
-  ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 6 hours before registration ends/],
-  ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on/],
-  ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
-  ['tournament', { subcommand: 'event', values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
-  ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon', add_event: 'on' } }, /Already tracking Soon.*Made a Discord event for Soon/],
+  ['t-o', { group: 'tournament', subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 6 hours before registration ends/],
+  ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on/],
+  ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
+  ['t-o', { group: 'tournament', subcommand: 'event', values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
+  ['t-o', { group: 'tournament', subcommand: 'add', values: { tournament: 'start.gg/tournament/soon', add_event: 'on' } }, /Already tracking Soon.*Made a Discord event for Soon/],
   ['track', { subcommand: 'list' }, /Tracked tournaments · 1.*Soon.*top 8s off/],
   ['bracket', {}, /No tracked tournaments going on right now/],
-  ['tournament', { subcommand: 'remove', values: { tournament: 'soon' }, press: 'Stop tracking' }, /Stop tracking Soon\?.*"update",\{"content":"Stopped tracking Soon\."/],
-  // no TO role yet, so Manage Server counts as one, and /to add makes the role
-  ['to', { subcommand: 'list' }, /There's no TO role yet/],
-  ['to', { subcommand: 'add', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone is a TO now/],
-  ['to', { subcommand: 'remove', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone isn't a TO/],
+  ['t-o', { group: 'tournament', subcommand: 'remove', values: { tournament: 'soon' }, press: 'Stop tracking' }, /Stop tracking Soon\?.*"update",\{"content":"Stopped tracking Soon\."/],
+  // no TO role yet, so Manage Server counts as one, and /t-o role add makes the role
+  ['t-o', { group: 'role', subcommand: 'list' }, /There's no TO role yet/],
+  ['t-o', { group: 'role', subcommand: 'add', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone is a TO now/],
+  ['t-o', { group: 'role', subcommand: 'remove', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone isn't a TO/],
   ['stream_link', {}, /twitch\.tv\/localstream/],
   ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /Registered from this server · 1/],
   ['reg_warn', { values: { tournament: 'start.gg/tournament/soon', user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /"content":"<@someone>"/],
@@ -338,7 +338,7 @@ test('every command and subcommand answers without throwing', async () => {
   }
 
   // user commands run from the Apps menu, not chat, so the runs table only covers slash commands.
-  // a subcommand group's subcommands would count one by one, like /tournament admin add was
+  // a subcommand group's subcommands count one by one, like /t-o tournament add
   const every = commands.flatMap((command) => {
     const nested = (command.options ?? []).flatMap((option) => {
       if (option.type === 1) return [`${command.name} ${option.name}`];

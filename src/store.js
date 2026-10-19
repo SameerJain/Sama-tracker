@@ -8,10 +8,10 @@ const FILE = `${stateDir}/state.json`;
 // players are keyed by start.gg user id. posted/streamed/called/dqs are ids already announced.
 // regPings, streamPings and callPings are discord ids that turned on /notify registration, streams or calls. regDmPings and startDmPings are the 1-hour
 // DM versions for registration and the start.
-// toRole is the TO role: { id, members, seeded }, id being the discord role, members the discord ids the bot has seen with it, for /to list,
+// toRole is the TO role: { id, members, seeded }, id being the discord role, members the discord ids the bot has seen with it, for /t-o role list,
 // and seeded whether the first TO got it.
 // tournaments are keyed by id: the ones tracked players are in, and tracked ones. tracked: { by, at, sets, stream, top8, reminders } says it's tracked,
-// by being 'manual', or 'admin' from before the TO role, and the rest its /tournament posts switches. reminder: { deadline, next } is its reg reminder progress, next being the
+// by being 'manual', or 'admin' from before the TO role, and the rest its /t-o tournament posts switches. reminder: { deadline, next } is its reg reminder progress, next being the
 // index into REG_REMINDER_HOURS. dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for. events are all its events from start.gg. crew is the registered server members who aren't tracked,
 // keyed by user id as { userId, slug, tag }, so cards can name them. lastCheck is when its sets were last checked, the way it is on a player.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
@@ -32,7 +32,7 @@ const FILE = `${stateDir}/state.json`;
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
 // matchmaking is the discord role id of each game's matchmaking role, keyed ult and melee, so a role renamed in server settings still counts
-// discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, from /tournament event, /tournament add
+// discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, from /t-o tournament event, /t-o tournament add
 // with add_event or /messages events, so every path lands on the same one: { eventId, slug, startAt, synced, gone }. synced is start.gg's side
 // as of the last sync, null until one ran, and gone means a mod deleted it, it started or start.gg deleted the tournament, so it's left alone
 // slippi watchlist entries a non-TO added by typed code have discordId, whoever claimed it as theirs

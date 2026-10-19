@@ -54,7 +54,7 @@ function mockStartgg(closesAt, { hidden = false } = {}) {
 
 // records every reply, edit, delete, follow-up and channel message in order. manager is Manage Server, and to
 // whether they have the TO role, which only counts once the server has one
-function interaction(commandName, values, user, send = async () => ({}), { subcommand = null, manager = true, to = null } = {}) {
+function interaction(commandName, values, user, send = async () => ({}), { group = null, subcommand = null, manager = true, to = null } = {}) {
   const calls = [];
   const roles = new Map(to === null ? [] : [['to-role', { id: 'to-role', name: 'TO' }]]);
   return {
@@ -70,7 +70,7 @@ function interaction(commandName, values, user, send = async () => ({}), { subco
     channel: { send: async r => { calls.push(['send', r]); return send(r); } },
     memberPermissions: { has: () => manager },
     options: {
-      getSubcommand: () => subcommand, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null,
+      getSubcommandGroup: () => group, getSubcommand: () => subcommand, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null,
       getUser: () => user, getMember: () => user && { displayName: user.displayName },
     },
     reply: async r => calls.push(['reply', r]),
@@ -199,6 +199,29 @@ test('reg_warn pings someone who is not registered in a channel message, not a f
   assert.doesNotMatch(warning.embeds[0].data.description, /Connect Discord/);
 });
 
+test('reg_warn rotates through a wide set of top lines', async () => {
+  const { regWarning } = await import('../src/embeds/index.js');
+  const realRandom = Math.random;
+  try {
+    // step through every random bucket so each top line shows at least once
+    const seen = new Set();
+    for (let i = 0; i < 100; i++) {
+      Math.random = () => i / 100;
+      seen.add(regWarning(tournament(), now + 3600).data.author.name);
+    }
+    assert.ok(seen.size >= 12, `only ${seen.size} top lines: ${[...seen].join(' | ')}`);
+    assert.ok(seen.has("Registration won't wait for you"));
+    assert.ok(!seen.has("Registration isn't waiting for you"), 'deleted line still in rotation');
+    assert.ok(!seen.has('Last call to get registered'), 'deleted line still in rotation');
+    for (const line of ["Don't be that guy", 'Bruh wya', "You don't have top player privilege to reg late", "reg now and you won't be seeded against steve", 'reg u fool']) {
+      assert.ok(seen.has(line), `missing top line: ${line}`);
+    }
+    for (const line of seen) assert.ok(line.length <= 100, `top line too long: ${line}`);
+  } finally {
+    Math.random = realRandom;
+  }
+});
+
 test('a reminder out after the deadline reads closed, not closes', async () => {
   const { regReminder } = await import('../src/embeds/index.js');
   const late = regReminder(tournament(now - 3600), now - 3600, true).data.description;
@@ -272,13 +295,13 @@ test('reg_warn does not ping once registration closed, or for bots', async () =>
   assert.deepEqual(bot.calls.map(([kind]) => kind), ['reply']);
 });
 
-test('tournament add tracks the tournament with everything on and its reminders set, tracking nobody', async () => {
+test('/t-o tournament add tracks the tournament with everything on and its reminders set, tracking nobody', async () => {
   state.players = {};
   state.tournaments = {};
   // the reminder's own send is covered elsewhere, here it would post to no channel
   state.messages = { registration: false };
   mockStartgg();
-  const run = interaction('tournament', { tournament: 'start.gg/tournament/local' }, undefined, undefined, { subcommand: 'add' });
+  const run = interaction('t-o', { tournament: 'start.gg/tournament/local' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(run);
   assert.deepEqual(state.players, {});
   const tracked = state.tournaments[5];
@@ -294,52 +317,52 @@ test('tournament add tracks the tournament with everything on and its reminders 
   assert.deepEqual(edit[1].allowedMentions, { parse: [] });
 
   // a second time just says so
-  const again = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add' });
+  const again = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(again);
   assert.match(again.calls.find(([kind]) => kind === 'edit')[1].content, /Local is already tracked/);
 });
 
-test('tournament add with reminders off or registration closed still tracks it, without reminders', async () => {
+test('/t-o tournament add with reminders off or registration closed still tracks it, without reminders', async () => {
   state.tournaments = {};
   state.messages = { registration: false };
   mockStartgg();
-  const off = interaction('tournament', { tournament: 'local', reminders: 'off' }, undefined, undefined, { subcommand: 'add' });
+  const off = interaction('t-o', { tournament: 'local', reminders: 'off' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(off);
   assert.equal(state.tournaments[5].tracked.reminders, false);
   assert.match(off.calls.find(([kind]) => kind === 'edit')[1].content, /\nNo reg reminders\./);
 
   state.tournaments = {};
   mockStartgg(now - 60);
-  const closed = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add' });
+  const closed = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(closed);
   assert.ok(state.tournaments[5].tracked);
   assert.match(closed.calls.find(([kind]) => kind === 'edit')[1].content, /Registration is closed, so no reg reminders\./);
 });
 
-test('tournament commands go by the TO role once the server has one, and Manage Server only before then', async () => {
+test('/t-o tournament commands go by the TO role once the server has one, and Manage Server only before then', async () => {
   mockStartgg();
   state.messages = { registration: false };
   state.toRole = { id: null, members: [], seeded: false };
   state.tournaments = {};
-  const run = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add', manager: false, to: true });
+  const run = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'add', manager: false, to: true });
   await handleCommand(run);
   assert.ok(state.tournaments[5].tracked);
 
   // a manager without the role, now that there is one, and someone with neither before there was
   state.tournaments = {};
   for (const options of [{ manager: true, to: false }, { manager: false }]) {
-    const refused = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add', ...options });
+    const refused = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'add', ...options });
     await handleCommand(refused);
-    assert.deepEqual(refused.calls, [['reply', { content: 'Only TOs can track tournaments. `/to list` shows who they are.', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }]]);
+    assert.deepEqual(refused.calls, [['reply', { content: 'Only TOs can track tournaments. `/t-o role list` shows who they are.', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }]]);
   }
   assert.deepEqual(state.tournaments, {});
   // the role's saved, so renaming it in server settings keeps it
   assert.equal(state.toRole.id, 'to-role');
 });
 
-async function autocomplete(commandName, typed, subcommand = null) {
+async function autocomplete(commandName, typed, subcommand = null, group = null) {
   let choices;
-  await handleAutocomplete({ commandName, options: { getSubcommand: () => subcommand, getFocused: () => typed }, respond: async (result) => { choices = result; } });
+  await handleAutocomplete({ commandName, options: { getSubcommandGroup: () => group, getSubcommand: () => subcommand, getFocused: () => typed }, respond: async (result) => { choices = result; } });
   return choices;
 }
 
@@ -362,16 +385,16 @@ test('tournament options offer tracked ones and tracked players\' tournaments, s
   // a pasted link to one it knows shows its name
   assert.deepEqual(await names('registered', 'https://www.start.gg/tournament/live/details'), ['Live Now']);
   // tracking one offers only the ones that aren't tracked or over
-  assert.deepEqual(await names('tournament', '', 'add'), ['Live Now', 'Next Month']);
+  assert.deepEqual((await autocomplete('t-o', '', 'add', 'tournament')).map(({ name }) => name), ['Live Now', 'Next Month']);
   // and untracking or changing one only the tracked ones, over or not
-  assert.deepEqual(await names('tournament', '', 'remove'), ['Last Week', 'Local', 'Admin Weekly']);
-  assert.deepEqual(await names('tournament', 'week', 'posts'), ['Last Week', 'Admin Weekly']);
+  assert.deepEqual((await autocomplete('t-o', '', 'remove', 'tournament')).map(({ name }) => name), ['Last Week', 'Local', 'Admin Weekly']);
+  assert.deepEqual((await autocomplete('t-o', 'week', 'posts', 'tournament')).map(({ name }) => name), ['Last Week', 'Admin Weekly']);
 
   // anything else typed comes back as it is, so a pasted link still goes through
   assert.deepEqual(await autocomplete('registered', ' start.gg/tournament/genesis-x '), [{ name: 'start.gg/tournament/genesis-x', value: 'start.gg/tournament/genesis-x' }]);
   state.tournaments = {};
-  assert.deepEqual(await autocomplete('tournament', '', 'add'), [{ name: 'No tournaments to pick yet, paste a start.gg link', value: 'none' }]);
-  assert.deepEqual(await autocomplete('tournament', '', 'posts'), [{ name: 'No tracked tournaments yet, /tournament add one', value: 'none' }]);
+  assert.deepEqual(await autocomplete('t-o', '', 'add', 'tournament'), [{ name: 'No tournaments to pick yet, paste a start.gg link', value: 'none' }]);
+  assert.deepEqual(await autocomplete('t-o', '', 'posts', 'tournament'), [{ name: 'No tracked tournaments yet, /t-o tournament add one', value: 'none' }]);
 });
 
 test('a picked tournament goes to start.gg by its slug, the same as a pasted link', async () => {

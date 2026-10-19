@@ -187,8 +187,8 @@ export function newTracked(player) {
   return { ...player, lastCheck: secondsNow(), trackedAt: secondsNow(), streamAlerts: false, setResults: false };
 }
 
-// /tournament add, or a reminder from before tournaments were tracked. everything it posts starts on and
-// /tournament posts turns parts off. its sets are looked at from now on, so tracking one partway through
+// /t-o tournament add, or a reminder from before tournaments were tracked. everything it posts starts on and
+// /t-o tournament posts turns parts off. its sets are looked at from now on, so tracking one partway through
 // doesn't flood its thread with what already happened. reminder fills in at the next reminder check
 export function trackTournament(tournament, by, now = secondsNow()) {
   tournament.tracked = { by, at: now, sets: true, stream: true, top8: true, reminders: true };
@@ -199,7 +199,7 @@ export function trackTournament(tournament, by, now = secondsNow()) {
   return tournament;
 }
 
-// whether a tracked tournament has this /tournament posts switch on. untracked ones have none
+// whether a tracked tournament has this /t-o tournament posts switch on. untracked ones have none
 function posting(tournament, kind) {
   return Boolean(tournament?.tracked) && tournament.tracked[kind] !== false;
 }

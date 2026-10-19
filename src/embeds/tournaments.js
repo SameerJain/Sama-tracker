@@ -232,6 +232,21 @@ const WARNINGS = [
   'The registration police have been notified',
   'No reg, no bracket',
   'The bracket isn\'t waiting for you',
+  'Registration won\'t wait for you',
+  'Registration closes with or without you',
+  'The bracket moves on without you',
+  'Your seat isn\'t saved yet',
+  'Don\'t sit this one out',
+  'Your friend sent this warning',
+  'Someone thinks you forgot to reg',
+  'The clock is ticking on reg',
+  'Don\'t let the cap fill without you',
+  'Bracket starts with or without you',
+  'Don\'t be that guy',
+  'Bruh wya',
+  'You don\'t have top player privilege to reg late',
+  'reg now and you won\'t be seeded against steve',
+  'reg u fool',
 ];
 
 // /reg_warn, for someone whose discord isn't on any registration for it

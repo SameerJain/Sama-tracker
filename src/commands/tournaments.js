@@ -13,7 +13,7 @@ import { tournamentNotFound, tournamentSlug } from './registration.js';
 
 const HOUR = 60 * 60;
 
-// /tournament posts switches, named the way the replies list them
+// /t-o tournament posts switches, named the way the replies list them
 const POSTS = { sets: 'Every set', stream: 'Stream alerts', top8: 'Top 8s', reminders: 'Reg reminders' };
 
 // 7 days, 3 days, 1 day and 6 hours
@@ -45,7 +45,7 @@ function threadWarning(interaction) {
   return null;
 }
 
-// tracks a tournament from getRegistration by hand for /tournament add, and says what that set up. one
+// tracks a tournament from getRegistration by hand for /t-o tournament add, and says what that set up. one
 // already tracked keeps its switches and reminder schedule
 function trackLines(interaction, found, reminders, now = secondsNow()) {
   const name = escapeMarkdown(found.name);
@@ -73,11 +73,11 @@ function trackLines(interaction, found, reminders, now = secondsNow()) {
   }
   const warning = threadWarning(interaction);
   if (warning) lines.push(warning);
-  lines.push('-# `/tournament posts` turns any of it off');
+  lines.push('-# `/t-o tournament posts` turns any of it off');
   return lines;
 }
 
-// /tournament is TOs only. discord shows it to everyone, since the TO role is the bot's to check
+// /t-o tournament is TOs only. discord shows it to everyone, since the TO role is the bot's to check
 async function tournamentAdd(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'track tournaments');
   const input = interaction.options.getString('tournament', true).trim();
@@ -92,7 +92,7 @@ async function tournamentAdd(interaction) {
   if (now > endTime(found) + RUNS_LATE_HOURS * HOUR) return interaction.editReply({ content: `${name} is already over.`, allowedMentions: { parse: [] } });
   // with add_event it still makes the event
   if (state.tournaments[found.id]?.tracked && !addEvent) {
-    return interaction.editReply({ content: `${name} is already tracked. \`/tournament posts\` changes what it posts.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: `${name} is already tracked. \`/t-o tournament posts\` changes what it posts.`, allowedMentions: { parse: [] } });
   }
 
   const lines = trackLines(interaction, found, reminders, now);
@@ -115,7 +115,7 @@ function tournamentRemove(interaction) {
 }
 
 confirmable('untrack_tournament', {
-  command: '/tournament remove',
+  command: '/t-o tournament remove',
   run: (id) => {
     const tournament = state.tournaments[id];
     if (!tournament?.tracked) return { content: 'It isn\'t tracked anymore.' };
@@ -130,13 +130,13 @@ confirmable('untrack_tournament', {
   undo: (kept) => {
     const tournament = state.tournaments[kept.id];
     // its placements went out and it got cleared in the minute since, which the next check would redo anyway
-    if (!tournament) return 'Too late to undo, it\'s over. `/tournament add` it again.';
+    if (!tournament) return 'Too late to undo, it\'s over. `/t-o tournament add` it again.';
     if (tournament.tracked) return `${escapeMarkdown(tournament.name)} is already tracked again.`;
     Object.assign(tournament, { tracked: kept.tracked, reminder: kept.reminder, crew: kept.crew });
     save();
     return `Tracking ${escapeMarkdown(tournament.name)} again, with the same settings as before.`;
   },
-  tooLate: 'Too late to undo. `/tournament add` it again.',
+  tooLate: 'Too late to undo. `/t-o tournament add` it again.',
 });
 
 // with no switches it says what's on. sets turned back on start from now, the way a newly tracked tournament does,
@@ -144,7 +144,7 @@ confirmable('untrack_tournament', {
 function tournamentPosts(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'change what tournaments post');
   const tournament = trackedPick(interaction);
-  if (!tournament) return replyEphemeral(interaction, 'That tournament isn\'t tracked. `/tournament add` it first.');
+  if (!tournament) return replyEphemeral(interaction, 'That tournament isn\'t tracked. `/t-o tournament add` it first.');
   const changes = {};
   for (const name of Object.keys(POSTS)) {
     const value = interaction.options.getString(name);
@@ -176,7 +176,7 @@ async function eventLines(interaction, found) {
     : [`${name} already has a Discord event: ${result.url}`];
 }
 
-// /tournament event: paste a start.gg link, get a discord event. it doesn't track the tournament, /tournament add
+// /t-o tournament event: paste a start.gg link, get a discord event. it doesn't track the tournament, /t-o tournament add
 // does that. the event follows start.gg's time and place from then on, see syncDiscordEvents
 async function tournamentEvent(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'make Discord events');

@@ -74,7 +74,7 @@ export function cantMakeEvents(guild) {
 const eventUrl = (guild, event) => event.url ?? `https://discord.com/events/${guild.id ?? ''}/${event.id}`;
 
 // the discord event for a tournament from getRegistration, made or found: { url, isNew }, or { error } to
-// show. the saved id goes first, then the start.gg link in a description, so /tournament event, add_event:on
+// show. the saved id goes first, then the start.gg link in a description, so /t-o tournament event, add_event:on
 // and /messages events land on the same one. the id gets saved either way, for the sync and so a deleted
 // event isn't made again
 export async function ensureDiscordEvent(found, guild) {

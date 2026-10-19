@@ -25,8 +25,8 @@ export { commands } from './definitions.js';
 const TRACKED_ONLY = ['track remove', 'track posts'];
 // all means everyone tracked
 const TAKES_ALL = ['upcoming', 'recent', 'track posts'];
-// a tournament link, or one the bot already knows. new is the ones /tournament add can still track, tracked the ones it does
-const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', 'tournament event': 'known', registered: 'known', reg_warn: 'known' };
+// a tournament link, or one the bot already knows. new is the ones /t-o tournament add can still track, tracked the ones it does
+const TAKES_TOURNAMENT = { 't-o tournament add': 'new', 't-o tournament remove': 'tracked', 't-o tournament posts': 'tracked', 't-o tournament event': 'known', registered: 'known', reg_warn: 'known' };
 
 // "track add", or just the command for the ones without subcommands. a subcommand group would go in the middle
 function commandName(interaction) {
@@ -45,10 +45,10 @@ const handlers = new Map([
   ['track remove', trackRemove],
   ['track list', (interaction) => sendEmbeds(interaction, embeds.trackedList(state.players, Object.keys(pickable()).length - Object.keys(state.players).length, state.tournaments))],
   ['track posts', trackPosts],
-  ['track cleanup', trackCleanup],
-  ['to add', toAdd],
-  ['to remove', toRemove],
-  ['to list', toList],
+  ['t-o cleanup', trackCleanup],
+  ['t-o role add', toAdd],
+  ['t-o role remove', toRemove],
+  ['t-o role list', toList],
   ['notify', notify],
   ['matchmaking_role', matchmakingRole],
   ['matchmaking_search', matchmakingSearch],
@@ -71,10 +71,10 @@ const handlers = new Map([
   ['slippi rank', slippiRank],
   ['slippi leaderboard', slippiLeaderboard],
   ['status', status],
-  ['tournament add', tournamentAdd],
-  ['tournament remove', tournamentRemove],
-  ['tournament posts', tournamentPosts],
-  ['tournament event', tournamentEvent],
+  ['t-o tournament add', tournamentAdd],
+  ['t-o tournament remove', tournamentRemove],
+  ['t-o tournament posts', tournamentPosts],
+  ['t-o tournament event', tournamentEvent],
   ['bracket', bracket],
   ['stream_link', streamLink],
   ['registered', registered],

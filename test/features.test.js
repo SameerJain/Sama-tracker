@@ -24,7 +24,7 @@ function mockApi(respond) {
 }
 
 const crewPlayer = { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active' };
-// a tournament tracked by hand with everything on, the way /tournament add leaves it
+// a tournament tracked by hand with everything on, the way /t-o tournament add leaves it
 const tracked = { by: 'manual', at: 0, sets: true, stream: true, top8: true, reminders: true };
 const event = { name: 'Singles', slug: 'tournament/local/event/singles', startAt: 150, numEntrants: 32,
   videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'Local' } };

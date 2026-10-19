@@ -130,31 +130,79 @@ export const commands = [
           switchOption('stream', 'Their sets on stream or up next in the stream queue'),
         ],
       },
-      {
-        type: Option.Subcommand,
-        name: 'cleanup',
-        description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. TOs only',
-        options: [{ type: Option.Boolean, name: 'no_discord', description: 'Also untrack players with no Discord connected on start.gg' }],
-      },
     ],
   },
   {
-    name: 'to',
-    description: 'TOs, who can change tracking for anyone and run /tournament. Only TOs add or remove TOs',
+    name: 't-o',
+    description: 'T.O. tools for roles, tournament tracking and track-list cleanup',
     options: [
       {
-        type: Option.Subcommand,
-        name: 'add',
-        description: 'Give someone the TO role. TOs only',
-        options: [{ type: Option.User, name: 'user', description: 'Server member', required: true }],
+        type: Option.SubcommandGroup,
+        name: 'role',
+        description: 'T.O. role members',
+        options: [
+          {
+            type: Option.Subcommand,
+            name: 'add',
+            description: 'Give someone the T.O. role. T.O.s only',
+            options: [{ type: Option.User, name: 'user', description: 'Server member', required: true }],
+          },
+          {
+            type: Option.Subcommand,
+            name: 'remove',
+            description: 'Take the T.O. role off someone, or yourself. T.O.s only',
+            options: [{ type: Option.User, name: 'user', description: 'A T.O.', required: true }],
+          },
+          { type: Option.Subcommand, name: 'list', description: 'Who the T.O.s are' },
+        ],
+      },
+      {
+        type: Option.SubcommandGroup,
+        name: 'tournament',
+        description: 'T.O. tournament tools',
+        options: [
+          {
+            type: Option.Subcommand,
+            name: 'add',
+            description: 'Track every set, stream alert and top 8, plus registration reminders',
+            options: [
+              { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
+              switchOption('reminders', 'Reg reminders for people with /notify registration on. On unless you turn them off'),
+              switchOption('add_event', 'Also make a Discord event from it. Off unless you turn it on'),
+            ],
+          },
+          {
+            type: Option.Subcommand,
+            name: 'remove',
+            description: 'Stop tracking a tournament. Asks first, then Undo puts it back for a minute',
+            options: [{ type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true }],
+          },
+          {
+            type: Option.Subcommand,
+            name: 'posts',
+            description: 'What a tracked tournament posts, on or off. Leave them all out to see them',
+            options: [
+              { type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true },
+              switchOption('sets', 'Every finished set, whoever played'),
+              switchOption('stream', 'Every set on stream or up next in the stream queue'),
+              switchOption('top8', 'Each event\'s top 8 once the bracket is finished'),
+              switchOption('reminders', 'Reg reminders for people with /notify registration on'),
+            ],
+          },
+          {
+            type: Option.Subcommand,
+            name: 'event',
+            description: 'Make a Discord event without tracking it. It follows start.gg\'s time and place',
+            options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
+          },
+        ],
       },
       {
         type: Option.Subcommand,
-        name: 'remove',
-        description: 'Take the TO role off someone, or yourself. TOs only',
-        options: [{ type: Option.User, name: 'user', description: 'A TO', required: true }],
+        name: 'cleanup',
+        description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. T.O.s only',
+        options: [{ type: Option.Boolean, name: 'no_discord', description: 'Also untrack players with no Discord connected on start.gg' }],
       },
-      { type: Option.Subcommand, name: 'list', description: 'Who the TOs are' },
     ],
   },
   {
@@ -304,47 +352,6 @@ export const commands = [
     ],
   },
   { name: 'status', description: 'Uptime, when the latest version was deployed, and the last start.gg and Slippi checks' },
-  // no default_member_permissions: the TO role decides, and discord can't be told about a role the bot checks
-  {
-    name: 'tournament',
-    description: 'Tracked tournaments: every set, stream alert and top 8 post here, plus reg reminders. TOs only',
-    options: [
-      {
-        type: Option.Subcommand,
-        name: 'add',
-        description: 'Track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders',
-        options: [
-          { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
-          switchOption('reminders', 'Reg reminders for people with /notify registration on. On unless you turn them off'),
-          switchOption('add_event', 'Also make a Discord event from it. Off unless you turn it on'),
-        ],
-      },
-      {
-        type: Option.Subcommand,
-        name: 'remove',
-        description: 'Stop tracking a tournament. Asks first, then Undo puts it back for a minute',
-        options: [{ type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true }],
-      },
-      {
-        type: Option.Subcommand,
-        name: 'posts',
-        description: 'What a tracked tournament posts, on or off. Leave them all out to see them',
-        options: [
-          { type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true },
-          switchOption('sets', 'Every finished set, whoever played'),
-          switchOption('stream', 'Every set on stream or up next in the stream queue'),
-          switchOption('top8', 'Each event\'s top 8 once the bracket is finished'),
-          switchOption('reminders', 'Reg reminders for people with /notify registration on'),
-        ],
-      },
-      {
-        type: Option.Subcommand,
-        name: 'event',
-        description: 'Make a Discord event from a start.gg link, without tracking it. It follows start.gg\'s time and place',
-        options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
-      },
-    ],
-  },
   { name: 'bracket', description: 'Bracket links for tracked tournaments, 30 min before start to 6 hours after the end' },
   { name: 'stream_link', description: 'Stream links for tournaments that are tracked or have tracked players, live or starting soon' },
   {

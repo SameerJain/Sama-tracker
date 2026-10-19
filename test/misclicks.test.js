@@ -269,11 +269,11 @@ test('an event named for Melee but tagged as Ultimate counts as Melee, and the o
 });
 
 // a slash command run by someone with Manage Server, recording what it answers
-function command(commandName, { subcommand = null, values = {}, user = 'runner' } = {}) {
+function command(commandName, { group = null, subcommand = null, values = {}, user = 'runner' } = {}) {
   const calls = [];
   const run = {
     calls, commandName, user: { id: user }, memberPermissions: { has: () => true },
-    options: { getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null, getInteger: () => null },
+    options: { getSubcommandGroup: () => group, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null, getInteger: () => null },
     reply: async (result) => calls.push(['reply', result]),
     deferReply: async () => { run.deferred = true; },
     editReply: async (result) => calls.push(['edit', result]),
@@ -411,7 +411,7 @@ test('/track posts for everyone off and /tournament remove ask first, and /track
   // Undo puts back its switches and reminder progress
   const switches = { by: 'manual', at: now, sets: true, stream: true, top8: true, reminders: true };
   state.tournaments = { 6: { id: 6, slug: 'tournament/soon', name: 'Soon', entries: [], userIds: [], tracked: switches, reminder: { next: 1 } } };
-  const remove = command('tournament', { subcommand: 'remove', values: { tournament: 'soon' } });
+  const remove = command('t-o', { group: 'tournament', subcommand: 'remove', values: { tournament: 'soon' } });
   await handleCommand(remove);
   const question = remove.calls[0][1];
   assert.equal(question.content, 'Stop tracking Soon? Its sets, stream alerts, top 8s and reg reminders stop.');
@@ -428,14 +428,14 @@ test('/track posts for everyone off and /tournament remove ask first, and /track
   assert.deepEqual(state.tournaments[6].reminder, { next: 1 });
 });
 
-test('/track cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {
+test('/t-o cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {
   state.players = {
     1: { ...crew },
     2: { userId: 2, playerId: 20, tag: 'Away', slug: 'user/away', discordId: 'away-discord' },
     3: { userId: 3, playerId: 30, tag: 'Unknown', slug: 'user/unknown' },
   };
   const cleanup = async (values = {}) => {
-    const run = command('track', { subcommand: 'cleanup', values });
+    const run = command('t-o', { subcommand: 'cleanup', values });
     run.guild = { members: { fetch: async ({ user: ids }) => new Map(ids.filter((id) => id === 'crew-discord').map((id) => [id, {}])) } };
     await handleCommand(run);
     return run.calls.find(([kind]) => kind === 'edit')[1];
@@ -462,10 +462,10 @@ test('/track cleanup untracks players whose start.gg discord is not in the serve
   assert.equal((await cleanup()).content, 'Everyone tracked has their start.gg Discord in this server.');
 
   // it untracks other people, so someone who isn't a TO is turned away before it looks
-  const refused = command('track', { subcommand: 'cleanup' });
+  const refused = command('t-o', { subcommand: 'cleanup' });
   refused.memberPermissions = { has: () => false };
   await handleCommand(refused);
-  assert.equal(refused.calls[0][1].content, 'Only TOs can clean up the track list. `/to list` shows who they are.');
+  assert.equal(refused.calls[0][1].content, 'Only TOs can clean up the track list. `/t-o role list` shows who they are.');
 });
 
 test('a name that matches nobody suggests the closest tracked, linked or watchlisted one', async () => {

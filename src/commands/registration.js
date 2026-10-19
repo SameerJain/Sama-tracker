@@ -25,7 +25,7 @@ function tournamentNotFound(input) {
 }
 
 // autocomplete, so nobody has to paste a link for a tournament the bot already knows: tracked ones and ones
-// tracked players are in, soonest first. only says which: new is the ones /tournament add can still track, tracked
+// tracked players are in, soonest first. only says which: new is the ones /t-o tournament add can still track, tracked
 // the ones it already does. a pasted link of one of them shows its name, and anything else typed is offered back as it is
 function tournamentChoices(typed, { only = 'known' } = {}) {
   const now = secondsNow();
@@ -44,7 +44,7 @@ function tournamentChoices(typed, { only = 'known' } = {}) {
   if (choices.length) return choices.slice(0, 25);
   // picking the empty one gets the not found reply
   if (!search) {
-    return [{ name: only === 'tracked' ? 'No tracked tournaments yet, /tournament add one' : 'No tournaments to pick yet, paste a start.gg link', value: 'none' }];
+    return [{ name: only === 'tracked' ? 'No tracked tournaments yet, /t-o tournament add one' : 'No tournaments to pick yet, paste a start.gg link', value: 'none' }];
   }
   return [{ name: typed.trim().slice(0, 100), value: typed.trim().slice(0, 100) }];
 }

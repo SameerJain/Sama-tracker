@@ -370,8 +370,8 @@ test('/track posts lets anyone change their own and only TOs change someone else
   // someone else's, by someone who isn't a TO, changes nothing
   const refused = await run('track', 'someone', { player: '1', sets: 'on' }, 'posts');
   assert.ok(refused.flags);
-  assert.equal(refused.content, 'Only TOs can change someone else\'s posts. Leave out `player` to change yours. `/to list` shows who they are.');
-  assert.equal((await run('track', 'someone', { player: 'all', sets: 'on' }, 'posts')).content, 'Only TOs can change everyone\'s posts. `/to list` shows who they are.');
+  assert.equal(refused.content, 'Only TOs can change someone else\'s posts. Leave out `player` to change yours. `/t-o role list` shows who they are.');
+  assert.equal((await run('track', 'someone', { player: 'all', sets: 'on' }, 'posts')).content, 'Only TOs can change everyone\'s posts. `/t-o role list` shows who they are.');
   assert.equal(state.players[1].setResults, false);
 
   // their own, left out or picked, by the discord on their start.gg or their /link
@@ -466,7 +466,7 @@ test('/track add and remove let anyone track or untrack themselves, and only TOs
 
   // untracking: someone else can't, they can, left out or by name
   const blocked = await run('track', 'someone', { player: '8' }, 'remove');
-  assert.equal(blocked.content, 'Only TOs can untrack someone else. Leave out `player` to untrack yourself. `/to list` shows who they are.');
+  assert.equal(blocked.content, 'Only TOs can untrack someone else. Leave out `player` to untrack yourself. `/t-o role list` shows who they are.');
   assert.match((await run('track', 'new-discord', {}, 'remove')).content, /^Stop tracking New\?/);
   assert.match((await run('track', 'to-discord', { player: '8' }, 'remove')).content, /^Stop tracking New\?/);
   assert.equal((await run('track', 'someone', {}, 'remove')).content, 'You aren\'t tracked. `/track add` tracks you.');

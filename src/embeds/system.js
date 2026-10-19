@@ -2,7 +2,7 @@ import { escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
 import { colors, FOOTER, baseEmbed, withLines, withSections, playerLink, count } from './shared.js';
 
-// /tournament posts switches a tracked tournament can have off, named for the list
+// /t-o tournament posts switches a tracked tournament can have off, named for the list
 const TOURNAMENT_POSTS = { sets: 'sets off', stream: 'stream alerts off', top8: 'top 8s off', reminders: 'reg reminders off' };
 
 // tracked players, then tracked tournaments that aren't over. linked is how many people linked their own start.gg without being tracked
@@ -15,7 +15,7 @@ export function trackedList(players, linked = 0, tournaments = {}) {
     return notes.length ? `${playerLink(player)} · ${notes.join(' · ')}` : playerLink(player);
   });
   if (!all.length) lines.push('Nobody yet. `/track add` tracks you.');
-  lines.push('', '-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Anyone can track or untrack themselves, and TOs can do it for anyone. Players with no reported sets in 6 months come off the list on their own, and `/track cleanup` untracks anyone whose start.gg Discord isn\'t in this server. `/link` your own start.gg instead to use the lookups without being posted');
+  lines.push('', '-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Anyone can track or untrack themselves, and TOs can do it for anyone. Players with no reported sets in 6 months come off the list on their own, and `/t-o cleanup` untracks anyone whose start.gg Discord isn\'t in this server. `/link` your own start.gg instead to use the lookups without being posted');
   if (linked) lines.push(`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
 
   // only what's off, since everything starts on
@@ -26,19 +26,19 @@ export function trackedList(players, linked = 0, tournaments = {}) {
     const when = tournament.startAt ? ` · <t:${tournament.startAt}:d>` : '';
     return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
   });
-  if (!tracked.length) tournamentLines.push('None yet. A TO can track one with `/tournament add`.');
-  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders. TOs change that with `/tournament posts`');
+  if (!tracked.length) tournamentLines.push('None yet. A TO can track one with `/t-o tournament add`.');
+  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders. TOs change that with `/t-o tournament posts`');
   return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(`Tracked tournaments · ${tracked.length}`), tournamentLines)];
 }
 
-// /to list. tos are discord ids, shown as mentions, which never ping from a card. role is the role's name in
+// /t-o role list. tos are discord ids, shown as mentions, which never ping from a card. role is the role's name in
 // the server, null when it hasn't been made yet
 export function toList(tos, role) {
   const embed = baseEmbed(colors.brand).setTitle(`TOs · ${tos.length}`);
   const lines = role
     ? (tos.length ? tos.map((id) => `<@${id}>`) : ['Nobody the bot has seen yet.'])
-    : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/to add` makes the role.'];
-  lines.push('', '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and run `/tournament` and `/track cleanup`. TOs add and remove each other with `/to add` and `/to remove`');
+    : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role.'];
+  lines.push('', '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
   if (role) lines.push(`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
   return embed.setDescription(lines.join('\n'));
 }
@@ -135,7 +135,7 @@ export function help() {
       '`/track remove` stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back with their settings for a minute',
       '`/track list` everyone tracked, and the tracked tournaments',
       '`/track posts` your set results and stream alerts on or off. TOs can change anyone\'s, or everyone\'s with `player:all`, which asks first. Anyone can look',
-      '`/track cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. TOs only',
+      '`/t-o cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. T.O.s only',
       '`/upcoming` tracked tournaments, and any other with 3 or more of the crew. `player:` checks one person, live from start.gg when linked but not tracked',
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
@@ -144,10 +144,10 @@ export function help() {
     ],
     [
       '**TOs**',
-      '`/to add` give someone the TO role. TOs only',
-      '`/to remove` take the TO role off someone. TOs only',
-      '`/to list` who the TOs are',
-      '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and run `/tournament` and `/track cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
+      '`/t-o role add` give someone the TO role. T.O.s only',
+      '`/t-o role remove` take the TO role off someone. T.O.s only',
+      '`/t-o role list` who the TOs are',
+      '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
     ],
     [
       '**Your pings**',
@@ -194,15 +194,15 @@ export function help() {
     ],
     [
       '**Tournaments**',
-      '`/tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `add_event:on` also makes a Discord event',
-      '`/tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute',
-      '`/tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off',
+      '`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `add_event:on` also makes a Discord event',
+      '`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute',
+      '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off',
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
       '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours',
       '`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end',
       '`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min',
-      '`/tournament event` make a Discord event from a start.gg link, without tracking it',
-      '-# `/tournament` is TOs only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time and place, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map',
+      '`/t-o tournament event` make a Discord event from a start.gg link, without tracking it',
+      '-# `/t-o tournament` is T.O.s only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time and place, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map',
     ],
     [
       '**Fun**',

@@ -104,8 +104,8 @@ function fakeGuild({ events = null, guildId = 'guild-1', allowed = true, roles =
 const TO_ROLE = { id: 'to-role', name: 'TO' };
 
 // manager is Manage Server, and to whether they have the TO role, which only counts once the server has one.
-// /tournament event by default, or another /tournament subcommand
-function interaction(values, { user = 'crew-discord', manager = true, to = null, events = null, command = 'tournament', subcommand = 'event' } = {}) {
+// /t-o tournament event by default, or another /t-o tournament subcommand
+function interaction(values, { user = 'crew-discord', manager = true, to = null, events = null, command = 't-o', group = 'tournament', subcommand = 'event' } = {}) {
   const calls = [];
   const { guild, created } = fakeGuild({ events, roles: new Map(to === null ? [] : [[TO_ROLE.id, TO_ROLE]]) });
   const run = {
@@ -115,7 +115,7 @@ function interaction(values, { user = 'crew-discord', manager = true, to = null,
     guild,
     member: { roles: { cache: new Set(to ? [TO_ROLE.id] : []) } },
     memberPermissions: { has: () => manager },
-    options: { getSubcommandGroup: () => null, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null },
+    options: { getSubcommandGroup: () => group, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null },
     reply: async (result) => calls.push(['reply', result]),
     deferReply: async () => { run.deferred = true; calls.push(['defer']); },
     editReply: async (result) => calls.push(['edit', result]),
@@ -173,7 +173,7 @@ test('once the server has a TO role, a TO without Manage Server makes one, and M
   await handleCommand(run);
   assert.equal(run.created.length, 1);
   assert.match(edited(run).content, /Made a Discord event for Soon/);
-  // whoever used it with the role is remembered for /to list
+  // whoever used it with the role is remembered for /t-o role list
   assert.deepEqual(state.toRole.members, ['to-discord']);
 
   const manager = interaction({ tournament: 'start.gg/tournament/soon' }, { user: 'manager-discord', manager: true, to: false });
@@ -190,7 +190,7 @@ test('anyone else is told privately, with no lookup', async () => {
   assert.deepEqual(asked, []);
   const [[kind, reply]] = lone.calls;
   assert.equal(kind, 'reply');
-  assert.match(reply.content, /^Only TOs can make Discord events\. `\/to list` shows who they are\.$/);
+  assert.match(reply.content, /^Only TOs can make Discord events\. `\/t-o role list` shows who they are\.$/);
   assert.equal(reply.flags, MessageFlags.Ephemeral);
 });
 
@@ -240,7 +240,7 @@ test('missing manage events permission says so instead of throwing', async () =>
   assert.match(edited(run).content, /Manage Events/);
 });
 
-test('making an event leaves tracking to /tournament add', async () => {
+test('making an event leaves tracking to /t-o tournament add', async () => {
   await reset();
   const run = interaction({ tournament: 'start.gg/tournament/soon' });
   await handleCommand(run);
@@ -271,14 +271,14 @@ test('an event for an already tracked tournament keeps its switches and saves th
 
 test('adding with add_event makes the event, without it does not', async () => {
   await reset();
-  const plain = interaction({ tournament: 'start.gg/tournament/soon' }, { command: 'tournament', subcommand: 'add' });
+  const plain = interaction({ tournament: 'start.gg/tournament/soon' }, { subcommand: 'add' });
   await handleCommand(plain);
   assert.equal(plain.created.length, 0);
   assert.ok(state.tournaments[6].tracked);
   assert.match(edited(plain).content, /Tracking Soon/);
 
   await reset();
-  const flagged = interaction({ tournament: 'start.gg/tournament/soon', add_event: 'on' }, { command: 'tournament', subcommand: 'add' });
+  const flagged = interaction({ tournament: 'start.gg/tournament/soon', add_event: 'on' }, { subcommand: 'add' });
   await handleCommand(flagged);
   assert.equal(flagged.created.length, 1);
   assert.ok(state.tournaments[6].tracked);
@@ -288,14 +288,14 @@ test('adding with add_event makes the event, without it does not', async () => {
   assert.match(reply.content, /Made a Discord event for Soon/);
 });
 
-test('/tournament event then add_event lands on the same event, and only the add tracks', async () => {
+test('/t-o tournament event then add_event lands on the same event, and only the add tracks', async () => {
   await reset();
   const store = new Map();
   const first = interaction({ tournament: 'start.gg/tournament/soon' }, { events: store });
   await handleCommand(first);
   assert.equal(first.created.length, 1);
   assert.deepEqual(state.tournaments, {});
-  const second = interaction({ tournament: 'start.gg/tournament/soon', add_event: 'on' }, { command: 'tournament', subcommand: 'add', events: store });
+  const second = interaction({ tournament: 'start.gg/tournament/soon', add_event: 'on' }, { subcommand: 'add', events: store });
   await handleCommand(second);
   assert.equal(second.created.length, 0);
   const reply = edited(second);
