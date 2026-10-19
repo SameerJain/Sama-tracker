@@ -79,15 +79,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   } catch (err) {
     console.error(err);
+    // error text comes from start.gg and friends, so it never gets to ping
     const message = `Something went wrong: ${err.message}`;
     if (button) {
       await buttonFailed(interaction, message).catch(console.error);
     } else if (interaction.replied) {
-      await interaction.followUp({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);
+      await interaction.followUp({ content: message, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }).catch(console.error);
     } else if (interaction.deferred) {
-      await interaction.editReply(message).catch(console.error);
+      await interaction.editReply({ content: message, allowedMentions: { parse: [] } }).catch(console.error);
     } else {
-      await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(console.error);
+      await interaction.reply({ content: message, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }).catch(console.error);
     }
   }
 });

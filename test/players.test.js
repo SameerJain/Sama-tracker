@@ -79,7 +79,8 @@ test('leaving the player out looks up whoever ran it, from /link or a tracked di
 });
 
 test('stats asks start.gg for Melee standings only when the game option is enabled', async () => {
-  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  // fresh playerId so the short /stats cache from earlier tests doesn't answer instead of start.gg
+  state.players = { 1: { ...crew, playerId: 12, discordId: 'crew-discord' } };
   state.links = {};
   const requests = [];
   mockApi(({ variables }) => { requests.push(variables); return noStats(); });
@@ -555,7 +556,8 @@ test('h2h melee and verbose combine: splits and streaks come from the Melee sets
 });
 
 test('/h2h venue and since leave out online sets and old ones, and name the filters', async () => {
-  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: b };
+  // fresh ids since the history caches outlive the test and earlier h2h runs used 10 and 20
+  state.players = { 71: { ...crew, userId: 71, playerId: 71, discordId: 'crew-discord' }, 72: { ...b, userId: 72, playerId: 72 } };
   state.links = {};
   const now = Math.floor(Date.now() / 1000);
   const ULTIMATE = { id: 1386, displayName: 'Ultimate' };
@@ -564,13 +566,13 @@ test('/h2h venue and since leave out online sets and old ones, and name the filt
   const nodes = specs.map(([id, ago, online, won]) => ({
     id, completedAt: now - ago, fullRoundText: 'Winners Final', winnerId: won ? 1 : 2,
     event: { slug: `tournament/t${id}/event/singles`, videogame: ULTIMATE, tournament: { name: `T${id}`, isOnline: online } },
-    slots: [[1, 10, 'Crew'], [2, 20, 'B']].map(([entrant, player, name]) => ({ entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] }, standing: null })),
+    slots: [[1, 71, 'Crew'], [2, 72, 'B']].map(([entrant, player, name]) => ({ entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] }, standing: null })),
   }));
   mockApi(({ query }) => {
     if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
     return { player: { sets: { pageInfo: { totalPages: 1 }, nodes } } };
   });
-  const title = async (values) => (await run('h2h', 'crew-discord', { opponent: '2', ...values })).embeds[0].data;
+  const title = async (values) => (await run('h2h', 'crew-discord', { opponent: '72', ...values })).embeds[0].data;
   // date granularity is days, so these land on whole days whatever time it is
   const day = (ago) => new Date((now - ago) * 1000).toISOString().slice(0, 10);
   const plain = await title({});

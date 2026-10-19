@@ -193,8 +193,9 @@ async function editPost(postChannel, { channelId, messageId }, payload) {
   }
 }
 
-// discord ids are snowflakes. anything else is a bad start.gg value, and it stays out instead of going in as text
-const mentions = (discordIds) => discordIds.filter((id) => /^\d+$/.test(String(id))).map((id) => `<@${id}>`).join(' ');
+// ids only ever form a mention. anything with mention syntax in it stays out instead of going in as text
+const mentionable = (id) => Boolean(id) && /^[\w-]+$/.test(String(id));
+const mentions = (discordIds) => discordIds.filter(mentionable).map((id) => `<@${id}>`).join(' ');
 
 const checkSets = queued(async () => {
   await postNewSets();
@@ -515,7 +516,8 @@ async function sendPinging(postChannel, type, ids, text, embed, components = [])
   let first;
   for (let i = 0; i === 0 || i < ids.length; i += MENTIONS_PER_MESSAGE) {
     if (i > 0 && !messageEnabled(type)) break;
-    const users = ids.slice(i, i + MENTIONS_PER_MESSAGE);
+    // ping lists come from discord, but the filter stays here so no caller can pass mention syntax through
+    const users = ids.slice(i, i + MENTIONS_PER_MESSAGE).filter(mentionable);
     const sent = await postChannel.send({
       content: users.length ? `${mentions(users)} ${text}` : undefined,
       embeds: i === 0 ? embeds.withImage([embed]) : [],
@@ -607,8 +609,8 @@ export async function postMatchCalls(postChannel = channel) {
       const inSet = players.filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
       if (!inSet.length) continue;
       if (messageEnabled('calls', set.updatedAt)) {
-        // discord ids come from start.gg, so only snowflakes get to ping
-        const discordIds = [...new Set(inSet.map((player) => player.discordId).filter((id) => /^\d+$/.test(String(id))))];
+        // discord ids come from start.gg, so anything with mention syntax stays out
+        const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(mentionable))];
         const components = h2hRow(set);
         const sent = await postChannel.send({
           content: discordIds.length ? `${mentions(discordIds)} your match was called` : undefined,
@@ -662,7 +664,7 @@ export async function followCalls(postChannel = channel) {
         each.warned = true;
         save();
         if (messageEnabled('calls', each.calledAt + CALL_WARN_MINUTES * 60)) {
-          const users = each.discordIds.filter((id) => /^\d+$/.test(String(id)));
+          const users = each.discordIds.filter(mentionable);
           await postChannel.send({
             content: `${mentions(each.discordIds)} called ${minutes} min ago, TOs usually DQ at ${CALL_DQ_MINUTES}`,
             reply: { messageReference: each.messageId, failIfNotExists: false },

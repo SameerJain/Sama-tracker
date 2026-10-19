@@ -37,18 +37,32 @@ test('message controls are registered for server managers', () => {
   assert.ok([threads.description, ...threads.choices.map(c => c.name)].every(text => text.length <= 100));
 });
 
+test('status answers where everyone sees it', async () => {
+  let reply;
+  await handleCommand({
+    commandName: 'status',
+    options: { getSubcommand: () => null },
+    client: { user: { displayAvatarURL: () => 'https://cdn.example/avatar.png' } },
+    reply: async (result) => { reply = result; },
+  });
+  assert.match(JSON.stringify(reply.embeds), /Status/);
+  assert.equal(reply.flags, undefined);
+});
+
 test('only managers can change settings', async () => {
   state.messages = {};
   const reply = await configure({ sets: false }, false);
   assert.match(reply.content, /Manage Server/);
+  assert.ok(reply.flags);
   assert.deepEqual(state.messages, {});
 });
 
-test('message switches and recap schedule save immediately and return private settings', async (t) => {
+test('message switches and recap schedule save immediately and answer where everyone sees them', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
   const reply = await configure({ sets: false, streams: false, recap_day: 0, recap_time: '18:30', timezone: 'America/Los_Angeles' });
-  assert.ok(reply.flags);
+  assert.equal(reply.flags, undefined);
+  assert.deepEqual(reply.allowedMentions, { parse: [] });
   assert.match(reply.content, /Set results:\*\* off/);
   assert.match(reply.content, /Sunday 18:30 PST/);
   const saved = JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).messages;
@@ -64,6 +78,7 @@ test('invalid schedules do not partially apply accompanying switches', async () 
     state.messages = {};
     const reply = await configure({ sets: false, ...invalid });
     assert.match(reply.content, /HH:MM|timezone/i);
+    assert.ok(reply.flags);
     assert.deepEqual(state.messages, {});
   }
 });
@@ -72,6 +87,7 @@ test('running messages without options shows defaults without writing settings',
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
   const reply = await configure();
+  assert.equal(reply.flags, undefined);
   assert.match(reply.content, /Set results:\*\* on/);
   assert.match(reply.content, /Match call pings:\*\* off/);
   assert.match(reply.content, /Top 8s:\*\* off/);

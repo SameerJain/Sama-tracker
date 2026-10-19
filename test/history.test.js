@@ -13,7 +13,7 @@ delete process.env.ANTHROPIC_API_KEY;
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
 const { state } = await import('../src/store.js');
 const { handleCommand } = await import('../src/commands/index.js');
-const { setHistory } = await import('../src/commands/history.js');
+const { setHistory, h2hHistory, statsHistory } = await import('../src/commands/history.js');
 const startgg = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -39,6 +39,17 @@ function fakeStartgg(pages, { fail = () => false, newest = () => 0 } = {}) {
     if (query.includes('user(id:') && query.includes('authorizations')) data = { u1: { slug: 'user/me', player: { gamerTag: 'Me' }, authorizations: [{ externalId: 'me' }] } };
     else if (query.includes('user(slug:')) data = { user: { id: 2, slug: 'user/them', player: { id: 99, gamerTag: 'Them' } } };
     else if (query.includes('events(query:')) data = { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    else if (query.includes('recentStandings')) {
+      const request = `stats ${variables.id} ${variables.videogameId ?? ''} ${variables.page}`;
+      asked.push(request);
+      if (fail(request)) return { ok: false, status: 500, json: async () => ({}) };
+      const node = (id) => ({
+        id, completedAt: 100_000, winnerId: variables.id,
+        event: { slug: 'tournament/t/event/e', videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'T' } },
+        slots: [variables.id, 5].map((player) => ({ entrant: { id: player, name: `P${player}`, initialSeedNum: 1, participants: [{ player: { id: player } }] }, standing: { stats: { score: { value: 1 } } } })),
+      });
+      data = { player: { recentStandings: [], sets: { pageInfo: { totalPages: 1 }, nodes: [node(`${variables.id}-stats-${variables.page}`)] } } };
+    }
     else {
       const request = `${kind} ${variables.id} ${variables.page}`;
       asked.push(request);
@@ -89,6 +100,53 @@ test('/h2h reads all opponent pages plus both histories for its predicted odds',
   const card = replies.at(-1).embeds[0].toJSON();
   assert.equal(card.title, 'Me 3-0 Busy');
   assert.match(card.description, /\*\*Predicted:\*\*/);
+});
+
+test('meetings between two players are asked for once, at the same time or for the full report', async () => {
+  const asked = fakeStartgg({ 10: 2 });
+  // either order is the same meetings, so lookups at once share them
+  const [a, b] = await settle(Promise.all([h2hHistory(10, 5), h2hHistory(5, 10)]));
+  assert.deepEqual(a.map((set) => set.id), b.map((set) => set.id));
+  assert.deepEqual(sets(asked, 10), [1, 2]);
+  // the full report press asks nothing again
+  const before = asked.length;
+  await settle(h2hHistory(10, 5));
+  assert.equal(asked.length, before);
+  // 10 minutes later it looks again
+  mock.timers.tick(11 * 60 * 1000);
+  await settle(h2hHistory(10, 5));
+  assert.deepEqual(sets(asked.slice(before), 10), [1, 2]);
+});
+
+test('h2h lookups send the opponent along, keep pairs apart, and forget failures', async () => {
+  // fresh ids: the meetings cache outlives the test, and earlier runs already cached 10 and 5
+  const opponents = [];
+  let failed = false;
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    if (query.includes('events(query:')) return { ok: true, json: async () => ({ data: { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } } }) };
+    opponents.push(variables.opponentId);
+    if (variables.id === 12 && variables.page === 1 && !failed) {
+      failed = true;
+      return { ok: false, status: 500, json: async () => ({}) };
+    }
+    const node = (id) => ({
+      id, completedAt: 100_000, fullRoundText: 'Winners Round 1', winnerId: 12,
+      event: { slug: 'tournament/t/event/e', videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'T' } },
+      slots: [12, variables.opponentId].map((player) => ({ entrant: { id: player, name: `P${player}`, initialSeedNum: 1, participants: [{ player: { id: player } }] }, standing: { stats: { score: { value: 1 } } } })),
+      games: [],
+    });
+    return { ok: true, json: async () => ({ data: { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node(`12-${variables.opponentId}`)] } } } }) };
+  };
+  // the failed lookup isn't kept, so trying again asks start.gg again and gets the meetings
+  await assert.rejects(settle(h2hHistory(12, 7)), /HTTP 500/);
+  const against7 = await settle(h2hHistory(12, 7));
+  assert.deepEqual(against7.map((set) => set.id), ['12-7']);
+  assert.ok(opponents.includes(7), 'opponent 7 reaches start.gg');
+  // another pair is another lookup, not the first pair's meetings
+  const against8 = await settle(h2hHistory(12, 8));
+  assert.deepEqual(against8.map((set) => set.id), ['12-8']);
+  assert.ok(opponents.includes(8), 'opponent 8 reaches start.gg');
 });
 
 test('/scout verbose builds on the pages /scout already has, without asking for any again', async () => {
@@ -145,4 +203,35 @@ test('/predict counts every meeting, not just the ones still in the histories', 
   assert.deepEqual(sets(asked, 70).toSorted(), [1, 1, 2, 2]);
   assert.deepEqual(sets(asked, 80), [1, 2]);
   assert.match(replies.at(-1).embeds[0].toJSON().description, /\*\*Head-to-head:\*\* \*\*Old\*\* leads 2-0/);
+});
+
+test('short /stats lookups with the same filters share one fetch, at the same time or within 3 minutes', async () => {
+  // fresh id so nothing is cached
+  const asked = fakeStartgg({});
+  const stats = (player) => asked.filter((each) => each.startsWith(`stats ${player} `));
+  const [a, b] = await settle(Promise.all([statsHistory(101, {}), statsHistory(101, {})]));
+  assert.deepEqual(a.sets.map((set) => set.id), b.sets.map((set) => set.id));
+  assert.deepEqual(stats(101), ['stats 101  1']);
+  // the repeat press asks nothing again
+  const before = asked.length;
+  await settle(statsHistory(101, {}));
+  assert.equal(asked.length, before);
+  // different filters are a different window, so they ask again
+  await settle(statsHistory(101, { venue: 'online' }));
+  assert.deepEqual(stats(101).slice(before), ['stats 101  1']);
+  await settle(statsHistory(101, { videogameId: 1 }));
+  assert.equal(stats(101).length, 3);
+  // 3 minutes later it looks again
+  mock.timers.tick(4 * 60 * 1000);
+  await settle(statsHistory(101, {}));
+  assert.equal(stats(101).length, 4);
+});
+
+test('a failed /stats lookup is not kept, so the next try asks again', async () => {
+  let failed = false;
+  const asked = fakeStartgg({}, { fail: (request) => request === 'stats 102  1' && !failed && (failed = true) });
+  await assert.rejects(settle(statsHistory(102, {})), /HTTP 500/);
+  const { sets } = await settle(statsHistory(102, {}));
+  assert.deepEqual(asked.filter((each) => each.startsWith('stats 102 ')), ['stats 102  1', 'stats 102  1']);
+  assert.deepEqual(sets.map((set) => set.id), ['102-stats-1']);
 });

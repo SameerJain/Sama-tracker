@@ -72,7 +72,7 @@ Anyone can change `/stream`, `/sets` and `/calls` for any tracked player. New pl
 
 Add `player:` to look up someone else, like `/h2h opponent:Sparg0 player:Leo`. In `/h2h` and `/predict`, either player can be a start.gg link or ID, tracked or not.
 
-`/h2h` runs the same prediction as `/predict` but keeps it to one line, even with `verbose:True`. The **Why these odds** button under the card posts the `/predict` reasoning. `/scout` always compares the opponent with you, replies privately, and needs your Discord connected on start.gg.
+`/h2h` runs the same prediction as `/predict` but keeps it to one line, even with `verbose:True`. Run `/predict` for the reasoning behind the odds. `/scout` always compares the opponent with you, replies privately, and needs your Discord connected on start.gg.
 
 > [!TIP]
 > On a phone, skip the typing. Long-press a server member (right-click on desktop), open **Apps**, and pick **H2H with me** for `/h2h` or **Scout them** for `/scout`. Both find the member's start.gg the way `/profile` does, so the member has to be tracked, linked, or registered for a tournament the bot checks. **H2H with me** needs you tracked or linked too.
@@ -134,7 +134,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Command | What it does |
 | --- | --- |
 | `/help` | List the commands. |
-| `/status` | Uptime, when the latest version was deployed, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, any downtime before the last start, and why a post last missed its thread. Replies privately. A copy run on another computer also shows that computer's name. |
+| `/status` | Uptime, when the latest version was deployed, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, any downtime before the last start, and why a post last missed its thread. A copy run on another computer also shows that computer's name. |
 | `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
 | `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event) and the recap schedule. Needs **Manage Server**. |
 | `/socials` | Saved streams and social links. |
@@ -278,7 +278,7 @@ Slippi rank checks ask about 20 watchlist players per request, one request a sec
 
 ### Speed and waiting
 
-start.gg allows 80 requests a minute. A first lookup can take tens of seconds, or about a minute for a large report. Commands share cached history where they can, and long lookups show progress while they load.
+start.gg allows 80 requests a minute. A first lookup can take tens of seconds, or about a minute for a large report. Commands share cached history where they can, and long lookups show progress while they load. A **Full report** press on `/h2h` or `/predict` reuses its report's lookup, so it asks start.gg for nothing new. The other full reports read further back, but keep the pages the short report already has. Pressing a Full report button that's already loading shares the first lookup instead of asking again. The second press hears start.gg is on it.
 
 Your commands take turns with start.gg one at a time. A command sent while your last one is still loading answers right away. If it needs start.gg, it says **Queued** with about how long your last one has left, counting everyone else's commands, and starts when that one finishes. Commands that don't need start.gg, like `/help`, don't wait. Up to 3 can wait behind the one running, and past that the bot asks you to try again.
 

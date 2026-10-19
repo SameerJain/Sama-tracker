@@ -16,8 +16,9 @@ function zoneLabel(timezone) {
 }
 
 function configureMessages(interaction) {
-  const reply = (content) => replyEphemeral(interaction, content);
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return reply('You need Manage Server permission to control automatic messages.');
+  // failures stay private, but the settings themselves post where everyone sees them
+  const fail = (content) => replyEphemeral(interaction, content);
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return fail('You need Manage Server permission to control automatic messages.');
   const previous = messageSettings();
   const changes = {};
   for (const type of Object.keys(MESSAGE_TYPES)) {
@@ -28,7 +29,7 @@ function configureMessages(interaction) {
   if (day !== null) changes.recapDay = day;
   const time = interaction.options.getString('recap_time')?.trim();
   if (time !== undefined) {
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return reply('Use a 24-hour time in HH:MM format, like 09:00 or 21:30.');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return fail('Use a 24-hour time in HH:MM format, like 09:00 or 21:30.');
     changes.recapTime = time;
   }
   const timezone = interaction.options.getString('timezone')?.trim();
@@ -36,7 +37,7 @@ function configureMessages(interaction) {
     try {
       changes.timezone = new Intl.DateTimeFormat('en-US', { timeZone: timezone }).resolvedOptions().timeZone;
     } catch {
-      return reply('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
+      return fail('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
     }
   }
   const threads = interaction.options.getString('threads');
@@ -45,8 +46,8 @@ function configureMessages(interaction) {
     if (threads !== 'off') {
       const channelId = process.env.CHANNEL_ID;
       const missing = missingThreadPermissions(interaction.client.channels.cache.get(channelId));
-      if (!missing) return reply(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
-      if (missing.length) return reply(`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
+      if (!missing) return fail(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
+      if (missing.length) return fail(`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
     }
     changes.threads = threads;
   }
@@ -74,7 +75,7 @@ function configureMessages(interaction) {
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
     '-# `threads` has three modes for set results and stream alerts. Off posts them here, one per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles.');
-  return reply(lines.join('\n'));
+  return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
 // twitch.tv/name works without the https. null for anything that isn't a web link

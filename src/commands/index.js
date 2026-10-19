@@ -82,21 +82,26 @@ export async function handleCommand(interaction) {
   return handlers.get(commandName(interaction))?.(interaction);
 }
 
-// a report's button. more greys out the buttons and swaps the message for the full report, new answers with
-// another report, and private does too but only for whoever pressed it, so buttons on the automatic posts
-// don't fill the channel. the button only has profile slugs or player ids, so the players get looked up again
-export async function handleButton(interaction) {
-  // Are you sure and Undo answer by changing the message they're on, see confirm.js
-  if (isChoice(interaction.customId)) return handleChoice(interaction);
-  const { action, command, player, opponent, melee, game, since: sinceText, venue } = readButton(interaction.customId);
-  // buttons only ever hold dates the command accepted, so a bad one just means no filter
-  const { since } = parseSince(sinceText);
+// a Full report press swapped twice at once shares the first lookup instead of asking
+// start.gg again. the swap lands on the message it's on, so the key adds that message.
+// every other press runs its own report: a private answer only shows for whoever pressed it,
+// and a new one posts for them too. the history caches share the lookups underneath either way
+const inflightButtons = new Map();
+
+// pressing the same button twice greys it out for all first, so this is only the moment before that
+async function deferButton(interaction, action) {
   if (action === 'more') {
     await interaction.deferUpdate();
-    await interaction.editReply({ components: disabled(interaction.message) });
   } else {
     await interaction.deferReply(action === 'private' ? { flags: MessageFlags.Ephemeral } : {});
   }
+}
+
+async function answerButton(interaction) {
+  const { action, command, player, opponent, melee, game, since: sinceText, venue } = readButton(interaction.customId);
+  // buttons only ever hold dates the command accepted, so a bad one just means no filter
+  const { since } = parseSince(sinceText);
+  if (action === 'more') await interaction.editReply({ components: disabled(interaction.message) });
   const report = reports[command];
   if (!report || !['more', 'new', 'private'].includes(action)) return buttonFailed(interaction, 'That button doesn\'t work anymore, run the command again.');
 
@@ -106,6 +111,58 @@ export async function handleButton(interaction) {
   const against = opponent ? await playerBySlug(opponent) : null;
   if (!who || (opponent && !against)) return buttonFailed(interaction, `Couldn't find a start.gg account for that player. Run \`/${command}\` again.`);
   return report(interaction, { player: who, opponent: against, verbose: action === 'more', melee, game, since, venue });
+}
+
+// a report's button. more greys out the buttons and swaps the message for the full report, new answers with
+// another report, and private does too but only for whoever pressed it, so buttons on the automatic posts
+// don't fill the channel. the button only has profile slugs or player ids, so the players get looked up again
+export async function handleButton(interaction) {
+  // Are you sure and Undo answer by changing the message they're on, see confirm.js
+  if (isChoice(interaction.customId)) return handleChoice(interaction);
+  const { action } = readButton(interaction.customId);
+  if (action !== 'more') {
+    await deferButton(interaction, action);
+    return answerButton(interaction);
+  }
+  // no message to swap, so there's nothing to share
+  const messageId = interaction.message?.id;
+  if (!messageId) {
+    await deferButton(interaction, action);
+    return answerButton(interaction);
+  }
+  const key = `${interaction.customId} ${messageId}`;
+  const running = inflightButtons.get(key);
+  if (running) return sameReport(interaction, running, key);
+  // set before the first wait, so a second press in the meantime sees it
+  const done = (async () => {
+    await deferButton(interaction, action);
+    return answerButton(interaction);
+  })();
+  inflightButtons.set(key, done);
+  try {
+    return await done;
+  } finally {
+    if (inflightButtons.get(key) === done) inflightButtons.delete(key);
+  }
+}
+
+// the same Full report pressed again while it's still swapping. it says start.gg is on it instead of
+// asking again, since the first press swaps the answer in for all to see. when the first
+// press fails there's nothing to wait for, so the waiters share one retry instead of each asking alone
+async function sameReport(interaction, running, key) {
+  await deferButton(interaction, 'more');
+  await interaction.followUp({ content: 'Start.gg is already working on that one. The full report swaps in when it\'s done.', flags: MessageFlags.Ephemeral });
+  if (await running.then(() => true, () => false)) return;
+  // a waiter ahead of this one already started the retry, so share that instead of asking alone
+  const shared = inflightButtons.get(key);
+  if (shared) return shared;
+  const retry = answerButton(interaction);
+  inflightButtons.set(key, retry);
+  try {
+    return await retry;
+  } finally {
+    if (inflightButtons.get(key) === retry) inflightButtons.delete(key);
+  }
 }
 
 // the same buttons, greyed out
@@ -194,7 +251,7 @@ function status(interaction) {
     tournaments: tournaments.length,
     queued: startgg.queueLength(),
   };
-  return interaction.reply({ embeds: [embeds.status(info)], flags: MessageFlags.Ephemeral });
+  return interaction.reply({ embeds: [embeds.status(info)] });
 }
 
 // just the picture, as big as discord has it

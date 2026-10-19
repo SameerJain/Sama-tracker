@@ -9,13 +9,13 @@ import { periodSummary } from '../reports.js';
 import { PICKABLE_GAMES } from './definitions.js';
 import {
   SCOUT_PAGES, SCOUT_CHARACTER_PAGES, setHistories, characterHistories, setHistory, characterHistory, lifetimeHistory, lifetimeCharacterHistory, eventHistory,
-  doublesHistory, doublesEvents,
+  doublesHistory, doublesEvents, h2hHistory, statsHistory,
 } from './history.js';
 import { findAccount, verifiedCaller } from '../accounts.js';
 import { slippiFor, slippiLookup } from './slippi.js';
 import { LOGO as slippiLogo } from '../slippi.js';
 import {
-  fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, reportButton, fullReport, buttonRow,
+  fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, fullReport, buttonRow,
   linkedPlayer, rememberPick, parseSince,
 } from './shared.js';
 
@@ -203,7 +203,7 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
   // meetings for the record, histories and events for one line of /predict odds
   const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
     Promise.all([
-      startgg.getHeadToHead(a.playerId, b.playerId),
+      h2hHistory(a.playerId, b.playerId),
       setHistory(a.playerId), setHistory(b.playerId),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
@@ -214,12 +214,9 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
   const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: shown };
   // the odds went with melee as the game they share, so it's a melee matchup even without the option
   const { odds, profiles } = await oddsWithSlippi(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options, ranked, allMelee(melee, shown));
-  // never having played, the full report would say the same thing. the odds stay one line in both, so
-  // the other button posts /predict for why
-  const buttons = buttonRow(
-    !verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee, since: sinceText, venue }),
-    odds && reportButton('Why these odds', 'new', 'predict', { player: a, opponent: b, melee, since: sinceText, venue }),
-  );
+  // never having played, the full report would say the same thing. the odds stay one line in both,
+  // run /predict for the reasoning behind them
+  const buttons = buttonRow(!verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee, since: sinceText, venue }));
   const cards = embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - only(sets).length, odds, filters });
   return sendEmbeds(interaction, embeds.withSlippi(cards, [a, b], profiles, { odds: Boolean(odds), slippi: Boolean(odds?.slippi) }), buttons);
 }
@@ -240,7 +237,7 @@ async function statsReport(interaction, { player, verbose, melee, since, venue, 
   const inScope = (list) => scopeSets(filters)(only(list));
   const inScopeEvents = (list) => scopeEntries(filters)(only(list));
   const ranked = slippiLookup([player], melee);
-  const { standings, sets } = await startgg.getStats(player.playerId, { videogameId: melee ? startgg.MELEE : undefined, since, venue });
+  const { standings, sets } = await statsHistory(player.playerId, { videogameId: melee ? startgg.MELEE : undefined, since, venue });
   const profiles = await ranked(allMelee(melee, standings, sets));
   const [recent] = embeds.withSlippi([embeds.stats(player, inScopeEvents(standings), inScope(sets), { melee, filters })], [player], profiles);
   if (!verbose) {
@@ -383,7 +380,7 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
   // work without events, so either failing doesn't sink it
   const [historyA, historyB, meetings, eventsA, eventsB] = await withCountdown(interaction, `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`,
     Promise.all([
-      setHistory(a.playerId), setHistory(b.playerId), startgg.getHeadToHead(a.playerId, b.playerId).catch(() => []),
+      setHistory(a.playerId), setHistory(b.playerId), h2hHistory(a.playerId, b.playerId).catch(() => []),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
   // the odds and the no-odds wording pick their own game out of these, so since and venue

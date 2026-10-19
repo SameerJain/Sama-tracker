@@ -22,12 +22,13 @@ function mockApi(respond) {
 const crew = { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew', discordId: 'crew-discord' };
 const rival = { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival' };
 
-// a press of this button on a short report that has it. records every call in order
-function press(button, { ephemeral = false, user = 'crew-discord' } = {}) {
+// a press of this button on a short report that has it. records every call in order.
+// messageId is which message it's on: same button, same message shares a Full report swap
+function press(button, { ephemeral = false, user = 'crew-discord', messageId = 'm1' } = {}) {
   const calls = [];
   const run = {
     customId: button.toJSON().custom_id, calls, user: { id: user },
-    message: { content: '', embeds: [new EmbedBuilder().setTitle('Short report')], components: buttonRow(button), flags: { has: () => ephemeral } },
+    message: { id: messageId, content: '', embeds: [new EmbedBuilder().setTitle('Short report')], components: buttonRow(button), flags: { has: () => ephemeral } },
     isButton: () => true,
     deferUpdate: async () => { calls.push(['update']); run.deferred = true; },
     deferReply: async () => { calls.push(['defer']); run.deferred = true; },
@@ -107,10 +108,93 @@ test('a press that fails puts the report back the way it was and tells only whoe
   assert.match(stale.calls.at(-1)[1].content, /doesn't work anymore, run the command again/);
 
   // something going wrong in a new report drops its thinking reply and answers privately
-  const failed = press(reportButton('Why these odds', 'new', 'predict', { player: crew, opponent: rival }));
+  const failed = press(reportButton('H2H vs Rival', 'new', 'h2h', { player: crew, opponent: rival }));
   failed.deferred = true;
   await buttonFailed(failed, 'Something went wrong: start.gg is down');
   assert.deepEqual(failed.calls, [['delete'], ['followUp', { content: 'Something went wrong: start.gg is down', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }]]);
+});
+
+test('two presses of a new report button each get an answer, sharing the lookups underneath', async () => {
+  const a = { userId: 101, playerId: 1010, tag: 'Alpha', slug: 'user/alpha' };
+  const b = { userId: 102, playerId: 1020, tag: 'Beta', slug: 'user/beta' };
+  state.players = { 101: a, 102: b };
+  state.links = {};
+  let fetches = 0;
+  mockApi(({ query }) => {
+    fetches++;
+    if (query.includes('events(query:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+  });
+  // one page of meetings, one page per history and per events
+  const button = reportButton('H2H vs Beta', 'new', 'h2h', { player: a, opponent: b });
+  const first = press(button, { user: 'u1' });
+  const second = press(button, { user: 'u2' });
+  await Promise.all([handleButton(first), handleButton(second)]);
+  // each presser gets their own answer: nothing is deleted, nobody hears it's loading
+  for (const [who, run] of [['first', first], ['second', second]]) {
+    const answer = run.calls.findLast(([kind]) => kind === 'edit')?.[1];
+    assert.match(JSON.stringify(answer.embeds), /Alpha vs Beta/, who);
+    assert.ok(run.calls.length > 1, `${who} answers`);
+  }
+  assert.ok(!second.calls.some(([kind, result]) => kind === 'followUp' && /already working/.test(result?.content ?? '')), 'no loading notice');
+  assert.ok(!first.calls.concat(second.calls).some(([kind]) => kind === 'delete'), 'no deleted reply');
+  // the history caches share the in-flight lookups, so two at once still cost one page each
+  assert.equal(fetches, 5);
+  // once it's done the same button runs on its own again, asking nothing new
+  const third = press(button, { user: 'u3' });
+  await handleButton(third);
+  assert.match(JSON.stringify(third.calls.findLast(([kind]) => kind === 'edit')?.[1].embeds), /Alpha vs Beta/);
+  assert.equal(fetches, 5);
+});
+
+test('two Full report presses share one swap, the second just hears it\'s loading', async () => {
+  const a = { userId: 201, playerId: 2010, tag: 'Gamma', slug: 'user/gamma' };
+  const b = { userId: 202, playerId: 2020, tag: 'Delta', slug: 'user/delta' };
+  state.players = { 201: a, 202: b };
+  state.links = {};
+  let fetches = 0;
+  mockApi(({ query }) => {
+    fetches++;
+    if (query.includes('events(query:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+  });
+  const button = reportButton('Full report', 'more', 'h2h', { player: a, opponent: b });
+  const first = press(button, { user: 'u1' });
+  const second = press(button, { user: 'u2' });
+  await Promise.all([handleButton(first), handleButton(second)]);
+  // greyed out before anything else, then swapped for the full report
+  assert.deepEqual(first.calls.slice(0, 2).map(([kind]) => kind), ['update', 'edit']);
+  assert.ok(first.calls[1][1].components.every((row) => row.components.every((button) => button.disabled)));
+  assert.match(JSON.stringify(first.calls.findLast(([kind]) => kind === 'edit')?.[1].embeds), /Gamma vs Delta/);
+  assert.deepEqual(second.calls.map(([kind]) => kind), ['update', 'followUp']);
+  assert.equal(second.calls[1][1].flags, MessageFlags.Ephemeral);
+  assert.match(second.calls[1][1].content, /already working/);
+  assert.equal(fetches, 5);
+});
+
+test('the same Full report on two messages swaps twice, and one with no message just answers', async () => {
+  const a = { userId: 301, playerId: 3010, tag: 'Epsilon', slug: 'user/epsilon' };
+  const b = { userId: 302, playerId: 3020, tag: 'Zeta', slug: 'user/zeta' };
+  state.players = { 301: a, 302: b };
+  state.links = {};
+  mockApi(({ query }) => {
+    if (query.includes('events(query:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+  });
+  // different messages are different swaps, so both pressers get the full report
+  const button = reportButton('Full report', 'more', 'h2h', { player: a, opponent: b });
+  const one = press(button, { user: 'u1', messageId: 'm1' });
+  const two = press(button, { user: 'u2', messageId: 'm2' });
+  await Promise.all([handleButton(one), handleButton(two)]);
+  for (const [who, run] of [['m1', one], ['m2', two]]) {
+    assert.match(JSON.stringify(run.calls.findLast(([kind]) => kind === 'edit')?.[1].embeds), /Epsilon vs Zeta/, who);
+    assert.ok(!run.calls.some(([kind, result]) => kind === 'followUp' && /already working/.test(result?.content ?? '')), `${who} shares nothing`);
+  }
+  // a message that went away has nothing to share on, but it still answers
+  const gone = press(button, { user: 'u3' });
+  delete gone.message.id;
+  await handleButton(gone);
+  assert.match(JSON.stringify(gone.calls.findLast(([kind]) => kind === 'edit')?.[1].embeds), /Epsilon vs Zeta/);
 });
 
 test('a /scout button compares with whoever pressed it, as long as start.gg still has their discord', async () => {

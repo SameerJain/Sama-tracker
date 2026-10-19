@@ -14,6 +14,7 @@ delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleButton, handleCommand } = await import('../src/commands/index.js');
 const startgg = await import('../src/startgg.js');
+startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
@@ -363,7 +364,6 @@ const presses = [
   ['characters', {}, 'Full report', /Fox/],
   ['scout', { values: { profile: '2' } }, 'Full report', /Crew vs Rival/],
   ['h2h', { values: { opponent: '2' } }, 'Full report', /First played/],
-  ['h2h', { values: { opponent: '2' } }, 'Why these odds', /Crew \d+% · \d+% Rival/],
   ['predict', { values: { opponent: '2' } }, 'Full report', /How it adds up/],
   // whoever's next, by the player id in the set
   ['run', {}, 'H2H vs Rival', /Crew 2-0 Rival/],
@@ -382,6 +382,10 @@ test('every report button answers the way its command would, and the full report
     await runningCommand.run(command, () => handleCommand(command));
     const message = command.calls.findLast(([kind, result]) => kind === 'edit' && result.components?.length)?.[1];
     assert.ok(message, `/${name} has no buttons`);
+    // short /h2h is one Full report button since the odds moved to /predict
+    if (name === 'h2h' && label === 'Full report') {
+      assert.deepEqual(message.components.flatMap((row) => row.toJSON().components).map((button) => button.label), ['Full report'], what);
+    }
 
     const run = press(message, label);
     await runningCommand.run(run, () => handleButton(run));
@@ -395,7 +399,7 @@ test('every report button answers the way its command would, and the full report
       assert.ok(run.calls[1][1].components.every((row) => row.components.every((button) => button.disabled)), what);
       assert.doesNotMatch(buttons, /Full report/, what);
     } else {
-      // a new message for /predict, with its own button
+      // a new message for the head-to-head, with its own Full report button
       assert.equal(run.calls[0][0], 'defer', what);
       assert.match(buttons, /Full report/, what);
     }
@@ -406,7 +410,7 @@ test('every report button answers the way its command would, and the full report
   const sent = recent.calls.filter(([kind]) => kind === 'edit' || kind === 'followUp').map(([, result]) => result);
   assert.ok(sent.some((result) => result.embeds?.length), '/recent never answers');
   assert.ok(sent.every((result) => !result.components?.length), '/recent has buttons');
-  // verbose is the full report, so it never offers another one. /h2h still offers the odds
+  // verbose is the full report, so it never offers another one
   const verboseRuns = [
     ['stats', {}], ['doubles', {}], ['progress', {}], ['characters', {}],
     ['scout', { values: { profile: '2' } }], ['h2h', { values: { opponent: '2' } }], ['predict', { values: { opponent: '2' } }],
@@ -418,9 +422,7 @@ test('every report button answers the way its command would, and the full report
     const answer = verbose.calls.findLast(([kind, result]) => kind === 'edit' && 'components' in result)?.[1];
     assert.ok(answer, `${what} never answers`);
     assert.doesNotMatch(JSON.stringify(answer.components), /Full report/, what);
-    if (name === 'h2h') {
-      assert.deepEqual(JSON.parse(JSON.stringify(answer.components))[0].components.map((button) => button.label), ['Why these odds'], what);
-    }
+    if (name === 'h2h') assert.deepEqual(JSON.parse(JSON.stringify(answer.components)), [], what);
   }
 });
 

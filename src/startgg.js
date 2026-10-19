@@ -22,9 +22,15 @@ const fromCommand = new AsyncLocalStorage();
 // one queue per command, in here while it has requests waiting
 const commandQueues = [];
 const background = [];
-const REQUEST_GAP_MS = 800;
+let REQUEST_GAP_MS = 800;
 let nextSlot = 0;
 let timer;
+
+// tests run through hundreds of queued requests, so commands.test.js sets this to 0.
+// the rate limit itself is still covered by requests.test.js and queue.test.js on the real gap
+export function setRequestGap(ms) {
+  REQUEST_GAP_MS = ms;
+}
 
 // a command's queue also counts what it sent and how often start.gg said to slow down. wait, when given,
 // gets called on its first request and every request waits on what it returns, which is how someone's
