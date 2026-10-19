@@ -36,7 +36,7 @@ async function trackAdd(interaction) {
 function trackRemove(interaction) {
   const player = readPlayer(interaction, 'player', { trackedOnly: true });
   if (!player) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
-  return askFirst(interaction, 'untrack', player.userId, `Stop tracking ${player.tag}? Their set result and stream alert settings go with them.`, 'Stop tracking');
+  return askFirst(interaction, 'untrack', player.userId, `Stop tracking ${escapeMarkdown(player.tag)}? Their set result and stream alert settings go with them.`, 'Stop tracking');
 }
 
 confirmable('untrack', {
@@ -46,14 +46,14 @@ confirmable('untrack', {
     if (!player) return { content: 'They aren\'t tracked anymore.' };
     delete state.players[userId];
     save();
-    return { content: `Stopped tracking ${player.tag}.`, undo: player };
+    return { content: `Stopped tracking ${escapeMarkdown(player.tag)}.`, undo: player };
   },
-  cancel: (userId) => (state.players[userId] ? `Still tracking ${state.players[userId].tag}.` : 'They aren\'t tracked anymore.'),
+  cancel: (userId) => (state.players[userId] ? `Still tracking ${escapeMarkdown(state.players[userId].tag)}.` : 'They aren\'t tracked anymore.'),
   undo: (player) => {
-    if (state.players[player.userId]) return `${player.tag} is already tracked again.`;
+    if (state.players[player.userId]) return `${escapeMarkdown(player.tag)} is already tracked again.`;
     state.players[player.userId] = player;
     save();
-    return `Tracking ${player.tag} again, with the same settings as before.`;
+    return `Tracking ${escapeMarkdown(player.tag)} again, with the same settings as before.`;
   },
   tooLate: 'Too late to undo. `/track add` them again, with set results and stream alerts starting off.',
 });

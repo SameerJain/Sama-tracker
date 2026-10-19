@@ -17,6 +17,7 @@ async function run(commandName, subcommand, values = {}) {
   let reply;
   await handleCommand({
     commandName,
+    memberPermissions: { has: () => true },
     options: { getSubcommand: () => subcommand, getString: name => values[name] ?? null },
     reply: async result => { reply = result; },
   });

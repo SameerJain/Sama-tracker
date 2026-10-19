@@ -41,6 +41,8 @@ const MEMBERS_PER_FETCH = 100;
 
 // the ones of these discord ids that are in the server, id to member. asking by id doesn't need
 // the server members intent. discord can say to slow down, then it gets one more try after waiting
+// (capped, so a huge retry_after can't stall a command)
+const RETRY_AFTER_MAX_SECONDS = 10;
 export async function serverMembers(guild, ids) {
   const found = new Map();
   if (!guild) return found;
@@ -48,7 +50,8 @@ export async function serverMembers(guild, ids) {
     const user = ids.slice(i, i + MEMBERS_PER_FETCH);
     const members = await guild.members.fetch({ user }).catch(async (err) => {
       if (!err.data?.retry_after) throw err;
-      await new Promise((resolve) => setTimeout(resolve, err.data.retry_after * 1000));
+      const wait = Math.min(err.data.retry_after, RETRY_AFTER_MAX_SECONDS);
+      await new Promise((resolve) => setTimeout(resolve, wait * 1000));
       return guild.members.fetch({ user });
     });
     for (const [id, member] of members) found.set(id, member);

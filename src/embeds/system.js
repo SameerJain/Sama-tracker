@@ -45,9 +45,14 @@ const SITES = {
   'facebook.com': 'Facebook', 'threads.net': 'Threads', 'discord.gg': 'Discord', 'discord.com': 'Discord',
 };
 
-// other sites show the whole link
+// other sites show the whole link. try/catch so one bad saved link can't break /socials
 function socialLink(url) {
-  const site = SITES[new URL(url).hostname.replace(/^(www|m|mobile)\./, '')];
+  let site;
+  try {
+    site = SITES[new URL(url).hostname.replace(/^(www|m|mobile)\./, '')];
+  } catch {
+    return String(url);
+  }
   return site ? `[${site}](${url})` : url;
 }
 

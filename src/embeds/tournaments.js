@@ -76,7 +76,7 @@ export function onStream(set, players) {
 
   // twitch is the only source with a url we can build, otherwise just the name
   const { streamName, streamSource } = set.stream ?? {};
-  const twitch = streamSource === 'TWITCH' ? `https://twitch.tv/${streamName}` : null;
+  const twitch = streamSource === 'TWITCH' && streamName ? `https://twitch.tv/${encodeURIComponent(streamName)}` : null;
   const watch = streamName ? (twitch ? `[twitch.tv/${escapeMarkdown(streamName)}](${twitch})` : escapeMarkdown(streamName)) : null;
 
   const card = setEmbed(set, colors.stream, trackedA ?? findTracked(b, players))

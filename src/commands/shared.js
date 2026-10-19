@@ -117,15 +117,16 @@ async function sendLate(interaction, batches, components, files) {
 }
 
 // whatever doesn't fit in the reply goes in follow-ups, which are only ephemeral when the reply is.
-// buttons and files go with the reply, and leaving buttons out clears the ones a pressed button's message had
+// buttons and files go with the reply, and leaving buttons out clears the ones a pressed button's message had.
+// mentions stay off on every branch, so a start.gg tag can't ping: only sendLate pings on purpose
 async function sendEmbeds(interaction, list, components = [], files = []) {
   const batches = embeds.messages(list);
   if (await sendLate(interaction, batches, components, files)) return;
   for (const [i, batch] of batches.entries()) {
-    if (i > 0) await interaction.followUp({ embeds: batch, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
+    if (i > 0) await interaction.followUp({ embeds: batch, allowedMentions: { parse: [] }, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
     // null clears a countdown from withCountdown
-    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components, files });
-    else await interaction.reply({ embeds: batch, components, files });
+    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components, files, allowedMentions: { parse: [] } });
+    else await interaction.reply({ embeds: batch, components, files, allowedMentions: { parse: [] } });
   }
 }
 
@@ -208,7 +209,10 @@ async function withCountdown(interaction, doing, work, preview) {
     if (!waiting || seconds < (preview ? WAIT_PREVIEW_SECONDS : WAIT_SHOWN_SECONDS)) return;
     const content = `**${doing}** · ${sent} of ${sent + waiting} start.gg requests done, about ${roughly(seconds)} left\n`
       + '-# start.gg allows 80 requests a minute, so the first look takes a while. Asking again in the next few hours is quick';
-    const payload = preview && !previewed ? { content, embeds: embeds.messages(preview)[0] } : content;
+    // mentions off so a gamertag in the preview can't ping while it loads
+    const payload = preview && !previewed
+      ? { content, embeds: embeds.messages(preview)[0], allowedMentions: { parse: [] } }
+      : { content, allowedMentions: { parse: [] } };
     previewed ||= Boolean(preview);
     edit = edit.then(() => interaction.editReply(payload)).catch(() => {});
   };
@@ -286,8 +290,9 @@ function profileSlug(input) {
 // start.gg has nobody for it. whose is just for the wording, "use their/your profile link"
 async function findPlayer(interaction, input, whose = 'their') {
   const text = input.trim();
+  const shown = text.replaceAll('`', '');
   const player = await startgg.getPlayer(profileSlug(text));
-  if (!player) await interaction.editReply({ content: `Couldn't find a start.gg player for \`${text}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`, allowedMentions: { parse: [] } });
+  if (!player) await interaction.editReply({ content: `Couldn't find a start.gg player for \`${shown}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`, allowedMentions: { parse: [] } });
   return player;
 }
 
@@ -295,10 +300,11 @@ async function findPlayer(interaction, input, whose = 'their') {
 // after deferReply, so a miss drops the thinking reply and answers ephemeral instead. null when nobody
 async function fetchPlayer(interaction, input) {
   const text = input.trim();
+  const shown = text.replaceAll('`', '');
   const player = await startgg.getPlayer(profileSlug(text));
   if (!player) {
     const near = didYouMean(Object.values(pickable()), text);
-    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${text}\`.${near || ' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.'}`);
+    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${shown}\`.${near || ' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.'}`);
   }
   return player;
 }

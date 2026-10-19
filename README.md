@@ -1,5 +1,7 @@
 # Sama-tracker
 
+> **This bot has no invite link.** It's built for one Discord server, so you can't add it to yours the usual way. To use it you have to host your own copy, running 24/7 on a machine you control or on a cloud host. See [Run your own copy](#run-your-own-copy).
+
 A Discord bot that follows a Smash crew and its local tournaments on start.gg and Slippi. It posts results and stream alerts in one channel, sends registration reminders, and answers slash commands with stats, head-to-heads and odds.
 
 <img src="screenshots/predict.png" alt="/predict" width="56%"> <img src="screenshots/h2h.png" alt="/h2h" width="42%">

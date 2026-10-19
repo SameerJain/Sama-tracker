@@ -1,6 +1,6 @@
 // Buffalo Bills finals from ESPN's public scoreboard API, no key needed. the team
 // schedule has every game with the final score, and the summary adds quarters and
-// team stats for the snapshot. not AI, just the numbers.
+// team stats for the snapshot.
 const SCHEDULE = (season) => `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/BUF/schedule?season=${season}`;
 const SUMMARY = (id) => `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${id}`;
 

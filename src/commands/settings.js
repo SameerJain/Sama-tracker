@@ -94,8 +94,12 @@ function socialUrl(input) {
   return url.href.replaceAll('(', '%28').replaceAll(')', '%29');
 }
 
-// ephemeral so edits don't clutter the channel and a name can't ping anyone
+// ephemeral so edits don't clutter the channel and a name can't ping anyone.
+// code-level check too, since the discord permission can be handed to other roles
 function socialsAdd(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    return replyEphemeral(interaction, 'You need Manage Server permission to change the socials.');
+  }
   const reply = (content) => replyEphemeral(interaction, content);
   const typed = interaction.options.getString('name', true).trim();
   const url = socialUrl(interaction.options.getString('link', true));
@@ -113,6 +117,9 @@ function socialsAdd(interaction) {
 }
 
 function socialsRemove(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    return replyEphemeral(interaction, 'You need Manage Server permission to change the socials.');
+  }
   // autocomplete sends the saved link, typing it out might leave off the https
   const url = socialUrl(interaction.options.getString('link', true));
   const social = state.socials.find((each) => each.url === url);

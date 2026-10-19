@@ -18,9 +18,10 @@ function tournamentSlug(input) {
   return path.match(/tournament\/([\w-]+)/)?.[1] ?? path.split(/[/?#]/)[0];
 }
 
-// mentions stay off so a typed link can't ping anyone
+// mentions stay off so a typed link can't ping anyone. backticks stripped so it can't break the code span
 function tournamentNotFound(input) {
-  return { content: `Couldn't find a start.gg tournament for \`${input}\`. Paste its link, like start.gg/tournament/genesis-x.`, allowedMentions: { parse: [] } };
+  const shown = String(input).replaceAll('`', '').slice(0, 100);
+  return { content: `Couldn't find a start.gg tournament for \`${shown}\`. Paste its link, like start.gg/tournament/genesis-x.`, allowedMentions: { parse: [] } };
 }
 
 // autocomplete, so nobody has to paste a link for a tournament the bot already knows: tracked ones and ones
@@ -134,8 +135,8 @@ async function regWarn(interaction) {
     return interaction.editReply({ content: `Already registered.\n-# ${name} · ${escapeMarkdown(tournament.name)}`, allowedMentions: { parse: [] } });
   }
   const deadline = regDeadline(tournament);
-  if (deadline <= secondsNow()) return interaction.editReply({ content: `Registration for ${tournament.name} already closed.`, allowedMentions: { parse: [] } });
-  if (!tournament.isRegistrationOpen) return interaction.editReply({ content: `Registration for ${tournament.name} isn't open right now.`, allowedMentions: { parse: [] } });
+  if (deadline <= secondsNow()) return interaction.editReply({ content: `Registration for ${escapeMarkdown(tournament.name)} already closed.`, allowedMentions: { parse: [] } });
+  if (!tournament.isRegistrationOpen) return interaction.editReply({ content: `Registration for ${escapeMarkdown(tournament.name)} isn't open right now.`, allowedMentions: { parse: [] } });
   // not on a hidden list means nothing, so no warning
   if (startgg.attendeesHidden(tournament, participants)) {
     return interaction.editReply({ content: `start.gg hides who's registered for ${escapeMarkdown(tournament.name)}, so there's no telling if they are. No warning sent.`, allowedMentions: { parse: [] } });

@@ -35,21 +35,45 @@ const empty = {
 };
 
 function load() {
-  if (!fs.existsSync(FILE)) return empty;
+  if (!fs.existsSync(FILE)) return { ...empty };
   try {
     return { ...empty, ...JSON.parse(fs.readFileSync(FILE, 'utf8')) };
   } catch (err) {
-    // don't start empty, the next save would wipe it
-    console.error(`couldn't read ${FILE} (${err.message}), fix or delete it`);
-    process.exit(1);
+    // a half-written main file shouldn't wipe the track list: fall back to the
+    // backup from the last good save, and only quit when both are unreadable
+    try {
+      console.error(`couldn't read ${FILE} (${err.message}), trying ${FILE}.bak`);
+      return { ...empty, ...JSON.parse(fs.readFileSync(`${FILE}.bak`, 'utf8')) };
+    } catch {
+      console.error(`couldn't read ${FILE} (${err.message}), fix or delete it`);
+      process.exit(1);
+    }
   }
 }
 
 export const state = load();
 
-// write + rename so a crash can't leave it half written
+// saves so far, for /status
+export let saveCount = 0;
+let backedUpAt = 0;
+// a backup every hour at most, so a corrupt main file falls back to something recent
+const BACKUP_HOURS = 1;
+
+// write + fsync + rename so a crash can't leave it half written. 0600 so ids in it aren't world readable
 export function save() {
   fs.mkdirSync(stateDir, { recursive: true });
-  fs.writeFileSync(`${FILE}.tmp`, JSON.stringify(state, null, 2));
+  const text = JSON.stringify(state, null, 2);
+  fs.writeFileSync(`${FILE}.tmp`, text, { mode: 0o600 });
+  const fd = fs.openSync(`${FILE}.tmp`, 'r');
+  try {
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
   fs.renameSync(`${FILE}.tmp`, FILE);
+  saveCount++;
+  if (Date.now() - backedUpAt > BACKUP_HOURS * 60 * 60 * 1000) {
+    backedUpAt = Date.now();
+    fs.writeFileSync(`${FILE}.bak`, text, { mode: 0o600 });
+  }
 }

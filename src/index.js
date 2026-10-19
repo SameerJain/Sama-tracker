@@ -79,8 +79,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   } catch (err) {
     console.error(err);
-    // error text comes from start.gg and friends, so it never gets to ping
-    const message = `Something went wrong: ${err.message}`;
+    // detail stays in the logs. users get a plain line, since err text comes from start.gg
+    // and friends and would otherwise leak in the channel on a public deferred reply
+    const message = `Couldn't get that from start.gg right now.`;
     if (button) {
       await buttonFailed(interaction, message).catch(console.error);
     } else if (interaction.replied) {

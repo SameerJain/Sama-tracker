@@ -20,7 +20,7 @@ export async function post(interaction, fun) {
     // haiku and wiki text are quoted material, so they never get to ping
     await interaction.editReply({ ...reply, allowedMentions: { parse: [] } });
   } catch (err) {
-    // A source is down, so just say the command's line.
+    // a source is down, so fall back to the line
     console.error(`${fun.name} failed:`, err.message);
     await interaction.editReply(fun.line);
   }

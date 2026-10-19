@@ -4,7 +4,7 @@ import { buttonRow, replyEphemeral } from './shared.js';
 // a removal can be put back this long after
 const UNDO_SECONDS = 60;
 
-// Are you sure buttons for changes that are a pain to put back, and Undo buttons for removals. discord keeps
+// are-you-sure for hard-to-undo, undo for removals. discord keeps
 // nothing but a button's id, so it's choice:kind:target:discordId, with discordId whoever ran the command,
 // the only one who can press it. each kind is set up with confirmable by the module whose command it is:
 //   command: the command, for telling anyone else who presses it

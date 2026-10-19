@@ -1,9 +1,12 @@
 import { MessageFlags } from 'discord.js';
-import { asCommand, commandProgress } from '../startgg.js';
+import { asCommand, commandProgress, queueLength } from '../startgg.js';
 import { commandLabel, roughly } from './shared.js';
 
 // besides the one running. more than this and the newest gets turned away
 const QUEUED_PER_PERSON = 3;
+// waiting start.gg requests across everyone past this, and the newest command is
+// turned away instead of queueing for minutes behind the rest
+const QUEUED_GLOBAL_MAX = 200;
 // the time left on the one ahead only shows once it's this long
 const LEFT_SHOWN_SECONDS = 10;
 
@@ -25,6 +28,12 @@ async function inTurn(interaction, run) {
   const ahead = line.at(-1);
   const turn = { label: commandLabel(interaction), finished: false, progress: null };
   turn.done = new Promise((resolve) => { turn.finish = resolve; });
+  // the global check runs before this command takes a slot, so a backed-up
+  // start.gg turns the newest away instead of queueing it for minutes
+  if (!ahead && queueLength() >= QUEUED_GLOBAL_MAX) {
+    await interaction.reply({ content: 'start.gg is backed up right now, try again in a minute.', flags: MessageFlags.Ephemeral });
+    return false;
+  }
   line.push(turn);
   lines.set(userId, line);
   // the queued line has to land before the command goes on, or it could replace the answer
