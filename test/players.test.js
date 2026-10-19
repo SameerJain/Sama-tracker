@@ -594,6 +594,33 @@ test('/h2h venue and since leave out online sets and old ones, and name the filt
   assert.match(both.description, /-# Offline only · since <t:\d+:D>$/m);
 });
 
+test('/upcoming only lists tournaments with 3 or more of the crew registered', async () => {
+  const third = { userId: 3, playerId: 30, tag: 'Third', slug: 'user/third' };
+  state.players = { 1: { ...crew, discordId: 'crew-discord' }, 2: b, 3: third };
+  state.links = {};
+  const now = Math.floor(Date.now() / 1000);
+  const entry = (userId, event) => ({ userId, event, eventSlug: `tournament/t/event/${event}`, eventId: userId });
+  const tourney = (id, name, entries) => ({
+    id, name, slug: `tournament/${name}`, startAt: now + 3600, endAt: now + 7200,
+    city: 'Buffalo', addrState: 'NY', images: [], entries, userIds: [...new Set(entries.map((each) => each.userId))],
+  });
+  state.tournaments = {
+    // two of the crew in three events still stays out, it counts people
+    5: tourney(5, 'duo', [entry(1, 'Singles'), entry(1, 'Doubles'), entry(2, 'Singles')]),
+    6: tourney(6, 'crew-major', [entry(1, 'Singles'), entry(2, 'Singles'), entry(3, 'Singles')]),
+  };
+  const all = await run('upcoming', 'crew-discord', { player: 'all' });
+  assert.deepEqual(all.embeds.map((embed) => embed.data.title), ['crew-major']);
+  // one player still only sees their own events, but only in crew tournaments
+  const mine = await run('upcoming', 'crew-discord', { player: '1' });
+  assert.deepEqual(mine.embeds.map((embed) => embed.data.title), ['crew-major']);
+  assert.match(mine.embeds[0].data.description, /\*\*Players:\*\*\n\[Crew\]\(.*\): Singles/);
+  // nothing with enough crew says so
+  state.tournaments = { 5: tourney(5, 'duo', [entry(1, 'Singles'), entry(2, 'Singles')]) };
+  assert.match((await run('upcoming', 'crew-discord', { player: 'all' })).embeds[0].data.description, /No upcoming tournament has 3 or more of the crew registered yet/);
+  assert.match((await run('upcoming', 'crew-discord', { player: '1' })).embeds[0].data.description, /Crew has no upcoming tournament with 3 or more of the crew registered yet/);
+});
+
 test('h2h shows one-line predicted odds in both report lengths, never the breakdown', () => {
   const vs = (i, me, opponent, won) => ({
     id: `${me}-${i}`, completedAt: 1000 - i, winnerId: won ? me : opponent,

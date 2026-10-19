@@ -46,7 +46,7 @@ Player pickers list the last 5 people you picked first. Names match regardless o
 | `/track list` | List tracked players and who has set results, stream alerts or match call pings on. |
 | `/link profile:<link or ID>` | Link your own start.gg account. Leave out `profile` to find it by the Discord connected on start.gg, among the accounts `/profile` searches. |
 | `/unlink` | Remove your link, with an **Undo** button for a minute. Tracking stays as it was. |
-| `/upcoming` | Live and upcoming tournaments. |
+| `/upcoming` | Live and upcoming tournaments with 3 or more of the crew registered. |
 | `/recent` | Your last 5 sets. With `player:all`, up to 20 sets, at most 3 per player, from up to 40 players: those with set results on first, then whoever played most recently. |
 | `/run` | Your run and next opponent in each current bracket, with the station and scheduled time when the TO set them. Each next opponent gets a head-to-head button. |
 | `/stream player:<name or all> alerts:<on or off>` | Stream alerts for tracked players. |
@@ -112,7 +112,7 @@ Ranks use slippi.gg's cutoffs: Bronze 1 through Master 3 by rating, and Grandmas
 
 | Command | What it does |
 | --- | --- |
-| `/set_reg_reminder tournament:<link>` | Set registration reminders and track everyone registered. |
+| `/set_reg_reminder tournament:<link>` | Set registration reminders and track everyone registered (80 or fewer). |
 | `/delete_reg_reminder tournament:<name>` | Cancel reminders for a tournament, including ones added automatically. Asks first. |
 | `/reg_admin add profile:<link or ID>` | Set reminders automatically for every tournament this start.gg user admins. |
 | `/reg_admin remove admin:<name>` | Stop adding reminders for that admin. |
@@ -125,7 +125,7 @@ Ranks use slippi.gg's cutoffs: Bronze 1 through Master 3 by rating, and Grandmas
 
 `tournament` takes a start.gg link, or a tournament the bot already knows from the list: ones with reminders and ones tracked players are in, soonest first. `/set_reg_reminder` lists only upcoming ones without a reminder.
 
-Reminders go out 7 days, 3 days, 1 day and 12 hours before registration closes. If registration stays open past the tournament start, the start is the deadline. Past reminders are skipped, and a last call set within 12 hours goes out right away. Setting a reminder also tracks everyone registered, with set results, stream alerts and match call pings off.
+Reminders go out 7 days, 3 days, 1 day and 12 hours before registration closes. If registration stays open past the tournament start, the start is the deadline. Past reminders are skipped, and a last call set within 12 hours goes out right away. Setting a reminder also tracks everyone registered when 80 or fewer are registered, with set results, stream alerts and match call pings off. Over 80, nobody is tracked.
 
 Connect Discord on start.gg so the bot recognizes your registration and skips your reminder pings. A hidden entrant list blocks these checks. `/reg_warn` sends no ping if registration is closed, the person is registered, the list is hidden, or someone already warned them about that tournament in the last 12 hours. That last one tells only whoever ran it, with when they can be warned again.
 

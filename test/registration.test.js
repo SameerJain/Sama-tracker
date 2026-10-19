@@ -296,6 +296,87 @@ test('set_reg_reminder still sets the reminder when the list is hidden, tracking
   assert.doesNotMatch(edit[1].content, /now tracked/);
 });
 
+test('set_reg_reminder tracks nobody when over 80 are registered, without reading the list', async () => {
+  state.players = {};
+  state.regReminders = {};
+  state.messages = { registration: false };
+  let attendeePages = 0;
+  globalThis.fetch = async (_url, options) => {
+    const { query } = JSON.parse(options.body);
+    let data;
+    if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(), numAttendees: 120 } };
+    else if (query.includes('participants(')) {
+      attendeePages++;
+      data = { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    }
+    else if (query.includes('tournaments(query:')) data = {};
+    else if (query.includes('userEntrant')) data = { tournament: { ...tournament(), events: [] } };
+    else data = {};
+    return { ok: true, json: async () => ({ data }) };
+  };
+  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
+  await handleCommand(run);
+  assert.deepEqual(state.players, {});
+  assert.ok(state.regReminders[5]);
+  assert.equal(attendeePages, 0);
+  const edit = run.calls.find(([kind]) => kind === 'edit');
+  assert.match(edit[1].content, /120 are registered for Local, over 80, so nobody was tracked\./);
+});
+
+test('set_reg_reminder tracks nobody when the attendee pages run over 80', async () => {
+  state.players = {};
+  state.regReminders = {};
+  state.messages = { registration: false };
+  // no count from start.gg, so the pages decide
+  const nodes = Array.from({ length: 85 }, (_, i) => ({
+    gamerTag: `Player${i}`, player: { id: 1000 + i, gamerTag: `Player${i}` },
+    user: { id: 2000 + i, slug: `user/player${i}`, images: [], authorizations: [] },
+  }));
+  globalThis.fetch = async (_url, options) => {
+    const { query } = JSON.parse(options.body);
+    let data;
+    if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(), numAttendees: null } };
+    else if (query.includes('participants(')) data = { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes } } };
+    else if (query.includes('tournaments(query:')) data = {};
+    else if (query.includes('userEntrant')) data = { tournament: { ...tournament(), events: [] } };
+    else data = {};
+    return { ok: true, json: async () => ({ data }) };
+  };
+  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
+  await handleCommand(run);
+  assert.deepEqual(state.players, {});
+  assert.ok(state.regReminders[5]);
+  const edit = run.calls.find(([kind]) => kind === 'edit');
+  assert.match(edit[1].content, /85 are registered for Local, over 80, so nobody was tracked\./);
+});
+
+test('set_reg_reminder still tracks exactly 80 registered', async () => {
+  state.players = {};
+  state.regReminders = {};
+  state.messages = { registration: false };
+  const nodes = Array.from({ length: 80 }, (_, i) => ({
+    gamerTag: `Player${i}`, player: { id: 1000 + i, gamerTag: `Player${i}` },
+    user: { id: 2000 + i, slug: `user/player${i}`, images: [], authorizations: [] },
+  }));
+  globalThis.fetch = async (_url, options) => {
+    const { query } = JSON.parse(options.body);
+    let data;
+    if (query.includes('registrationClosesAt')) data = { tournament: { ...tournament(), numAttendees: nodes.length } };
+    else if (query.includes('participants(')) data = { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes } } };
+    else if (query.includes('tournaments(query:')) data = {};
+    else if (query.includes('userEntrant')) data = { tournament: { ...tournament(), events: [] } };
+    else data = {};
+    return { ok: true, json: async () => ({ data }) };
+  };
+  const run = interaction('set_reg_reminder', { tournament: 'start.gg/tournament/local' });
+  await handleCommand(run);
+  assert.equal(Object.keys(state.players).length, 80);
+  assert.ok(state.regReminders[5]);
+  const edit = run.calls.find(([kind]) => kind === 'edit');
+  assert.match(edit[1].content, /80 players from Local are now tracked, with set results, stream alerts and match call pings off\./);
+  state.players = {};
+});
+
 async function autocomplete(commandName, typed) {
   let choices;
   await handleAutocomplete({ commandName, options: { getSubcommand: () => null, getFocused: () => typed }, respond: async (result) => { choices = result; } });

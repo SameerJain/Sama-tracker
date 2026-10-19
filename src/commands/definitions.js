@@ -267,7 +267,7 @@ export const commands = [
   { name: 'status', description: 'Uptime, when the latest version was deployed, and the last start.gg and Slippi checks' },
   {
     name: 'set_reg_reminder',
-    description: 'Set a registration reminder and track everyone registered',
+    description: 'Set a registration reminder and track everyone registered (80 or fewer)',
     options: [{ type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true }],
   },
   {

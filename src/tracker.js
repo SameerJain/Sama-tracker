@@ -14,7 +14,7 @@ const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
 const PROFILE_CHECK_HOURS = 24;
 const ROLL_CALL_HOURS_BEFORE = 1;
-const ROLL_CALL_MIN_PLAYERS = 3;
+export const ROLL_CALL_MIN_PLAYERS = 3;
 // results wait this long after the end since TOs often report top 4 late
 const RESULTS_WAIT_HOURS = 12;
 // then this long if something's still missing, after that they go out with projected placements

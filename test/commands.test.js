@@ -190,7 +190,7 @@ const runs = [
   ['profile', {}, /"title":"Crew","url":"https:\/\/www\.start\.gg\/user\/crew"/],
   ['profile', { values: { player: '2' } }, /"title":"Rival","url":"https:\/\/www\.start\.gg\/user\/rival"/],
   ['profile', { values: { user: { id: 'stranger', bot: false, displayName: 'Stranger' } } }, /Couldn't find a start\.gg with Stranger's Discord connected/],
-  ['upcoming', {}, /Live · Crew/], ['upcoming', { values: { player: 'all' } }, /Live · everyone/],
+  ['upcoming', {}, /Crew has no upcoming tournament with 3 or more/], ['upcoming', { values: { player: 'all' } }, /No upcoming tournament has 3 or more/],
   ['recent', {}, /W · Crew 2-1 Rival/], ['recent', { values: { player: 'all' } }, /Crew 2-1 Rival/],
   ['run', {}, /Crew's run/], ['progress', {}, /Crew's progress/], ['progress', { values: { verbose: true } }, /Every 30 days, newest first/],
   // crew is on the slippi watchlist, rival and opponent aren't, so only crew shows up

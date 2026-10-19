@@ -6,6 +6,9 @@ import { stateDir } from './store.js';
 // overwritten by the next save
 const FILE = `${stateDir}/track-request.json`;
 
+// bulk adds stop here. a major would flood the tracked list, even one event at a time
+export const BULK_TRACK_MAX = 80;
+
 // start.gg link for a tournament, from the attendees page or anywhere else. takes the event
 // filter off the URL when it has one, like ?filter={"eventIds":["1682422"]}.
 // null when there's no tournament in it

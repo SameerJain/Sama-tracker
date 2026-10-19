@@ -104,7 +104,7 @@ export function help() {
       '`/stream` stream alerts on or off',
       '`/stream_pings` get pinged for every stream alert, on or off. Just for you, no tracking needed',
       '`/calls` match call pings on or off',
-      '`/upcoming` live and upcoming tournaments',
+      '`/upcoming` live and upcoming tournaments with 3 or more of the crew',
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
       '-# New players start with set results, stream alerts and match call pings off. `player:all` works with sets, stream, calls, upcoming and recent',
@@ -142,7 +142,7 @@ export function help() {
     ],
     [
       '**Registration**',
-      '`/set_reg_reminder` remind people to register, and track everyone registered',
+      '`/set_reg_reminder` remind people to register, and track everyone registered (80 or fewer)',
       '`/delete_reg_reminder` cancel one. Asks first',
       '`/reg_admin` TOs whose start.gg tournaments get reminders automatically',
       '`/reg_role` reminder pings on or off. Skipped once you\'re registered, if start.gg has your Discord',

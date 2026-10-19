@@ -2,7 +2,7 @@ import { MessageFlags, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { RUNS_LATE_HOURS, checkTournaments, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
+import { ROLL_CALL_MIN_PLAYERS, RUNS_LATE_HOURS, checkTournaments, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
 import { findAccount } from '../accounts.js';
 import { buttonRow, findPlayer, h2hButton, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
 import { askFirst, confirmable, undoRow } from './confirm.js';
@@ -167,6 +167,9 @@ async function upcoming(interaction) {
   const tournaments = [];
   for (const tournament of Object.values(state.tournaments)) {
     if (tournament.resultsPosted || now > endTime(tournament)) continue;
+    // only where the crew shows up, the same 3 as a roll call
+    const crew = new Set(tournament.entries.map((entry) => entry.userId).filter((id) => state.players[id]));
+    if (crew.size < ROLL_CALL_MIN_PLAYERS) continue;
 
     const entries = tournament.entries.filter((entry) => {
       if (!state.players[entry.userId]) return false;
@@ -177,7 +180,7 @@ async function upcoming(interaction) {
   tournaments.sort((a, b) => a.startAt - b.startAt);
 
   const who = choice === 'all' ? 'everyone' : choice.tag;
-  return sendEmbeds(interaction, embeds.upcoming(tournaments, state.players, who));
+  return sendEmbeds(interaction, embeds.upcoming(tournaments, state.players, who, { minimum: ROLL_CALL_MIN_PLAYERS }));
 }
 
 // someone from /link, straight from start.gg

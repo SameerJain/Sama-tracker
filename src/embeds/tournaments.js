@@ -310,11 +310,16 @@ function placementText(entry) {
   return `${medal(entry.placement)}${ordinal(entry.placement)} ${name}`;
 }
 
-// a card per tournament so each one gets its own image
-export function upcoming(tournaments, players, who) {
+// a card per tournament so each one gets its own image. minimum is how many of the crew
+// a tournament needs to list, for the empty answer
+export function upcoming(tournaments, players, who, { minimum = 0 } = {}) {
   if (!tournaments.length) {
-    const nobody = who === 'everyone' ? 'Nobody is' : `${escapeMarkdown(who)} isn't`;
-    return [baseEmbed(colors.brand).setTitle(`Upcoming · ${escapeMarkdown(who)}`).setDescription(`${nobody} registered for anything yet.`)];
+    const description = minimum > 1
+      ? (who === 'everyone'
+        ? `No upcoming tournament has ${minimum} or more of the crew registered yet.`
+        : `${escapeMarkdown(who)} has no upcoming tournament with ${minimum} or more of the crew registered yet.`)
+      : `${who === 'everyone' ? 'Nobody is' : `${escapeMarkdown(who)} isn't`} registered for anything yet.`;
+    return [baseEmbed(colors.brand).setTitle(`Upcoming · ${escapeMarkdown(who)}`).setDescription(description)];
   }
 
   const now = Math.floor(Date.now() / 1000);

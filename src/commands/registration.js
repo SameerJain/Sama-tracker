@@ -2,6 +2,7 @@ import { MessageFlags, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
+import { BULK_TRACK_MAX } from '../track-request.js';
 import { REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, newTracked, nextRegReminder, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts } from '../accounts.js';
 import { findPlayer, lookup, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag } from './shared.js';
@@ -9,6 +10,9 @@ import { askFirst, confirmable } from './confirm.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
+
+// /reg_warn pings someone once per tournament in this long
+const REG_WARN_COOLDOWN_HOURS = 12;
 
 // /reg_warn pings someone once per tournament in this long
 const REG_WARN_COOLDOWN_HOURS = 12;
@@ -78,25 +82,37 @@ async function setRegReminder(interaction) {
   // inside the last call window it goes out now
   checkRegReminders();
 
-  // everyone registered gets tracked too, the same as /track add
+  // everyone registered gets tracked too, the same as /track add, unless it's a big
+  // tournament. the count comes with the registration lookup, so a major skips the attendee pages
   let added = 0;
+  let skipped = 0;
   try {
-    const adding = (await startgg.getAttendees(tournament.id))
-      .filter((attendee) => attendee.userId && attendee.playerId && !state.players[attendee.userId]);
-    for (const player of adding) state.players[player.userId] = newTracked(player);
-    if (adding.length) {
-      save();
-      // don't wait 15 min for their tournaments to show up
-      checkTournaments();
+    if (tournament.numAttendees > REG_TRACK_MAX) {
+      skipped = tournament.numAttendees;
+    } else {
+      const attendees = await startgg.getAttendees(tournament.id);
+      if (attendees.length > REG_TRACK_MAX) {
+        skipped = attendees.length;
+      } else {
+        const adding = attendees
+          .filter((attendee) => attendee.userId && attendee.playerId && !state.players[attendee.userId]);
+        for (const player of adding) state.players[player.userId] = newTracked(player);
+        if (adding.length) {
+          save();
+          // don't wait 15 min for their tournaments to show up
+          checkTournaments();
+        }
+        added = adding.length;
+      }
     }
-    added = adding.length;
   } catch (err) {
     // the reminder is already saved, tracking just missed this one
     console.error(`tracking registrants for ${tournament.name} failed:`, err.message);
   }
   const tracked = added === 1
     ? ` 1 player from ${tournament.name} is now tracked, with set results, stream alerts and match call pings off.`
-    : added ? ` ${added} players from ${tournament.name} are now tracked, with set results, stream alerts and match call pings off.` : '';
+    : added ? ` ${added} players from ${tournament.name} are now tracked, with set results, stream alerts and match call pings off.`
+    : skipped ? ` ${skipped} are registered for ${tournament.name}, over ${REG_TRACK_MAX}, so nobody was tracked.` : '';
 
   if (firstAt <= secondsNow()) {
     return interaction.editReply({ content: `Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`, allowedMentions: { parse: [] } });
