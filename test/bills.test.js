@@ -11,7 +11,7 @@ delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const bills = await import('../src/bills.js');
 const embeds = await import('../src/embeds/index.js');
-const { postBillsResults, health } = await import('../src/tracker.js');
+const { postBillsResults, billsDelay, BILLS_BASELINE_HOURS, health } = await import('../src/tracker.js');
 const { messageSettings } = await import('../src/message-settings.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -190,4 +190,35 @@ test('an ESPN outage keeps old posts and shows on health', async () => {
       return { ok: true, json: async () => ({ events: scheduled }) };
     };
   }
+});
+
+test('the schedule state carries the next kickoff with the finals', async () => {
+  scheduled = [event({ id: '1' }), event({ id: '2', completed: false, billsScore: null, oppScore: null, winner: null })];
+  const { finals, nextDate } = await bills.getScheduleState(2026);
+  assert.deepEqual(finals.map((game) => game.id), ['1']);
+  assert.equal(nextDate, unix);
+});
+
+test('game day polls every 15 minutes, otherwise daily', () => {
+  const day = 24 * 60 * 60;
+  const baseline = BILLS_BASELINE_HOURS * 60 * 60 * 1000;
+  const gameday = 15 * 60 * 1000;
+  const kickoff = 1_000_000;
+  assert.equal(billsDelay(null, kickoff), baseline);
+  assert.equal(billsDelay(kickoff + 2 * day, kickoff), baseline);
+  assert.equal(billsDelay(kickoff, kickoff - 30 * 60), gameday);
+  assert.equal(billsDelay(kickoff, kickoff + 4 * 60 * 60), gameday);
+  assert.equal(billsDelay(kickoff, kickoff + 9 * 60 * 60), baseline);
+});
+
+test('the next check is tight when a game is near and daily otherwise', async () => {
+  state.messages = { bills: true };
+  const baseline = BILLS_BASELINE_HOURS * 60 * 60 * 1000;
+  // no game left on the schedule
+  scheduled = [event({ id: '1' })];
+  assert.equal(await postBillsResults(channel()), baseline);
+  // a game starting in half an hour
+  const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  scheduled = [{ ...event({ id: '2', completed: false, billsScore: null, oppScore: null, winner: null }), date: soon }];
+  assert.equal(await postBillsResults(channel()), 15 * 60 * 1000);
 });

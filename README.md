@@ -164,7 +164,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Match call pings | When a tracked player with `/calls` on has a set called. Pings their Discord when it's connected on start.gg, one message per set, with all four players in it for doubles. |
 | Tournament roll calls | An hour before a tournament with at least 3 tracked players. |
 | Tournament placements | 12 hours after the tournament ends, or up to 24 hours if results are incomplete. Unfinished placements are marked as projected. |
-| Top 8s | Off by default. Goes with the placements post: the top 8 of each event a tracked player entered, listing everyone, tracked or not. One card per event, marked as projected if the bracket isn't finished. If start.gg keeps failing on the top 8 for 12 hours, the placements post goes out without it. |
+| Top 8s | Off by default. As soon as every event a tracked player entered is finished: the top 8 of each event, listing everyone, tracked or not. One card per event. If the bracket still isn't finished when placements post, it goes with them marked as projected instead. If start.gg keeps failing on the top 8 for 12 hours, the placements post goes out without it. If the top 8 post itself fails to send, it is retried hourly for 3 days. |
 | Registration reminders | At the deadlines under [Registration](#registration), for people who turned on `/reg_role`. |
 | Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank, including their first rank of a season after Pending. A new season resetting everyone isn't posted. |
 | Bills final results | Off by default. After each Bills game: the final score with the other team's logo, green for a win and red for a loss, plus quarters and yards. |
@@ -172,7 +172,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 Singles stream alerts and match calls get a **Head to head** button that replies privately to whoever presses it. It comes off when the set ends, or 12 hours after the post.
 
-The set, stream and match call checks run every 2 minutes. Each asks start.gg only about players with that switch on, 20 players per request, so the checks stay small however many players are tracked. When the stream check finds a new set on stream, it asks again 30 seconds later to confirm. A set in a stream queue links that queue's stream. Rechecking recent set results and match calls takes one request per 50 posts, plus 1 per 10 set results whose winner or score changed. Bills finals check ESPN every 15 minutes, one request plus one per new final.
+The set, stream and match call checks run every 2 minutes. Each asks start.gg only about players with that switch on, 20 players per request, so the checks stay small however many players are tracked. When the stream check finds a new set on stream, it asks again 30 seconds later to confirm. A set in a stream queue links that queue's stream. Rechecking recent set results and match calls takes one request per 50 posts, plus 1 per 10 set results whose winner or score changed. Bills finals check ESPN daily, every 15 minutes from an hour before kickoff until 8 hours after: one request plus one per new final.
 
 After the bot has been down, set results from the last 3 hours still post and older ones are skipped. `/status` says when that happened.
 

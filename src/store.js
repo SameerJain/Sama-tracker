@@ -20,6 +20,7 @@ const FILE = `${stateDir}/state.json`;
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
 // callPosts are match calls still watched for the set going back to waiting or not starting: { setId, channelId, messageId, calledAt, discordIds, warned }.
 // a tournament with projected: { at, checkedAt, results, top8 } had placements go out projected, each list being the { channelId, messageId } posts to edit once they're final.
+// a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
 const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], streamPings: [], regAdmins: {}, regSkipped: [],

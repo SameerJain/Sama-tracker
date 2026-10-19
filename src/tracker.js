@@ -36,8 +36,12 @@ export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
 export const RUNS_LATE_HOURS = 6;
 // slippi ranks only change after ranked sets, and its API isn't public, so it gets asked less than start.gg
 const SLIPPI_CHECK_MINUTES = 30;
-// Bills play weekly, so every 15 minutes is plenty for a final
-const BILLS_CHECK_MINUTES = 15;
+// one or two games a week, so daily is plenty except near kickoff, when a
+// final can land any minute over about 4 hours
+export const BILLS_BASELINE_HOURS = 24;
+const BILLS_GAMEDAY_MINUTES = 15;
+const BILLS_PREGAME_HOURS = 1;
+const BILLS_POSTGAME_HOURS = 8;
 // players with no connect code on start.gg get looked at again this often, in case they play a netplay tournament since
 const SLIPPI_SEARCH_DAYS = 7;
 const SLIPPI_SKIPPED_KEPT = 1000;
@@ -122,7 +126,7 @@ export function startTracking(postChannel) {
   importTrackRequest();
   checkSlippiCodes();
   checkSlippiRanks();
-  checkBills();
+  loopBills();
   checkPrune();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
@@ -130,7 +134,6 @@ export function startTracking(postChannel) {
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
   setInterval(checkSlippiCodes, PROFILE_CHECK_HOURS * HOUR * 1000);
   setInterval(checkSlippiRanks, SLIPPI_CHECK_MINUTES * 60 * 1000);
-  setInterval(checkBills, BILLS_CHECK_MINUTES * 60 * 1000);
   setInterval(checkPrune, PRUNE_CHECK_DAYS * DAY * 1000);
   setInterval(checkWeeklyRecap, 60 * 1000);
   // the tool at the other end waits on this, so it's checked more often than the tournaments
@@ -229,8 +232,22 @@ export const checkRegReminders = queued(postRegReminders);
 const checkWeeklyRecap = queued(postWeeklyRecap);
 const checkSlippiCodes = queued(findSlippiCodes);
 const checkSlippiRanks = queued(postRankChanges);
-const checkBills = queued(postBillsResults);
 const checkPrune = queued(pruneInactive);
+
+// Bills runs on its own loop below since game day polls tighter than the baseline
+let billsRunning = false;
+async function loopBills() {
+  let delay = BILLS_BASELINE_HOURS * HOUR * 1000;
+  if (!billsRunning) {
+    billsRunning = true;
+    try {
+      delay = await postBillsResults();
+    } finally {
+      billsRunning = false;
+    }
+  }
+  setTimeout(loopBills, delay);
+}
 
 export async function postWeeklyRecap(postChannel = channel, now = secondsNow()) {
   const period = weeklyPeriod(now, messageSettings());
@@ -356,12 +373,23 @@ export async function postRankChanges(postChannel = channel) {
   save();
 }
 
+// 15 minutes from an hour before kickoff until 8 hours after, daily otherwise.
+// a live game keeps its kickoff as the next date until it's final, so the tight
+// polling covers the whole game plus any OT or ESPN delay
+export function billsDelay(nextDate, now = secondsNow()) {
+  if (nextDate != null && now >= nextDate - BILLS_PREGAME_HOURS * HOUR && now <= nextDate + BILLS_POSTGAME_HOURS * HOUR) {
+    return BILLS_GAMEDAY_MINUTES * 60 * 1000;
+  }
+  return BILLS_BASELINE_HOURS * HOUR * 1000;
+}
+
 // Bills finals, one request for the schedule and one per new final for quarters
-// and yards. off by default, and anything final while it was off stays skipped
+// and yards. off by default, and anything final while it was off stays skipped.
+// returns when to check again so the loop stays daily except near kickoff
 export async function postBillsResults(postChannel = channel) {
   const checkedAt = secondsNow();
   try {
-    const finals = await bills.getFinals();
+    const { finals, nextDate } = await bills.getScheduleState();
     finals.sort((a, b) => a.date - b.date);
     state.billsPosted ??= [];
     for (const game of finals) {
@@ -381,11 +409,14 @@ export async function postBillsResults(postChannel = channel) {
     state.billsPosted = (state.billsPosted ?? []).slice(-50);
     health.billsCheck = checkedAt;
     health.billsError = null;
+    save();
+    return billsDelay(nextDate, checkedAt);
   } catch (err) {
     console.error('checking Bills finals failed:', err.message);
     health.billsError = err.message;
   }
   save();
+  return BILLS_BASELINE_HOURS * HOUR * 1000;
 }
 
 // picks up tag, avatar and connected discord changes for tracked and /link people, 20 a request
@@ -970,9 +1001,15 @@ async function updateTournaments() {
       if (secondsNow() > endTime(tournament) + 7 * DAY) {
         await unpinTournamentThread(channel, tournament);
         delete state.tournaments[tournament.id];
-      } else if (tournament.projected) {
-        await correctPlacements(tournament)
-          .catch((err) => console.error(`correcting placements for ${tournament.name ?? tournament.id} failed:`, err.message));
+      } else {
+        if (tournament.projected) {
+          await correctPlacements(tournament)
+            .catch((err) => console.error(`correcting placements for ${tournament.name ?? tournament.id} failed:`, err.message));
+        }
+        if (tournament.top8Failed) {
+          await verifyTopEight(tournament)
+            .catch((err) => console.error(`verifying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message));
+        }
       }
       continue;
     }
@@ -1028,6 +1065,9 @@ export async function postResults(tournament, postChannel = channel) {
   if (now < tournament.startAt) return;
 
   if (tournament.entries.length && tournament.entries.every((entry) => entry.done)) tournament.doneAt ??= now;
+  // the top 8 goes out as soon as every event is finished, without waiting 12 hours for placements
+  if (!tournament.top8Posted) await postEarlyTopEight(tournament, postChannel, now);
+
   const waited = now - overAt(tournament);
   if (waited < RESULTS_WAIT_HOURS * HOUR) return;
 
@@ -1038,9 +1078,10 @@ export async function postResults(tournament, postChannel = channel) {
   if (!allIn && waited < RESULTS_GIVE_UP_HOURS * HOUR) return;
 
   const dueAt = overAt(tournament) + (allIn ? RESULTS_WAIT_HOURS : RESULTS_GIVE_UP_HOURS) * HOUR;
-  // fetched before anything posts, so a start.gg error retries both next hour instead of repeating placements
+  // fetched before anything posts, so a start.gg error retries both next hour instead of repeating placements.
+  // skipped when the top 8 already went out early
   let events = [];
-  if (messageEnabled('top8', dueAt)) {
+  if (!tournament.top8Posted && messageEnabled('top8', dueAt)) {
     try {
       events = await topEightEvents(entries);
     } catch (err) {
@@ -1052,15 +1093,102 @@ export async function postResults(tournament, postChannel = channel) {
   // marked before the top 8 goes, so discord failing on it can't post the placements again
   tournament.resultsPosted = true;
   let topEight = [];
-  if (events.length) {
-    topEight = await post(embeds.topEight(tournament, events), 'top8', dueAt, postChannel).catch((err) => {
+  if (!tournament.top8Posted && events.length) {
+    const sentTopEight = await post(embeds.topEight(tournament, events), 'top8', dueAt, postChannel).catch((err) => {
       console.error(`posting the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
-      return [];
+      return null;
     });
+    if (sentTopEight) {
+      topEight = sentTopEight;
+      tournament.top8Posted = true;
+    } else {
+      // the fail-safe retries this hourly, see verifyTopEight
+      tournament.top8Failed = true;
+      tournament.top8FailedAt ??= now;
+    }
+  } else if (!tournament.top8Posted && !messageEnabled('top8', dueAt)) {
+    // switched off counts as posted, so the fail-safe doesn't replay it
+    tournament.top8Posted = true;
   }
   // projected ones get edited once start.gg has them final, see correctPlacements
   const projected = { at: now, results: allIn ? [] : postRefs(results), top8: events.every((event) => event.done) ? [] : postRefs(topEight) };
   if (projected.results.length || projected.top8.length) tournament.projected = projected;
+}
+
+// posts the top 8 as soon as every event the crew played in is finished, before placements are due.
+// true once it went out or was consumed while switched off, so later placements skip it
+async function postEarlyTopEight(tournament, postChannel, now) {
+  const entries = tournament.entries.filter((entry) => entry.started);
+  if (!entries.length || !entries.every((entry) => entry.done)) return false;
+  // switched off counts as posted, so turning it back on doesn't replay it
+  if (!messageEnabled('top8', now)) {
+    tournament.top8Posted = true;
+    return true;
+  }
+  let events;
+  try {
+    events = await fetchDoneTopEight(entries);
+  } catch (err) {
+    console.error(`early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+    return false;
+  }
+  if (!events) return false;
+  try {
+    await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
+  } catch (err) {
+    console.error(`posting the early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+    return false;
+  }
+  tournament.top8Posted = true;
+  return true;
+}
+
+// every event the crew played in, once all of them are finished. null while the bracket
+// is still running. the entries gate the fetch, so live tournaments cost nothing extra
+async function fetchDoneTopEight(entries) {
+  const started = entries.filter((entry) => entry.started);
+  if (!started.length) return null;
+  const events = await topEightEvents(started);
+  // a missing event or an unfinished one means the bracket isn't fully reported yet
+  const distinct = new Set(started.filter((entry) => entry.eventId).map((entry) => entry.eventId)).size;
+  if (!events.length || events.length < distinct || !events.every((event) => event.done)) return null;
+  return events;
+}
+
+// fail-safe: a top 8 that failed to send gets retried hourly for 3 days, then gives up.
+// only tournaments the new code marked with top8Failed come here, so ones from before the
+// flag existed never get a second top 8. true once it went out or there's nothing to retry
+export async function verifyTopEight(tournament, postChannel = channel, now = secondsNow()) {
+  if (tournament.top8Posted || !tournament.top8Failed) return true;
+  if (now - (tournament.top8CheckedAt ?? 0) < HOUR) return false;
+  tournament.top8CheckedAt = now;
+  if (now > (tournament.top8FailedAt ?? now) + PROJECTED_KEPT_DAYS * DAY) {
+    delete tournament.top8Failed;
+    delete tournament.top8FailedAt;
+    delete tournament.top8CheckedAt;
+    return false;
+  }
+  // switched off since it failed: keep the marker so it retries if switched back on
+  if (!messageEnabled('top8')) return false;
+  let events;
+  try {
+    events = await fetchDoneTopEight(tournament.entries);
+  } catch (err) {
+    console.error(`retrying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+    return false;
+  }
+  if (!events) return false;
+  try {
+    await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
+  } catch (err) {
+    console.error(`retrying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+    return false;
+  }
+  tournament.top8Posted = true;
+  delete tournament.top8Failed;
+  delete tournament.top8FailedAt;
+  delete tournament.top8CheckedAt;
+  return true;
 }
 
 // a placement that won't change: the event's over, or they're out of it

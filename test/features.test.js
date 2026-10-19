@@ -750,6 +750,151 @@ test('top 8s start off, then post every event the crew entered with everyone in 
   assert.equal(rejected.resultsPosted, true);
 });
 
+test('the top 8 goes out as soon as the bracket is finished, without waiting for placements', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...crewPlayer } };
+  const entry = (done) => ({ userId: 1, eventId: 501, event: 'Singles', eventSlug: event.slug, entrants: 32,
+    started: true, done, placement: 5, final: true });
+  const standing = (placement, name) => ({ placement, isFinal: true, entrant: { name } });
+  const asked = [];
+  mockApi(({ query }) => {
+    asked.push(query);
+    return { e501: { state: 'COMPLETED', standings: { nodes: [standing(1, 'Champ'), standing(2, 'Runner')] } } };
+  });
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+
+  // bracket done but the tournament hasn't ended, so placements aren't due yet
+  state.messages = { top8: true };
+  const live = { name: 'Local', slug: 'tournament/local', startAt: now - 2 * 3600, endAt: now + 2 * 3600, entries: [entry(true)] };
+  await tracker.postResults(live, channel);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Top 8/);
+  assert.equal(live.resultsPosted, undefined);
+  assert.equal(live.top8Posted, true);
+
+  // the next check doesn't post it again
+  await tracker.postResults(live, channel);
+  assert.equal(sent.length, 1);
+
+  // once placements are due only they go out, without a second top 8
+  sent.length = 0;
+  live.startAt = now - 14 * 3600;
+  live.endAt = now - 13 * 3600;
+  await tracker.postResults(live, channel);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Results/);
+  assert.equal(live.resultsPosted, true);
+
+  // switched off it's consumed without asking start.gg, and later placements skip it
+  state.messages = {};
+  asked.length = 0;
+  sent.length = 0;
+  const quiet = { name: 'Local', slug: 'tournament/local', startAt: now - 2 * 3600, endAt: now + 2 * 3600, entries: [entry(true)] };
+  await tracker.postResults(quiet, channel);
+  assert.equal(asked.length, 0);
+  assert.equal(sent.length, 0);
+  assert.equal(quiet.top8Posted, true);
+  assert.equal(quiet.resultsPosted, undefined);
+
+  // a bracket still running posts nothing and asks nothing
+  state.messages = { top8: true };
+  asked.length = 0;
+  const running = { name: 'Local', slug: 'tournament/local', startAt: now - 2 * 3600, endAt: now + 2 * 3600, entries: [entry(false)] };
+  await tracker.postResults(running, channel);
+  assert.equal(asked.length, 0);
+  assert.equal(sent.length, 0);
+  assert.equal(running.top8Posted, undefined);
+
+  // finished entries but an unfinished event on start.gg waits too
+  mockApi(() => ({ e501: { state: 'ACTIVE', standings: { nodes: [standing(1, 'Champ')] } } }));
+  const undecided = { name: 'Local', slug: 'tournament/local', startAt: now - 2 * 3600, endAt: now + 2 * 3600, entries: [entry(true)] };
+  await tracker.postResults(undecided, channel);
+  assert.equal(sent.length, 0);
+  assert.equal(undecided.top8Posted, undefined);
+});
+
+test('a top 8 that fails to send is retried by the fail-safe instead of being lost', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...crewPlayer } };
+  const entries = [{ userId: 1, eventId: 501, event: 'Singles', eventSlug: event.slug, entrants: 32,
+    started: true, done: true, placement: 5, final: true }];
+  const standing = (placement, name) => ({ placement, isFinal: true, entrant: { name } });
+  mockApi(() => ({ e501: { state: 'COMPLETED', standings: { nodes: [standing(1, 'Champ'), standing(2, 'Runner')] } } }));
+  state.messages = { top8: true };
+  const sent = [];
+  let rejectTopEight = true;
+  const channel = { send: async (payload) => {
+    if (rejectTopEight && payload.embeds.some((card) => card.toJSON().author.name.startsWith('Top 8'))) throw new Error('Missing Permissions');
+    sent.push(payload);
+    return { id: `m${sent.length}`, channelId: 'c1' };
+  } };
+
+  // placements due but the top 8 fails on discord: placements still go out, marked for retry
+  const tournament = { name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600, entries };
+  await tracker.postResults(tournament, channel);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Results/);
+  assert.equal(tournament.resultsPosted, true);
+  assert.equal(tournament.top8Posted, undefined);
+  assert.equal(tournament.top8Failed, true);
+
+  // the fail-safe sends the missing top 8 once discord accepts it, without reposting placements
+  rejectTopEight = false;
+  sent.length = 0;
+  assert.equal(await tracker.verifyTopEight(tournament, channel), true);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Top 8/);
+  assert.equal(tournament.top8Posted, true);
+  assert.equal(tournament.top8Failed, undefined);
+
+  // and stays quiet afterwards
+  mockApi(() => { throw new Error('already verified'); });
+  sent.length = 0;
+  assert.equal(await tracker.verifyTopEight(tournament, channel), true);
+  assert.equal(sent.length, 0);
+
+  // switched off it waits instead of sending, keeping the marker
+  const muted = { name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600,
+    entries, resultsPosted: true, top8Failed: true, top8FailedAt: now };
+  state.messages = {};
+  sent.length = 0;
+  assert.equal(await tracker.verifyTopEight(muted, channel), false);
+  assert.equal(sent.length, 0);
+  assert.equal(muted.top8Failed, true);
+
+  // a start.gg failure waits an hour before trying again
+  state.messages = { top8: true };
+  let fetches = 0;
+  globalThis.fetch = async () => {
+    fetches++;
+    return { ok: false, status: 500, json: async () => ({ message: 'down' }) };
+  };
+  const flaky = { name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600,
+    entries, resultsPosted: true, top8Failed: true, top8FailedAt: now };
+  assert.equal(await tracker.verifyTopEight(flaky, channel), false);
+  assert.equal(flaky.top8Failed, true);
+  assert.equal(await tracker.verifyTopEight(flaky, channel), false);
+  assert.equal(fetches, 1);
+
+  // after 3 days it gives up without sending
+  const stale = { name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600,
+    entries, resultsPosted: true, top8Failed: true, top8FailedAt: now - 4 * 86400 };
+  mockApi(() => { throw new Error('should have given up'); });
+  sent.length = 0;
+  assert.equal(await tracker.verifyTopEight(stale, channel), false);
+  assert.equal(sent.length, 0);
+  assert.equal(stale.top8Failed, undefined);
+
+  // tournaments from before the marker existed never get a second top 8
+  const legacy = { name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600,
+    entries, resultsPosted: true };
+  mockApi(() => { throw new Error('legacy must not be fetched'); });
+  assert.equal(await tracker.verifyTopEight(legacy, channel), true);
+  assert.equal(sent.length, 0);
+  assert.equal(legacy.top8Posted, undefined);
+});
+
 test('every message gets a picture, the bot avatar on its first card when nothing in it has one', () => {
   const avatar = 'https://cdn.discordapp.com/avatars/bot/avatar.png';
   const plain = (n) => new EmbedBuilder().setTitle(`Card ${n}`).setDescription('text');

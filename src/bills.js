@@ -49,8 +49,17 @@ export function toGame(event) {
 }
 
 export async function getFinals(season = seasonYear()) {
+  return (await getScheduleState(season)).finals;
+}
+
+// finals plus the next kickoff in one schedule request, so the tracker can
+// poll daily and only go tight on game day. nextDate is null with no game left
+export async function getScheduleState(season = seasonYear()) {
   const data = await getJson(SCHEDULE(season));
-  return (data.events ?? []).map(toGame).filter((game) => game?.completed && game.billsScore != null);
+  const games = (data.events ?? []).map(toGame).filter(Boolean);
+  const finals = games.filter((game) => game.completed && game.billsScore != null);
+  const nextDate = games.filter((game) => !game.completed).map((game) => game.date).sort((a, b) => a - b)[0] ?? null;
+  return { finals, nextDate };
 }
 
 // quarters and team totals for one final. null when ESPN has no summary yet,
