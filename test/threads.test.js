@@ -21,13 +21,19 @@ let threadCount = 0;
 
 // a text channel that keeps what was sent to it and the threads started on its messages.
 // threads outlive the channel object, like they outlive a restart
-function fakeChannel({ allowed = BOTH, threads = new Map() } = {}) {
+function fakeChannel({ allowed = BOTH, threads = new Map(), pinFails = false } = {}) {
   const channel = {
-    id: 'posts', sent: [], threads: null, client: { user: { id: 'bot' } },
+    id: 'posts', sent: [], pinned: [], unpinned: [], cards: new Map(), threads: null,
+    client: { user: { id: 'bot' } },
     permissionsFor: () => ({ has: flag => allowed.some(name => PermissionFlagsBits[name] === flag) }),
     send: async message => {
       channel.sent.push(message);
-      return {
+      const card = {
+        id: `card-${channel.sent.length}`, channelId: 'posts',
+        pin: async () => {
+          if (pinFails) throw new Error('Missing Permissions');
+          channel.pinned.push(card.id);
+        },
         startThread: async ({ name }) => {
           const thread = { id: `thread-${++threadCount}`, name, sent: [], locked: false };
           thread.send = async sent => {
@@ -36,6 +42,22 @@ function fakeChannel({ allowed = BOTH, threads = new Map() } = {}) {
           };
           threads.set(thread.id, thread);
           return thread;
+        },
+      };
+      channel.cards.set(card.id, card);
+      return card;
+    },
+  };
+  channel.client.channels = {
+    fetch: async id => {
+      if (id !== 'posts') throw Object.assign(new Error('Unknown Channel'), { code: RESTJSONErrorCodes.UnknownChannel });
+      return {
+        messages: {
+          unpin: async messageId => {
+            if (!channel.cards.has(messageId)) throw Object.assign(new Error('Unknown Message'), { code: RESTJSONErrorCodes.UnknownMessage });
+            channel.unpinned.push(messageId);
+            channel.pinned = channel.pinned.filter(each => each !== messageId);
+          },
         },
       };
     },
@@ -218,6 +240,93 @@ test('stream alerts and their pings go in the tournament thread', async () => {
   assert.equal(thread.sent.length, 1);
   assert.equal(thread.sent[0].content, '<@fan> on stream');
   assert.deepEqual(thread.sent[0].allowedMentions, { users: ['fan'] });
+});
+
+test('tournament threads pin their channel card, event threads do not', async () => {
+  const channel = fakeChannel();
+  sets = [node('a1', now() - 30, tournament('Local'))];
+  await tracker.postNewSets(channel);
+  assert.deepEqual(channel.pinned, ['card-1']);
+  const entry = state.threads['tournament/local'];
+  assert.equal(entry.messageId, 'card-1');
+  assert.equal(entry.channelId, 'posts');
+  assert.equal(entry.pinned, true);
+
+  state.messages = { threads: 'event' };
+  state.posted = [];
+  const eventChannel = fakeChannel();
+  sets = [node('s1', now(), tournament('Local'))];
+  await tracker.postNewSets(eventChannel);
+  assert.deepEqual(eventChannel.pinned, []);
+  assert.equal(state.threads['tournament/local/event/singles'].pinned, undefined);
+});
+
+test('a thread still posts when pinning fails', async () => {
+  const channel = fakeChannel({ pinFails: true });
+  sets = [node('a1', now(), tournament('Local'))];
+  await tracker.postNewSets(channel);
+  assert.equal(channel.threads.all.size, 1);
+  assert.deepEqual(channel.pinned, []);
+  assert.equal(state.threads['tournament/local'].pinned, false);
+});
+
+test('a pinned starter is unpinned once its tournament is over', async () => {
+  const channel = fakeChannel();
+  sets = [node('a1', now() - 30, tournament('Local'))];
+  await tracker.postNewSets(channel);
+  assert.equal(state.threads['tournament/local'].pinned, true);
+
+  // still running, so the pin stays
+  state.tournaments = { 7: { id: 7, name: 'Local', slug: 'tournament/local', startAt: now() - 3600, endAt: now() + 3600, entries: [], userIds: [1] } };
+  await tracker.unpinFinishedThreads(channel);
+  assert.equal(state.threads['tournament/local'].pinned, true);
+  assert.deepEqual(channel.unpinned, []);
+
+  // past the end plus time for locals running late, so it comes off
+  state.tournaments[7].endAt = now() - 7 * 3600;
+  await tracker.unpinFinishedThreads(channel);
+  assert.equal(state.threads['tournament/local'].pinned, false);
+  assert.deepEqual(channel.unpinned, ['card-1']);
+
+  // already off, so nothing more to unpin
+  await tracker.unpinFinishedThreads(channel);
+  assert.deepEqual(channel.unpinned, ['card-1']);
+});
+
+test('placements posted unpin even with a far-out end date, unknown tournaments wait', async () => {
+  const channel = fakeChannel();
+  sets = [node('a1', now() - 30, tournament('Local'))];
+  await tracker.postNewSets(channel);
+  state.tournaments = { 7: { id: 7, name: 'Local', slug: 'tournament/local', startAt: now() - 3600, endAt: now() + 86400, entries: [], userIds: [1], resultsPosted: true } };
+  await tracker.unpinFinishedThreads(channel);
+  assert.equal(state.threads['tournament/local'].pinned, false);
+  assert.deepEqual(channel.unpinned, ['card-1']);
+
+  const other = fakeChannel();
+  sets = [node('b1', now(), tournament('Weekly'))];
+  await tracker.postNewSets(other);
+  assert.equal(state.threads['tournament/weekly'].pinned, true);
+  // its tournament hasn't shown up in the tracked list yet, so the pin stays
+  await tracker.unpinFinishedThreads(other);
+  assert.equal(state.threads['tournament/weekly'].pinned, true);
+  assert.deepEqual(other.unpinned, []);
+});
+
+test('replacing a deleted thread unpins its old card and pins the new one', async () => {
+  const threads = new Map();
+  const channel = fakeChannel({ threads });
+  sets = [node('first', now() - 20, tournament('Local'))];
+  await tracker.postNewSets(channel);
+  const first = { ...state.threads['tournament/local'] };
+
+  threads.delete(first.id);
+  sets = [node('second', now() - 10, tournament('Local'))];
+  await tracker.postNewSets(channel);
+  assert.deepEqual(channel.unpinned, [first.messageId]);
+  const replacement = state.threads['tournament/local'];
+  assert.notEqual(replacement.id, first.id);
+  assert.equal(replacement.pinned, true);
+  assert.deepEqual(channel.pinned, [replacement.messageId]);
 });
 
 async function configure(values, channel) {

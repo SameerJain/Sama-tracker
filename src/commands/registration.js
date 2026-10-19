@@ -14,9 +14,6 @@ const BRACKET_MINUTES_BEFORE = 30;
 // /reg_warn pings someone once per tournament in this long
 const REG_WARN_COOLDOWN_HOURS = 12;
 
-// /reg_warn pings someone once per tournament in this long
-const REG_WARN_COOLDOWN_HOURS = 12;
-
 // discord takes this many ids a request when checking who's in the server
 const MEMBERS_PER_FETCH = 100;
 
@@ -87,11 +84,11 @@ async function setRegReminder(interaction) {
   let added = 0;
   let skipped = 0;
   try {
-    if (tournament.numAttendees > REG_TRACK_MAX) {
+    if (tournament.numAttendees > BULK_TRACK_MAX) {
       skipped = tournament.numAttendees;
     } else {
       const attendees = await startgg.getAttendees(tournament.id);
-      if (attendees.length > REG_TRACK_MAX) {
+      if (attendees.length > BULK_TRACK_MAX) {
         skipped = attendees.length;
       } else {
         const adding = attendees
@@ -112,7 +109,7 @@ async function setRegReminder(interaction) {
   const tracked = added === 1
     ? ` 1 player from ${tournament.name} is now tracked, with set results, stream alerts and match call pings off.`
     : added ? ` ${added} players from ${tournament.name} are now tracked, with set results, stream alerts and match call pings off.`
-    : skipped ? ` ${skipped} are registered for ${tournament.name}, over ${REG_TRACK_MAX}, so nobody was tracked.` : '';
+    : skipped ? ` ${skipped} are registered for ${tournament.name}, over ${BULK_TRACK_MAX}, so nobody was tracked.` : '';
 
   if (firstAt <= secondsNow()) {
     return interaction.editReply({ content: `Registration for ${tournament.name} ends <t:${deadline}:R>, sending the last call now.${tracked}`, allowedMentions: { parse: [] } });

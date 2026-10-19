@@ -29,7 +29,7 @@ test('message controls are registered for server managers', () => {
   const command = commands.find(c => c.name === 'messages');
   assert.equal(command?.default_member_permissions, PermissionFlagsBits.ManageGuild.toString());
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'slippi', 'recap']);
+    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'slippi', 'recap', 'bills']);
   // three modes, picked by name
   const threads = command.options.find(o => o.name === 'threads');
   assert.equal(threads.type, 3);
@@ -91,6 +91,7 @@ test('running messages without options shows defaults without writing settings',
   assert.match(reply.content, /Set results:\*\* on/);
   assert.match(reply.content, /Match call pings:\*\* off/);
   assert.match(reply.content, /Top 8s:\*\* off/);
+  assert.match(reply.content, /Bills final results:\*\* off/);
   assert.match(reply.content, /Sunday 21:00 EST/);
   assert.deepEqual(state.messages, {});
 });

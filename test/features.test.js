@@ -1441,3 +1441,57 @@ test('/calls turns match call pings on or off for one player or everyone', async
   assert.equal((await calls({ player: 'all', pings: 'off' })).content, 'Match call pings off for everyone.');
   assert.ok(Object.values(state.players).every(player => player.callPings === false));
 });
+
+test('newly tracked players save when they were added, so the prune knows they are not inactive', () => {
+  const before = Math.floor(Date.now() / 1000);
+  const player = tracker.newTracked(crewPlayer);
+  assert.ok(player.trackedAt >= before);
+  assert.ok(player.lastCheck >= before);
+});
+
+test('players with no reported sets in 6 months come off the track list silently', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const old = now - 200 * DAY;
+  const recent = now - 10 * DAY;
+  state.players = {
+    1: { ...crewPlayer, lastSetAt: recent, trackedAt: recent },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastSetAt: old, trackedAt: old },
+    // never played, tracked long ago
+    3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', trackedAt: old },
+    4: { userId: 4, playerId: 40, tag: 'New', slug: 'user/new', trackedAt: recent },
+  };
+  // only the stale two get a fresh lookup, and start.gg has nothing new for either.
+  // the prune takes no channel, so nothing can go out on discord
+  const asked = [];
+  mockApi(({ query }) => {
+    const aliases = [...query.matchAll(/(p\d+): player\(/g)].map(([, alias]) => alias);
+    asked.push(...aliases);
+    return Object.fromEntries(aliases.map((alias) => [alias, { sets: { nodes: [] } }]));
+  });
+  const pruned = await tracker.pruneInactive(now);
+  assert.deepEqual(pruned.map((player) => player.tag).sort(), ['Quiet', 'Rival']);
+  assert.deepEqual(Object.keys(state.players).sort(), ['1', '4']);
+  assert.deepEqual(asked.sort(), ['p20', 'p30']);
+});
+
+test('a stale player with a recent set on start.gg stays, with a fresh last set time', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const old = now - 200 * DAY;
+  state.players = {
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastSetAt: old, trackedAt: old },
+  };
+  mockApi(() => ({ p20: { sets: { nodes: [node('recent-set', now - DAY, 20)] } } }));
+  assert.deepEqual(await tracker.pruneInactive(now), []);
+  assert.equal(state.players[2].lastSetAt, now - DAY);
+});
+
+test('a failed prune lookup keeps everyone tracked', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const old = now - 200 * DAY;
+  state.players = {
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastSetAt: old, trackedAt: old },
+  };
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+  assert.deepEqual(await tracker.pruneInactive(now), []);
+  assert.ok(state.players[2]);
+});

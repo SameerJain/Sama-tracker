@@ -11,7 +11,7 @@ export function trackedList(players, linked = 0) {
     return notes.length ? `${playerLink(player)} · ${notes.join(' · ')}` : playerLink(player);
   });
   if (!all.length) lines.push('Nobody yet. Add someone with `/track add`.');
-  lines.push('', '-# Their placements get posted here, plus their sets, streams and match calls once `/sets`, `/stream` and `/calls` turn them on. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
+  lines.push('', '-# Their placements get posted here, plus their sets, streams and match calls once `/sets`, `/stream` and `/calls` turn them on. Players with no reported sets in 6 months come off the list on their own. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
   if (linked) lines.push(`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
   return withLines(embed, lines);
 }
@@ -108,6 +108,7 @@ export function help() {
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
       '-# New players start with set results, stream alerts and match call pings off. `player:all` works with sets, stream, calls, upcoming and recent',
+      '-# Players with no reported sets in 6 months come off the track list on their own',
     ],
     [
       '**Linking yourself**',
@@ -162,6 +163,7 @@ export function help() {
       '`/pplus` a Project+ player who wants you on netplay',
       '`/bills` Bills photos, memes and GIFs with a rally cry. Uses each image in a pool before repeating',
       '`/view_pfp` my profile picture, full size',
+      '-# `/messages bills:True` posts Bills final scores here after each game, green for a win and red for a loss',
     ],
     [
       '**Posted here automatically**',
@@ -173,8 +175,9 @@ export function help() {
       '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting. Projected placements get edited once start.gg has them final',
       '• with `/messages top8` on, the full top 8 of each event the crew played in, at the same time',
       '• Slippi rank changes for the watchlist, checked every 30 minutes',
+      '• Bills final scores with the other team\'s logo, green for a win and red for a loss, checked every 15 minutes. Off unless `/messages bills` turns it on',
       '• a weekly recap of players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
-      '-# `/messages threads` has three modes for set results and stream alerts: off, one thread per tournament, or one thread per event. If a thread can\'t be used, they post here',
+      '-# `/messages threads` has three modes for set results and stream alerts: off, one thread per tournament, or one thread per event. One per tournament pins its channel card until the tournament ends. If a thread can\'t be used, they post here',
     ],
   ];
   return withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections);

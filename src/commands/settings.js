@@ -74,7 +74,7 @@ function configureMessages(interaction) {
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
-    '-# `threads` has three modes for set results and stream alerts. Off posts them here, one per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles.');
+    '-# `threads` has three modes for set results and stream alerts. Off posts them here, one per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. One per tournament pins its channel card until the tournament ends.');
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 

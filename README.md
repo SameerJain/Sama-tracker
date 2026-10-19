@@ -54,7 +54,7 @@ Player pickers list the last 5 people you picked first. Names match regardless o
 | `/sets player:<name or all> results:<on or off>` | Automatic set results for tracked players. Sets finished before you turn them on aren't posted. `player:all results:off` asks first. |
 | `/calls player:<name or all> pings:<on or off>` | Match call pings for tracked players whose Discord is connected on start.gg. One message per called set, with all four players in it for doubles. |
 
-Anyone can change `/stream`, `/sets` and `/calls` for any tracked player. New players start with all three off.
+Anyone can change `/stream`, `/sets` and `/calls` for any tracked player. New players start with all three off. Players with no reported sets in 6 months come off the track list on their own.
 
 `/track remove`, `/sets player:all results:off` and `/delete_reg_reminder` ask "Are you sure?" with buttons first. Only whoever ran the command can press them.
 
@@ -151,6 +151,8 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 `/bills` posts a Bills photo, meme or GIF with a rally cry and a link to the source. Photos come from Wikimedia Commons, memes from selected Imgflip posts, and GIFs from the official Bills and NFL GIPHY channels. It rotates the three types evenly and uses every image in a pool before repeating one. The pools and rotation reset when the bot restarts. It needs no AI or API keys.
 
+`/messages bills:True` posts the Bills final score here after each game, with the other team's logo, green for a win and red for a loss. Scores come from ESPN's public scoreboard, with quarters and yards. Off by default. It needs no AI or API keys.
+
 `/view_pfp` posts the bot's profile picture at full size, the meme image its avatar comes from.
 
 ## Automatic posts
@@ -165,11 +167,12 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Top 8s | Off by default. Goes with the placements post: the top 8 of each event a tracked player entered, listing everyone, tracked or not. One card per event, marked as projected if the bracket isn't finished. If start.gg keeps failing on the top 8 for 12 hours, the placements post goes out without it. |
 | Registration reminders | At the deadlines under [Registration](#registration), for people who turned on `/reg_role`. |
 | Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank, including their first rank of a season after Pending. A new season resetting everyone isn't posted. |
+| Bills final results | Off by default. After each Bills game: the final score with the other team's logo, green for a win and red for a loss, plus quarters and yards. |
 | Weekly recap | Sunday at 9 pm New York time by default: results, highlights and next week's entries. Only tracked players with a non-DQ singles set that week are included. |
 
 Singles stream alerts and match calls get a **Head to head** button that replies privately to whoever presses it. It comes off when the set ends, or 12 hours after the post.
 
-The set, stream and match call checks run every 2 minutes. Each asks start.gg only about players with that switch on, 20 players per request, so the checks stay small however many players are tracked. When the stream check finds a new set on stream, it asks again 30 seconds later to confirm. A set in a stream queue links that queue's stream. Rechecking recent set results and match calls takes one request per 50 posts, plus 1 per 10 set results whose winner or score changed.
+The set, stream and match call checks run every 2 minutes. Each asks start.gg only about players with that switch on, 20 players per request, so the checks stay small however many players are tracked. When the stream check finds a new set on stream, it asks again 30 seconds later to confirm. A set in a stream queue links that queue's stream. Rechecking recent set results and match calls takes one request per 50 posts, plus 1 per 10 set results whose winner or score changed. Bills finals check ESPN every 15 minutes, one request plus one per new final.
 
 After the bot has been down, set results from the last 3 hours still post and older ones are skipped. `/status` says when that happened.
 
@@ -187,7 +190,7 @@ Some TOs tag an event with the wrong game, like a "Melee Singles" tagged as Ulti
 
 ### Turning posts on and off
 
-Run `/messages` without options to see the current settings. Change any of the nine switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `top8`, `registration`, `slippi` and `recap`. Match call pings and top 8s start off server-wide. For match call pings, turn on both the `calls` switch and `/calls` for the player.
+Run `/messages` without options to see the current settings. Change any of the ten switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `top8`, `registration`, `slippi`, `recap` and `bills`. Match call pings, top 8s and Bills finals start off server-wide. For match call pings, turn on both the `calls` switch and `/calls` for the player.
 
 ```text
 /messages sets:False streams:False
@@ -206,15 +209,15 @@ Times use 24-hour `HH:MM` in the chosen timezone, with daylight saving. Settings
 | **One thread per tournament** | A thread for each tournament, named after it. |
 | **One thread per event** | A thread for each event, like `Genesis 11 · Ultimate Singles`. A tournament where the crew plays three events gets three threads. |
 
-The first set result or stream alert from a tournament, or from an event in the per-event mode, posts a card with its name in the channel and starts a thread on it. Later set results and stream alerts from it go in the thread, and stream alert pings add people to it. Match call pings, roll calls, placements and top 8s stay in the channel in every mode. Discord has no threads inside threads, so the per-event threads sit side by side in the channel. Each card names its tournament and event.
+The first set result or stream alert from a tournament, or from an event in the per-event mode, posts a card with its name in the channel and starts a thread on it. One thread per tournament pins that card so the thread stays easy to find, and unpins it once the tournament is over. Later set results and stream alerts from it go in the thread, and stream alert pings add people to it. Match call pings, roll calls, placements and top 8s stay in the channel in every mode. Discord has no threads inside threads, so the per-event threads sit side by side in the channel. Each card names its tournament and event.
 
-The bot needs **Create Public Threads** and **Send Messages in Threads** in the channel. Picking either thread mode checks for both and names any that are missing instead of switching. If a post can't go in its thread later, say a permission was removed or a moderator locked the thread, it posts in the channel and `/status` shows why. A deleted thread gets replaced on the next post. Threads archive after a day without posts and reopen when the next one goes in. Switching to **Off** sends everything back to the channel. Switching modes keeps the old threads, so going back to a mode reuses them for 14 days. A server that turned threads on before there were three modes keeps one thread per tournament.
+The bot needs **Create Public Threads** and **Send Messages in Threads** in the channel. Picking either thread mode checks for both and names any that are missing instead of switching. Pinning the tournament thread card needs **Manage Messages**; without it threads still work but the card stays unpinned. If a post can't go in its thread later, say a permission was removed or a moderator locked the thread, it posts in the channel and `/status` shows why. A deleted thread gets replaced on the next post. Threads archive after a day without posts and reopen when the next one goes in. Switching to **Off** sends everything back to the channel. Switching modes keeps the old threads, so going back to a mode reuses them for 14 days. A server that turned threads on before there were three modes keeps one thread per tournament.
 
 ## Run your own copy
 
 You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
 
-1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications). Invite it with the `bot` and `applications.commands` scopes and these permissions: View Channel, Send Messages, Embed Links, Attach Files and Manage Roles. For threads, add Create Public Threads and Send Messages in Threads. It needs no privileged intents.
+1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications). Invite it with the `bot` and `applications.commands` scopes and these permissions: View Channel, Send Messages, Embed Links, Attach Files and Manage Roles. For threads, add Create Public Threads and Send Messages in Threads, plus Manage Messages so tournament thread cards get pinned. It needs no privileged intents.
 2. Create a start.gg API token under Settings > Developer Settings.
 3. Copy [.env.example](.env.example) to `.env` and fill it in. With Discord Developer Mode on, right-click the server and channel to copy their IDs.
 4. Install and start it:
@@ -259,6 +262,7 @@ docker run -d --name sama-tracker --restart unless-stopped --env-file .env -v sa
 To add everyone at a tournament without going through Discord, run `npm run track` (or `node tools/track-attendees.js`) on the bot's host and paste a start.gg tournament link when it asks. On Railway, run `railway ssh` first.
 
 - A link from the tournament's attendees page adds just the events that page is filtered to, like `start.gg/tournament/smashcade-2-4/attendees?filter={"eventIds":["1682422"]}`. A plain tournament link adds everyone registered.
+- It refuses tournaments with more than 80 attendees, even when the link filters to one event. `/track add` the crew instead.
 - It skips players already tracked and leaves out attendees without a start.gg account. New players start with set results, stream alerts and match call pings off, the same as `/track add`.
 - The bot adds the queued players within 30 seconds and the tool reports how many. Players queued while the bot is down get added on its next start.
 

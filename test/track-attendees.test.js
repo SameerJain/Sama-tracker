@@ -9,7 +9,8 @@ process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
-const { parseTournamentLink, readTrackRequest, writeTrackRequest } = await import('../src/track-request.js');
+const { BULK_TRACK_MAX, parseTournamentLink, readTrackRequest, writeTrackRequest } = await import('../src/track-request.js');
+const { tooBigToQueue } = await import('../tools/track-attendees.js');
 const { importTrackRequest } = await import('../src/tracker.js');
 const { getAttendees, queueLength } = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
@@ -38,6 +39,17 @@ test('tournament links keep the attendees page event filter', () => {
   assert.deepEqual(parseTournamentLink('https://start.gg/tournament/x?filter=%7B%22poolIds%22%3A%5B1%5D%7D'), { slug: 'x', eventIds: null });
   // not a tournament
   assert.equal(parseTournamentLink('https://www.start.gg/user/f64a83c8'), null);
+});
+
+test('tournaments over 80 total attendees never queue, even one event of them', () => {
+  assert.equal(BULK_TRACK_MAX, 80);
+  // a filtered link only lists one event, but the tournament total still decides
+  assert.equal(tooBigToQueue({ numAttendees: 120 }, new Array(30).fill({})), true);
+  assert.equal(tooBigToQueue({ numAttendees: 81 }, []), true);
+  assert.equal(tooBigToQueue({ numAttendees: 80 }, new Array(80).fill({})), false);
+  // without a count the list is all there is to go by
+  assert.equal(tooBigToQueue({ numAttendees: null }, new Array(85).fill({})), true);
+  assert.equal(tooBigToQueue({ numAttendees: null }, new Array(3).fill({})), false);
 });
 
 test('attendees come back with the account behind each one, and the filter goes with the request', async () => {

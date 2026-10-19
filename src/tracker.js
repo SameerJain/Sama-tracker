@@ -2,6 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { PermissionFlagsBits, RESTJSONErrorCodes, ThreadAutoArchiveDuration } from 'discord.js';
 import * as startgg from './startgg.js';
 import * as slippi from './slippi.js';
+import * as bills from './bills.js';
 import * as embeds from './embeds/index.js';
 import { state, save } from './store.js';
 import { clearTrackRequest, readTrackRequest } from './track-request.js';
@@ -35,6 +36,8 @@ export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
 export const RUNS_LATE_HOURS = 6;
 // slippi ranks only change after ranked sets, and its API isn't public, so it gets asked less than start.gg
 const SLIPPI_CHECK_MINUTES = 30;
+// Bills play weekly, so every 15 minutes is plenty for a final
+const BILLS_CHECK_MINUTES = 15;
 // players with no connect code on start.gg get looked at again this often, in case they play a netplay tournament since
 const SLIPPI_SEARCH_DAYS = 7;
 const SLIPPI_SKIPPED_KEPT = 1000;
@@ -55,6 +58,10 @@ const CALL_WATCH_MINUTES = 15;
 const UNCALLED_STATES = [1, 4, 7];
 // placements that went out projected get edited once they're final, for this long after
 const PROJECTED_KEPT_DAYS = 3;
+// players with no reported set in this long get taken off the track list silently
+export const PRUNE_AFTER_DAYS = 6 * 30;
+// the prune only looks at dates, so every two weeks is plenty
+const PRUNE_CHECK_DAYS = 14;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -66,6 +73,7 @@ export function secondsNow() {
 // for /status
 export const health = {
   startedAt: secondsNow(), downSince: null, skippedBefore: null, setCheck: null, setError: null, tournamentCheck: null, slippiCheck: null, slippiError: null, threadError: null,
+  billsCheck: null, billsError: null,
 };
 
 let channel;
@@ -100,6 +108,11 @@ export function startTracking(postChannel) {
   for (const tournament of Object.values(state.tournaments)) {
     tournament.userIds ??= [...new Set(tournament.entries.map((entry) => entry.userId))];
   }
+  // saved from before trackedAt existed. lastSetAt means they played while tracked, so it
+  // counts as the start. otherwise now, so nobody gets pruned for time before this was kept
+  for (const player of Object.values(state.players)) {
+    player.trackedAt ??= player.lastSetAt ?? secondsNow();
+  }
 
   checkTournaments();
   checkSets();
@@ -109,12 +122,16 @@ export function startTracking(postChannel) {
   importTrackRequest();
   checkSlippiCodes();
   checkSlippiRanks();
+  checkBills();
+  checkPrune();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
   setInterval(checkSlippiCodes, PROFILE_CHECK_HOURS * HOUR * 1000);
   setInterval(checkSlippiRanks, SLIPPI_CHECK_MINUTES * 60 * 1000);
+  setInterval(checkBills, BILLS_CHECK_MINUTES * 60 * 1000);
+  setInterval(checkPrune, PRUNE_CHECK_DAYS * DAY * 1000);
   setInterval(checkWeeklyRecap, 60 * 1000);
   // the tool at the other end waits on this, so it's checked more often than the tournaments
   setInterval(importTrackRequest, 30 * 1000);
@@ -122,9 +139,10 @@ export function startTracking(postChannel) {
 
 // /track add, /set_reg_reminder and the host tool all save this. set results, stream alerts and
 // match call pings start off since everyone with them on goes in a check every 2 minutes, and bulk
-// adds made that slow. /sets, /stream and /calls turn them on
+// adds made that slow. /sets, /stream and /calls turn them on. trackedAt is when they were added,
+// so the prune knows a player with no sets yet isn't inactive
 export function newTracked(player) {
-  return { ...player, lastCheck: secondsNow(), streamAlerts: false, setResults: false, callPings: false };
+  return { ...player, lastCheck: secondsNow(), trackedAt: secondsNow(), streamAlerts: false, setResults: false, callPings: false };
 }
 
 // players queued by tools/track-attendees.js, added the same way /track add does and saved
@@ -211,6 +229,8 @@ export const checkRegReminders = queued(postRegReminders);
 const checkWeeklyRecap = queued(postWeeklyRecap);
 const checkSlippiCodes = queued(findSlippiCodes);
 const checkSlippiRanks = queued(postRankChanges);
+const checkBills = queued(postBillsResults);
+const checkPrune = queued(pruneInactive);
 
 export async function postWeeklyRecap(postChannel = channel, now = secondsNow()) {
   const period = weeklyPeriod(now, messageSettings());
@@ -336,6 +356,38 @@ export async function postRankChanges(postChannel = channel) {
   save();
 }
 
+// Bills finals, one request for the schedule and one per new final for quarters
+// and yards. off by default, and anything final while it was off stays skipped
+export async function postBillsResults(postChannel = channel) {
+  const checkedAt = secondsNow();
+  try {
+    const finals = await bills.getFinals();
+    finals.sort((a, b) => a.date - b.date);
+    state.billsPosted ??= [];
+    for (const game of finals) {
+      if (state.billsPosted.includes(game.id)) continue;
+      if (messageEnabled('bills', game.date)) {
+        let details = null;
+        try {
+          details = await bills.getDetails(game.id);
+        } catch (err) {
+          console.error(`bills details for ${game.id} failed:`, err.message);
+        }
+        await postChannel.send({ embeds: embeds.withImage([embeds.billsFinal(game, details)]), allowedMentions: { parse: [] } });
+      }
+      state.billsPosted.push(game.id);
+      save();
+    }
+    state.billsPosted = (state.billsPosted ?? []).slice(-50);
+    health.billsCheck = checkedAt;
+    health.billsError = null;
+  } catch (err) {
+    console.error('checking Bills finals failed:', err.message);
+    health.billsError = err.message;
+  }
+  save();
+}
+
 // picks up tag, avatar and connected discord changes for tracked and /link people, 20 a request
 async function updateProfiles() {
   const records = [...Object.values(state.players), ...Object.values(state.links)];
@@ -352,6 +404,33 @@ async function updateProfiles() {
     console.error('refreshing profiles failed:', err.message);
   }
   save();
+}
+
+// players with no reported set in PRUNE_AFTER_DAYS come off the track list, silently. lastSetAt
+// only moves for sets the 2-minute check asked about, so anyone stale gets one fresh lookup first:
+// someone with results off who only plays untracked people looks stale but isn't
+export async function pruneInactive(now = secondsNow()) {
+  const cutoff = now - PRUNE_AFTER_DAYS * DAY;
+  const candidates = Object.values(state.players).filter((player) => (player.lastSetAt ?? player.trackedAt ?? now) < cutoff);
+  if (!candidates.length) return [];
+  try {
+    const sets = await startgg.getSets(candidates.map((player) => player.playerId), { perPage: 1 });
+    for (const set of sets) {
+      for (const player of candidates) {
+        if (set.sides.some((side) => side.playerIds.includes(player.playerId))) {
+          player.lastSetAt = Math.max(player.lastSetAt ?? 0, set.completedAt);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('checking inactive players failed:', err.message);
+    return [];
+  }
+  const pruned = candidates.filter((player) => (player.lastSetAt ?? player.trackedAt ?? now) < cutoff);
+  for (const player of pruned) delete state.players[player.userId];
+  save();
+  if (pruned.length) console.log(`pruned ${pruned.length} inactive player${pruned.length === 1 ? '' : 's'} from the track`);
+  return pruned;
 }
 
 export async function postNewSets(postChannel = channel) {
@@ -557,9 +636,35 @@ function tournamentPosts(set, postChannel) {
   return { send };
 }
 
+// pinning the starter needs manage messages, but threads work without it so a failed pin just logs
+async function pinThreadCard(card, tournament) {
+  try {
+    await card.pin();
+    return true;
+  } catch (err) {
+    console.error(`pinning the thread starter for ${tournament?.name ?? 'a tournament'} failed:`, err.message);
+    return false;
+  }
+}
+
+// the starter lives in the channel, so unpinning goes through its saved channel and message ids.
+// true when there's nothing left to unpin, false to try again next check
+async function unpinThreadRef(postChannel, ref) {
+  try {
+    const { messages } = await postChannel.client.channels.fetch(ref.channelId ?? postChannel.id);
+    if (messages.unpin) await messages.unpin(ref.messageId);
+    else (await messages.fetch(ref.messageId)).unpin();
+    return true;
+  } catch (err) {
+    if ([RESTJSONErrorCodes.UnknownMessage, RESTJSONErrorCodes.UnknownChannel].includes(err.code)) return true;
+    throw err;
+  }
+}
+
 // the first post for a tournament, or for an event when byEvent, puts a card with its name in the channel and
 // starts the thread on it. saved by slug, since sets don't come with the tournament id, so a restart keeps using
-// the same one. event slugs start with their tournament's, so both kinds share state.threads without clashing
+// the same one. event slugs start with their tournament's, so both kinds share state.threads without clashing.
+// a tournament thread pins its card so the thread stays easy to find, and unpinFinishedThreads takes it off once over
 async function tournamentThread(event, byEvent, postChannel) {
   const { tournament } = event;
   const slug = byEvent ? event.slug : tournament.slug;
@@ -571,6 +676,10 @@ async function tournamentThread(event, byEvent, postChannel) {
       throw err;
     });
     if (thread) return thread;
+    // its card stays in the channel, so a pinned one comes off before the replacement goes up
+    if (saved.pinned && saved.messageId) {
+      await unpinThreadRef(postChannel, saved).catch((err) => console.error(`unpinning the old thread starter for ${tournament.name} failed:`, err.message));
+    }
   }
 
   // checked before the card goes out, or every set would leave another card with no thread on it
@@ -583,10 +692,70 @@ async function tournamentThread(event, byEvent, postChannel) {
   });
   const thread = await card.startThread({ name: threadName(event, byEvent), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
   const now = secondsNow();
+  // forgetting an old thread takes its pin off too, so pins don't outlast the 14 days
+  for (const [oldSlug, old] of Object.entries(state.threads)) {
+    if (old.at <= now - THREAD_KEPT_DAYS * DAY && old.pinned && old.messageId) {
+      await unpinThreadRef(postChannel, old).catch((err) => console.error('unpinning an old thread starter failed:', err.message));
+    }
+  }
   state.threads = Object.fromEntries(Object.entries(state.threads).filter(([, each]) => each.at > now - THREAD_KEPT_DAYS * DAY));
-  state.threads[slug] = { id: thread.id, at: now };
+  const entry = { id: thread.id, at: now };
+  if (!byEvent && card?.id) {
+    entry.channelId = card.channelId ?? postChannel.id;
+    entry.messageId = card.id;
+    entry.pinned = await pinThreadCard(card, tournament);
+  }
+  state.threads[slug] = entry;
   save();
   return thread;
+}
+
+// pinned tournament starters whose tournament is over get unpinned. over means past the end plus time
+// for locals running late, or placements already posted for a TO with a far-out end date
+export async function unpinFinishedThreads(postChannel = channel) {
+  if (!postChannel?.client) return;
+  const now = secondsNow();
+  let changed = false;
+  for (const [slug, entry] of Object.entries(state.threads)) {
+    if (!entry?.pinned || !entry.messageId) continue;
+    if (entry.at <= now - THREAD_KEPT_DAYS * DAY) {
+      try {
+        await unpinThreadRef(postChannel, entry);
+      } catch (err) {
+        console.error('unpinning an old thread starter failed:', err.message);
+        continue;
+      }
+      delete state.threads[slug];
+      changed = true;
+      continue;
+    }
+    const tournament = Object.values(state.tournaments).find((each) => each.slug === slug);
+    // not tracked yet, or already pruned. deletions unpin on the way out, so this waits
+    if (!tournament) continue;
+    if (!tournament.resultsPosted && now <= endTime(tournament) + RUNS_LATE_HOURS * HOUR) continue;
+    try {
+      await unpinThreadRef(postChannel, entry);
+    } catch (err) {
+      console.error(`unpinning the thread starter for ${tournament.name} failed:`, err.message);
+      continue;
+    }
+    entry.pinned = false;
+    changed = true;
+  }
+  if (changed) save();
+}
+
+// a tournament going away takes its pin off first, so deleted and unpublished ones don't stay pinned
+async function unpinTournamentThread(postChannel, tournament) {
+  const entry = state.threads[tournament.slug];
+  if (!entry?.pinned || !entry.messageId || !(postChannel ?? channel)?.client) return;
+  try {
+    await unpinThreadRef(postChannel ?? channel, entry);
+  } catch (err) {
+    console.error(`unpinning the thread starter for ${tournament.name} failed:`, err.message);
+    return;
+  }
+  entry.pinned = false;
 }
 
 // discord caps thread names at 100. a long tournament name gets cut before the event's, which tells the threads apart
@@ -798,8 +967,10 @@ async function updateTournaments() {
   for (const tournament of Object.values(state.tournaments)) {
     if (tournament.resultsPosted) {
       // keep it a week, otherwise it gets re-added and the results post again
-      if (secondsNow() > endTime(tournament) + 7 * DAY) delete state.tournaments[tournament.id];
-      else if (tournament.projected) {
+      if (secondsNow() > endTime(tournament) + 7 * DAY) {
+        await unpinTournamentThread(channel, tournament);
+        delete state.tournaments[tournament.id];
+      } else if (tournament.projected) {
         await correctPlacements(tournament)
           .catch((err) => console.error(`correcting placements for ${tournament.name ?? tournament.id} failed:`, err.message));
       }
@@ -816,6 +987,7 @@ async function updateTournaments() {
       const latest = await startgg.getTournament(tournament.id, userIds);
       // deleted or unpublished
       if (!latest) {
+        await unpinTournamentThread(channel, tournament);
         delete state.tournaments[tournament.id];
         continue;
       }
@@ -832,6 +1004,7 @@ async function updateTournaments() {
     }
   }
 
+  await unpinFinishedThreads().catch((err) => console.error('unpinning finished tournament threads failed:', err.message));
   health.tournamentCheck = secondsNow();
   save();
 }

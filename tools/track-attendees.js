@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import * as startgg from '../src/startgg.js';
 import { state } from '../src/store.js';
-import { parseTournamentLink, readTrackRequest, writeTrackRequest } from '../src/track-request.js';
+import { BULK_TRACK_MAX, parseTournamentLink, readTrackRequest, writeTrackRequest } from '../src/track-request.js';
 
 const WAIT_SECONDS = 60;
 const POLL_MS = 2000;
@@ -15,6 +15,12 @@ const NAMES_SHOWN = 25;
 const fail = (message) => {
   throw new Error(message);
 };
+
+// the tournament total decides, not the filtered list, so one event of a major still stops here.
+// without a count the list is all there is to go by
+export function tooBigToQueue(tournament, attendees) {
+  return (tournament.numAttendees ?? attendees.length) > BULK_TRACK_MAX;
+}
 
 async function main() {
   if (!process.env.STARTGG_TOKEN) {
@@ -43,6 +49,10 @@ async function main() {
       ? 'start.gg hides the attendee list'
       : `no attendees${link.eventIds ? ` in events ${link.eventIds.join(', ')}` : ''}`;
     fail(`Nothing to add: ${why} for ${tournament.name}.`);
+  }
+  if (tooBigToQueue(tournament, attendees)) {
+    const total = tournament.numAttendees ?? attendees.length;
+    fail(`Too many attendees at ${tournament.name} (${total}, over ${BULK_TRACK_MAX}), so nothing was queued. /track add the crew instead.`);
   }
 
   // a TO can add people who never made an account, and a filter can bring back an event's list twice

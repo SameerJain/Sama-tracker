@@ -14,6 +14,7 @@ const FILE = `${stateDir}/state.json`;
 // slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from the last check and
 // userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back.
 // threads are the threads from /messages threads, keyed by tournament slug, or event slug for one per event: { id, at }, with at when it was started.
+// a tournament thread also saves its channel card as { channelId, messageId, pinned }, pinned saying if the pin worked, so it comes off once the tournament is over.
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
 // buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }, with at when it was sent
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
@@ -23,7 +24,7 @@ const FILE = `${stateDir}/state.json`;
 const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regReminders: {}, regPings: [], streamPings: [], regAdmins: {}, regSkipped: [],
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
-  resultPosts: [], callPosts: [], regWarned: [],
+  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [],
 };
 
 function load() {
