@@ -147,7 +147,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 ### Fun
 
-`/64`, `/melee`, `/brawl`, `/sm4sh`, `/ult` and `/pplus` are each a different character with their own Smash take. With `ANTHROPIC_API_KEY` set, Claude Haiku writes each post in that character from the game's talking points. Half the posts use one of the game's own styles, and half use a shared scenario picked to fit that character, like a campaign speech, a news report or a famous movie scene. About 1 in 4 posts use a scenario Haiku makes up for that character first. About a third also draw on a SmashWiki article and a third on a YouTube video, which needs `YOUTUBE_API_KEY`. Without that key, those posts use an article. Every post comes with a SmashWiki screenshot. Without `ANTHROPIC_API_KEY`, each command replies with its catchphrase.
+`/64`, `/melee`, `/brawl`, `/sm4sh`, `/ult` and `/pplus` are each a different character with their own Smash take. With `ANTHROPIC_API_KEY` set, Claude Haiku writes each post in that character from the game's talking points. Every post comes with a SmashWiki screenshot. Without `ANTHROPIC_API_KEY`, each command replies with its catchphrase.
 
 `/bills` posts a Bills photo, meme or GIF with a rally cry and a link to the source. Photos come from Wikimedia Commons, memes from selected Imgflip posts, and GIFs from the official Bills and NFL GIPHY channels. It rotates the three types evenly and uses every image in a pool before repeating one. The pools and rotation reset when the bot restarts. It needs no AI or API keys.
 

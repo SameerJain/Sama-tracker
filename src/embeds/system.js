@@ -162,7 +162,6 @@ export function help() {
       '`/pplus` a Project+ player who wants you on netplay',
       '`/bills` Bills photos, memes and GIFs with a rally cry. Uses each image in a pool before repeating',
       '`/view_pfp` my profile picture, full size',
-      '-# Claude Haiku writes each Smash post in that character, from the game\'s facts, in a style or scene that fits it, like a news report or a campaign speech, sometimes one it makes up. Some also use a SmashWiki article or YouTube video',
     ],
     [
       '**Posted here automatically**',
