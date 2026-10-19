@@ -66,10 +66,11 @@ function venueOption() {
 export const commands = [
   { name: 'help', description: 'Show commands' },
   {
-    name: 'messages', description: 'Show or change automatic posts, threads and the weekly recap schedule',
+    name: 'messages', description: 'Show or change automatic posts, threads, set result colors and the weekly recap schedule',
     default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
     options: [
       ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
+      { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green for a win, red for a loss, gold for crew vs crew' },
       {
         type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
         choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
@@ -192,7 +193,7 @@ export const commands = [
           {
             type: Option.Subcommand,
             name: 'event',
-            description: 'Make a Discord event without tracking it. It follows start.gg\'s time and place',
+            description: 'Make a Discord event without tracking it. Time, end time and cover from start.gg',
             options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
           },
         ],
@@ -210,7 +211,7 @@ export const commands = [
     description: 'What pings you: match calls, stream alerts, reg reminders and 1-hour DMs. Leave all out to see yours',
     options: [
       switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
-      switchOption('streams', 'Every stream alert posted here'),
+      switchOption('streams', 'When your set is on stream. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('registration', 'Reg reminders for tracked tournaments, skipped once you\'re registered'),
       switchOption('dm_registration', 'DM 1 hour before registration closes, with link, location and image'),
       switchOption('dm_start', 'DM 1 hour before the tournament starts, with link, location and image'),

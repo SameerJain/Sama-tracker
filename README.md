@@ -18,7 +18,7 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 2. **Hand out the TO role.** TOs use `/t-o tournament` and can change tracking for anyone. Everyone else only changes their own. `/t-o role add user:@someone` gives someone the role. See [TOs](#tos).
 3. **Track your tournaments.** A TO's `/t-o tournament add tournament:<link>` posts every set, stream alert and top 8 from a tournament in its own thread, plus registration reminders. `/t-o tournament event tournament:<link>` makes a Discord event from a link that keeps up with start.gg.
 4. **Track yourself.** `/track add` posts your placements wherever you play, found by the Discord on your start.gg. `/track posts` turns on your set results and stream alerts too. TOs can do both for anyone.
-5. **Pick your pings.** `/notify` pings you when your match is called, for every stream alert, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
+5. **Pick your pings.** `/notify` pings you when your match is called, when your set is on stream, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
 6. **Follow Slippi ranked.** `/slippi add` puts your connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
 
 `/help` in Discord lists every command in short form.
@@ -54,7 +54,7 @@ Player pickers start with the last 5 people you picked. Once you type, names tha
 | `/unlink` | Remove your link, with an **Undo** button for a minute. Tracking stays as it was. |
 | `/upcoming` | Tracked tournaments, and any other live or upcoming tournament with 3 or more of the crew registered. `player:` checks one person instead, live from start.gg when they're linked but not tracked. |
 | `/recent` | Your last 5 sets. With `player:all`, up to 20 sets, at most 3 per player, from up to 40 players: those with set results on first, then whoever played most recently. |
-| `/run` | Your run and next opponent in each current bracket, with the station and scheduled time when the TO set them. Each next opponent gets a head-to-head button, up to 5, singles only. |
+| `/run` | Your run and next opponent in each current bracket, with the station and scheduled time when the TO set them. Each next opponent gets a head-to-head button for the short report, up to 5, singles only. |
 
 Anyone can track, untrack and change posts for themselves. Yourself means the start.gg you `/link`ed, or the one whose Discord is yours. Only TOs can do it for someone else. New players start with both off. Players with no reported sets in 6 months come off the track list on their own.
 
@@ -78,13 +78,13 @@ The bot makes the TO role the first time it's needed. A role named `TO` made by 
 | --- | --- |
 | `/notify` | Which of your pings are on, and the posts about you if you're tracked. Only you see it. |
 | `/notify calls:<on or off>` | Get pinged when your set is called, at any tournament. Needs your start.gg linked, or you tracked with Discord connected on start.gg. One message per called set, with everyone in it who has this on, all four players for doubles. |
-| `/notify streams:<on or off>` | Get pinged for every stream alert, whoever is on stream. |
+| `/notify streams:<on or off>` | Get pinged when your set is on stream, at any tournament. Needs your start.gg linked, or you tracked with Discord connected on start.gg. |
 | `/notify registration:<on or off>` | Get pinged for registration reminders, and get the **Reg Reminders** role. Skipped for tournaments you're already registered for, if start.gg has your Discord. |
 | `/notify dm_registration:<on or off>` | Get a DM 1 hour before registration closes, with the tournament link, location and image. Skipped once you're registered, if start.gg has your Discord. |
 | `/notify dm_start:<on or off>` | Get a DM 1 hour before the tournament starts, with the tournament link, location and image. |
 | `/notify all:<on or off>` | All five at once. |
 
-`/notify` only ever changes whoever ran it, and stream, registration and DM pings need no tracking or linking.
+`/notify` only ever changes whoever ran it, and registration and DM pings need no tracking or linking. Calls and streams need your start.gg linked, or you tracked with Discord connected on start.gg.
 
 ### Matchmaking
 
@@ -155,7 +155,7 @@ A tracked tournament posts every set, whoever played, plus its stream alerts and
 | `/t-o tournament add tournament:<link>` | Track a tournament: every finished set, stream alerts, top 8s and registration reminders. `reminders:off` leaves out the reminders, `add_event:on` also makes a Discord event. |
 | `/t-o tournament remove tournament:<name>` | Stop tracking it. Asks first, then **Undo** puts it back for a minute. |
 | `/t-o tournament posts tournament:<name>` | Turn its `sets`, `stream`, `top8` and `reminders` on or off. Leave them all out to see them. |
-| `/t-o tournament event tournament:<link>` | Make a Discord event from a start.gg link, with the time, venue, close time and events. It doesn't track the tournament. |
+| `/t-o tournament event tournament:<link>` | Make a Discord event from a start.gg link, with the time and end time, venue, close time, events and cover photo. It doesn't track the tournament. |
 | `/bracket` | Bracket links for tracked tournaments, from 30 minutes before the start until 6 hours after the end. |
 | `/stream_link` | Streams added on start.gg for tracked tournaments and tournaments tracked players entered, in the same window as `/bracket`. Twitch streams are links, and other sites show the stream name. If none are going on, none have a stream, or start.gg doesn't answer, it says to ask a TO in another channel. |
 | `/registered tournament:<link>` | Registered server members, by name so nobody gets pinged. `by_event:True` groups them by event. |
@@ -165,7 +165,7 @@ A tracked tournament posts every set, whoever played, plus its stream alerts and
 
 `tournament` takes a start.gg link, or a tournament the bot already knows from the list: tracked ones and ones tracked players are in, soonest first. Tournaments nobody tracks are forgotten a month after they end. `/t-o tournament add` lists only ones that aren't tracked yet, and `/t-o tournament remove` and `/t-o tournament posts` only tracked ones. `/t-o tournament add add_event:on` tracks the tournament and makes its Discord event. `/t-o tournament event` only makes the event. Both find an event made earlier for the same link instead of making another.
 
-Discord events keep up with start.gg until they start. Once an hour the bot checks each one it made, and when the TO changes the time, name, venue, close time or events on start.gg, it edits them into the event. A tournament deleted or unpublished on start.gg gets its event cancelled. It goes by the tournament's start.gg ID, so a TO changing the link doesn't count as deleting it. An edit a mod makes in Discord stays until something changes on start.gg. An event a mod deletes, or one that has started, is left alone.
+Discord events keep up with start.gg until they start. Once an hour the bot checks each one it made, and when the TO changes the time, end time, cover photo, name, venue, close time or events on start.gg, it edits them into the event. A tournament deleted or unpublished on start.gg gets its event cancelled. It goes by the tournament's start.gg ID, so a TO changing the link doesn't count as deleting it. An edit a mod makes in Discord stays until something changes on start.gg. An event a mod deletes, or one that has started, is left alone. Discord requires an end time on external events, so one with none on start.gg runs 6 hours.
 
 `/messages events:True` makes a Discord event on its own for each upcoming tracked tournament, once. An event a mod deletes isn't made again. It's off by default.
 
@@ -186,7 +186,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | `/help` | List the commands. |
 | `/status` | Uptime, when the latest version was deployed, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, the state file size and saves since start, any downtime before the last start, and why a post last missed its thread. A copy run on another computer also shows that computer's name. |
 | `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
-| `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event) and the recap schedule. Needs **Manage Server**. |
+| `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event), set result colors and the recap schedule. Needs **Manage Server**. |
 | `/socials` | Saved streams and social links. |
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional, and links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |
@@ -212,7 +212,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Automatic message | When it posts | Who appears and what controls it |
 | --- | --- | --- |
 | Set results | Every finished set at a tracked tournament. Anywhere else, when a tracked player with set results on finishes a set. | `/track posts sets` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. |
-| Stream alerts | Every set on stream or next in the stream queue at a tracked tournament. Anywhere else, when a tracked player with stream alerts on has a set there. A new alert waits 30 seconds to confirm. | `/track posts stream` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. `/notify streams` only controls who gets pinged. |
+| Stream alerts | Every set on stream or next in the stream queue at a tracked tournament. Anywhere else, when a tracked player with stream alerts on has a set there. A new alert waits 30 seconds to confirm. | `/track posts stream` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. `/notify streams` pings whoever is playing. |
 | Match call pings | When a set is called for someone with `/notify calls` on. The ping says You're up, with the station number when the TO set one on start.gg. Calls taken back get crossed out, and one still waiting after 5 minutes pings once more. | One card per set names everyone in it. `/notify calls` controls each person's ping subscription. |
 | Tournament roll calls | An hour before a tournament with at least 3 of the crew registered, with the stream links from its start.gg page. | Tracked players appear. At a tracked tournament, registered server members whose Discord is connected on start.gg count too. Linking alone does not add someone. |
 | Tournament placements | 12 hours after the tournament ends, or after its bracket finishes if that's first. Unfinished placements are marked as projected. | Tracked players appear. At a tracked tournament, the same registered server members as roll calls appear too. |
@@ -225,9 +225,9 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Bills final results | Off by default. After each Bills game, with quarters and yards. | No player appears. |
 | Weekly crew recap | Sunday at 9 pm New York time by default. | Tracked players with a non-DQ singles set that week appear. There is no separate player switch. |
 
-Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. A top 8 lookup that fails at placements time holds them back 12 hours, then they go without it. A top 8 that fails to send retries for up to 3 days.
+Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. `/messages set_colors` colors them green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played, so a small crew sees each member at a glance. Off, every card stays green. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. A top 8 lookup that fails at placements time holds them back 12 hours, then they go without it. A top 8 that fails to send retries for up to 3 days.
 
-Singles stream alerts and match calls get a **Head to head** button that replies privately to whoever presses it. It comes off when the set ends or is deleted, or 12 hours after the post.
+Singles stream alerts and match calls get a **Head to head** button for the short report that replies privately to whoever presses it. It comes off when the set ends or is deleted, or 12 hours after the post.
 
 The set, stream and match call checks run every 2 minutes. Each asks start.gg only about players with that switch on, 20 players per request, so the checks stay small however many players are tracked. A tracked tournament that's going on adds one request per 20 of its events for its new sets, and one per live tournament for its stream queue. When the stream check finds a new set on stream, it asks again 30 seconds later to confirm. A set in a stream queue links that queue's stream. Rechecking recent set results and match calls takes one request per 50 posts, plus 1 per 10 set results whose winner or score changed. Bills finals check ESPN daily, every 15 minutes from an hour before kickoff until 8 hours after: one request plus one per new final. A roll call adds one request for its streams. 1-hour DMs look a tournament up every 15 minutes, only in the 3 hours before one is due, plus one request for who's registered before a registration DM.
 
@@ -241,14 +241,14 @@ TOs report the wrong winner, fix it a minute later, or call a set and take it ba
 | --- | --- |
 | Set results | For an hour after a result posts, the bot checks it again every 2 minutes. If the TO changes the winner or score, the card is replaced with the new result marked **Corrected by TO**. If the TO resets or deletes the set, the card turns grey and its title starts with **Reset by TO**. If the set is reported again within that hour, the card shows the new result. |
 | Match call pings | For 15 minutes after a call, the bot checks it every 2 minutes. If the set goes back to waiting, the ping is crossed out with "Uncalled by the TO", and calling it again pings again. If the set is still called 5 minutes in, the players get pinged once more in a reply ("You're still up, 5 min in. TOs usually DQ at 10"). This needs the `calls` switch on. |
-| Discord events | Checked hourly until they start. A new time, name, venue, close time or event list on start.gg gets edited in, and a tournament deleted there gets its event cancelled. Nothing is posted about it. |
+| Discord events | Checked hourly until they start. A new time, end time, cover photo, name, venue, close time or event list on start.gg gets edited in, and a tournament deleted there gets its event cancelled. Nothing is posted about it. |
 | Placements and top 8s | Projected placements are checked hourly for 3 days. Once start.gg has every placement final, or every event in the top 8 finished, the post is edited to the final standings. If the final version no longer splits into the same number of messages, it goes out as a new post saying so. A top 8 with nothing reported when placements posted goes out as a new message once the bracket is finished. |
 
 Some TOs tag an event with the wrong game, like a "Melee Singles" tagged as Ultimate. When an event's name says Melee and its tag says Ultimate, or the other way around, the bot goes by the name. That covers `melee:True`, `game:` and the game shown on cards. Events whose name mentions both games, or another game like Project+, keep their tag.
 
 ### Turning posts on and off
 
-Run `/messages` without options to see the current settings. Change any of the eleven switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `top8`, `registration`, `events`, `slippi`, `recap` and `bills`. Only Bills finals and Discord events start off server-wide. Turning `events` on checks for Manage Events first, and it makes events for upcoming tournaments already tracked. The `/notify` DMs go by each person's own setting and the tournament's reminders, not these switches. Match calls only ping people who turned on `/notify calls`, and top 8s only come from tracked tournaments.
+Run `/messages` without options to see the current settings. Change any of the eleven switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `top8`, `registration`, `events`, `slippi`, `recap` and `bills`. Only Bills finals and Discord events start off server-wide. `set_colors` colors set result cards green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played, and starts off. Turning `events` on checks for Manage Events first, and it makes events for upcoming tournaments already tracked. The `/notify` DMs go by each person's own setting and the tournament's reminders, not these switches. Match calls only ping people who turned on `/notify calls`, stream alerts only ping whoever is playing with `/notify streams` on, and top 8s only come from tracked tournaments.
 
 ```text
 /messages sets:False streams:False
@@ -334,7 +334,7 @@ Slippi rank checks ask about 20 watchlist players per request, one request a sec
 
 ### Speed and waiting
 
-start.gg allows 80 requests a minute. A first lookup can take tens of seconds, or about a minute for a large report. Commands share cached history where they can, profile and tournament links that come back empty stay missed for 5 minutes, and long lookups show progress while they load. A **Full report** press on `/h2h` or `/predict` reuses its report's lookup, so it asks start.gg for nothing new. The other full reports read further back, but keep the pages the short report already has. Pressing a Full report button that's already loading shares the first lookup instead of asking again. The second press hears start.gg is on it.
+start.gg allows 80 requests a minute. A first lookup can take tens of seconds, or about a minute for a large report. Commands share cached history where they can, profile and tournament links that come back empty stay missed for 5 minutes, and long lookups show progress while they load. A **Full report** press on `/h2h` or `/predict` reuses its report's lookup, so it asks start.gg for nothing new. The other full reports read further back, but keep the pages the short report already has. Pressing a Full report button that's already loading shares the first lookup instead of asking again. The second press hears start.gg is on it. A press that expires before the bot can answer runs once more on its own, landing as a new message that pings whoever pressed instead of the timeout. Private and ephemeral reports retry by DM so they stay private.
 
 Your commands take turns with start.gg one at a time. A command sent while your last one is still loading answers right away. If it needs start.gg, it says **Queued** with about how long your last one has left, counting everyone else's commands, and starts when that one finishes. Commands that don't need start.gg, like `/help`, don't wait. Up to 3 can wait behind the one running, and past that the bot asks you to try again. When start.gg is backed up for everyone, new commands ask you to try again in a minute instead of queueing. Every 10th request goes to the background checks, so automatic posts keep moving on busy nights.
 

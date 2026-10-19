@@ -31,11 +31,18 @@ const notimed = { ...soon, id: 7, name: 'Timeless', slug: 'tournament/timeless',
 let lastFetch = 0;
 // what got asked, by the kind of lookup
 const asked = [];
+// cover photos downloaded straight from their urls, not through the start.gg api
+const downloaded = [];
 // what start.gg has for a tournament looked up by id, for the sync. one left out is soon under that id, and null
 // means it was deleted
 let byId = {};
 globalThis.fetch = async (_url, options) => {
   lastFetch = Date.now();
+  if (typeof _url === 'string' && !_url.includes('api.start.gg')) {
+    downloaded.push(_url);
+    if (_url.includes('gone.jpg')) return { ok: false, status: 404 };
+    return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
+  }
   const { query, variables } = JSON.parse(options.body);
   if (query.includes('registrationClosesAt') && variables.id !== undefined) {
     asked.push(`registration ${variables.id}`);
@@ -142,6 +149,7 @@ async function reset() {
   state.messages = {};
   byId = {};
   asked.length = 0;
+  downloaded.length = 0;
 }
 
 test('with no TO role yet, a manager makes a discord event from a start.gg link', async () => {
@@ -377,6 +385,51 @@ test('an event shows the venue and its address when start.gg has them, and the c
   assert.equal(created[2].entityMetadata.location, 'Main St Arcade, 5 Elm St, Buffalo, NY');
 });
 
+test('a made event carries start.gg\'s banner as its cover, the logo when there\'s no banner, and none without either', async () => {
+  await reset();
+  const { guild, created } = fakeGuild();
+  const bannered = {
+    ...soon, id: 20, slug: 'tournament/bannered',
+    images: [{ type: 'profile', url: 'https://images.example/logo.png' }, { type: 'banner', url: 'https://images.example/banner.png' }],
+  };
+  await ensureDiscordEvent(bannered, guild);
+  assert.ok(Buffer.isBuffer(created[0].image));
+  assert.deepEqual(downloaded, ['https://images.example/banner.png']);
+
+  state.discordEvents = {};
+  const logoless = { ...soon, id: 21, slug: 'tournament/logoless', images: [{ type: 'profile', url: 'https://images.example/logo.png' }] };
+  await ensureDiscordEvent(logoless, guild);
+  assert.ok(Buffer.isBuffer(created[1].image));
+  assert.ok(downloaded.includes('https://images.example/logo.png'));
+
+  state.discordEvents = {};
+  const bare = { ...soon, id: 22, slug: 'tournament/bare', images: [] };
+  await ensureDiscordEvent(bare, guild);
+  assert.equal(created[2].image, undefined);
+});
+
+test('a cover that won\'t download leaves the event without one instead of failing', async () => {
+  await reset();
+  const { guild, created } = fakeGuild();
+  const broken = { ...soon, id: 23, slug: 'tournament/broken', images: [{ type: 'banner', url: 'https://images.example/gone.jpg' }] };
+  const result = await ensureDiscordEvent(broken, guild);
+  assert.equal(created.length, 1);
+  assert.equal(created[0].image, undefined);
+  assert.match(result.url, /discord\.com\/events/);
+});
+
+test('the event runs to start.gg\'s end time, or 6 hours when it has none', async () => {
+  await reset();
+  const { guild, created } = fakeGuild();
+  await ensureDiscordEvent(soon, guild);
+  assert.deepEqual(created[0].scheduledEndTime, new Date(soon.endAt * 1000));
+
+  state.discordEvents = {};
+  const open = { ...soon, id: 24, slug: 'tournament/open', endAt: null };
+  await ensureDiscordEvent(open, guild);
+  assert.deepEqual(created[1].scheduledEndTime, new Date((open.startAt + 6 * 3600) * 1000));
+});
+
 test('reminders, DMs and roll calls show the venue and address as a map link, or the city without them', async () => {
   const addressed = { ...soon, venueName: 'Gamers [Lounge]', venueAddress: '123 Main St (rear), Buffalo, NY' };
   const location = (card) => card.data.description.split('\n').find((line) => line.startsWith('**Location:**'));
@@ -420,6 +473,24 @@ test('the sync moves a discord event when the TO moves the tournament on start.g
   assert.equal(state.discordEvents[6].startAt, moved.startAt);
 
   // once synced, the same start.gg details don't edit it again
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
+});
+
+test('the sync edits in a new cover photo when the TO changes it on start.gg', async () => {
+  await reset();
+  const { guild, created, edited } = fakeGuild();
+  await ensureDiscordEvent({ ...soon, images: [{ type: 'banner', url: 'https://images.example/old.png' }] }, guild);
+  assert.ok(Buffer.isBuffer(created[0].image));
+  downloaded.length = 0;
+
+  byId = { 6: { ...soon, images: [{ type: 'banner', url: 'https://images.example/new.png' }] } };
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
+  assert.ok(Buffer.isBuffer(edited[0][1].image));
+  assert.deepEqual(downloaded, ['https://images.example/new.png']);
+
+  // once synced, the same cover doesn't edit it again
   await syncDiscordEvents(guild);
   assert.equal(edited.length, 1);
 });

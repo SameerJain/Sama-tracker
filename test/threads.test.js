@@ -231,7 +231,9 @@ test('a thread that rejects the post sends it to the channel, and a working one 
 });
 
 test('stream alerts and their pings go in the tournament thread', async () => {
-  state.streamPings = ['fan'];
+  state.players[1].discordId = 'fan';
+  state.streamPings = ['fan', 'stranger'];
+  state.links = {};
   const channel = fakeChannel();
   sets = [node('live', now(), tournament('Local'), 2)];
   await tracker.postStreamAlerts(channel, 0);
@@ -420,8 +422,8 @@ test('a tracked tournament posts every finished set in its thread even with thre
     'Set result · W · Visitor 2-1 Guest · L',
     'Set result · W · Active 2-1 Opponent · L',
   ]);
-  // nobody tracked is the brand color, a tracked winner is green
-  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.color), [0x5b21b6, 0x22c55e]);
+  // every set result is green, whoever played
+  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.color), [0x22c55e, 0x22c55e]);
   assert.ok(state.tournaments[5].lastCheck > lastCheck);
 
   // a later check skips what's posted

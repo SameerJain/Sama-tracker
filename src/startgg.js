@@ -293,7 +293,7 @@ const SET_FIELDS = `
   event {
     name
     slug
-    videogame { displayName }
+    videogame { id displayName }
     tournament { name slug isOnline images(type: "profile") { url } }
   }
   ${SET_SLOTS}
@@ -512,7 +512,8 @@ function connectionPage(connection) {
   return { totalPages: connection?.pageInfo?.totalPages ?? 0, nodes: connection?.nodes ?? [] };
 }
 
-// a set is about 16 objects, 17 with its station, so 30 a page comes to about 510
+// a set is about 16 objects, 17 with its station, so 30 a page comes to about 510.
+// the event's game rides along so the run's head-to-head button filters to it
 export async function getRunSets(eventId, playerId) {
   const pages = await allPages((page) => fitPage(async (page, perPage) => connectionPage((await query(`
     query ($id: ID!, $player: ID!, $page: Int!, $perPage: Int!) {
@@ -521,7 +522,7 @@ export async function getRunSets(eventId, playerId) {
           pageInfo { totalPages }
           nodes {
             id state completedAt fullRoundText winnerId startAt vodUrl
-            event { slug }
+            event { name slug videogame { id displayName } }
             station { number }
             ${SET_SLOTS}
           }

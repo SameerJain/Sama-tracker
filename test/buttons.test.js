@@ -11,7 +11,7 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleButton, buttonFailed } = await import('../src/commands/index.js');
-const { reportButton, readButton, parseSince, buttonRow, sendEmbeds } = await import('../src/commands/shared.js');
+const { reportButton, readButton, parseSince, buttonRow, sendEmbeds, h2hButton } = await import('../src/commands/shared.js');
 const { setFallbackImage } = await import('../src/embeds/index.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
@@ -158,6 +158,45 @@ test('two presses of a new report button each get an answer, sharing the lookups
   assert.equal(fetches, 5);
 });
 
+test('a head-to-head button is a shortcut for the short report, in the set\'s game', async () => {
+  const a = { userId: 401, playerId: 4010, tag: 'Alpha', slug: 'user/alpha' };
+  const b = { userId: 402, playerId: 4020, tag: 'Beta', slug: 'user/beta' };
+  const set = (game) => ({
+    sides: [
+      { id: 1, name: 'Alpha', playerIds: [4010], score: 2 },
+      { id: 2, name: 'Beta', playerIds: [4020], score: 1 },
+    ],
+    event: { name: `${game} Singles`, slug: 'tournament/local/event/singles', videogame: game === 'Melee' ? { id: 1, displayName: 'Melee' } : { id: 1386, displayName: 'Ultimate' } },
+  });
+  // melee next sets filter to melee, the rest leave the game out for the odds to pick
+  assert.match(h2hButton(set('Melee'), a).toJSON().custom_id, /:melee:::/);
+  assert.doesNotMatch(h2hButton(set('Ultimate'), a).toJSON().custom_id, /melee/);
+  // a display name alone still counts, for sets from before the id rode along
+  assert.match(h2hButton({ sides: set('Melee').sides, event: { name: 'Bracket', videogame: { displayName: 'Melee' } } }, a).toJSON().custom_id, /:melee:::/);
+
+  state.players = { 401: a, 402: b };
+  state.links = {};
+  const meeting = (id, at) => ({
+    id, state: 3, completedAt: at, updatedAt: at, fullRoundText: 'Winners Final', winnerId: 1,
+    event: { name: 'Ultimate Singles', slug: 'tournament/local/event/singles', videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'Local', isOnline: false } },
+    slots: [[1, 4010, 'Alpha'], [2, 4020, 'Beta']].map(([entrantId, playerId, name], i) => ({
+      entrant: { id: entrantId, name, initialSeedNum: i + 1, participants: [{ player: { id: playerId } }] },
+      standing: { stats: { score: { value: 2 - i } } },
+    })),
+  });
+  mockApi(({ query }) => {
+    if (query.includes('events(query:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [meeting('m1', 1000), meeting('m2', 500)] } } };
+  });
+  const run = press(reportButton('H2H vs Beta', 'new', 'h2h', { player: a, opponent: b }));
+  await handleButton(run);
+  const [, answer] = run.calls.findLast(([kind]) => kind === 'edit');
+  // short, so the record without splits and first played, with nothing more to press
+  assert.match(JSON.stringify(answer.embeds), /Alpha 2-0 Beta/);
+  assert.doesNotMatch(JSON.stringify(answer.embeds), /First played/);
+  assert.doesNotMatch(JSON.stringify(answer.components), /Full report/);
+});
+
 test('two Full report presses share one swap, the second just hears it\'s loading', async () => {
   const a = { userId: 201, playerId: 2010, tag: 'Gamma', slug: 'user/gamma' };
   const b = { userId: 202, playerId: 2020, tag: 'Delta', slug: 'user/delta' };
@@ -231,6 +270,121 @@ test('a pressed button on a private report keeps its follow-ups private, and the
   assert.deepEqual(calls.map(([kind]) => kind), ['edit', 'followUp']);
   assert.deepEqual(calls[0][1].components, []);
   assert.equal(calls[1][1].flags, MessageFlags.Ephemeral);
+});
+
+// a press whose ack is already dead: the defer throws unknown interaction, so the retry
+// delivers the report as a new message. posted collects channel sends, dm collects DM sends
+function expiredPress(button, { ephemeral = false, user = 'crew-discord', messageId = 'm1', ack = 10062 } = {}) {
+  const posted = [];
+  const dm = [];
+  const calls = [];
+  const dead = async () => {
+    const err = new Error('Unknown interaction');
+    err.code = ack;
+    throw err;
+  };
+  const message = {
+    id: messageId, content: '', embeds: [new EmbedBuilder().setTitle('Short report')],
+    components: buttonRow(button), flags: { has: () => ephemeral },
+    edit: async (result) => calls.push(['messageEdit', result]),
+  };
+  const run = {
+    customId: button.toJSON().custom_id, calls, posted, dm,
+    user: { id: user, createDM: async () => ({ send: async (result) => dm.push(result) }) },
+    message, channel: { send: async (result) => posted.push(result) },
+    isButton: () => true,
+    deferUpdate: async () => {
+      if (ack === 40060) run.deferred = true;
+      await dead();
+    },
+    deferReply: async () => {
+      if (ack === 40060) run.deferred = true;
+      await dead();
+    },
+    editReply: async (result) => calls.push(['edit', result]),
+    followUp: async (result) => calls.push(['followUp', result]),
+  };
+  return run;
+}
+
+test('an expired Full report press runs once more, posting the report as a new message', async () => {
+  const a = { userId: 701, playerId: 7010, tag: 'Hotel', slug: 'user/hotel' };
+  const b = { userId: 702, playerId: 7020, tag: 'India', slug: 'user/india' };
+  state.players = { 701: a, 702: b };
+  state.links = {};
+  mockApi(({ query }) => {
+    if (query.includes('events(query:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+  });
+  const run = expiredPress(reportButton('Full report', 'more', 'h2h', { player: a, opponent: b }));
+  await handleButton(run);
+  // the dead press answers nothing itself, its message just loses the buttons
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['messageEdit']);
+  assert.ok(run.calls[0][1].components.every((row) => row.components.every((button) => button.disabled)));
+  assert.equal(run.posted.length, 2);
+  assert.match(run.posted[0].content, /<@crew-discord>.*expired.*Retrying \/h2h/);
+  assert.match(JSON.stringify(run.posted[1].embeds), /Hotel vs India/);
+  assert.equal(run.dm.length, 0);
+});
+
+test('an expired press on an ephemeral or private report retries by DM, never the channel', async () => {
+  const a = { userId: 801, playerId: 8010, tag: 'Hotel', slug: 'user/hotel' };
+  const b = { userId: 802, playerId: 8020, tag: 'India', slug: 'user/india' };
+  state.players = { 801: a, 802: b };
+  state.links = {};
+  mockApi(({ query }) => {
+    if (query.includes('events(query:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+  });
+  const quiet = expiredPress(reportButton('Full report', 'more', 'h2h', { player: a, opponent: b }), { ephemeral: true });
+  await handleButton(quiet);
+  assert.equal(quiet.posted.length, 0);
+  assert.equal(quiet.calls.length, 0);
+  assert.equal(quiet.dm.length, 2);
+  assert.match(quiet.dm[0].content, /expired.*Retrying \/h2h/);
+  assert.doesNotMatch(quiet.dm[0].content, /<@/);
+  assert.match(JSON.stringify(quiet.dm[1].embeds), /Hotel vs India/);
+
+  // a Head to head button from a match call stays private even though its message is public
+  const call = expiredPress(reportButton('Head to head', 'private', 'h2h', { player: a, opponent: b }));
+  await handleButton(call);
+  assert.equal(call.posted.length, 0);
+  assert.match(JSON.stringify(call.dm.at(-1).embeds ?? call.dm.at(-1).content), /Hotel vs India/);
+});
+
+test('a press that answers twice keeps the normal swap, with no retry', async () => {
+  const a = { userId: 901, playerId: 9010, tag: 'Hotel', slug: 'user/hotel' };
+  const b = { userId: 902, playerId: 9020, tag: 'India', slug: 'user/india' };
+  state.players = { 901: a, 902: b };
+  state.links = {};
+  mockApi(({ query }) => {
+    if (query.includes('events(query:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+  });
+  const run = expiredPress(reportButton('Full report', 'more', 'h2h', { player: a, opponent: b }), { ack: 40060 });
+  await handleButton(run);
+  assert.deepEqual(run.calls.map(([kind]) => kind), ['edit', 'edit']);
+  assert.match(JSON.stringify(run.calls.at(-1)[1].embeds), /Hotel vs India/);
+  assert.equal(run.posted.length, 0);
+  assert.equal(run.dm.length, 0);
+});
+
+test('a retry whose report fails says whose side failed instead of going quiet', async () => {
+  const a = { userId: 1001, playerId: 10010, tag: 'Hotel', slug: 'user/hotel' };
+  const b = { userId: 1002, playerId: 10020, tag: 'India', slug: 'user/india' };
+  state.players = { 1001: a, 1002: b };
+  state.links = {};
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+  const logged = console.error;
+  console.error = () => {};
+  try {
+    const run = expiredPress(reportButton('Full report', 'more', 'h2h', { player: a, opponent: b }));
+    await handleButton(run);
+    assert.match(run.posted[0].content, /Retrying \/h2h/);
+    assert.match(run.posted.at(-1).content, /start\.gg is having trouble/);
+  } finally {
+    console.error = logged;
+  }
 });
 
 // a deferred command run this many seconds ago. records replies and channel posts in order

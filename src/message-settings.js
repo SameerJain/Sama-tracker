@@ -29,3 +29,8 @@ export function messageSettings() {
   const threads = saved === true ? 'tournament' : Object.hasOwn(THREAD_MODES, saved ?? '') ? saved : 'off';
   return { ...defaults, ...DEFAULT_RECAP_SCHEDULE, ...state.messages, threads };
 }
+
+// green for a tracked win, red for a loss, gold when two tracked players meet and purple when
+// nobody tracked played. off, every set result card stays green. small crews turn it on to see
+// each member at a glance, big servers leave it off
+export const setResultColors = () => messageSettings().setColors === true;

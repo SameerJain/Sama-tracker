@@ -6,7 +6,7 @@ import * as bills from './bills.js';
 import * as embeds from './embeds/index.js';
 import { state, save } from './store.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
-import { messageEnabled, messageSettings } from './message-settings.js';
+import { messageEnabled, messageSettings, setResultColors } from './message-settings.js';
 import { rememberAccounts, serverMembers } from './accounts.js';
 import { cantMakeEvents, ensureDiscordEvent, syncDiscordEvents } from './discord-events.js';
 import { buttonRow, h2hButton, linkedPlayer } from './commands/shared.js';
@@ -588,7 +588,7 @@ export async function postNewSets(postChannel = channel) {
       const showing = covered.has(set.id) || set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
       if (showing && messageEnabled('sets', set.completedAt)) {
         // no head to head button, the set's over
-        const sent = await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players)]) });
+        const sent = await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players, { setColors: setResultColors() })]) });
         watchResult(sent, set);
       }
       state.posted.push(set.id);
@@ -646,7 +646,7 @@ export async function fixCorrectedResults(postChannel = channel) {
         const set = sets.get(each.setId);
         // reset again between the two requests, the next check sorts it out
         if (set?.state !== 3) continue;
-        kept = await editPost(postChannel, each, { embeds: embeds.withImage([embeds.correctedResult(set, state.players)]) });
+        kept = await editPost(postChannel, each, { embeds: embeds.withImage([embeds.correctedResult(set, state.players, { setColors: setResultColors() })]) });
         Object.assign(each, { outcome: startgg.outcomeOf(set), reset: false });
       } else if (outcomes.get(each.setId)?.state !== 3 && !each.reset) {
         // start.gg doesn't have the result anymore, so the card stays as it was with the result marked
@@ -699,10 +699,10 @@ export async function postStreamAlerts(postChannel = channel, confirmAfter = STR
       const set = still.get(id);
       // taken off stream or moved to another one. the next check looks again once it settles
       if (!set || set.stream.streamName !== stream.streamName || state.streamed.includes(id)) continue;
-      // everyone with /notify streams on, for every alert whoever is on stream
+      // only whoever is playing and has /notify streams on
       if (messageEnabled('streams', wentLiveAt(set))) {
         const components = h2hRow(set);
-        const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', state.streamPings, 'on stream', embeds.onStream(set, state.players), components);
+        const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', streamPingIds(set), 'on stream', embeds.onStream(set, state.players), components);
         rememberButton(sent, set, components);
       }
       state.streamed.push(id);
@@ -711,6 +711,17 @@ export async function postStreamAlerts(postChannel = channel, confirmAfter = STR
 
   state.streamed = state.streamed.slice(-200);
   save();
+}
+
+// everyone with /notify streams on who is in this set, by their /link or the tracked
+// player with their discord on start.gg. doubles sides hold two player ids each
+function streamPingIds(set) {
+  const ids = [];
+  for (const discordId of state.streamPings) {
+    const player = linkedPlayer(discordId);
+    if (player?.playerId && set.sides.some((side) => side.playerIds.includes(player.playerId))) ids.push(discordId);
+  }
+  return [...new Set(ids)];
 }
 
 // the card and its buttons go with the first batch of pings, or alone if there's nobody to ping. the rest
@@ -923,7 +934,7 @@ export async function postMatchCalls(postChannel = channel) {
         // the card goes by whoever it's for, tracked or only linked
         const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
         // the station shows only when the TO set one, otherwise just the ping
-        const text = set.station ? `You're up — Station ${set.station}` : `You're up`;
+        const text = set.station ? `You're up - Station ${set.station}` : `You're up`;
         const sent = await postChannel.send({
           content: discordIds.length ? `${mentions(discordIds)} ${text}` : undefined,
           embeds: embeds.withImage([embeds.matchCall(set, people)]),

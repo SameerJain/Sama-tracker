@@ -28,6 +28,8 @@ function configureMessages(interaction) {
     const value = interaction.options.getBoolean(type);
     if (value !== null) changes[type] = value;
   }
+  const setColors = interaction.options.getBoolean('set_colors');
+  if (setColors !== null) changes.setColors = setColors;
   const day = interaction.options.getInteger('recap_day');
   if (day !== null) changes.recapDay = day;
   const time = interaction.options.getString('recap_time')?.trim();
@@ -79,11 +81,13 @@ function configureMessages(interaction) {
     lines.push(`**${label}:** ${settings[key] ? 'on' : 'off'}`);
   }
   lines.push(`**Threads:** ${THREAD_MODES[settings.threads]}`);
+  lines.push(`**Set result colors:** ${settings.setColors ? 'on' : 'off'}`);
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
     '-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events',
-    '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. One per tournament pins its channel card until the tournament ends.');
+    '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. One per tournament pins its channel card until the tournament ends.',
+    '-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played. Off leaves every card green.');
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
@@ -212,7 +216,7 @@ function trackPosts(interaction) {
 // what each /notify switch keeps a list of, and what the reply says about it
 const PINGS = {
   calls: { list: 'callPings', on: 'You\'ll get pinged when your match is called.', off: 'No more match call pings.' },
-  streams: { list: 'streamPings', on: 'You\'ll get pinged for every stream alert posted here.', off: 'No more stream alert pings.' },
+  streams: { list: 'streamPings', on: 'You\'ll get pinged when your set is on stream.', off: 'No more stream alert pings.' },
   registration: {
     list: 'regPings',
     on: 'You\'ll get pinged for reg reminders. If your Discord is connected on start.gg, not for ones you\'re already registered for.',
@@ -239,10 +243,12 @@ function notifyText(discordId, me) {
   const has = (name) => (state[PINGS[name].list] ?? []).includes(discordId);
   let calls = has('calls') ? 'on' : 'off';
   if (has('calls') && !me) calls += ', but nothing to go by until you `/link`';
+  let streams = has('streams') ? 'on' : 'off';
+  if (has('streams') && !me) streams += ', but nothing to go by until you `/link`';
   const lines = [
     '**Your pings**',
     `**Match calls:** ${calls}`,
-    `**Stream alerts:** ${has('streams') ? 'on' : 'off'}`,
+    `**Stream alerts:** ${streams}`,
     `**Reg reminders:** ${has('registration') ? 'on' : 'off'}`,
     `**Registration DMs:** ${has('dm_registration') ? 'on' : 'off'}`,
     `**Start DMs:** ${has('dm_start') ? 'on' : 'off'}`,
@@ -253,9 +259,9 @@ function notifyText(discordId, me) {
   return lines.join('\n');
 }
 
-// /notify: only ever changes whoever ran it. match calls go by their start.gg, so those need them linked or
-// tracked with their discord on start.gg. registration hands out the Reg Reminders role too, which can take
-// discord past the 3 seconds a command gets, so that one defers first
+// /notify: only ever changes whoever ran it. match calls and stream alerts go by their start.gg, so those
+// need them linked or tracked with their discord on start.gg. registration hands out the Reg Reminders role
+// too, which can take discord past the 3 seconds a command gets, so that one defers first
 async function notify(interaction) {
   const { id } = interaction.user;
   const all = interaction.options.getString('all');
@@ -269,8 +275,8 @@ async function notify(interaction) {
 
   const lines = [];
   for (const [name, on] of Object.entries(changes)) {
-    if (name === 'calls' && on && !me) {
-      lines.push('Match call pings need your start.gg, so `/link` first. Leave out the link and it finds yours.');
+    if ((name === 'calls' || name === 'streams') && on && !me) {
+      lines.push(`${name === 'calls' ? 'Match call' : 'Stream alert'} pings need your start.gg, so \`/link\` first. Leave out the link and it finds yours.`);
       continue;
     }
     const list = PINGS[name].list;

@@ -177,7 +177,7 @@ async function eventLines(interaction, found) {
 }
 
 // /t-o tournament event: paste a start.gg link, get a discord event. it doesn't track the tournament, /t-o tournament add
-// does that. the event follows start.gg's time and place from then on, see syncDiscordEvents
+// does that. the event follows start.gg's time, end time, cover and place from then on, see syncDiscordEvents
 async function tournamentEvent(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'make Discord events');
   const input = interaction.options.getString('tournament', true).trim();

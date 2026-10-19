@@ -391,17 +391,19 @@ test('/notify only changes whoever ran it, and match calls need their start.gg',
   state.messages = {};
   globalThis.fetch = async () => assert.fail('no start.gg lookup');
 
-  // nobody to look up, so calls stay off and the rest still go through
+  // nobody to look up, so calls and streams stay off and the rest still go through
   const stranger = await run('notify', 'stranger', { calls: 'on', streams: 'on' });
   assert.ok(stranger.flags);
-  assert.match(stranger.content, /^Match call pings need your start\.gg, so `\/link` first\..*\nYou'll get pinged for every stream alert posted here\.$/);
+  assert.match(stranger.content, /^Match call pings need your start\.gg, so `\/link` first\..*\nStream alert pings need your start\.gg, so `\/link` first\..*$/);
   assert.deepEqual(state.callPings, []);
-  assert.deepEqual(state.streamPings, ['stranger']);
+  assert.deepEqual(state.streamPings, []);
 
   // linked, or tracked with this discord on start.gg
   assert.match((await run('notify', 'me-discord', { calls: 'on' })).content, /^You'll get pinged when your match is called\.$/);
   assert.match((await run('notify', 'crew-discord', { calls: 'on' })).content, /^You'll get pinged when your match is called\.$/);
   assert.deepEqual(state.callPings, ['me-discord', 'crew-discord']);
+  assert.match((await run('notify', 'me-discord', { streams: 'on' })).content, /^You'll get pinged when your set is on stream\.$/);
+  assert.deepEqual(state.streamPings, ['me-discord']);
 
   // nothing given shows where theirs are at, and a tracked player's own posts
   const mine = await run('notify', 'crew-discord');

@@ -268,7 +268,7 @@ const runs = [
   ['t-o', { subcommand: 'cleanup' }, /Everyone tracked has their start\.gg Discord in this server/],
   ['notify', {}, /Your pings.*Match calls:\*\* off.*Registration DMs:\*\* off.*Start DMs:\*\* off/],
   ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off for the whole server/],
-  ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged for every stream alert.*pinged for reg reminders.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
+  ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your set is on stream.*pinged for reg reminders.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['notify', { values: { dm_registration: 'on', dm_start: 'on' } }, /DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['matchmaking_role', { values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
   ['matchmaking_search', { values: { game: 'ult' } }, /You need the \*\*Ultimate Matchmaking\*\* role to ping it\. `\/matchmaking_role game:Ultimate`/],
@@ -405,7 +405,7 @@ const presses = [
   ['scout', { values: { profile: '2' } }, 'Full report', /Crew vs Rival/],
   ['h2h', { values: { opponent: '2' } }, 'Full report', /First played/],
   ['predict', { values: { opponent: '2' } }, 'Full report', /How it adds up/],
-  // whoever's next, by the player id in the set
+  // whoever's next, by the player id in the set. a shortcut for short /h2h, so no second press
   ['run', {}, 'H2H vs Rival', /Crew 2-0 Rival/],
 ];
 
@@ -439,9 +439,10 @@ test('every report button answers the way its command would, and the full report
       assert.ok(run.calls[1][1].components.every((row) => row.components.every((button) => button.disabled)), what);
       assert.doesNotMatch(buttons, /Full report/, what);
     } else {
-      // a new message for the head-to-head, with its own Full report button
+      // a new message for the head-to-head, the short report with nothing more to show
       assert.equal(run.calls[0][0], 'defer', what);
-      assert.match(buttons, /Full report/, what);
+      assert.doesNotMatch(buttons, /Full report/, what);
+      assert.doesNotMatch(JSON.stringify(answer), /First played/, what);
     }
   }
   // short /progress has no Full report button, but one on a message from before still swaps in the full report

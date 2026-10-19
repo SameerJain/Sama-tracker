@@ -111,25 +111,19 @@ export function matchCall(set, players) {
   return card;
 }
 
-export function setResult(set, players) {
+export function setResult(set, players, { setColors = false } = {}) {
   const [a, b] = set.sides;
   const trackedA = findTracked(a, players);
   const trackedB = findTracked(b, players);
-  const clash = Boolean(trackedA && trackedB);
 
   // winner on the left with the W, loser on the right with the L, whoever is tracked
   const bWon = b.id === set.winnerId;
   const winner = bWon ? b : a;
   const loser = bWon ? a : b;
-  // the card is still about the tracked one: their picture, and green or red for how they did
+  // the card is still about the tracked one: their picture when someone tracked played
   const player = (bWon ? trackedB : trackedA) ?? (bWon ? trackedA : trackedB);
-  const trackedWon = Boolean(bWon ? trackedB : trackedA);
-  let color = trackedWon ? colors.win : colors.loss;
-  if (clash) color = colors.clash;
-  // nobody tracked, from a tracked tournament, so it's nobody's win or loss
-  if (!trackedA && !trackedB) color = colors.brand;
 
-  const embed = setEmbed(set, color, player)
+  const embed = setEmbed(set, setColors ? resultColor(trackedA, trackedB, bWon) : colors.win, player)
     .setTitle(`Set result · W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
     .setURL(setUrl(set))
     .setTimestamp(set.completedAt * 1000);
@@ -151,9 +145,17 @@ export function setResult(set, players) {
   return embed;
 }
 
+// green when someone tracked won, red when they lost, gold when two tracked players met,
+// purple when nobody tracked played
+function resultColor(trackedA, trackedB, bWon) {
+  if (!trackedA && !trackedB) return colors.brand;
+  if (trackedA && trackedB) return colors.clash;
+  return (bWon ? trackedB : trackedA) ? colors.win : colors.loss;
+}
+
 // a set result card edited in after the TO changed the winner or score, or reported a reset set again
-export function correctedResult(set, players) {
-  const embed = setResult(set, players);
+export function correctedResult(set, players, options) {
+  const embed = setResult(set, players, options);
   return embed.setDescription(`**Corrected by TO**\n${embed.data.description}`);
 }
 

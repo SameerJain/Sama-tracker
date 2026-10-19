@@ -242,11 +242,20 @@ function parseSince(input) {
 const fullReport = (command, options) => reportButton('Full report', 'more', command, options);
 
 // /h2h between a player and whoever they played or play next in a set. singles only, like /h2h.
-// discord caps labels at 80
+// a shortcut for /h2h in the game the set is in: melee sets filter to melee, the rest
+// leave the game out so the odds pick their shared one. pressing it runs the short report, no
+// second Full report press. discord caps labels at 80
 function h2hButton(set, player, { label, action = 'new' } = {}) {
   const them = startgg.fromSide(set, player.playerId)?.them;
   if (!them || set.sides.some((side) => side.playerIds.length !== 1)) return null;
-  return reportButton((label ?? `H2H vs ${them.name}`).slice(0, 80), action, 'h2h', { player, opponent: { playerId: them.playerIds[0] } });
+  return reportButton((label ?? `H2H vs ${them.name}`).slice(0, 80), action, 'h2h', { player, opponent: { playerId: them.playerIds[0] }, melee: isMeleeSet(set) });
+}
+
+// the id is the game when start.gg has one, else the display name or event name says melee
+function isMeleeSet(set) {
+  if (startgg.isMelee(set)) return true;
+  if (set.event?.videogame?.displayName === 'Melee') return true;
+  return /\b(melee|ssbm)\b/i.test(set.event?.name ?? '');
 }
 
 // the row the buttons go in, or none when there aren't any

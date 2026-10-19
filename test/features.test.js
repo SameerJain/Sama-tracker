@@ -1129,10 +1129,18 @@ test('set result cards put the winner on the left with a W and the loser on the 
   // a tracked player losing to someone untracked: the winner still goes first, the card stays theirs
   const loss = card('l', [10, 'Active', 2], [99, 'Opponent', 3], false, [1, 3]);
   assert.equal(loss.title, 'Set result · W · Opponent 3-1 Active · L');
-  assert.equal(loss.color, colors.loss);
+  assert.equal(loss.color, colors.win);
   assert.equal(loss.author.name, 'Active');
   assert.equal(loss.fields.find((field) => field.name === 'Characters').value, 'Opponent: Wario\nActive: Pac-Man');
   assert.doesNotMatch(loss.description, /Major upset/);
+
+  // nobody tracked, from a tracked tournament, and two tracked players fighting are green too
+  const stranger = card('s', [98, 'Visitor', 1], [99, 'Guest', 2], true, [2, 1]);
+  assert.equal(stranger.color, colors.win);
+  const both = { ...players, 2: { userId: 2, playerId: 99, tag: 'Opponent', slug: 'user/opponent' } };
+  const clashSet = result('c', 100, [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 0]);
+  const clash = embeds.setResult({ ...clashSet, event: { ...clashSet.event, name: 'Singles' }, sides: clashSet.sides.map((side) => ({ ...side, characters: [] })) }, both).data;
+  assert.equal(clash.color, colors.win);
 
   // seed 17 over seed 2 is a major upset whoever won it. seed 9 over seed 2 is short of it
   const upset = card('u', [10, 'Active', 2], [99, 'Opponent', 17], false, [1, 2]);
@@ -1141,6 +1149,27 @@ test('set result cards put the winner on the left with a W and the loser on the 
   assert.doesNotMatch(card('n', [10, 'Active', 2], [99, 'Opponent', 9], false, [1, 2]).description, /Major upset/);
   // DQ wins aren't upsets
   assert.doesNotMatch(card('d', [10, 'Active', 2], [99, 'Opponent', 17], false, [-1, 0]).description, /Major upset/);
+});
+
+test('set_colors paints set result cards green for a win, red for a loss, gold for crew vs crew', async () => {
+  const { colors } = await import('../src/embeds/shared.js');
+  const players = { 1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active' } };
+  const card = (id, me, them, won, score, list = players) => {
+    const set = result(id, 100, me, them, won, score);
+    return embeds.setResult({ ...set, event: { ...set.event, name: 'Singles' }, sides: set.sides.map((side) => ({ ...side, characters: [] })) }, list, { setColors: true }).data;
+  };
+
+  assert.equal(card('w', [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 1]).color, colors.win);
+  assert.equal(card('l', [10, 'Active', 2], [99, 'Opponent', 3], false, [1, 3]).color, colors.loss);
+  // nobody tracked, from a tracked tournament
+  assert.equal(card('s', [98, 'Visitor', 1], [99, 'Guest', 2], true, [2, 1]).color, colors.brand);
+  const both = { ...players, 2: { userId: 2, playerId: 99, tag: 'Opponent', slug: 'user/opponent' } };
+  assert.equal(card('c', [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 0], both).color, colors.clash);
+  // a corrected card keeps its colors
+  const set = result('w', 100, [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 1]);
+  const corrected = embeds.correctedResult({ ...set, event: { ...set.event, name: 'Singles' }, sides: set.sides.map((side) => ({ ...side, characters: [] })) }, players, { setColors: true }).data;
+  assert.equal(corrected.color, colors.win);
+  assert.match(corrected.description, /Corrected by TO/);
 });
 
 test('muted automatic messages are consumed without posting or replaying them later', async () => {
@@ -1411,12 +1440,16 @@ test('a set put on stream by mistake and taken back before the confirm look is n
   assert.equal(asked, 1);
 });
 
-test('stream alerts ping everyone with /notify streams on, 80 to a message', async () => {
+test('stream alerts ping only whoever is playing with /notify streams on', async () => {
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
   const channel = { send: async payload => sent.push(payload) };
   state.messages = {};
-  state.players = { 1: { ...crewPlayer, lastCheck: now } };
+  state.players = {
+    1: { ...crewPlayer, discordId: 'crew-discord', lastCheck: now },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', discordId: 'rival-discord', lastCheck: now },
+  };
+  state.links = {};
   state.streamed = [];
   state.tournaments = {};
   state.streamPings = [];
@@ -1424,44 +1457,45 @@ test('stream alerts ping everyone with /notify streams on, 80 to a message', asy
   mockApi(() => ({ p10: { sets: { nodes: [current] } } }));
   const streamed = id => ({ ...node(id, null), state: 2, updatedAt: now, stream: { streamName: 'local', streamSource: 'TWITCH' } });
 
-  const fromInteraction = (id, ping) => ({ user: { id }, options: { getString: (name) => (name === 'streams' ? ping : null) }, reply: async () => {} });
+  const replies = [];
+  const fromInteraction = (id, ping) => ({ user: { id }, options: { getString: (name) => (name === 'streams' ? ping : null) }, reply: async (result) => replies.push(result) });
   const { notify } = await import('../src/commands/settings.js');
+  // nobody to look up, so it stays off
   await notify(fromInteraction('fan', 'on'));
-  await notify(fromInteraction('fan', 'on'));
-  await notify(fromInteraction('quit', 'on'));
-  await notify(fromInteraction('quit', 'off'));
-  assert.deepEqual(state.streamPings, ['fan']);
+  assert.match(replies.at(-1).content, /Stream alert pings need your start\.gg/);
+  assert.deepEqual(state.streamPings, []);
+  // tracked with this discord on start.gg counts
+  await notify(fromInteraction('crew-discord', 'on'));
+  await notify(fromInteraction('crew-discord', 'on'));
+  await notify(fromInteraction('rival-discord', 'on'));
+  await notify(fromInteraction('rival-discord', 'off'));
+  assert.deepEqual(state.streamPings, ['crew-discord']);
 
   current = streamed('one-fan');
   await tracker.postStreamAlerts(channel, 0);
   assert.equal(sent.length, 1);
-  assert.equal(sent[0].content, '<@fan> on stream');
-  assert.deepEqual(sent[0].allowedMentions, { users: ['fan'] });
+  assert.equal(sent[0].content, '<@crew-discord> on stream');
+  assert.deepEqual(sent[0].allowedMentions, { users: ['crew-discord'] });
   assert.equal(sent[0].embeds.length, 1);
   // against someone only known from the set, by player id, answered just to whoever presses it
   const [button] = sent[0].components[0].toJSON().components;
   assert.deepEqual([button.label, button.custom_id], ['Head to head', 'private:h2h:active:#99::::']);
 
-  // nobody opted in still posts the card, pinging no one
-  state.streamPings = [];
-  current = streamed('no-fans');
+  // someone with pings on who isn't playing gets no ping, but the card still posts
+  state.streamPings = ['rival-discord'];
+  current = streamed('not-playing');
   await tracker.postStreamAlerts(channel, 0);
   assert.equal(sent[1].content, undefined);
   assert.deepEqual(sent[1].allowedMentions, { users: [] });
   assert.equal(sent[1].components.length, 1);
 
-  state.streamPings = Array.from({ length: 85 }, (_, i) => `fan${i}`);
-  current = streamed('many-fans');
+  // nobody opted in still posts the card, pinging no one
+  state.streamPings = [];
+  current = streamed('no-fans');
   await tracker.postStreamAlerts(channel, 0);
-  const [first, rest] = sent.slice(2);
-  assert.equal(sent.length, 4);
-  assert.equal(first.allowedMentions.users.length, 80);
-  assert.equal(first.embeds.length, 1);
-  assert.deepEqual(rest.allowedMentions.users, ['fan80', 'fan81', 'fan82', 'fan83', 'fan84']);
-  assert.equal(rest.embeds.length, 0);
-  // the button stays with the card
-  assert.deepEqual([first.components.length, rest.components], [1, []]);
-  assert.ok(first.content.length <= 2000);
+  assert.equal(sent[2].content, undefined);
+  assert.deepEqual(sent[2].allowedMentions, { users: [] });
+  assert.equal(sent[2].components.length, 1);
   state.streamPings = [];
 });
 
@@ -1613,7 +1647,7 @@ test('match call pings mention connected discords, one message per set', async (
   assert.equal(sent.length, 2);
   // one message for the shared set, with both pings in it
   assert.match(sent[0].content, /<@crew-discord>.*<@rival-discord>|<@rival-discord>.*<@crew-discord>/);
-  assert.match(sent[0].content, /You're up — Station 4/);
+  assert.match(sent[0].content, /You're up - Station 4/);
   assert.deepEqual(sent[0].allowedMentions, { users: ['crew-discord', 'rival-discord'] });
   assert.match(sent[0].embeds[0].data.title, /Match call · /);
   assert.match(sent[0].embeds[0].data.description, /Station 4/);
@@ -1750,20 +1784,22 @@ test('match calls and stream alerts lose their Head to head button once the set 
   assert.deepEqual(asked, []);
 });
 
-test('a stream alert saves the message with the card, not the overflow pings', async () => {
+test('a stream alert saves the message with the card', async () => {
   const now = Math.floor(Date.now() / 1000);
   let nextId = 0;
   const channel = { send: async () => ({ id: `m${++nextId}`, channelId: 'c1' }) };
   state.messages = {};
-  state.players = { 1: { ...crewPlayer, lastCheck: now } };
+  state.players = { 1: { ...crewPlayer, discordId: 'crew-discord', lastCheck: now } };
+  state.links = {};
   state.streamed = [];
   state.tournaments = {};
   state.buttons = [];
-  state.streamPings = Array.from({ length: 85 }, (_, i) => `fan${i}`);
+  // only whoever is playing gets pinged, so one message with the card
+  state.streamPings = ['crew-discord', 'rival-discord'];
   const live = { ...node('601', null), state: 2, updatedAt: now, stream: { streamName: 'local', streamSource: 'TWITCH' } };
   mockApi(() => ({ p10: { sets: { nodes: [live] } } }));
   await tracker.postStreamAlerts(channel, 0);
-  assert.equal(nextId, 2);
+  assert.equal(nextId, 1);
   assert.deepEqual(state.buttons.map(({ setId, messageId }) => [setId, messageId]), [['601', 'm1']]);
   state.streamPings = [];
   state.buttons = [];

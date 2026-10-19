@@ -6,7 +6,7 @@ import { venueText } from './embeds/shared.js';
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
-// discord events need an end time, and start.gg doesn't always have one
+// how long an event runs when start.gg has no end time for it
 const DEFAULT_LENGTH_HOURS = 6;
 // a saved event is forgotten this long after its tournament started. discord events have to start in the
 // future, so by then nothing would make it again anyway
@@ -43,7 +43,28 @@ function eventDescription(tournament) {
   return lines.join('\n').slice(0, 1000);
 }
 
-// what a discord event shows for a tournament from getRegistration
+// the banner for the discord cover, the logo when there's no banner. discord's cover is wide like the banner
+function coverUrl(tournament) {
+  const image = (type) => tournament.images?.find((each) => each.type === type)?.url;
+  return image('banner') ?? image('profile') ?? null;
+}
+
+// downloaded, so a bad image leaves the event without a cover instead of failing the whole create
+async function coverImage(tournament) {
+  const url = coverUrl(tournament);
+  if (!url) return { url: null, image: null };
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    return { url, image: Buffer.from(await res.arrayBuffer()) };
+  } catch (err) {
+    console.error(`downloading the cover for ${tournament.name ?? tournament.id} failed:`, err.message);
+    return { url: null, image: null };
+  }
+}
+
+// what a discord event shows for a tournament from getRegistration. discord requires an end time on
+// external events, and start.gg doesn't always have one, so that falls back to 6 hours
 function eventFields(found) {
   return {
     name: found.name.slice(0, 100),
@@ -56,7 +77,7 @@ function eventFields(found) {
 
 // start.gg's side of an event as of the last make or sync. the sync only edits when this changes, so an edit a
 // mod made in discord stays until the TO changes something on start.gg
-const syncKey = (fields) => JSON.stringify([fields.name, +fields.scheduledStartTime, +fields.scheduledEndTime, fields.description, fields.entityMetadata.location]);
+const syncKey = (fields, cover) => JSON.stringify([fields.name, +fields.scheduledStartTime, +fields.scheduledEndTime, fields.description, fields.entityMetadata.location, cover ?? null]);
 
 // synced null means the event may not match start.gg yet, and the next sync puts start.gg's details on it
 function remember(found, eventId, synced) {
@@ -96,10 +117,12 @@ export async function ensureDiscordEvent(found, guild) {
   }
 
   const fields = eventFields(found);
+  const cover = await coverImage(found);
   let created;
   try {
     created = await guild.scheduledEvents.create({
       ...fields,
+      ...(cover.image ? { image: cover.image } : {}),
       privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
       entityType: GuildScheduledEventEntityType.External,
     });
@@ -107,14 +130,14 @@ export async function ensureDiscordEvent(found, guild) {
     if (err.code === 50013) return { error: NO_PERMISSION };
     throw err;
   }
-  remember(found, created.id, syncKey(fields));
+  remember(found, created.id, syncKey(fields, cover.url));
   return { url: eventUrl(guild, created), isNew: true };
 }
 
-// the discord events the bot made keep up with start.gg until they start: a new time, name, venue, close time
-// or event list gets edited in, and a tournament deleted or unpublished on start.gg cancels its event. it goes
-// by tournament id, since a TO can change the link. an event a mod deleted, or one that started, is left alone.
-// nothing gets posted, and each event costs one start.gg request a run
+// the discord events the bot made keep up with start.gg until they start: a new time, end time, cover, name,
+// venue, close time or event list gets edited in, and a tournament deleted or unpublished on start.gg cancels
+// its event. it goes by tournament id, since a TO can change the link. an event a mod deleted, or one that
+// started, is left alone. nothing gets posted, and each event costs one start.gg request a run
 export async function syncDiscordEvents(guild, now = secondsNow()) {
   let changed = false;
   for (const [id, saved] of Object.entries(state.discordEvents)) {
@@ -145,10 +168,13 @@ export async function syncDiscordEvents(guild, now = secondsNow()) {
         // moved to a time that's already past, which discord won't take
         if (!(found.startAt > now)) continue;
         const fields = eventFields(found);
-        const key = syncKey(fields);
+        const key = syncKey(fields, coverUrl(found));
         if (key === saved.synced) continue;
-        await guild.scheduledEvents.edit(event, fields);
-        Object.assign(saved, { slug: found.slug, startAt: found.startAt, synced: key });
+        // a cover that won't download still gets the text edits. the saved key keeps no cover, so the next
+        // run tries the image again
+        const cover = await coverImage(found);
+        await guild.scheduledEvents.edit(event, cover.image ? { ...fields, image: cover.image } : fields);
+        Object.assign(saved, { slug: found.slug, startAt: found.startAt, synced: syncKey(fields, cover.url) });
         changed = true;
       } catch (err) {
         console.error(`syncing the discord event for tournament ${id} failed:`, err.message);

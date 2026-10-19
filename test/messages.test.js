@@ -29,7 +29,7 @@ test('message controls are registered for server managers', () => {
   const command = commands.find(c => c.name === 'messages');
   assert.equal(command?.default_member_permissions, PermissionFlagsBits.ManageGuild.toString());
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills']);
+    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
   // three modes, picked by name
   const threads = command.options.find(o => o.name === 'threads');
   assert.equal(threads.type, 3);
@@ -71,6 +71,23 @@ test('message switches and recap schedule save immediately and answer where ever
   assert.equal(saved.recapDay, 0);
   assert.equal(saved.recapTime, '18:30');
   assert.ok(saved.recapChangedAt > 0);
+});
+
+test('set result colors save and show, off until a small crew turns them on', async () => {
+  const { setResultColors } = await import('../src/message-settings.js');
+  state.messages = {};
+  assert.equal(setResultColors(), false);
+  assert.match((await configure()).content, /Set result colors:\*\* off/);
+
+  const reply = await configure({ set_colors: true });
+  assert.match(reply.content, /Set result colors:\*\* on/);
+  assert.match(reply.content, /green for a tracked win, red for a loss, gold when two tracked players meet/);
+  assert.equal(state.messages.setColors, true);
+  assert.equal(setResultColors(), true);
+
+  await configure({ set_colors: false });
+  assert.equal(state.messages.setColors, false);
+  assert.equal(setResultColors(), false);
 });
 
 test('invalid schedules do not partially apply accompanying switches', async () => {

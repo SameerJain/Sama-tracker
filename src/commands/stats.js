@@ -215,8 +215,8 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
     ? await oddsWithSlippi(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options, ranked, true)
     : { odds: predictOdds(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options), profiles: null };
   // never having played, the full report would say the same thing. the odds stay one line in both,
-  // run /predict for the reasoning behind them
-  const buttons = buttonRow(!verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee, since: sinceText, venue }));
+  // run /predict for the reasoning behind them. a button press gets no second press
+  const buttons = buttonRow(!verbose && shown.length && !interaction.isButton?.() && fullReport('h2h', { player: a, opponent: b, melee, since: sinceText, venue }));
   const cards = embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - only(sets).length, odds, filters });
   return sendEmbeds(interaction, embeds.withSlippi(cards, [a, b], profiles, { odds: Boolean(odds), slippi: Boolean(odds?.slippi) }), buttons);
 }

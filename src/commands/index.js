@@ -1,5 +1,5 @@
 import { hostname } from 'node:os';
-import { MessageFlags } from 'discord.js';
+import { HTTPError, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, saveCount } from '../store.js';
@@ -14,7 +14,7 @@ import { toAdd, toRemove, toList } from './to.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch } from './matchmaking.js';
-import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
+import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
@@ -104,6 +104,115 @@ async function deferButton(interaction, action) {
   }
 }
 
+// discord's "didn't respond in time" means the press expired before the ack landed, and that press
+// can never be answered. so a dead ack runs the report once more and delivers it as a new message
+// instead of leaving the timeout. true when the press is answered, false when the retry took over
+async function deferButtonOrRetry(interaction, action) {
+  try {
+    await deferButton(interaction, action);
+    return true;
+  } catch (err) {
+    // already answered, so the press is still alive
+    if (err?.code === RESTJSONErrorCodes.InteractionHasAlreadyBeenAcknowledged) return true;
+    if (err?.code === RESTJSONErrorCodes.UnknownInteraction || err instanceof HTTPError) {
+      await retryExpiredButton(interaction);
+      return false;
+    }
+    throw err;
+  }
+}
+
+// one more try for an expired press. public reports go to the channel pinging whoever pressed, and
+// private or ephemeral ones go by DM so they stay private. failures here only log, the press itself
+// is already dead
+async function retryExpiredButton(interaction) {
+  const { action, command } = readButton(interaction.customId);
+  const ephemeral = Boolean(interaction.message?.flags?.has?.(MessageFlags.Ephemeral));
+  const toChannel = action !== 'private' && !ephemeral && interaction.channel?.send ? interaction.channel : null;
+  let target = null;
+  if (toChannel) {
+    target = { channel: toChannel, ping: `<@${interaction.user.id}> ` };
+  } else {
+    try {
+      target = { channel: await interaction.user.createDM(), ping: '' };
+    } catch (err) {
+      console.error(`/${command} button retry failed: couldn't open a DM (${err.message})`);
+      return;
+    }
+  }
+  try {
+    await target.channel.send({
+      content: `${target.ping}The button press expired before I could answer. Retrying /${command} now.`,
+      allowedMentions: target.ping ? { users: [interaction.user.id] } : { parse: [] },
+    });
+  } catch (err) {
+    console.error(`/${command} button retry failed: couldn't post (${err.message})`);
+    return;
+  }
+  // the dead press can't grey out its own buttons, so take them off directly
+  if (action === 'more' && toChannel) {
+    try {
+      await interaction.message?.edit?.({ components: disabled(interaction.message) });
+    } catch {}
+  }
+  const relay = expiredRelay(interaction, target);
+  try {
+    await answerButton(relay);
+    if (!relay.sent && relay.pendingContent) {
+      await target.channel.send({ content: relay.pendingContent, allowedMentions: { parse: [] } });
+    }
+  } catch (err) {
+    console.error(`/${command} button retry failed:`, err);
+    try {
+      await target.channel.send({ content: failureMessage(err), allowedMentions: { parse: [] } });
+    } catch {}
+  }
+}
+
+// stands in for a dead press while its retry runs. sends go to the new message's home, and
+// content-only edits stay out since those are loading progress, flushed at the end when the
+// retry had nothing else to say
+function expiredRelay(interaction, target) {
+  const relay = {
+    customId: interaction.customId,
+    user: interaction.user,
+    message: { content: null, embeds: [], components: [], flags: { has: () => false } },
+    deferred: true,
+    replied: false,
+    ephemeral: false,
+    createdTimestamp: Date.now(),
+    channel: target.channel,
+    appPermissions: interaction.appPermissions,
+    isButton: () => true,
+    sent: false,
+    pendingContent: null,
+    deferReply: async () => {},
+    reply: async (payload) => relaySend(relay, target, payload),
+    editReply: async (payload) => relaySend(relay, target, payload),
+    followUp: async (payload) => relaySend(relay, target, payload),
+    deleteReply: async () => {},
+  };
+  return relay;
+}
+
+async function relaySend(relay, target, payload) {
+  const data = typeof payload === 'string' ? { content: payload } : { ...payload };
+  delete data.flags; // a channel or DM post can't be ephemeral
+  if (!data.embeds?.length) {
+    if (typeof data.content === 'string' && data.content) relay.pendingContent = data.content;
+    return { id: null };
+  }
+  await target.channel.send({
+    content: data.content ?? undefined,
+    embeds: data.embeds,
+    components: data.components ?? [],
+    files: data.files ?? [],
+    allowedMentions: { parse: [] },
+  });
+  relay.sent = true;
+  return { id: null };
+}
+
 async function answerButton(interaction) {
   const { action, command, player, opponent, melee, game, since: sinceText, venue } = readButton(interaction.customId);
   // buttons only ever hold dates the command accepted, so a bad one just means no filter
@@ -117,24 +226,27 @@ async function answerButton(interaction) {
   if (!who && command === 'scout') return buttonFailed(interaction, NOT_LINKED);
   const against = opponent ? await playerBySlug(opponent) : null;
   if (!who || (opponent && !against)) return buttonFailed(interaction, `Couldn't find a start.gg account for that player. Run \`/${command}\` again.`);
+  // head-to-head buttons on /run, match calls and stream alerts are a shortcut for /h2h
+  // in the set's game, so they run the short report with no second press
   return report(interaction, { player: who, opponent: against, verbose: action === 'more', melee, game, since, venue });
 }
 
 // a report's button. more greys out the buttons and swaps the message for the full report, new answers with
 // another report, and private does too but only for whoever pressed it, so buttons on the automatic posts
-// don't fill the channel. the button only has profile slugs or player ids, so the players get looked up again
+// don't fill the channel. head-to-head buttons run the short report with no second press. the button
+// only has profile slugs or player ids, so the players get looked up again
 export async function handleButton(interaction) {
   // Are you sure and Undo answer by changing the message they're on, see confirm.js
   if (isChoice(interaction.customId)) return handleChoice(interaction);
   const { action } = readButton(interaction.customId);
   if (action !== 'more') {
-    await deferButton(interaction, action);
+    if (!await deferButtonOrRetry(interaction, action)) return;
     return answerButton(interaction);
   }
   // no message to swap, so there's nothing to share
   const messageId = interaction.message?.id;
   if (!messageId) {
-    await deferButton(interaction, action);
+    if (!await deferButtonOrRetry(interaction, action)) return;
     return answerButton(interaction);
   }
   const key = `${interaction.customId} ${messageId}`;
@@ -142,7 +254,7 @@ export async function handleButton(interaction) {
   if (running) return sameReport(interaction, running, key);
   // set before the first wait, so a second press in the meantime sees it
   const done = (async () => {
-    await deferButton(interaction, action);
+    if (!await deferButtonOrRetry(interaction, action)) return;
     return answerButton(interaction);
   })();
   inflightButtons.set(key, done);
@@ -157,7 +269,13 @@ export async function handleButton(interaction) {
 // asking again, since the first press swaps the answer in for all to see. when the first
 // press fails there's nothing to wait for, so the waiters share one retry instead of each asking alone
 async function sameReport(interaction, running, key) {
-  await deferButton(interaction, 'more');
+  try {
+    await deferButton(interaction, 'more');
+  } catch (err) {
+    if (err?.code === RESTJSONErrorCodes.InteractionHasAlreadyBeenAcknowledged) {} // press still alive, carry on
+    // the first press owns delivery, so a dead waiter just watches the message
+    else return console.error(`/${readButton(interaction.customId).command} button waiter couldn't answer:`, err.message);
+  }
   await interaction.followUp({ content: 'Start.gg is already working on that one. The full report swaps in when it\'s done.', flags: MessageFlags.Ephemeral });
   if (await running.then(() => true, () => false)) return;
   // a waiter ahead of this one already started the retry, so share that instead of asking alone

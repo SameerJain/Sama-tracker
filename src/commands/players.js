@@ -4,6 +4,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { ROLL_CALL_MIN_PLAYERS, RUNS_LATE_HOURS, checkTournaments, crewOf, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
 import { findAccount, serverMembers } from '../accounts.js';
+import { setResultColors } from '../message-settings.js';
 import { count } from '../embeds/shared.js';
 import {
   buttonRow, findPlayer, flag, h2hButton, isSelf, linkedPlayer, readChoice, readPlayer, readTracked, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer,
@@ -298,7 +299,7 @@ async function recent(interaction) {
 
   // someone from /link isn't tracked, the cards still need to know which side is theirs
   const players = choice === 'all' ? state.players : { ...state.players, [choice.userId]: choice };
-  const cards = latest.map((set) => embeds.setResult(set, players));
+  const cards = latest.map((set) => embeds.setResult(set, players, { setColors: setResultColors() }));
   // sort is stable, so each player's sets stay newest first
   if (choice === 'all') cards.sort((a, b) => (a.data.author?.name ?? '').localeCompare(b.data.author?.name ?? ''));
 
