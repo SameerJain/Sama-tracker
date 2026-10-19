@@ -17,7 +17,7 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 1. **Link yourself.** Connect Discord on your start.gg profile, then run `/link`. Commands then know who you are, and nothing gets posted about you. Tracked players with Discord connected can skip this.
 2. **Track your tournaments.** `/tournament add tournament:<link>` posts every set, stream alert and top 8 from a tournament in its own thread, plus registration reminders. `/tournament admin add` does that for every tournament a TO runs. Both need Manage Server. `/discord_event tournament:<link>` makes a Discord event from a link, and tournament admins can use it too.
 3. **Track your crew.** `/track add profile:<link>` posts a player's placements wherever they play. Anyone can add someone. `/track posts` turns on their set results and stream alerts too.
-4. **Pick your pings.** `/notify` pings you when your match is called, for every stream alert, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking` asks. `/messages` controls posts for the whole server.
+4. **Pick your pings.** `/notify` pings you when your match is called, for every stream alert, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
 5. **Follow Slippi ranked.** `/slippi add` puts a connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
 
 `/help` in Discord lists every command in short form.
@@ -78,9 +78,9 @@ Anyone can change `/track posts` for any tracked player. New players start with 
 | Command | What it does |
 | --- | --- |
 | `/matchmaking_role game:<Ultimate or Melee>` | Give yourself the **Ultimate Matchmaking** or **Melee Matchmaking** role, or take it off if you have it. Only you see the reply. |
-| `/matchmaking game:<Ultimate or Melee> message:<text>` | Ping that role here, with a card naming you and your message, like a netplay connect code or where you're playing. `message` is optional. Only people with the role can use it. |
+| `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role here, with a card naming you and your message, like a netplay connect code or where you're playing. `message` is optional. Only people with the role can use it. |
 
-The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. If an admin turns off mentions for a role, `/matchmaking` says so instead of sending a ping nobody gets.
+The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets.
 
 ### Stats and matchups
 

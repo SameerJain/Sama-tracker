@@ -71,7 +71,7 @@ const lastText = (calls) => {
 
 test('both commands take a required game first, and only the ping takes a message', () => {
   const toggle = commands.find((command) => command.name === 'matchmaking_role');
-  const ping = commands.find((command) => command.name === 'matchmaking');
+  const ping = commands.find((command) => command.name === 'matchmaking_search');
   for (const command of [toggle, ping]) {
     assert.equal(command.options[0].name, 'game');
     assert.equal(command.options[0].required, true);
@@ -95,7 +95,7 @@ test('the first toggle makes a mentionable role that grants nothing, saves its i
   assert.equal(guild.made[0].colors, undefined);
   assert.ok(member.held.has('made-1'));
   assert.equal(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmaking.melee, 'made-1');
-  assert.match(lastText(calls), /You have the \*\*Melee Matchmaking\*\* role now.*`\/matchmaking game:Melee` pings it, and so does typing @Melee Matchmaking/);
+  assert.match(lastText(calls), /You have the \*\*Melee Matchmaking\*\* role now.*`\/matchmaking_search game:Melee` pings it, and so does typing @Melee Matchmaking/);
 });
 
 test('running it again takes the role off without making another', async () => {
@@ -130,7 +130,7 @@ test('a role renamed in server settings is still the one it hands out and pings'
   assert.ok(member.held.has('ult-role'));
   assert.match(lastText(toggled), /You have the \*\*Ult LFG\*\* role now/);
 
-  const pinged = await run('matchmaking', { guild, member, values: { game: 'ult' } });
+  const pinged = await run('matchmaking_search', { guild, member, values: { game: 'ult' } });
   assert.equal(lastText(pinged), '<@&ult-role>');
 });
 
@@ -144,7 +144,7 @@ test('a role someone made by hand with the right name gets used and remembered',
 
 test('pinging needs the role, whether or not anyone has made it yet', async () => {
   for (const guild of [server(), server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }])]) {
-    const calls = await run('matchmaking', { guild, values: { game: 'melee' } });
+    const calls = await run('matchmaking_search', { guild, values: { game: 'melee' } });
     assert.equal(calls.length, 1);
     const [kind, result] = calls[0];
     assert.equal(kind, 'reply');
@@ -157,7 +157,7 @@ test('pinging needs the role, whether or not anyone has made it yet', async () =
 test('a ping mentions only the role, with a card naming who asked and their message', async () => {
   state.matchmaking = { melee: 'melee-role' };
   const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }]);
-  const calls = await run('matchmaking', { guild, member: person(['melee-role']), values: { game: 'melee', message: '  @everyone netplay? FOXY#420  ' } });
+  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee', message: '  @everyone netplay? FOXY#420  ' } });
 
   assert.equal(calls.length, 1);
   const [kind, result] = calls[0];
@@ -175,7 +175,7 @@ test('a ping mentions only the role, with a card naming who asked and their mess
 test('a ping without a message leaves out the quote', async () => {
   state.matchmaking = { ult: 'ult-role' };
   const guild = server([{ id: 'ult-role', name: 'Ultimate Matchmaking', mentionable: true }]);
-  const calls = await run('matchmaking', { guild, member: person(['ult-role']), values: { game: 'ult', message: '   ' } });
+  const calls = await run('matchmaking_search', { guild, member: person(['ult-role']), values: { game: 'ult', message: '   ' } });
 
   assert.equal(calls[0][1].embeds[0].data.description, '<@me-discord> is looking for Ultimate games.\n-# `/matchmaking_role game:Ultimate` gets you these pings, or stops them');
 });
@@ -185,12 +185,12 @@ test('a role with mentions turned off only gets pinged when the bot has Mention 
   const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: false }]);
   const member = person(['melee-role']);
 
-  const refused = await run('matchmaking', { guild, member, values: { game: 'melee' } });
+  const refused = await run('matchmaking_search', { guild, member, values: { game: 'melee' } });
   assert.equal(refused[0][1].flags, MessageFlags.Ephemeral);
   assert.match(refused[0][1].content, /\*\*Melee Matchmaking\*\* can't be pinged right now.*Allow anyone to @mention this role/);
 
   const appPermissions = { has: (permission) => permission === PermissionFlagsBits.MentionEveryone };
-  const sent = await run('matchmaking', { guild, member, values: { game: 'melee' }, appPermissions });
+  const sent = await run('matchmaking_search', { guild, member, values: { game: 'melee' }, appPermissions });
   assert.equal(sent[0][1].content, '<@&melee-role>');
 });
 

@@ -91,7 +91,7 @@ export function status(info) {
   return baseEmbed(colors.brand).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
 
-// a /matchmaking ping. a mention in a card never pings, so this one is just a name to click
+// a /matchmaking_search ping. a mention in a card never pings, so this one is just a name to click
 export function matchmaking({ label, color, discordId, avatar, message }) {
   const lines = [`<@${discordId}> is looking for ${label} games.`];
   if (message) lines.push(`> ${message}`);
@@ -146,7 +146,7 @@ export function help() {
     [
       '**Matchmaking**',
       '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it',
-      '`/matchmaking` ping that role to find games. `message:` says what you want, like your connect code. Only people with the role can',
+      '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. Only people with the role can',
       '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it',
     ],
     [

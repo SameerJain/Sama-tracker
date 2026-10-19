@@ -537,6 +537,17 @@ test('progress verbose shows a win-rate trend graph, short does not', async () =
   assert.doesNotMatch(short, /Trend, oldest/);
 });
 
+test('progress trend graph reads oldest first with exact win rates', () => {
+  const until = 200 * DAY;
+  const win = (id, days) => result(id, until - days * DAY, [10, 'Active', 1], [20, 'Rival', 2], true, [2, 0]);
+  const loss = (id, days) => result(id, until - days * DAY, [10, 'Active', 1], [20, 'Rival', 2], false, [0, 2]);
+  const sets = [win('n1', 5), win('n2', 10), win('m1', 45), loss('m2', 50), loss('o1', 70), loss('o2', 75)];
+  const periods = periodsFor(crewPlayer, sets, [], until, 6);
+  const text = embeds.progress(crewPlayer, periods, { verbose: true }).map(e => e.toJSON().description).join('\n');
+  // newest period 2-0, one back 1-1, one before that 0-2, older three empty
+  assert.ok(text.includes('**Trend, oldest → newest:** ···▁▅█ win rate'), text);
+});
+
 test('progress describes streaks at the end of each period', () => {
   const until = 200 * DAY;
   const sets = [

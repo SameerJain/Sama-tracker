@@ -157,7 +157,7 @@ export const commands = [
     options: [matchmakingGame('Which role')],
   },
   {
-    name: 'matchmaking',
+    name: 'matchmaking_search',
     description: 'Ping Ultimate or Melee Matchmaking to find games. Only people with that role can',
     options: [
       matchmakingGame('Which role to ping'),

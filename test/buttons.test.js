@@ -52,6 +52,16 @@ test('a button carries the report, profile slugs and options in its id, within d
   assert.deepEqual(buttonRow(null, false, 0), []);
 });
 
+test('a button id at exactly 100 characters fits, and 101 breaks it on purpose', () => {
+  const slug = (n) => `user/${'x'.repeat(n)}`;
+  const options = (n) => ({ player: { slug: slug(n) }, opponent: { slug: slug(32) }, melee: true, since: '2026-01-01', venue: 'offline' });
+  const fit = reportButton('Full report', 'more', 'h2h', options(32));
+  assert.ok(fit, 'exactly 100 should fit');
+  assert.equal(fit.toJSON().custom_id.length, 100);
+  // one character more is no button instead of a broken one
+  assert.equal(reportButton('Full report', 'more', 'h2h', options(33)), null);
+});
+
 test('since and venue ride along in the button id, and old buttons still read without them', () => {
   const button = reportButton('Full report', 'more', 'stats', { player: crew, since: '2026-01-01', venue: 'offline' }).toJSON();
   assert.equal(button.custom_id, 'more:stats:crew::::2026-01-01:offline');

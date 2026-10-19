@@ -45,7 +45,7 @@ async function matchmakingRole(interaction) {
     } else {
       role ??= await makeRole(guild, game);
       await member.roles.add(role);
-      reply = `You have the **${name}** role now, so you'll get pinged when someone wants games. \`/matchmaking game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
+      reply = `You have the **${name}** role now, so you'll get pinged when someone wants games. \`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
     }
   } catch (err) {
     if (err.code === MISSING_PERMISSIONS) {
@@ -59,9 +59,9 @@ async function matchmakingRole(interaction) {
   return interaction.editReply(reply);
 }
 
-// /matchmaking: pings the role with a card saying who's looking. only people with the role can, so it can't
+// /matchmaking_search: pings the role with a card saying who's looking. only people with the role can, so it can't
 // be used to ping a group someone isn't in
-function matchmaking(interaction) {
+function matchmakingSearch(interaction) {
   const game = interaction.options.getString('game', true);
   const { label } = MATCHMAKING[game];
   const role = findRole(interaction.guild, game);
@@ -83,4 +83,4 @@ function matchmaking(interaction) {
   return interaction.reply({ content: `<@&${role.id}>`, embeds: [card], allowedMentions: { roles: [role.id] } });
 }
 
-export { matchmakingRole, matchmaking };
+export { matchmakingRole, matchmakingSearch };
