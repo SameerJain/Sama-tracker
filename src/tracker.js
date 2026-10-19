@@ -16,10 +16,9 @@ const TOURNAMENT_CHECK_MINUTES = 15;
 const PROFILE_CHECK_HOURS = 24;
 const ROLL_CALL_HOURS_BEFORE = 1;
 export const ROLL_CALL_MIN_PLAYERS = 3;
-// results wait this long after the end since TOs often report top 4 late
+// results wait this long after the end since TOs often report top 4 late, then go out
+// with whatever exists. unfinished placements are marked as projected
 const RESULTS_WAIT_HOURS = 12;
-// then this long if something's still missing, after that they go out with projected placements
-const RESULTS_GIVE_UP_HOURS = 24;
 // a top 8 start.gg keeps erroring on holds the placements back this long, then they go without it
 const TOP8_RETRY_HOURS = 12;
 // after downtime, don't post sets older than this
@@ -1075,9 +1074,8 @@ export async function postResults(tournament, postChannel = channel) {
   const entries = tournament.entries.filter((entry) => entry.started);
   // anyone still in when the TO stopped reporting only has a projected placement
   const allIn = entries.every(placed);
-  if (!allIn && waited < RESULTS_GIVE_UP_HOURS * HOUR) return;
 
-  const dueAt = overAt(tournament) + (allIn ? RESULTS_WAIT_HOURS : RESULTS_GIVE_UP_HOURS) * HOUR;
+  const dueAt = overAt(tournament) + RESULTS_WAIT_HOURS * HOUR;
   // fetched before anything posts, so a start.gg error retries both next hour instead of repeating placements.
   // skipped when the top 8 already went out early
   let events = [];
@@ -1110,9 +1108,10 @@ export async function postResults(tournament, postChannel = channel) {
     // switched off counts as posted, so the fail-safe doesn't replay it
     tournament.top8Posted = true;
   }
-  // projected ones get edited once start.gg has them final, see correctPlacements
+  // projected ones get edited once start.gg has them final, see correctPlacements.
+  // a top 8 with nothing reported yet saves with nothing to edit, so the final still goes out
   const projected = { at: now, results: allIn ? [] : postRefs(results), top8: events.every((event) => event.done) ? [] : postRefs(topEight) };
-  if (projected.results.length || projected.top8.length) tournament.projected = projected;
+  if (projected.results.length || projected.top8.length || !tournament.top8Posted) tournament.projected = projected;
 }
 
 // posts the top 8 as soon as every event the crew played in is finished, before placements are due.
@@ -1195,7 +1194,8 @@ export async function verifyTopEight(tournament, postChannel = channel, now = se
 const placed = (entry) => Boolean(entry.placement && (entry.done || entry.final));
 
 // placements that went out projected because the TO stopped reporting get edited once start.gg has every
-// one final, looked at hourly for 3 days. the top 8 the same, once its events are finished
+// one final, looked at hourly for 3 days. the top 8 the same, once its events are finished. a top 8
+// with nothing reported at 12 hours goes out as a new message instead, since there's nothing to edit
 export async function correctPlacements(tournament, postChannel = channel) {
   const { projected } = tournament;
   const now = secondsNow();
@@ -1221,8 +1221,16 @@ export async function correctPlacements(tournament, postChannel = channel) {
       await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', 'Final top 8, the one above was projected');
       projected.top8 = [];
     }
+  } else if (!tournament.top8Posted && messageEnabled('top8')) {
+    // nothing went out at 12 hours, so the final goes out as a new message once it's reported.
+    // switched off waits for it to come back on instead of replaying later
+    const events = await fetchDoneTopEight(tournament.entries);
+    if (events) {
+      await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
+      tournament.top8Posted = true;
+    }
   }
-  if (!projected.results.length && !projected.top8.length) delete tournament.projected;
+  if (!projected.results.length && !projected.top8.length && tournament.top8Posted) delete tournament.projected;
 }
 
 // the final version goes over the projected one. one that no longer splits into the same number of

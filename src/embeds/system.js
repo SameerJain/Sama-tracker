@@ -172,7 +172,7 @@ export function help() {
       '• called sets, pinging players with `/calls` on whose Discord is on start.gg, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
       '• a roll call an hour before a tournament with 3+ of the crew',
       '• registration reminders a week, 3 days and a day out, then a last call 12 hours before',
-      '• where everyone placed, 12 hours after it ends, or 24 if the TO is late reporting. Projected placements get edited once start.gg has them final',
+      '• where everyone placed, 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '• with `/messages top8` on, the full top 8 of each event the crew played in, as soon as the bracket is finished',
       '• Slippi rank changes for the watchlist, checked every 30 minutes',
       '• Bills final scores with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',

@@ -895,6 +895,61 @@ test('a top 8 that fails to send is retried by the fail-safe instead of being lo
   assert.equal(legacy.top8Posted, undefined);
 });
 
+test('placements and the top 8 go out at 12 hours even when the TO is still reporting', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...crewPlayer } };
+  state.messages = { top8: true };
+  const entries = [{ userId: 1, eventId: 501, event: 'Singles', eventSlug: event.slug, entrants: 32,
+    started: true, done: false, placement: 5, final: false }];
+  const standing = (placement, name, isFinal) => ({ placement, isFinal, entrant: { name } });
+  mockApi(() => ({ e501: { state: 'ACTIVE', standings: { nodes: [standing(1, 'Champ', true), standing(5, 'Active', false)] } } }));
+  const sent = [];
+  const channel = { send: async (payload) => { sent.push(payload); return { id: `m${sent.length}`, channelId: 'c1' }; } };
+
+  // 13 hours after the end with the bracket unfinished: no waiting for 24 hours
+  const tournament = { name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600, entries };
+  await tracker.postResults(tournament, channel);
+  assert.equal(sent.length, 2);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Results/);
+  assert.match(sent[0].embeds[0].toJSON().description, /\(projected\)/);
+  assert.match(sent[1].embeds[0].toJSON().author.name, /^Top 8/);
+  assert.match(sent[1].embeds[0].toJSON().description, /\(projected\)/);
+  assert.equal(tournament.resultsPosted, true);
+  assert.equal(tournament.top8Posted, true);
+  assert.ok(tournament.projected);
+});
+
+test('a top 8 with nothing reported at 12 hours goes out as a new message once the event completes', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...crewPlayer } };
+  state.messages = { top8: true };
+  const entries = [{ userId: 1, eventId: 501, event: 'Singles', eventSlug: event.slug, entrants: 32,
+    started: true, done: false, placement: 5, final: true }];
+  // start.gg keeps erroring on the top 8, so placements go out without it
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({ message: 'down' }) });
+  const sent = [];
+  const channel = { send: async (payload) => { sent.push(payload); return { id: `m${sent.length}`, channelId: 'c1' }; } };
+  const tournament = { name: 'Local', slug: 'tournament/local', startAt: now - 27 * 3600, endAt: now - 26 * 3600, entries };
+  await tracker.postResults(tournament, channel);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Results/);
+  assert.equal(tournament.resultsPosted, true);
+  assert.equal(tournament.top8Posted, undefined);
+  assert.ok(tournament.projected);
+
+  // the TO completes the event later: the final top 8 goes out on its own
+  const standing = (placement, name) => ({ placement, isFinal: true, entrant: { name } });
+  mockApi(() => ({ e501: { state: 'COMPLETED', standings: { nodes: [standing(1, 'Champ'), standing(5, 'Active')] } } }));
+  tournament.projected.checkedAt = now - 3601;
+  sent.length = 0;
+  await tracker.correctPlacements(tournament, channel);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].toJSON().author.name, /^Top 8/);
+  assert.doesNotMatch(sent[0].embeds[0].toJSON().description, /projected/);
+  assert.equal(tournament.top8Posted, true);
+  assert.equal(tournament.projected, undefined);
+});
+
 test('every message gets a picture, the bot avatar on its first card when nothing in it has one', () => {
   const avatar = 'https://cdn.discordapp.com/avatars/bot/avatar.png';
   const plain = (n) => new EmbedBuilder().setTitle(`Card ${n}`).setDescription('text');
