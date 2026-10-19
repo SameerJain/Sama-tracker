@@ -416,7 +416,10 @@ test('a tracked tournament posts every finished set in its thread even with thre
   // one card starts the thread, and the two sets go in it. the DQ'd one isn't tracked, so it stays out
   assert.deepEqual(channel.sent.map((message) => message.embeds[0].data.author.name), ['Tournament thread']);
   const [thread] = channel.threads.all.values();
-  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.title), ['W · Visitor 2-1 Guest · L', 'W · Active 2-1 Opponent · L']);
+  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.title), [
+    'Set result · W · Visitor 2-1 Guest · L',
+    'Set result · W · Active 2-1 Opponent · L',
+  ]);
   // nobody tracked is the brand color, a tracked winner is green
   assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.color), [0x5b21b6, 0x22c55e]);
   assert.ok(state.tournaments[5].lastCheck > lastCheck);
@@ -458,7 +461,7 @@ test('a tracked tournament announces everything in its stream queue, with nobody
   assert.deepEqual(asked, ['queue', 'queue']);
   const [thread] = channel.threads.all.values();
   assert.equal(thread.sent.length, 1);
-  assert.match(thread.sent[0].embeds[0].data.title, /^On stream · /);
+  assert.match(thread.sent[0].embeds[0].data.title, /^Stream alert · /);
 
   // switched off for the tournament, its queue isn't asked about
   state.tournaments[5].tracked.stream = false;

@@ -80,7 +80,7 @@ export function onStream(set, players) {
   const watch = streamName ? (twitch ? `[twitch.tv/${escapeMarkdown(streamName)}](${twitch})` : escapeMarkdown(streamName)) : null;
 
   const card = setEmbed(set, colors.stream, trackedA ?? findTracked(b, players))
-    .setTitle(`On stream · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
+    .setTitle(`Stream alert · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
     .setURL(twitch ?? setUrl(set));
   if (watch) card.addFields({ name: 'Watch', value: watch });
   return card;
@@ -117,7 +117,7 @@ export function setResult(set, players) {
   if (!trackedA && !trackedB) color = colors.brand;
 
   const embed = setEmbed(set, color, player)
-    .setTitle(`W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
+    .setTitle(`Set result · W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
     .setURL(setUrl(set))
     .setTimestamp(set.completedAt * 1000);
   // DQ wins aren't upsets
@@ -157,7 +157,8 @@ export function rollCall(tournament, players) {
   for (const entries of groupByEvent(tournament, players)) {
     lines.push('', `**${escapeMarkdown(eventTitle(entries[0]))}**`, ...entries.map((entry) => playerLink(entry.player)));
   }
-  return withLines(tournamentEmbed(colors.brand, 'Roll call', tournament), lines);
+  return withLines(tournamentEmbed(colors.brand, 'Tournament roll call', tournament)
+    .setTitle(`Tournament roll call · ${tournament.name}`.slice(0, 256)), lines);
 }
 
 export function regReminder(tournament, deadline, lastCall) {
@@ -174,7 +175,7 @@ export function regReminder(tournament, deadline, lastCall) {
 
   const embed = baseEmbed(lastCall ? colors.reg : colors.regEarly)
     .setAuthor({ name: lastCall ? 'Last call to register' : 'Registration reminder' })
-    .setTitle(tournament.name)
+    .setTitle(`Registration reminder · ${tournament.name}`.slice(0, 256))
     .setURL(register)
     .setDescription(lines.join('\n'));
 
@@ -262,7 +263,8 @@ function registeredByEvent(entries, members) {
 export function results(tournament, players) {
   return groupByEvent(tournament, players).flatMap((entries) => {
     entries.sort((a, b) => (a.placement ?? Infinity) - (b.placement ?? Infinity));
-    return withLines(tournamentEmbed(colors.results, `Results · ${eventTitle(entries[0])}`, tournament), entries.map(placementText));
+    return withLines(tournamentEmbed(colors.results, `Results · ${eventTitle(entries[0])}`, tournament)
+      .setTitle(`Tournament placements · ${tournament.name}`.slice(0, 256)), entries.map(placementText));
   });
 }
 
@@ -277,6 +279,7 @@ export function topEight(tournament, events) {
     if (!lines.length) lines.push('No placements reported on start.gg.');
     else if (!event.done) lines.push('-# The bracket wasn\'t finished on start.gg, so unfinished placements are projected');
     return tournamentEmbed(colors.results, `Top 8 · ${eventTitle(event)}`, tournament)
+      .setTitle(`Top 8 · ${tournament.name}`.slice(0, 256))
       .setURL(startggUrl(`${event.eventSlug}/standings`))
       .setDescription(lines.join('\n'));
   });

@@ -107,7 +107,7 @@ test('a rank change posts once, up or down, with the rating change and no pings'
   assert.equal(posts.sent.length, 1);
   const [up] = posts.sent;
   assert.deepEqual(up.allowedMentions, { parse: [] });
-  assert.match(JSON.stringify(up.embeds), /"title":"AAA ranked up to Gold 2".*\+110\.0.*Was Gold 1.*10-5/);
+  assert.match(JSON.stringify(up.embeds), /"title":"Slippi rank change · AAA ranked up to Gold 2".*\+110\.0.*Was Gold 1.*10-5/);
   // the new rank's badge, and start.gg's icon for the character they've played most in ranked
   assert.match(JSON.stringify(up.embeds), /"thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}.*"author":\{"name":"Fox","icon_url":"attachment:\/\/character-1\.png"\}/);
   assert.deepEqual(up.files.map((file) => file.name), ['rank-gold-2.png', 'character-1.png']);
@@ -132,7 +132,7 @@ test('placing out of pending posts, a new season starting everyone over does not
   await postRankChanges(posts);
   assert.equal(posts.sent.length, 1);
   // the start.gg tag, since that's who the server knows
-  assert.match(JSON.stringify(posts.sent[0].embeds), /"title":"Crew placed into Platinum 1"/);
+  assert.match(JSON.stringify(posts.sent[0].embeds), /"title":"Slippi rank change · Crew placed into Platinum 1"/);
   assert.doesNotMatch(JSON.stringify(posts.sent[0].embeds), /Was Pending/);
   assert.equal(state.slippi.c.rank, 'Pending');
   assert.equal(state.slippi.c.season, 'RANKED_SINGLES-c-season-5');
@@ -164,7 +164,7 @@ test('a slippi outage keeps the watchlist as it was and shows on /status', async
   assert.match(card.data.description, /Slippi ranks checked:.*last try failed.*1 player on the watchlist/);
 });
 
-test('the weekly search adds tracked and linked players\' codes from start.gg, and skips removed ones', async () => {
+test('the weekly search adds tracked players\' codes from start.gg, but not linked players or removed codes', async () => {
   state.players = {
     1: { userId: 1, playerId: 10, tag: 'Crew' },
     2: { userId: 2, playerId: 20, tag: 'Ult only' },
@@ -180,12 +180,11 @@ test('the weekly search adds tracked and linked players\' codes from start.gg, a
   state.slippiSkipped = ['skip'];
 
   await findSlippiCodes();
-  assert.deepEqual(Object.keys(state.slippi).sort(), ['crew', 'lnk']);
+  assert.deepEqual(Object.keys(state.slippi), ['crew']);
   assert.equal(state.slippi.crew.userId, 1);
   assert.equal(state.slippi.crew.rank, 'Gold 1');
-  assert.equal(state.slippi.lnk.userId, 3);
-  assert.equal(state.slippi.lnk.seasons, undefined, 'past seasons only go on the /slippi rank card');
   assert.ok(Object.values(state.players).every((player) => player.slippiSearchedAt));
+  assert.equal(state.links.someone.slippiSearchedAt, undefined);
 
   // nobody's due again for a week
   startggRequests = 0;

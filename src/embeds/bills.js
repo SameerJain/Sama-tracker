@@ -7,7 +7,7 @@ export function billsFinal(game, details = null) {
   const { opponent } = game;
   const color = game.won ? colors.win : colors.loss;
   const embed = baseEmbed(color, `${FOOTER} · ESPN`)
-    .setTitle(`Bills ${game.billsScore} – ${opponent.displayName} ${game.oppScore} · Final`);
+    .setTitle(`Bills final · Bills ${game.billsScore} – ${opponent.displayName} ${game.oppScore}`);
   // the other team's logo. without one the message falls back to the bot's avatar
   if (opponent.logo) embed.setThumbnail(opponent.logo);
   if (game.url) embed.setURL(game.url);

@@ -676,6 +676,8 @@ test('tournament roll calls and placements disable mentions', async () => {
 
   assert.equal(sent.length, 2);
   assert.deepEqual(sent.map(({ allowedMentions }) => allowedMentions), [{ parse: [] }, { parse: [] }]);
+  assert.equal(sent[0].embeds[0].data.title, 'Tournament roll call · Local');
+  assert.equal(sent[1].embeds[0].data.title, 'Tournament placements · Local');
 });
 
 test('top 8s only come from tracked tournaments, every event with everyone in it', async () => {
@@ -1051,12 +1053,12 @@ test('set result cards put the winner on the left with a W and the loser on the 
   };
 
   const win = card('w', [10, 'Active', 2], [99, 'Opponent', 3], true, [3, 0]);
-  assert.equal(win.title, 'W · Active 3-0 Opponent · L');
+  assert.equal(win.title, 'Set result · W · Active 3-0 Opponent · L');
   assert.equal(win.color, colors.win);
 
   // a tracked player losing to someone untracked: the winner still goes first, the card stays theirs
   const loss = card('l', [10, 'Active', 2], [99, 'Opponent', 3], false, [1, 3]);
-  assert.equal(loss.title, 'W · Opponent 3-1 Active · L');
+  assert.equal(loss.title, 'Set result · W · Opponent 3-1 Active · L');
   assert.equal(loss.color, colors.loss);
   assert.equal(loss.author.name, 'Active');
   assert.equal(loss.fields.find((field) => field.name === 'Characters').value, 'Opponent: Wario\nActive: Pac-Man');
@@ -1064,7 +1066,7 @@ test('set result cards put the winner on the left with a W and the loser on the 
 
   // seed 17 over seed 2 is a major upset whoever won it. seed 9 over seed 2 is short of it
   const upset = card('u', [10, 'Active', 2], [99, 'Opponent', 17], false, [1, 2]);
-  assert.equal(upset.title, 'W · Opponent 2-1 Active · L');
+  assert.equal(upset.title, 'Set result · W · Opponent 2-1 Active · L');
   assert.match(upset.description, /^\*\*Major upset\*\* · seed 17 beat seed 2\n\*\*Winners round 1\*\*/);
   assert.doesNotMatch(card('n', [10, 'Active', 2], [99, 'Opponent', 9], false, [1, 2]).description, /Major upset/);
   // DQ wins aren't upsets
@@ -1402,6 +1404,9 @@ test('/help lists every command, and each card starts at a section', () => {
     assert.match(card.data.description, /^\*\*/);
   }
   const text = cards.map(card => card.data.description).join('\n');
+  for (const title of ['Set results', 'Stream alerts', 'Match call pings', 'Tournament roll calls', 'Tournament placements', 'Top 8s', 'Registration reminders', 'Slippi rank changes', 'Bills final results', 'Weekly crew recap']) {
+    assert.match(text, new RegExp(`\\*\\*${title}\\.\\*\\*`));
+  }
   for (const { name, type } of commands) {
     // the Apps menu ones on a member go by their menu name, not a slash
     assert.match(text, type === 2 ? new RegExp(`\\*\\*${name}\\*\\*`) : new RegExp(`\`/${name}[\` ]`), name);
@@ -1732,7 +1737,7 @@ test('saved reg reminders become tracked tournaments, and match call pings move 
   state.tournaments = {};
 });
 
-test('a tracked tournament\'s crew counts linked players and registered server members, and its roll call names them', async () => {
+test('a tracked tournament\'s crew counts registered server members but not linked-only players', async () => {
   const now = Math.floor(Date.now() / 1000);
   state.players = { 1: { ...crewPlayer, discordId: 'active-discord' } };
   state.links = { 'linked-discord': { userId: 7, playerId: 70, tag: 'Linked', slug: 'user/linked' } };
@@ -1740,22 +1745,23 @@ test('a tracked tournament\'s crew counts linked players and registered server m
   const local = { id: 5, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 7200, entries: [], userIds: [], tracked };
   const participant = (tag, id, discordId) => ({ gamerTag: tag, user: { id, slug: `user/${tag.toLowerCase()}`, authorizations: discordId ? [{ externalId: discordId }] : [] } });
   mockApi(() => ({ tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [
-    participant('Active', 1, 'active-discord'), participant('Linked', 7), participant('Member', 8, 'member-discord'),
+    participant('Active', 1, 'active-discord'), participant('Linked', 7), participant('Member', 8, 'member-discord'), participant('Other', 10, 'other-discord'),
     participant('Visitor', 9, 'visitor-discord'), { gamerTag: 'Added by the TO', user: null },
   ] } } }));
-  const guild = { members: { fetch: async ({ user: ids }) => new Map(ids.filter((id) => id === 'member-discord').map((id) => [id, {}])) } };
+  const guild = { members: { fetch: async ({ user: ids }) => new Map(ids.filter((id) => ['member-discord', 'other-discord'].includes(id)).map((id) => [id, {}])) } };
   await tracker.refreshCrew(local, guild);
   // tracked players go by userIds, the rest are saved to be named
   assert.deepEqual(local.userIds, [1]);
-  assert.deepEqual(local.crew, { 7: { userId: 7, slug: 'user/linked', tag: 'Linked' }, 8: { userId: 8, slug: 'user/member', tag: 'Member' } });
+  assert.deepEqual(local.crew, { 8: { userId: 8, slug: 'user/member', tag: 'Member' }, 10: { userId: 10, slug: 'user/other', tag: 'Other' } });
 
   // one tracked player, but three of the crew, so the roll call goes out and names them all
-  local.entries = [1, 7, 8].map((userId) => ({ userId, event: 'Singles', eventSlug: 'tournament/local/event/singles', entrants: 32 }));
+  local.entries = [1, 8, 10].map((userId) => ({ userId, event: 'Singles', eventSlug: 'tournament/local/event/singles', entrants: 32 }));
   state.messages = {};
   const sent = [];
   await tracker.postRollCall(local, { send: async (payload) => sent.push(payload) });
   assert.equal(sent.length, 1);
-  assert.match(sent[0].embeds[0].data.description, /\[Active\]\(https:\/\/www\.start\.gg\/user\/active\)\n\[Linked\]\(https:\/\/www\.start\.gg\/user\/linked\)\n\[Member\]/);
+  assert.match(sent[0].embeds[0].data.description, /\[Active\]\(https:\/\/www\.start\.gg\/user\/active\)\n\[Member\].*\n\[Other\]/s);
+  assert.doesNotMatch(sent[0].embeds[0].data.description, /Linked/);
 
   // start.gg failing keeps the crew it had
   globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({ message: 'down' }) });
@@ -1766,7 +1772,7 @@ test('a tracked tournament\'s crew counts linked players and registered server m
   } finally {
     console.error = logged;
   }
-  assert.deepEqual(Object.keys(local.crew), ['7', '8']);
+  assert.deepEqual(Object.keys(local.crew), ['8', '10']);
   state.links = {};
 });
 

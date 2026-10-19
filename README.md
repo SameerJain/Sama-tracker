@@ -16,7 +16,7 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 2. **Track your tournaments.** `/tournament add tournament:<link>` posts every set, stream alert and top 8 from a tournament in its own thread, plus registration reminders. `/tournament admin add` does that for every tournament a TO runs. Both need Manage Server.
 3. **Track your crew.** `/track add profile:<link>` posts a player's placements wherever they play. Anyone can add someone. `/track posts` turns on their set results and stream alerts too.
 4. **Pick your pings.** `/notify` pings you when your match is called, for every stream alert, or for registration reminders. `/messages` controls posts for the whole server.
-5. **Follow Slippi ranked.** `/slippi add` puts a connect code on the watchlist. Tracked and linked players get added on their own once their code shows up on start.gg.
+5. **Follow Slippi ranked.** `/slippi add` puts a connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
 
 `/help` in Discord lists every command in short form.
 
@@ -99,7 +99,7 @@ These reports count singles and leave DQs out of set records. `/doubles` counts 
 | `/slippi rank` | Rank, rating, this season's record, daily leaderboard placement, top 3 characters and the last 3 seasons. `player:` takes someone on the watchlist or any connect code. Leave it out for yourself. |
 | `/slippi leaderboard` | The watchlist by rank, then rating, with each player's most played character. Shows the top 50. |
 
-Rank cards and rank change posts show slippi.gg's rank badge and start.gg's icon for the player's most played ranked character. The leaderboard shows the leader's badge. Slippi cards with no badge to show, like an empty leaderboard, show the Slippi logo.
+Rank cards and rank change posts show slippi.gg's rank badge and start.gg's icon for the player's most played ranked character. The leaderboard shows the leader's badge. Slippi cards with no badge to show, like an empty leaderboard, show the Slippi logo. Once a week, the bot checks tracked players' recent online start.gg registrations for a connect code and looks that code up on Slippi. `/link` alone does not do this.
 
 Melee reports add Slippi ranked info for players on the watchlist. That covers reports run with `melee:True`, reports where everything found is Melee anyway, and `/h2h` or `/predict` odds that come out in Melee. Players who aren't on the watchlist get the same report as always, with no extra lookups.
 
@@ -112,7 +112,7 @@ Melee reports add Slippi ranked info for players on the watchlist. That covers r
 
 `/predict melee:True` gives Slippi odds even when neither player has Melee sets on start.gg, so netplay-only players can compare. With only one of them ranked, it shows the ranks and no odds.
 
-Netplay tournaments on start.gg ask for a connect code at registration, and start.gg keeps it. Once a day the bot looks for the codes of tracked and linked players not yet on the watchlist, in their 8 newest online singles sets, checking each player at most once a week. Anyone found goes on the watchlist under their start.gg tag. Offline-only players and people who play other games online have no code there, so add them with `code:`.
+Netplay tournaments on start.gg ask for a connect code at registration, and start.gg keeps it. Once a day the bot looks for the codes of tracked players not yet on the watchlist, in their 8 newest online singles sets, checking each player at most once a week. Anyone found goes on the watchlist under their start.gg tag. Linked players can use `/slippi add` themselves. Offline-only players and people who play other games online have no code there, so add them with `code:`.
 
 Ranks use slippi.gg's cutoffs: Bronze 1 through Master 3 by rating, and Grandmaster for a Master rating with a placement on Slippi's daily leaderboards. A player with fewer than 5 ranked sets in the season is Pending. Slippi doesn't share ranked match results, so posts show the new rank and rating change, not who they played.
 
@@ -140,7 +140,7 @@ A tracked tournament posts every set, whoever played, plus its stream alerts and
 
 `tournament` takes a start.gg link, or a tournament the bot already knows from the list: tracked ones and ones tracked players are in, soonest first. `/tournament add` lists only ones that aren't tracked yet, and `/tournament remove` and `/tournament posts` only tracked ones.
 
-At a tracked tournament, the crew for the roll call and the placements post is tracked players, linked players, and anyone registered whose start.gg Discord is in this server. A hidden entrant list leaves just the tracked players.
+At a tracked tournament, the crew for the roll call and the placements post is tracked players and anyone registered whose start.gg Discord is in this server. Linking alone does not add someone. A hidden entrant list leaves just the tracked players.
 
 Reminders go out 7 days, 3 days, 1 day and 12 hours before registration closes. If registration stays open past the tournament start, the start is the deadline. Past reminders are skipped, and a last call set within 12 hours goes out right away. Turning reminders back on with `/tournament posts` starts from the next one still to come.
 
@@ -174,18 +174,22 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 ## Automatic posts
 
-| Type | When it posts |
-| --- | --- |
-| Set results | Every finished set at a tracked tournament, whoever played. Anywhere else, when a tracked player with set results on finishes a set. The winner is on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. |
-| Stream alerts | Every set on stream or next in the stream queue at a tracked tournament. Anywhere else, when a tracked player with stream alerts on has a set on stream, called, or next in the stream queue. A new one waits 30 seconds and posts only if the set is still on the same stream, so a set put on stream by mistake and taken back isn't posted. Pings everyone with `/notify streams` on, 80 per message. |
-| Match call pings | When a set is called for someone with `/notify calls` on. One message per set, pinging everyone in it who has it on, all four players for doubles. |
-| Tournament roll calls | An hour before a tournament with at least 3 of the crew registered. At a tracked tournament that counts linked players and registered server members too. |
-| Tournament placements | 12 hours after the tournament ends, with whatever is reported for the crew. Unfinished placements are marked as projected. |
-| Top 8s | At a tracked tournament, as soon as every event is finished: the top 8 of each event, listing everyone, tracked or not. One card per event. An event that hasn't started holds it until the tournament's end time, so doubles after singles still makes it. If the bracket still isn't finished when placements post, whatever is reported goes with them marked as projected instead, and the final top 8 follows once the TO completes the event. If start.gg keeps failing on the top 8, the placements post goes out without it and it follows once start.gg answers. If the top 8 post itself fails to send, it is retried hourly for 3 days. |
-| Registration reminders | At the deadlines under [Tournaments](#tournaments), for tracked tournaments, pinging people who turned on `/notify registration`. |
-| Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank, including their first rank of a season after Pending. A new season resetting everyone isn't posted. |
-| Bills final results | Off by default. After each Bills game: the final score with the other team's logo, green for a win and red for a loss, plus quarters and yards. |
-| Weekly recap | Sunday at 9 pm New York time by default: results, highlights and next week's entries. Only tracked players with a non-DQ singles set that week are included. |
+`/link` identifies you for commands. `/track` follows a player publicly. `/notify` controls only your pings. Tracking a tournament covers its whole bracket. A registered server member can still appear in a tracked tournament's roll call or placements, and anyone can appear in its sets, streams or top 8.
+
+| Automatic message | When it posts | Who appears and what controls it |
+| --- | --- | --- |
+| Set results | Every finished set at a tracked tournament. Anywhere else, when a tracked player with set results on finishes a set. | `/track posts sets` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. |
+| Stream alerts | Every set on stream or next in the stream queue at a tracked tournament. Anywhere else, when a tracked player with stream alerts on has a set there. A new alert waits 30 seconds to confirm. | `/track posts stream` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. `/notify streams` only controls who gets pinged. |
+| Match call pings | When a set is called for someone with `/notify calls` on. Calls taken back get crossed out, and one still waiting after 5 minutes pings once more. | One card per set names everyone in it. `/notify calls` controls each person's ping subscription. |
+| Tournament roll calls | An hour before a tournament with at least 3 of the crew registered. | Tracked players appear. At a tracked tournament, registered server members whose Discord is connected on start.gg count too. Linking alone does not add someone. |
+| Tournament placements | 12 hours after the tournament ends. Unfinished placements are marked as projected. | Tracked players appear. At a tracked tournament, the same registered server members as roll calls appear too. |
+| Top 8s | As soon as every event finishes at a tracked tournament. Delayed or failed top 8s retry as described below. | Everyone in each top 8 appears, tracked or not. |
+| Registration reminders | At the deadlines under [Tournaments](#tournaments). | The card lists no players. `/notify registration` controls pings and skips subscribers already registered when start.gg has their Discord. |
+| Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank. A new season reset is not posted. | `/slippi add` and `/slippi remove` control the watchlist. Tracked players can be discovered from connect codes entered on start.gg. Linked-only players cannot. |
+| Bills final results | Off by default. After each Bills game, with quarters and yards. | No player appears. |
+| Weekly crew recap | Sunday at 9 pm New York time by default. | Tracked players with a non-DQ singles set that week appear. There is no separate player switch. |
+
+Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. Failed top 8 lookups and sends retry for up to 3 days.
 
 Singles stream alerts and match calls get a **Head to head** button that replies privately to whoever presses it. It comes off when the set ends, or 12 hours after the post.
 

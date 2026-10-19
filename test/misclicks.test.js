@@ -95,7 +95,7 @@ test('a set result the TO corrects gets edited, a reset one gets marked, and an 
   assert.equal(channel.edits.length, 1);
   const [[id, { embeds: [card] }]] = channel.edits;
   assert.equal(id, 'm1');
-  assert.equal(card.data.title, 'W · Rival 2-1 Crew · L');
+  assert.equal(card.data.title, 'Set result · W · Rival 2-1 Crew · L');
   assert.match(card.data.description, /^\*\*Corrected by TO\*\*\n/);
   assert.equal(state.resultPosts[0].outcome, '2:1:2');
 
@@ -111,7 +111,7 @@ test('a set result the TO corrects gets edited, a reset one gets marked, and an 
   await tracker.fixCorrectedResults(channel);
   assert.equal(channel.edits.length, 2);
   const marked = channel.edits[1][1].embeds[0].data;
-  assert.match(marked.title, /^Reset by TO · W · Crew 2-1 Rival · L$/);
+  assert.match(marked.title, /^Reset by TO · Set result · W · Crew 2-1 Rival · L$/);
   assert.match(marked.description, /The TO reset this set on start\.gg/);
   assert.equal(state.resultPosts[0].reset, true);
   await tracker.fixCorrectedResults(channel);
@@ -121,7 +121,7 @@ test('a set result the TO corrects gets edited, a reset one gets marked, and an 
   latest = { state: 3, winner: 1, scores: [2, 1] };
   await tracker.fixCorrectedResults(channel);
   assert.equal(channel.edits.length, 3);
-  assert.equal(channel.edits[2][1].embeds[0].data.title, 'W · Crew 2-1 Rival · L');
+  assert.equal(channel.edits[2][1].embeds[0].data.title, 'Set result · W · Crew 2-1 Rival · L');
   assert.equal(state.resultPosts[0].reset, false);
 
   // a deleted set counts as reset, and a deleted post stops being watched

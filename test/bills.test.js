@@ -110,7 +110,7 @@ test('only completed games with a score count as finals', async () => {
 
 test('the final card is green for a win and red for a loss, with the other team\'s logo', () => {
   const win = embeds.billsFinal(bills.toGame(event()), { lines: { BUF: ['3', '10'], LV: ['7', '6'] }, stats: { BUF: { yards: '345', turnovers: '0' }, LV: { yards: '378', turnovers: '1' } } });
-  assert.match(win.data.title, /Bills 33.*Raiders 30.*Final/);
+  assert.match(win.data.title, /^Bills final · Bills 33.*Raiders 30/);
   assert.equal(win.data.color, 0x22c55e);
   assert.equal(win.data.thumbnail.url, 'https://images.example/lv.png');
   assert.match(win.data.description, /Bills win.*Week 6.*Allegiant Stadium/);

@@ -103,7 +103,7 @@ export function rankChange(entry, before, players, { characterFile = null } = {}
   const placement = placementLine(entry);
   if (placement) lines.push(placement);
   return withArt(baseEmbed(rank.color, SLIPPI_FOOTER), entry, characterFile)
-    .setTitle(`${escapeMarkdown(name)} ${verb} ${rank.name}`)
+    .setTitle(`Slippi rank change · ${escapeMarkdown(name)} ${verb} ${rank.name}`)
     .setURL(profileUrl(entry.code))
     .setDescription(lines.join('\n'));
 }

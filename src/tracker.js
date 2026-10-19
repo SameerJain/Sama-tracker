@@ -334,12 +334,12 @@ export function slippiEntry(profile, entry = {}) {
   return { ...entry, ...current, rank: slippi.rankOf(profile).name, checkedAt: secondsNow() };
 }
 
-// tracked and linked players whose slippi isn't on the watchlist yet, looked for once a week in their
+// tracked players whose slippi isn't on the watchlist yet, looked for once a week in their
 // start.gg netplay registrations. anyone found goes on the watchlist with their start.gg attached
 export async function findSlippiCodes() {
   const now = secondsNow();
   const watched = new Set(Object.values(state.slippi).map((entry) => String(entry.userId)));
-  const records = [...Object.values(state.players), ...Object.values(state.links)];
+  const records = Object.values(state.players);
   const due = new Map();
   for (const record of records) {
     if (watched.has(String(record.userId)) || now - (record.slippiSearchedAt ?? 0) < SLIPPI_SEARCH_DAYS * DAY) continue;
@@ -1061,8 +1061,8 @@ async function addAdminTournaments() {
   }
 }
 
-// a tracked tournament's crew is everyone registered who's tracked, linked, or has the discord on their start.gg in
-// this server. the ones who aren't tracked get saved with their tag so the roll call and placements can name them.
+// a tracked tournament's crew is everyone registered who's tracked, or has the discord on their start.gg in this
+// server. the ones who aren't tracked get saved with their tag so the roll call and placements can name them.
 // tracked players it finds go in userIds, in case their own upcoming list missed it. a hidden list, or start.gg or
 // discord failing, keeps whoever it had
 export async function refreshCrew(tournament, guild = channel?.guild) {
@@ -1070,14 +1070,13 @@ export async function refreshCrew(tournament, guild = channel?.guild) {
     const participants = await startgg.getParticipants(tournament.id);
     rememberAccounts(participants);
     if (!participants.length) return;
-    const linked = new Set(Object.values(state.links).map((link) => String(link.userId)));
     const members = await serverMembers(guild, [...new Set(participants.map((participant) => participant.discordId).filter(Boolean))]);
     const crew = {};
     for (const { userId, slug, tag, discordId } of participants) {
       if (!userId) continue;
       if (state.players[userId]) {
         if (!tournament.userIds.some((id) => String(id) === String(userId))) tournament.userIds.push(userId);
-      } else if (slug && (linked.has(String(userId)) || members.has(discordId))) {
+      } else if (slug && members.has(discordId)) {
         crew[userId] = { userId, slug, tag };
       }
     }
