@@ -142,6 +142,23 @@ export function vodLink(set) {
   return set?.vod ? ` · [VOD](${set.vod.replaceAll('(', '%28').replaceAll(')', '%29')})` : '';
 }
 
+// the venue's name and street address from start.gg as plain text, for cards and discord events. the name gets
+// left off when the address already starts with it. null online, or when the TO filled in neither
+export function venueText(tournament) {
+  if (tournament.isOnline) return null;
+  const name = tournament.venueName?.trim();
+  const address = tournament.venueAddress?.trim();
+  if (!address) return name || null;
+  if (!name || address.toLowerCase().startsWith(name.toLowerCase())) return address;
+  return `${name}, ${address}`;
+}
+
+// a map search for the venue's address, so tapping the location on a phone opens directions. parens get
+// encoded so they can't end the markdown link early
+export function mapUrl(address) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`.replaceAll('(', '%28').replaceAll(')', '%29');
+}
+
 export function percent(part, whole) {
   return `${Math.round((part / whole) * 100)}%`;
 }

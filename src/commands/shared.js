@@ -1,7 +1,8 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, DiscordAPIError, HTTPError, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
+import { ApiError } from '../errors.js';
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
 // a slow lookup's reply says how far along start.gg is once there's at least this long left, or this long
@@ -69,6 +70,35 @@ function linkedPlayer(discordId) {
   const linked = state.links[discordId];
   if (linked) return state.players[linked.userId] ?? linked;
   return Object.values(state.players).find((player) => player.discordId === discordId);
+}
+
+// whether a tracked or linked player is whoever ran the command: their /link, or the discord on their start.gg.
+// both were checked against start.gg, so nobody can pass as someone else
+function isSelf(interaction, player) {
+  if (!player || player === 'all') return false;
+  const me = linkedPlayer(interaction.user.id);
+  return (Boolean(me) && String(me.userId) === String(player.userId)) || player.discordId === interaction.user.id;
+}
+
+// what to tell someone whose command threw, naming whose fault it was. the details stay in the logs, since
+// start.gg's and discord's own wording can carry ids and reads badly in the channel
+function failureMessage(err) {
+  if (err instanceof ApiError) {
+    const { source, status } = err;
+    if (source === 'start.gg' && startgg.badToken(err)) return 'start.gg turned down the bot\'s API token, so nothing from start.gg works until whoever runs the bot makes a new one.';
+    if (status === 429) return `${source} is limiting how fast the bot can ask right now. Try again in a minute.`;
+    if (status === null) return `${source} didn't answer in time. Try again in a minute.`;
+    if (status >= 500) return `${source} is having trouble right now. Try again in a few minutes.`;
+    return `Couldn't get that from ${source} right now. Try again in a minute.`;
+  }
+  if (err instanceof DiscordAPIError) {
+    if (err.code === RESTJSONErrorCodes.MissingPermissions) return 'Discord says I\'m missing a permission for that. A server admin can check my role, in server settings and on this channel.';
+    if (err.code === RESTJSONErrorCodes.MissingAccess) return 'Discord says I can\'t see what that needs. A server admin can check that my role can view this channel.';
+    if (err.code === RESTJSONErrorCodes.UnknownMember) return 'That person isn\'t in this server anymore.';
+    return 'Discord didn\'t let me do that just now. Try again in a minute.';
+  }
+  if (err instanceof HTTPError) return 'Discord is having trouble right now. Try again in a few minutes.';
+  return 'Something went wrong in the bot itself, not start.gg or Discord. It\'s in the bot\'s logs.';
 }
 
 // autocomplete sends the id, typing it out sends the name, spelled close enough.
@@ -321,6 +351,18 @@ function didYouMean(records, typed, name = 'tag', describe = (record) => record[
   return near ? ` Did you mean **${escapeMarkdown(describe(near))}**?` : '';
 }
 
+// a tracked player picked in player:, or whoever ran it when it's left out. undefined when it's nobody tracked,
+// like someone who only used /link, and replyNotTracked says why
+function readTracked(interaction) {
+  const player = readPlayer(interaction, 'player', { trackedOnly: true });
+  return player && state.players[player.userId] ? player : undefined;
+}
+
+function replyNotTracked(interaction) {
+  if (interaction.options.getString('player') === null) return replyEphemeral(interaction, 'You aren\'t tracked. `/track add` tracks you.');
+  return replyNoPlayer(interaction, 'player', { trackedOnly: true });
+}
+
 // left out with no start.gg linked, or someone picked who isn't on the list
 function replyNoPlayer(interaction, name = 'player', { trackedOnly = false } = {}) {
   const typed = interaction.options.getString(name);
@@ -372,7 +414,7 @@ async function replyEphemeralAfterDefer(interaction, content) {
 const flag = (interaction, name) => interaction.options.getBoolean(name) ?? false;
 
 export {
-  pickable, readChoice, linkedPlayer, lookup, readPlayer, sendEmbeds, withCountdown, replyNoPlayer, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag,
+  pickable, readChoice, linkedPlayer, isSelf, failureMessage, lookup, readPlayer, readTracked, sendEmbeds, withCountdown, replyNoPlayer, replyNotTracked, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag,
   reportButton, fullReport, h2hButton, buttonRow, readButton, parseSince, playerBySlug, recentPicks, rememberPick, nameMatches, didYouMean,
   commandLabel, roughly, LATE_SECONDS,
 };

@@ -1,7 +1,9 @@
-import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes } from 'discord.js';
 import { buttonFailed, commands, handleAutocomplete, handleButton, handleCommand } from './commands/index.js';
 import { inTurn } from './commands/turns.js';
-import { checkToken } from './startgg.js';
+import { failureMessage } from './commands/shared.js';
+import { seedFirstTO } from './commands/to.js';
+import { badToken, checkToken } from './startgg.js';
 import { missingThreadPermissions, startTracking } from './tracker.js';
 import { messageSettings } from './message-settings.js';
 import { setFallbackImage } from './embeds/index.js';
@@ -18,7 +20,15 @@ for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN', 'GUILD_ID', 'CHANNEL_ID'])
   if (!process.env[name]) quit(`${name} isn't set, put it in .env or the host's environment variables`);
 }
 
-await checkToken().catch((err) => quit(`bad STARTGG_TOKEN (${err.message}), make a new one in start.gg Settings > Developer Settings`));
+// a token start.gg turns down never works, so that stops here. start.gg being down or slow at boot doesn't, since
+// quitting over it can outlast the host's restart limit, and every check retries on its own once start.gg is back
+await checkToken().catch((err) => {
+  if (badToken(err)) quit(`bad STARTGG_TOKEN (${err.message}), make a new one in start.gg Settings > Developer Settings`);
+  console.error(`couldn't check STARTGG_TOKEN (${err.message}), starting anyway`);
+});
+
+// discord's codes for the bot not being in a server, or not seeing a channel
+const NOT_THERE = [RESTJSONErrorCodes.UnknownGuild, RESTJSONErrorCodes.UnknownChannel, RESTJSONErrorCodes.MissingAccess];
 
 // set here and not after login so it comes back after reconnects
 const client = new Client({
@@ -27,13 +37,22 @@ const client = new Client({
 });
 
 client.once(Events.ClientReady, async () => {
-  const guild = await client.guilds.fetch(process.env.GUILD_ID).catch(() => null);
-  if (!guild) quit(`bot isn't in server ${process.env.GUILD_ID}, check GUILD_ID or invite it`);
+  const guild = await client.guilds.fetch(process.env.GUILD_ID).catch((err) => {
+    if (NOT_THERE.includes(err.code)) quit(`bot isn't in server ${process.env.GUILD_ID}, check GUILD_ID or invite it`);
+    quit(`couldn't load server ${process.env.GUILD_ID} from Discord (${err.message})`);
+  });
 
   // replaces whatever was registered before, so old commands go away
-  await guild.commands.set(commands).catch(() => quit('couldn\'t register the commands, re-invite the bot with the applications.commands scope'));
+  await guild.commands.set(commands).catch((err) => {
+    if (err.code === RESTJSONErrorCodes.MissingAccess) quit('couldn\'t register the commands, re-invite the bot with the applications.commands scope');
+    // usually a command in definitions.js breaking one of discord's limits, which the message names
+    quit(`couldn't register the commands (${err.message})`);
+  });
 
-  const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch(() => null);
+  const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch((err) => {
+    if (NOT_THERE.includes(err.code)) return null;
+    quit(`couldn't load channel ${process.env.CHANNEL_ID} from Discord (${err.message})`);
+  });
   if (!channel?.isTextBased()) quit(`can't see a text channel with id ${process.env.CHANNEL_ID}, check CHANNEL_ID`);
 
   const missing = channel.permissionsFor(client.user).missing([
@@ -57,6 +76,8 @@ client.once(Events.ClientReady, async () => {
   // before anything posts, so a message with no picture of its own gets this one
   setFallbackImage(client.user.displayAvatarURL({ extension: 'png', size: 256 }));
   startTracking(channel);
+  // in the background, it asks start.gg who the first TO is
+  seedFirstTO(guild);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -82,10 +103,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    // detail stays in the logs. users get a plain line, since err text comes from start.gg
-    // and friends and would otherwise leak in the channel on a public deferred reply
-    const message = `Couldn't get that from start.gg right now.`;
+    console.error(`${described(interaction)} failed:`, err);
+    // detail stays in the logs. users get a plain line saying whether start.gg, slippi, discord or the bot
+    // itself went wrong, since the raw text would otherwise land in the channel on a public deferred reply
+    const message = failureMessage(err);
     if (button) {
       await buttonFailed(interaction, message).catch(console.error);
     } else if (interaction.replied) {

@@ -8,7 +8,7 @@ import { state, save } from './store.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
 import { messageEnabled, messageSettings } from './message-settings.js';
 import { rememberAccounts, serverMembers } from './accounts.js';
-import { cantMakeEvents, ensureDiscordEvent } from './discord-events.js';
+import { cantMakeEvents, ensureDiscordEvent, syncDiscordEvents } from './discord-events.js';
 import { buttonRow, h2hButton, linkedPlayer } from './commands/shared.js';
 
 const SET_CHECK_MINUTES = 2;
@@ -71,6 +71,9 @@ const PROJECTED_KEPT_DAYS = 3;
 export const PRUNE_AFTER_DAYS = 6 * 30;
 // the prune only looks at dates, so every two weeks is plenty
 const PRUNE_CHECK_DAYS = 14;
+// discord events get start.gg's latest time and place this often. TOs rarely move a tournament, and each
+// event costs one request
+const EVENT_SYNC_MINUTES = 60;
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
@@ -135,6 +138,8 @@ export function startTracking(postChannel) {
   checkSlippiRanks();
   loopBills();
   checkPrune();
+  checkDiscordEvents();
+  setInterval(checkDiscordEvents, EVENT_SYNC_MINUTES * 60 * 1000);
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkDmReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
@@ -148,8 +153,18 @@ export function startTracking(postChannel) {
 
 // saved from before tournaments could be tracked. a reg reminder becomes a tracked tournament with reminders
 // on. match call pings were a switch anyone could flip on a player, now they're each person's own, so a player's
-// discord keeps them only if the server switch was on and they were actually getting pinged
+// discord keeps them only if the server switch was on and they were actually getting pinged. tournament admins
+// gave way to the TO role, and their tournaments stay tracked. a discord event id moves to state.discordEvents
+// unsynced, so the next sync puts start.gg's latest on it, venue address included
 export function migrateTracking(now = secondsNow()) {
+  delete state.regAdmins;
+  delete state.regSkipped;
+  for (const tournament of Object.values(state.tournaments)) {
+    if (!tournament.discordEventId) continue;
+    state.discordEvents[tournament.id] ??= { eventId: tournament.discordEventId, slug: tournament.slug, startAt: tournament.startAt, synced: null };
+    delete tournament.discordEventId;
+  }
+
   for (const reminder of Object.values(state.regReminders ?? {})) {
     const { id, name, slug, startAt, endAt, images } = reminder;
     const tournament = state.tournaments[id] ??= { id, name, slug, startAt, endAt, images: images ?? [], entries: [], userIds: [] };
@@ -172,7 +187,7 @@ export function newTracked(player) {
   return { ...player, lastCheck: secondsNow(), trackedAt: secondsNow(), streamAlerts: false, setResults: false };
 }
 
-// /tournament add, a reg admin's tournament, or a reminder from before. everything it posts starts on and
+// /tournament add, or a reminder from before tournaments were tracked. everything it posts starts on and
 // /tournament posts turns parts off. its sets are looked at from now on, so tracking one partway through
 // doesn't flood its thread with what already happened. reminder fills in at the next reminder check
 export function trackTournament(tournament, by, now = secondsNow()) {
@@ -271,6 +286,7 @@ const checkWeeklyRecap = queued(postWeeklyRecap);
 const checkSlippiCodes = queued(findSlippiCodes);
 const checkSlippiRanks = queued(postRankChanges);
 const checkPrune = queued(pruneInactive);
+const checkDiscordEvents = queued(() => syncDiscordEvents(channel?.guild));
 
 // Bills runs on its own loop below since game day polls tighter than the baseline
 let billsRunning = false;
@@ -1070,33 +1086,19 @@ export function resultsOn(player) {
   return Boolean(player) && player.setResults !== false;
 }
 
-// reg admins' upcoming tournaments get tracked without anyone adding them, except ones /tournament remove untracked
-async function addAdminTournaments() {
-  try {
-    for (const found of await startgg.getAdminTournaments(Object.keys(state.regAdmins))) {
-      // bad end dates make old tournaments show up as upcoming
-      if (state.regSkipped.some((id) => String(id) === String(found.id)) || secondsNow() > endTime(found)) continue;
-      const tournament = state.tournaments[found.id] ??= { ...found, entries: [], userIds: [] };
-      if (!tournament.tracked) trackTournament(tournament, 'admin');
-    }
-  } catch (err) {
-    console.error('finding reg admins\' tournaments failed:', err.message);
-  }
-}
-
-// with /messages events on, each upcoming tournament tracked for a reg admin gets a discord event, once.
-// discordEventId is saved either way, so an event a mod deleted stays deleted. no due time like the posts,
-// since turning it on is asking for events at the tournaments already coming up
-export async function makeAdminEvents(guild = channel?.guild) {
+// with /messages events on, each upcoming tracked tournament gets a discord event, once. state.discordEvents keeps
+// it either way, so an event a mod deleted stays deleted. no due time like the posts, since turning it on is
+// asking for events at the tournaments already coming up
+export async function makeTournamentEvents(guild = channel?.guild) {
   if (!messageEnabled('events')) return;
   const waiting = Object.values(state.tournaments)
-    .filter((tournament) => tournament.tracked?.by === 'admin' && !tournament.discordEventId && tournament.startAt > secondsNow());
+    .filter((tournament) => tournament.tracked && !state.discordEvents[tournament.id] && tournament.startAt > secondsNow());
   // the switch checks the permission when it's turned on, this catches it being taken away after
   if (!waiting.length || cantMakeEvents(guild)) return;
   for (const tournament of waiting) {
     try {
       // the description wants the close time and the events, which the saved tournament doesn't have
-      const found = await startgg.getRegistration(tournament.slug);
+      const found = await startgg.getRegistrationById(tournament.id);
       if (!found || !(found.startAt > secondsNow())) continue;
       const { error } = await ensureDiscordEvent(found, guild);
       if (error) console.error(`discord event for ${tournament.name ?? tournament.id}: ${error}`);
@@ -1151,8 +1153,7 @@ async function updateTournaments() {
   } catch (err) {
     console.error('finding tournaments failed:', err.message);
   }
-  await addAdminTournaments();
-  await makeAdminEvents().catch((err) => console.error('making discord events failed:', err.message));
+  await makeTournamentEvents().catch((err) => console.error('making discord events failed:', err.message));
 
   for (const tournament of Object.values(state.tournaments)) {
     if (tournament.resultsPosted) {
@@ -1466,7 +1467,7 @@ export function nextRegReminder(deadline) {
 }
 
 // reminders for tracked tournaments with reminders on, pinging everyone with /notify registration on
-// who isn't registered yet. the tournament check finds reg admins' tournaments and tracks them
+// who isn't registered yet
 export async function postRegReminders(postChannel = channel) {
   for (const tournament of Object.values(state.tournaments)) {
     const { reminder } = tournament;
@@ -1479,7 +1480,7 @@ export async function postRegReminders(postChannel = channel) {
       if (!latest) continue;
       const deadline = regDeadline(latest);
       reminder.deadline = deadline;
-      // tracked for a reg admin, or reminders just turned back on
+      // registration wasn't open yet when it was tracked, or reminders just turned back on
       reminder.next ??= nextRegReminder(deadline);
       // it closed, maybe while the bot was down
       if (deadline <= secondsNow()) continue;

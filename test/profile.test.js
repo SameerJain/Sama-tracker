@@ -184,7 +184,6 @@ test('only server members, and no bots, without asking start.gg', async () => {
 
 test('reg reminders remember who registered with discord connected', async () => {
   state.messages = {};
-  state.regAdmins = {};
   state.regPings = [];
   state.tournaments = { 5: { id: 5, slug: 'tournament/local', name: 'Local', tracked: { by: 'manual' }, reminder: { next: 0 } } };
   registered = [{ gamerTag: 'Herbert', user: { id: 8, authorizations: [{ externalId: HERB }] } }, { gamerTag: 'Added by the TO', user: null }];

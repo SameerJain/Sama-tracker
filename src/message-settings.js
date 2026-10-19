@@ -3,7 +3,7 @@ import { DEFAULT_RECAP_SCHEDULE } from './reports.js';
 
 export const MESSAGE_TYPES = {
   sets: 'Set results', streams: 'Stream alerts', calls: 'Match call pings', rollcall: 'Tournament roll calls',
-  results: 'Tournament placements', top8: 'Top 8s', registration: 'Registration reminders', events: 'Discord events for admin tournaments',
+  results: 'Tournament placements', top8: 'Top 8s', registration: 'Registration reminders', events: 'Discord events for tracked tournaments',
   slippi: 'Slippi rank changes', recap: 'Weekly crew recap', bills: 'Bills final results',
 };
 // where set results and stream alerts go, named the way /messages lists them

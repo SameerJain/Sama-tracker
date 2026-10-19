@@ -29,7 +29,8 @@ async function settle(promise) {
 }
 
 // a start.gg where player id has pages[id] pages of history, a set each against player 5 or opponentId. fail says which
-// requests error. asked lists 'sets 99 3' for the set history page 3 of player 99, and the like
+// requests start.gg turns down, with a 400 since a 5xx gets retried. asked lists 'sets 99 3' for the set history page 3
+// of player 99, and the like
 function fakeStartgg(pages, { fail = () => false, newest = () => 0 } = {}) {
   const asked = [];
   globalThis.fetch = async (_url, options) => {
@@ -42,7 +43,7 @@ function fakeStartgg(pages, { fail = () => false, newest = () => 0 } = {}) {
     else if (query.includes('recentStandings')) {
       const request = `stats ${variables.id} ${variables.videogameId ?? ''} ${variables.page}`;
       asked.push(request);
-      if (fail(request)) return { ok: false, status: 500, json: async () => ({}) };
+      if (fail(request)) return { ok: false, status: 400, json: async () => ({}) };
       const node = (id) => ({
         id, completedAt: 100_000, winnerId: variables.id,
         event: { slug: 'tournament/t/event/e', videogame: { id: 1386, displayName: 'Ultimate' }, tournament: { name: 'T' } },
@@ -53,7 +54,7 @@ function fakeStartgg(pages, { fail = () => false, newest = () => 0 } = {}) {
     else {
       const request = `${kind} ${variables.id} ${variables.page}`;
       asked.push(request);
-      if (fail(request)) return { ok: false, status: 500, json: async () => ({}) };
+      if (fail(request)) return { ok: false, status: 400, json: async () => ({}) };
       // sets played since push every page down by that many
       const index = (variables.page - 1) * 40 - newest(variables.id);
       const node = (id) => ({
@@ -128,7 +129,7 @@ test('h2h lookups send the opponent along, keep pairs apart, and forget failures
     opponents.push(variables.opponentId);
     if (variables.id === 12 && variables.page === 1 && !failed) {
       failed = true;
-      return { ok: false, status: 500, json: async () => ({}) };
+      return { ok: false, status: 400, json: async () => ({}) };
     }
     const node = (id) => ({
       id, completedAt: 100_000, fullRoundText: 'Winners Round 1', winnerId: 12,
@@ -139,7 +140,7 @@ test('h2h lookups send the opponent along, keep pairs apart, and forget failures
     return { ok: true, json: async () => ({ data: { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node(`12-${variables.opponentId}`)] } } } }) };
   };
   // the failed lookup isn't kept, so trying again asks start.gg again and gets the meetings
-  await assert.rejects(settle(h2hHistory(12, 7)), /HTTP 500/);
+  await assert.rejects(settle(h2hHistory(12, 7)), /HTTP 400/);
   const against7 = await settle(h2hHistory(12, 7));
   assert.deepEqual(against7.map((set) => set.id), ['12-7']);
   assert.ok(opponents.includes(7), 'opponent 7 reaches start.gg');
@@ -169,7 +170,7 @@ test('more pages failing keeps the copy it was adding to', async () => {
     options: { getSubcommand: () => null, getString: (name) => (name === 'player' ? '2' : null), getBoolean: (name) => name === 'verbose' },
     deferReply: async () => { interaction.deferred = true; }, editReply: async () => {},
   };
-  await assert.rejects(settle(startgg.asCommand(() => handleCommand(interaction))), /HTTP 500/);
+  await assert.rejects(settle(startgg.asCommand(() => handleCommand(interaction))), /HTTP 400/);
   // the 30 pages are still there, so /scout verbose needs none of them again
   const asked = fakeStartgg({ 99: 60 });
   await command('scout', { profile: 'them', verbose: true });
@@ -179,7 +180,7 @@ test('more pages failing keeps the copy it was adding to', async () => {
 test('a first fetch that failed is not kept, so the next try asks again', async () => {
   let failed = false;
   const asked = fakeStartgg({ 40: 1 }, { fail: (request) => request === 'sets 40 1' && !failed && (failed = true) });
-  await assert.rejects(settle(setHistory(40)), /HTTP 500/);
+  await assert.rejects(settle(setHistory(40)), /HTTP 400/);
   const history = await settle(setHistory(40));
   assert.deepEqual(sets(asked, 40), [1, 1]);
   assert.deepEqual(history.map(({ id }) => id), ['40-1']);
@@ -230,7 +231,7 @@ test('short /stats lookups with the same filters share one fetch, at the same ti
 test('a failed /stats lookup is not kept, so the next try asks again', async () => {
   let failed = false;
   const asked = fakeStartgg({}, { fail: (request) => request === 'stats 102  1' && !failed && (failed = true) });
-  await assert.rejects(settle(statsHistory(102, {})), /HTTP 500/);
+  await assert.rejects(settle(statsHistory(102, {})), /HTTP 400/);
   const { sets } = await settle(statsHistory(102, {}));
   assert.deepEqual(asked.filter((each) => each.startsWith('stats 102 ')), ['stats 102  1', 'stats 102  1']);
   assert.deepEqual(sets.map((set) => set.id), ['102-stats-1']);

@@ -110,22 +110,22 @@ export const commands = [
       {
         type: Option.Subcommand,
         name: 'add',
-        description: 'Post a start.gg player\'s placements here. /track posts turns on their sets and streams',
-        options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
+        description: 'Post your start.gg placements here. TOs can add anyone. /track posts turns on sets and streams',
+        options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID. Leave out to find yours. Someone else needs a TO' }],
       },
       {
         type: Option.Subcommand,
         name: 'remove',
-        description: 'Stop tracking a player. Asks first, then Undo puts them back for a minute',
-        options: [playerOption('Tracked player')],
+        description: 'Stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back',
+        options: [playerOption('Tracked player, leave out for yourself. Someone else needs a TO', 'player', false)],
       },
       { type: Option.Subcommand, name: 'list', description: 'List tracked players and tournaments' },
       {
         type: Option.Subcommand,
         name: 'posts',
-        description: 'A tracked player\'s set results and stream alerts on or off. Leave both out to see them',
+        description: 'Your set results and stream alerts on or off, or anyone\'s if you\'re a TO. Leave both out to see',
         options: [
-          playerOption('Tracked player, or all'),
+          playerOption('Tracked player or all, leave out for yourself. Changing someone else\'s needs a TO', 'player', false),
           switchOption('sets', 'Their finished sets. Asks first unless already off for everyone'),
           switchOption('stream', 'Their sets on stream or up next in the stream queue'),
         ],
@@ -133,9 +133,28 @@ export const commands = [
       {
         type: Option.Subcommand,
         name: 'cleanup',
-        description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. Manage Server',
+        description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. TOs only',
         options: [{ type: Option.Boolean, name: 'no_discord', description: 'Also untrack players with no Discord connected on start.gg' }],
       },
+    ],
+  },
+  {
+    name: 'to',
+    description: 'TOs, who can change tracking for anyone and run /tournament. Only TOs add or remove TOs',
+    options: [
+      {
+        type: Option.Subcommand,
+        name: 'add',
+        description: 'Give someone the TO role. TOs only',
+        options: [{ type: Option.User, name: 'user', description: 'Server member', required: true }],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'remove',
+        description: 'Take the TO role off someone, or yourself. TOs only',
+        options: [{ type: Option.User, name: 'user', description: 'A TO', required: true }],
+      },
+      { type: Option.Subcommand, name: 'list', description: 'Who the TOs are' },
     ],
   },
   {
@@ -266,14 +285,14 @@ export const commands = [
       {
         type: Option.Subcommand,
         name: 'add',
-        description: 'Add someone to the watchlist. Their rank changes get posted here',
-        options: [{ type: Option.String, name: 'code', description: 'Connect code like ABCD#123. Leave out to find yours on your start.gg', max_length: 60 }],
+        description: 'Add yourself to the watchlist, or anyone if you\'re a TO. Rank changes get posted here',
+        options: [{ type: Option.String, name: 'code', description: 'Your connect code like ABCD#123, or leave out to find it on your start.gg', max_length: 60 }],
       },
       {
         type: Option.Subcommand,
         name: 'remove',
-        description: 'Take someone off the watchlist',
-        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist', required: true, autocomplete: true }],
+        description: 'Take yourself off the watchlist, or anyone if you\'re a TO',
+        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist, leave out for yourself', autocomplete: true }],
       },
       {
         type: Option.Subcommand,
@@ -285,10 +304,10 @@ export const commands = [
     ],
   },
   { name: 'status', description: 'Uptime, when the latest version was deployed, and the last start.gg and Slippi checks' },
+  // no default_member_permissions: the TO role decides, and discord can't be told about a role the bot checks
   {
     name: 'tournament',
-    description: 'Tournaments whose every set, stream alert and top 8 post here, plus their reg reminders',
-    default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
+    description: 'Tracked tournaments: every set, stream alert and top 8 post here, plus reg reminders. TOs only',
     options: [
       {
         type: Option.Subcommand,
@@ -319,32 +338,12 @@ export const commands = [
         ],
       },
       {
-        type: Option.SubcommandGroup,
-        name: 'admin',
-        description: 'TOs whose start.gg tournaments get tracked on their own',
-        options: [
-          {
-            type: Option.Subcommand,
-            name: 'add',
-            description: 'Track every upcoming tournament a start.gg user is an admin of',
-            options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID', required: true }],
-          },
-          {
-            type: Option.Subcommand,
-            name: 'remove',
-            description: 'Stop tracking their new tournaments. Ones already tracked stay',
-            options: [{ type: Option.String, name: 'admin', description: 'Tournament admin', required: true, autocomplete: true }],
-          },
-          { type: Option.Subcommand, name: 'list', description: 'List tournament admins' },
-        ],
+        type: Option.Subcommand,
+        name: 'event',
+        description: 'Make a Discord event from a start.gg link, without tracking it. It follows start.gg\'s time and place',
+        options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
       },
     ],
-  },
-  // not under /tournament, which discord hides without Manage Server. tournament admins are checked when it runs
-  {
-    name: 'discord_event',
-    description: 'Make a Discord event from a start.gg link. For tournament admins and Manage Server',
-    options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
   },
   { name: 'bracket', description: 'Bracket links for tracked tournaments, 30 min before start to 6 hours after the end' },
   { name: 'stream_link', description: 'Stream links for tournaments that are tracked or have tracked players, live or starting soon' },

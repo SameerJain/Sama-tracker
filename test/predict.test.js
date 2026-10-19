@@ -166,9 +166,10 @@ test('slippi ratings count toward melee odds when both are ranked, the same from
   const flipped = predict(b, a, historyB, historyA, { now, game: 'Melee', slippiA: slippiB, slippiB: slippiA });
   assert.ok(Math.abs(odds.chance + flipped.chance - 1) < 1e-9);
 
-  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  assert.doesNotMatch(embeds.prediction(a, b, odds, false)[0].data.description, /Slippi ranked:/);
+  const short = embeds.prediction(a, b, odds, false, { melee: true })[0].data.description;
   assert.match(short, /\*\*Slippi ranked:\*\*/);
-  const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
+  const text = embeds.prediction(a, b, odds, true, { melee: true }).map((embed) => embed.data.description).join('\n');
   assert.match(text, /\*\*Slippi ranked:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
   assert.match(text, /Slippi ratings are netplay Elo/);
 });
@@ -189,8 +190,10 @@ test('slippi stays out unless it is melee with two ranked ratings', () => {
   // without slippi the card says nothing about it
   const plain = predict(a, b, historyA, historyB, { now, game: 'Melee' });
   assert.doesNotMatch(embeds.prediction(a, b, plain, false)[0].data.description, /Slippi ranked:/);
-  const verbose = embeds.prediction(a, b, plain, true).map((embed) => embed.data.description).join('\n');
-  assert.match(verbose, /\*\*Slippi ranked:\*\* nothing to go on/);
+  const unasked = embeds.prediction(a, b, plain, true).map((embed) => embed.data.description).join('\n');
+  assert.doesNotMatch(unasked, /Slippi ranked:/);
+  const asked = embeds.prediction(a, b, plain, true, { melee: true }).map((embed) => embed.data.description).join('\n');
+  assert.match(asked, /\*\*Slippi ranked:\*\* nothing to go on/);
 });
 
 test('the gap and variance match the chance, and thin evidence stays near 50%', () => {
@@ -219,7 +222,7 @@ test('more slippi updates mean the same rating gap counts for more', () => {
 test('explained shows bars and model numbers behind the same odds', () => {
   const sets = Array.from({ length: 8 }, (_, i) => set(1, 2, i < 6, { mySeed: 2, theirSeed: 6, event: `w${i}`, daysAgo: i * 7 }));
   const odds = predict(a, b, sets, mirror(sets), { now });
-  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  const short = embeds.prediction(a, b, odds, false, { melee: true })[0].data.description;
   const text = embeds.predictionExplained(a, b, odds).map((embed) => embed.data.description).join('\n');
   // same title odds as the short card
   assert.equal(embeds.predictionExplained(a, b, odds)[0].data.title, embeds.prediction(a, b, odds, false)[0].data.title);
@@ -265,10 +268,11 @@ test('slippi alone predicts melee when both are ranked with no sets on start.gg'
   // ultimate never counts, even ranked
   assert.equal(predict(a, b, [], [], { now, game: 'Ultimate', slippiA, slippiB }), null);
 
-  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  assert.doesNotMatch(embeds.prediction(a, b, odds, false)[0].data.description, /Slippi ranked:/);
+  const short = embeds.prediction(a, b, odds, false, { melee: true })[0].data.description;
   assert.match(short, /\*\*Head-to-head:\*\* never played/);
   assert.match(short, /\*\*Slippi ranked:\*\*/);
-  const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
+  const text = embeds.prediction(a, b, odds, true, { melee: true }).map((embed) => embed.data.description).join('\n');
   assert.match(text, /\*\*Head-to-head:\*\* nothing to go on/);
   assert.match(text, /\*\*Slippi ranked:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
 });

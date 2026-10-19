@@ -3,6 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { MessageFlags } from 'discord.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-registration-'));
 process.env.STATE_DIR = directory;
@@ -51,13 +52,21 @@ function mockStartgg(closesAt, { hidden = false } = {}) {
   };
 }
 
-// records every reply, edit, delete, follow-up and channel message in order. manager is Manage Server
-function interaction(commandName, values, user, send = async () => ({}), { subcommand = null, manager = true } = {}) {
+// records every reply, edit, delete, follow-up and channel message in order. manager is Manage Server, and to
+// whether they have the TO role, which only counts once the server has one
+function interaction(commandName, values, user, send = async () => ({}), { subcommand = null, manager = true, to = null } = {}) {
   const calls = [];
+  const roles = new Map(to === null ? [] : [['to-role', { id: 'to-role', name: 'TO' }]]);
   return {
     calls,
     commandName,
-    guild: { members: { fetch: async ({ user: ids }) => new Map(ids.filter(id => id === 'in-server').map(id => [id, { displayName: 'Herb' }])) } },
+    // whoever ran it. user is who an option picked
+    user: { id: 'runner' },
+    guild: {
+      members: { fetch: async ({ user: ids }) => new Map(ids.filter(id => id === 'in-server').map(id => [id, { displayName: 'Herb' }])) },
+      roles: { cache: Object.assign(roles, { find: (fn) => [...roles.values()].find(fn) }) },
+    },
+    member: { roles: { cache: new Set(to ? ['to-role'] : []) } },
     channel: { send: async r => { calls.push(['send', r]); return send(r); } },
     memberPermissions: { has: () => manager },
     options: {
@@ -266,8 +275,6 @@ test('reg_warn does not ping once registration closed, or for bots', async () =>
 test('tournament add tracks the tournament with everything on and its reminders set, tracking nobody', async () => {
   state.players = {};
   state.tournaments = {};
-  // untracked before, so a reg admin's would have stayed out
-  state.regSkipped = [5];
   // the reminder's own send is covered elsewhere, here it would post to no channel
   state.messages = { registration: false };
   mockStartgg();
@@ -282,7 +289,6 @@ test('tournament add tracks the tournament with everything on and its reminders 
   // closes in an hour, so the last call is all that's left
   assert.equal(tracked.reminder.deadline, now + 3600);
   assert.ok(tracked.reminder.next >= 3);
-  assert.deepEqual(state.regSkipped, []);
   const edit = run.calls.find(([kind]) => kind === 'edit');
   assert.match(edit[1].content, /^Tracking Local\. Every set and stream alert from it posts in its own thread.*\nRegistration ends <t:\d+:R>, sending the last call now\./);
   assert.deepEqual(edit[1].allowedMentions, { parse: [] });
@@ -310,13 +316,25 @@ test('tournament add with reminders off or registration closed still tracks it, 
   assert.match(closed.calls.find(([kind]) => kind === 'edit')[1].content, /Registration is closed, so no reg reminders\./);
 });
 
-test('tournament commands go by discord, so a role handed /tournament can use it without Manage Server', async () => {
+test('tournament commands go by the TO role once the server has one, and Manage Server only before then', async () => {
   mockStartgg();
+  state.messages = { registration: false };
+  state.toRole = { id: null, members: [], seeded: false };
   state.tournaments = {};
-  const run = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add', manager: false });
+  const run = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add', manager: false, to: true });
   await handleCommand(run);
   assert.ok(state.tournaments[5].tracked);
-  assert.doesNotMatch(JSON.stringify(run.calls), /Manage Server/);
+
+  // a manager without the role, now that there is one, and someone with neither before there was
+  state.tournaments = {};
+  for (const options of [{ manager: true, to: false }, { manager: false }]) {
+    const refused = interaction('tournament', { tournament: 'local' }, undefined, undefined, { subcommand: 'add', ...options });
+    await handleCommand(refused);
+    assert.deepEqual(refused.calls, [['reply', { content: 'Only TOs can track tournaments. `/to list` shows who they are.', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }]]);
+  }
+  assert.deepEqual(state.tournaments, {});
+  // the role's saved, so renaming it in server settings keeps it
+  assert.equal(state.toRole.id, 'to-role');
 });
 
 async function autocomplete(commandName, typed, subcommand = null) {
@@ -331,7 +349,7 @@ test('tournament options offer tracked ones and tracked players\' tournaments, s
     5: { id: 5, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600, tracked: { by: 'manual' } },
     6: { id: 6, slug: 'tournament/live', name: 'Live Now', startAt: now - 3600, endAt: now + 3600 },
     7: { id: 7, slug: 'tournament/last-week', name: 'Last Week', startAt: now - 8 * day, endAt: now - 7 * day, tracked: { by: 'manual' } },
-    // a reg admin's, before the tournament check fills in its dates
+    // one saved without dates, from a tournament admin before the TO role
     8: { id: 8, slug: 'tournament/admin-weekly', name: 'Admin Weekly', tracked: { by: 'admin' } },
     9: { id: 9, slug: 'tournament/next-month', name: 'Next Month', startAt: now + 30 * day, endAt: now + 30 * day + 3600 },
   };

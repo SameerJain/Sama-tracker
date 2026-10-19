@@ -33,7 +33,7 @@ function tournamentChoices(typed, { only = 'known' } = {}) {
   const known = Object.values(state.tournaments).filter((tournament) => {
     if (!tournament.slug || !tournament.name) return false;
     if (only === 'tracked') return Boolean(tournament.tracked);
-    // a reg admin's has no dates until the next tournament check
+    // one saved without dates is let through
     if (tournament.startAt && endTime(tournament) < now) return false;
     return only !== 'new' || !tournament.tracked;
   });

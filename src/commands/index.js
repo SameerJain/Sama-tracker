@@ -9,7 +9,8 @@ import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, recent, run } from './players.js';
 import { progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
-import { tournamentAdd, tournamentRemove, tournamentPosts, discordEvent, adminAdd, adminRemove, adminList } from './tournaments.js';
+import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
+import { toAdd, toRemove, toList } from './to.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch } from './matchmaking.js';
@@ -25,9 +26,9 @@ const TRACKED_ONLY = ['track remove', 'track posts'];
 // all means everyone tracked
 const TAKES_ALL = ['upcoming', 'recent', 'track posts'];
 // a tournament link, or one the bot already knows. new is the ones /tournament add can still track, tracked the ones it does
-const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', discord_event: 'known', registered: 'known', reg_warn: 'known' };
+const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', 'tournament event': 'known', registered: 'known', reg_warn: 'known' };
 
-// "track add", "tournament admin add", or just the command for the ones without subcommands
+// "track add", or just the command for the ones without subcommands. a subcommand group would go in the middle
 function commandName(interaction) {
   const group = interaction.options.getSubcommandGroup?.(false);
   const subcommand = interaction.options.getSubcommand(false);
@@ -45,6 +46,9 @@ const handlers = new Map([
   ['track list', (interaction) => sendEmbeds(interaction, embeds.trackedList(state.players, Object.keys(pickable()).length - Object.keys(state.players).length, state.tournaments))],
   ['track posts', trackPosts],
   ['track cleanup', trackCleanup],
+  ['to add', toAdd],
+  ['to remove', toRemove],
+  ['to list', toList],
   ['notify', notify],
   ['matchmaking_role', matchmakingRole],
   ['matchmaking_search', matchmakingSearch],
@@ -70,10 +74,7 @@ const handlers = new Map([
   ['tournament add', tournamentAdd],
   ['tournament remove', tournamentRemove],
   ['tournament posts', tournamentPosts],
-  ['discord_event', discordEvent],
-  ['tournament admin add', adminAdd],
-  ['tournament admin remove', adminRemove],
-  ['tournament admin list', adminList],
+  ['tournament event', tournamentEvent],
   ['bracket', bracket],
   ['stream_link', streamLink],
   ['registered', registered],
@@ -196,13 +197,6 @@ export async function handleAutocomplete(interaction) {
   if (Object.hasOwn(TAKES_TOURNAMENT, name)) return interaction.respond(tournamentChoices(focused, { only: TAKES_TOURNAMENT[name] }));
 
   if (name === 'slippi remove' || name === 'slippi rank') return interaction.respond(slippiChoices(focused, { anyCode: name === 'slippi rank' }));
-
-  if (name === 'tournament admin remove') {
-    for (const admin of Object.values(state.regAdmins)) {
-      if (nameMatches(admin.tag, focused)) choices.push({ name: admin.tag, value: String(admin.userId) });
-    }
-    return interaction.respond(choices.slice(0, 25));
-  }
 
   if (name === 'socials_edit remove') {
     for (const social of state.socials) {

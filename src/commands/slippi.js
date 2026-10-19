@@ -5,6 +5,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { slippiEntry } from '../tracker.js';
 import { didYouMean, linkedPlayer, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds } from './shared.js';
+import { isTO, notTO } from './to.js';
 
 const NOT_A_CODE = 'That isn\'t a connect code. Use the one Slippi Launcher shows, like ABCD#123.';
 
@@ -33,7 +34,15 @@ function noCodeOnStartgg(player) {
   return `Couldn't find a connect code on ${player.tag}'s start.gg. It's saved when you register for a netplay tournament that asks for one. Use \`code:\` instead, like \`/slippi add code:ABCD#123\`.`;
 }
 
-// with the code left out, it's yours from start.gg. a code found there is tied to that start.gg player
+// whose watchlist entry this is: the start.gg player it came from, or whoever added their own code by hand.
+// a TO's typed code belongs to nobody
+function ownsEntry(interaction, entry) {
+  const me = linkedPlayer(interaction.user.id);
+  return entry.discordId === interaction.user.id || (Boolean(me) && Boolean(entry.userId) && String(entry.userId) === String(me.userId));
+}
+
+// with the code left out, it's yours from start.gg. a code found there is tied to that start.gg player.
+// slippi can't tie a code to a discord, so a typed one goes on as whoever typed it, one each. TOs can add anyone
 async function slippiAdd(interaction) {
   const typed = interaction.options.getString('code');
   const code = typed && slippi.readCode(typed);
@@ -41,6 +50,11 @@ async function slippiAdd(interaction) {
   const me = typed ? null : linkedPlayer(interaction.user.id);
   if (!typed && !me) {
     return replyEphemeral(interaction, 'Add a connect code, like `/slippi add code:ABCD#123`. Left out, it looks for yours on your start.gg, so `/link` that first.');
+  }
+  const claim = Boolean(typed) && !isTO(interaction);
+  const mine = claim && Object.values(state.slippi).find((each) => ownsEntry(interaction, each));
+  if (mine && mine.code !== code) {
+    return replyEphemeral(interaction, `You're on the watchlist as ${escapeMarkdown(mine.name)} (${mine.code}). Only TOs can add someone else. \`/slippi remove\` takes you off first if your code changed.`);
   }
 
   await interaction.deferReply();
@@ -53,6 +67,7 @@ async function slippiAdd(interaction) {
   // the rank check moves an existing entry's numbers, so a rank change can't go unposted
   const entry = existing ?? slippiEntry(profile);
   if (me) entry.userId = me.userId;
+  if (claim && !existing) entry.discordId = interaction.user.id;
   state.slippi[profile.uid] = entry;
   state.slippiSkipped = state.slippiSkipped.filter((uid) => uid !== profile.uid);
   save();
@@ -67,11 +82,22 @@ async function slippiAdd(interaction) {
   });
 }
 
-// the daily search skips them after this, /slippi add brings them back
+// the daily search skips them after this, /slippi add brings them back. left out, it's your own entry.
+// only TOs can take someone else off
 function slippiRemove(interaction) {
-  const typed = interaction.options.getString('player', true);
+  const typed = interaction.options.getString('player');
+  if (typed === null) {
+    const own = Object.values(state.slippi).find((each) => ownsEntry(interaction, each));
+    if (!own) return replyEphemeral(interaction, 'You aren\'t on the Slippi watchlist. Pick someone to take off, if you\'re a TO.');
+    return takeOff(interaction, own);
+  }
   const entry = watched(typed);
   if (!entry) return replyEphemeral(interaction, `They aren't on the Slippi watchlist.${nearestWatched(typed) || ' `/slippi leaderboard` shows who is.'}`);
+  if (!ownsEntry(interaction, entry) && !isTO(interaction)) return notTO(interaction, 'take someone else off the watchlist. Leave out `player` to take yourself off');
+  return takeOff(interaction, entry);
+}
+
+function takeOff(interaction, entry) {
   delete state.slippi[entry.uid];
   state.slippiSkipped.push(entry.uid);
   save();

@@ -408,27 +408,24 @@ test('/track posts for everyone off and /tournament remove ask first, and /track
   assert.equal(already.calls[0][1].content, 'Set results off for everyone.');
   assert.equal(already.calls[0][1].components, undefined);
 
-  // a tournament admin's stays untracked after, until Undo or /tournament add
-  const switches = { by: 'admin', at: now, sets: true, stream: true, top8: true, reminders: true };
+  // Undo puts back its switches and reminder progress
+  const switches = { by: 'manual', at: now, sets: true, stream: true, top8: true, reminders: true };
   state.tournaments = { 6: { id: 6, slug: 'tournament/soon', name: 'Soon', entries: [], userIds: [], tracked: switches, reminder: { next: 1 } } };
-  state.regSkipped = [];
   const remove = command('tournament', { subcommand: 'remove', values: { tournament: 'soon' } });
   await handleCommand(remove);
   const question = remove.calls[0][1];
-  assert.match(question.content, /^Stop tracking Soon\? Its sets, stream alerts, top 8s and reg reminders stop\. It came from a tournament admin/);
+  assert.equal(question.content, 'Stop tracking Soon? Its sets, stream alerts, top 8s and reg reminders stop.');
   assert.equal((await press(question, 'Cancel')).calls[0][1].content, 'Still tracking Soon.');
   assert.ok(state.tournaments[6].tracked);
   const stopped = (await press(question, 'Stop tracking')).calls[0][1];
   assert.equal(stopped.content, 'Stopped tracking Soon.');
   assert.deepEqual(labels(stopped), ['Undo']);
   assert.equal(state.tournaments[6].tracked, undefined);
-  assert.deepEqual(state.regSkipped, [6]);
   // the prompt's still there, so a late press finds it gone
   assert.equal((await press(question, 'Stop tracking')).calls[0][1].content, 'It isn\'t tracked anymore.');
   assert.equal((await press(stopped, 'Undo')).calls[0][1].content, 'Tracking Soon again, with the same settings as before.');
   assert.deepEqual(state.tournaments[6].tracked, switches);
   assert.deepEqual(state.tournaments[6].reminder, { next: 1 });
-  assert.deepEqual(state.regSkipped, []);
 });
 
 test('/track cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {
@@ -464,11 +461,11 @@ test('/track cleanup untracks players whose start.gg discord is not in the serve
   state.players = { 1: { ...crew } };
   assert.equal((await cleanup()).content, 'Everyone tracked has their start.gg Discord in this server.');
 
-  // without Manage Server it doesn't look
+  // it untracks other people, so someone who isn't a TO is turned away before it looks
   const refused = command('track', { subcommand: 'cleanup' });
   refused.memberPermissions = { has: () => false };
   await handleCommand(refused);
-  assert.match(refused.calls[0][1].content, /You need Manage Server permission/);
+  assert.equal(refused.calls[0][1].content, 'Only TOs can clean up the track list. `/to list` shows who they are.');
 });
 
 test('a name that matches nobody suggests the closest tracked, linked or watchlisted one', async () => {

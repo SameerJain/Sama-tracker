@@ -31,14 +31,17 @@ async function settle() {
 }
 
 // a command run by discordId, values are its options. returns the last reply or edit
+// to-discord is a TO: the server has no TO role here, so Manage Server counts as one. anyone else isn't
 async function run(commandName, discordId, values = {}, subcommand = null) {
   let reply;
   const interaction = {
-    commandName, user: { id: discordId },
+    commandName, user: { id: discordId }, memberPermissions: { has: () => discordId === 'to-discord' },
     options: { getSubcommand: () => subcommand, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null },
     reply: async result => { reply = result; },
     deferReply: async () => { interaction.deferred = true; },
     editReply: async result => { reply = result; },
+    deleteReply: async () => {},
+    followUp: async result => { reply = result; },
   };
   await handleCommand(interaction);
   return reply;
@@ -336,7 +339,7 @@ test('/track posts for someone from /link says they aren\'t tracked instead of p
   state.links = { 'me-discord': me };
   const reply = await run('track', 'me-discord', { sets: 'off', stream: 'off' }, 'posts');
   assert.ok(reply.flags);
-  assert.match(reply.content, /^Me isn't tracked, so nothing about them gets posted\. `\/track add` them first\.$/);
+  assert.equal(reply.content, 'You aren\'t tracked. `/track add` tracks you.');
   assert.equal(state.links['me-discord'].streamAlerts, undefined);
   assert.equal(state.links['me-discord'].setResults, undefined);
 });
@@ -344,20 +347,37 @@ test('/track posts for someone from /link says they aren\'t tracked instead of p
 test('/track posts changes one or both switches, and with none says where they\'re at', async () => {
   state.players = { 1: { ...crew, setResults: false, streamAlerts: false }, 2: { userId: 2, playerId: 20, tag: 'Old', slug: 'user/old' } };
   state.links = {};
+  // anyone can look
   const shown = await run('track', 'someone', { player: '1' }, 'posts');
   assert.ok(shown.flags);
   assert.equal(shown.content, 'Crew: set results off, stream alerts off.');
   // saved before either started off, so both count as on
   assert.equal((await run('track', 'someone', { player: 'all' }, 'posts')).content, 'Set results are on for 1 and stream alerts for 1 of the 2 tracked players.');
 
-  assert.equal((await run('track', 'someone', { player: '1', sets: 'on', stream: 'on' }, 'posts')).content, 'Set results and stream alerts on for Crew.');
+  assert.equal((await run('track', 'to-discord', { player: '1', sets: 'on', stream: 'on' }, 'posts')).content, 'Set results and stream alerts on for Crew.');
   assert.ok(state.players[1].setResultsOnAt > 0);
   assert.equal(state.players[1].streamAlerts, true);
-  assert.equal((await run('track', 'someone', { player: '1', sets: 'off', stream: 'on' }, 'posts')).content, 'Set results off and stream alerts on for Crew.');
+  assert.equal((await run('track', 'to-discord', { player: '1', sets: 'off', stream: 'on' }, 'posts')).content, 'Set results off and stream alerts on for Crew.');
   // stream alerts save no on time: they're about sets live right now
   assert.equal(state.players[1].streamAlertsOnAt, undefined);
-  assert.equal((await run('track', 'someone', { player: 'all', stream: 'off' }, 'posts')).content, 'Stream alerts off for everyone.');
+  assert.equal((await run('track', 'to-discord', { player: 'all', stream: 'off' }, 'posts')).content, 'Stream alerts off for everyone.');
   assert.ok(Object.values(state.players).every((player) => player.streamAlerts === false));
+});
+
+test('/track posts lets anyone change their own and only TOs change someone else\'s or everyone\'s', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord', setResults: false }, 2: { userId: 2, playerId: 20, tag: 'Old', slug: 'user/old', setResults: false } };
+  state.links = { 'me-discord': { ...me, userId: 2 } };
+  // someone else's, by someone who isn't a TO, changes nothing
+  const refused = await run('track', 'someone', { player: '1', sets: 'on' }, 'posts');
+  assert.ok(refused.flags);
+  assert.equal(refused.content, 'Only TOs can change someone else\'s posts. Leave out `player` to change yours. `/to list` shows who they are.');
+  assert.equal((await run('track', 'someone', { player: 'all', sets: 'on' }, 'posts')).content, 'Only TOs can change everyone\'s posts. `/to list` shows who they are.');
+  assert.equal(state.players[1].setResults, false);
+
+  // their own, left out or picked, by the discord on their start.gg or their /link
+  assert.equal((await run('track', 'crew-discord', { sets: 'on' }, 'posts')).content, 'Set results on for Crew.');
+  assert.equal((await run('track', 'me-discord', { player: '2', sets: 'on' }, 'posts')).content, 'Set results on for Old.');
+  assert.equal(state.players[2].setResults, true);
 });
 
 test('/notify only changes whoever ran it, and match calls need their start.gg', async () => {
@@ -411,12 +431,46 @@ test('/track add starts set results and stream alerts off and says how to turn t
   state.tournaments = {};
   // the second answer is for the tournament check it kicks off
   mockApi(({ query }) => (query.includes('user(slug:') ? { user: { id: 8, slug: 'user/new', player: { id: 80, gamerTag: 'New' } } } : {}));
-  const reply = await run('track', 'someone', { profile: 'start.gg/user/new' }, 'add');
+  const reply = await run('track', 'to-discord', { profile: 'start.gg/user/new' }, 'add');
   assert.match(reply.embeds[0].data.description, /^Now tracking \[New\].*\. Their placements post here\.\n-# Set results and stream alerts start off\. `\/track posts` turns them on$/);
   assert.equal(state.players[8].setResults, false);
   assert.equal(state.players[8].streamAlerts, false);
   assert.equal(state.players[8].callPings, undefined);
   await settle();
+});
+
+test('/track add and remove let anyone track or untrack themselves, and only TOs someone else', async () => {
+  state.players = {};
+  state.links = {};
+  state.tournaments = {};
+  state.accounts = { 'new-discord': 8 };
+  const profile = { id: 8, slug: 'user/new', images: [], player: { id: 80, gamerTag: 'New' }, authorizations: [{ externalId: 'new-discord' }] };
+  mockApi(({ query }) => {
+    if (query.includes('user(slug:')) return { user: profile };
+    // the account search reads the discord on each saved account live
+    if (query.includes('u8: user')) return { u8: { slug: 'user/new', player: { gamerTag: 'New' }, images: [], authorizations: [{ externalId: 'new-discord' }] } };
+    return {};
+  });
+
+  // someone else's start.gg isn't theirs to track
+  const refused = await run('track', 'someone', { profile: 'start.gg/user/new' }, 'add');
+  assert.equal(refused.content, 'Only TOs can track someone else. New\'s start.gg has a different Discord connected.');
+  assert.ok(refused.flags);
+  assert.equal(state.players[8], undefined);
+
+  // left out, it finds theirs by the discord connected on start.gg
+  const added = await run('track', 'new-discord', {}, 'add');
+  assert.match(added.embeds[0].data.description, /^Now tracking \[New\]/);
+  assert.equal(state.players[8].discordId, 'new-discord');
+  await settle();
+
+  // untracking: someone else can't, they can, left out or by name
+  const blocked = await run('track', 'someone', { player: '8' }, 'remove');
+  assert.equal(blocked.content, 'Only TOs can untrack someone else. Leave out `player` to untrack yourself. `/to list` shows who they are.');
+  assert.match((await run('track', 'new-discord', {}, 'remove')).content, /^Stop tracking New\?/);
+  assert.match((await run('track', 'to-discord', { player: '8' }, 'remove')).content, /^Stop tracking New\?/);
+  assert.equal((await run('track', 'someone', {}, 'remove')).content, 'You aren\'t tracked. `/track add` tracks you.');
+  state.accounts = {};
 });
 
 test('/recent all asks about players with set results on first, since only their last set time stays fresh', async () => {
@@ -462,7 +516,7 @@ test('/track list only notes what differs from a new player, then lists tracked 
   assert.equal(tournaments.data.title, 'Tracked tournaments · 2');
   const [first, second] = tournaments.data.description.split('\n');
   assert.equal(first, `[Local](https://www.start.gg/tournament/local) · <t:${now + 3600}:d>`);
-  assert.equal(second, `[Weekly](https://www.start.gg/tournament/weekly) · <t:${now + 86400}:d> · top 8s off · from a tournament admin`);
+  assert.equal(second, `[Weekly](https://www.start.gg/tournament/weekly) · <t:${now + 86400}:d> · top 8s off`);
 });
 
 test('autocomplete puts recent picks first and matches names loosely', async () => {

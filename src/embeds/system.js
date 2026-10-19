@@ -14,8 +14,8 @@ export function trackedList(players, linked = 0, tournaments = {}) {
     const notes = [player.setResults !== false && 'set results on', player.streamAlerts !== false && 'stream alerts on'].filter(Boolean);
     return notes.length ? `${playerLink(player)} · ${notes.join(' · ')}` : playerLink(player);
   });
-  if (!all.length) lines.push('Nobody yet. Add someone with `/track add`.');
-  lines.push('', '-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Players with no reported sets in 6 months come off the list on their own, and `/track cleanup` untracks anyone whose start.gg Discord isn\'t in this server. Anyone can `/link` their own start.gg instead, to use the lookups without being posted');
+  if (!all.length) lines.push('Nobody yet. `/track add` tracks you.');
+  lines.push('', '-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Anyone can track or untrack themselves, and TOs can do it for anyone. Players with no reported sets in 6 months come off the list on their own, and `/track cleanup` untracks anyone whose start.gg Discord isn\'t in this server. `/link` your own start.gg instead to use the lookups without being posted');
   if (linked) lines.push(`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
 
   // only what's off, since everything starts on
@@ -23,20 +23,24 @@ export function trackedList(players, linked = 0, tournaments = {}) {
     .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
   const tournamentLines = tracked.map((tournament) => {
     const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => tournament.tracked[name] === false).map(([, note]) => note);
-    if (tournament.tracked.by === 'admin') notes.push('from a tournament admin');
     const when = tournament.startAt ? ` · <t:${tournament.startAt}:d>` : '';
     return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
   });
-  if (!tracked.length) tournamentLines.push('None yet. `/tournament add` tracks one, and tournament admins\' upcoming ones get tracked on their own.');
-  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders. `/tournament posts` changes that, and needs Manage Server');
+  if (!tracked.length) tournamentLines.push('None yet. A TO can track one with `/tournament add`.');
+  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders. TOs change that with `/tournament posts`');
   return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(`Tracked tournaments · ${tracked.length}`), tournamentLines)];
 }
 
-export function regAdmins(admins) {
-  const all = Object.values(admins).sort((a, b) => a.tag.localeCompare(b.tag));
-  const embed = baseEmbed(colors.brand).setTitle(`Tournament admins · ${all.length}`);
-  if (!all.length) return embed.setDescription('Nobody yet. Add a TO with `/tournament admin add`.');
-  return embed.setDescription(`Their upcoming start.gg tournaments get tracked on their own.\n\n${all.map(playerLink).join('\n')}`);
+// /to list. tos are discord ids, shown as mentions, which never ping from a card. role is the role's name in
+// the server, null when it hasn't been made yet
+export function toList(tos, role) {
+  const embed = baseEmbed(colors.brand).setTitle(`TOs · ${tos.length}`);
+  const lines = role
+    ? (tos.length ? tos.map((id) => `<@${id}>`) : ['Nobody the bot has seen yet.'])
+    : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/to add` makes the role.'];
+  lines.push('', '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and run `/tournament` and `/track cleanup`. TOs add and remove each other with `/to add` and `/to remove`');
+  if (role) lines.push(`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
+  return embed.setDescription(lines.join('\n'));
 }
 
 const SITES = {
@@ -127,16 +131,23 @@ export function help() {
     ],
     [
       '**Tracking players**',
-      '`/track add` track someone by start.gg link or ID. Their placements post here',
-      '`/track remove` stop tracking someone. Asks first, then Undo puts them back with their settings for a minute',
+      '`/track add` track yourself, found by the Discord on your start.gg. TOs can add anyone by start.gg link or ID. Their placements post here',
+      '`/track remove` stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back with their settings for a minute',
       '`/track list` everyone tracked, and the tracked tournaments',
-      '`/track posts` someone\'s set results and stream alerts on or off. Off for everyone asks first unless already off',
-      '`/track cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. Needs Manage Server',
+      '`/track posts` your set results and stream alerts on or off. TOs can change anyone\'s, or everyone\'s with `player:all`, which asks first. Anyone can look',
+      '`/track cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. TOs only',
       '`/upcoming` tracked tournaments, and any other with 3 or more of the crew. `player:` checks one person, live from start.gg when linked but not tracked',
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
-      '-# New players start with set results and stream alerts off. `player:all` works with posts, upcoming and recent',
+      '-# New players start with set results and stream alerts off. `player:all` works with posts, upcoming and recent. Leaving `player` out means you',
       '-# Players with no reported sets in 6 months come off the track list on their own',
+    ],
+    [
+      '**TOs**',
+      '`/to add` give someone the TO role. TOs only',
+      '`/to remove` take the TO role off someone. TOs only',
+      '`/to list` who the TOs are',
+      '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and run `/tournament` and `/track cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
     ],
     [
       '**Your pings**',
@@ -175,8 +186,8 @@ export function help() {
     ],
     [
       '**Slippi ranked**',
-      '`/slippi add` add a connect code to the watchlist. Leave it out to find yours on your start.gg',
-      '`/slippi remove` take someone off the watchlist',
+      '`/slippi add` add your connect code to the watchlist, or leave it out to find yours on your start.gg. TOs can add anyone\'s',
+      '`/slippi remove` take yourself off the watchlist, or anyone if you\'re a TO',
       '`/slippi rank` rank, rating, record, characters and past seasons. Takes any connect code',
       '`/slippi leaderboard` everyone on the watchlist, best rank first',
       '-# Cards show the rank badge and their most played character. Tracked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it',
@@ -186,13 +197,12 @@ export function help() {
       '`/tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `add_event:on` also makes a Discord event',
       '`/tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute',
       '`/tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off',
-      '`/tournament admin` TOs whose upcoming start.gg tournaments get tracked on their own',
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
       '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours',
       '`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end',
       '`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min',
-      '`/discord_event` make a Discord event from a start.gg link, without tracking it. For tournament admins and Manage Server',
-      '-# `/tournament` needs Manage Server, which can hand it to other roles under Server Settings > Integrations. `tournament:` takes a link or one the bot knows. `/messages events` makes the Discord events for tournament admins on its own',
+      '`/tournament event` make a Discord event from a start.gg link, without tracking it',
+      '-# `/tournament` is TOs only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time and place, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map',
     ],
     [
       '**Fun**',
@@ -215,7 +225,7 @@ export function help() {
       '**Tournament placements.** Where the crew placed, 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
       '**Registration reminders.** Tracked tournaments a week, 3 days and a day out, then a last call 6 hours before. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start. When registration closes within an hour of the start there\'s one DM, the start one',
-      '**Discord events.** Each upcoming tournament tracked from `/tournament admin` gets a Discord event, once. Off unless `/messages events` turns it on',
+      '**Discord events.** Each upcoming tracked tournament gets a Discord event, once. Off unless `/messages events` turns it on',
       '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg',
       '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',
       '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',

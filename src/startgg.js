@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { ApiError } from './errors.js';
 
 const API_URL = 'https://api.start.gg/gql/alpha';
 
@@ -109,7 +110,7 @@ async function query(text, variables, retries = 2) {
   } catch (err) {
     // a slow request can time out even when start.gg is fine, so those retry within the same budget
     if (retries > 0) return query(text, variables, retries - 1);
-    throw new Error(`start.gg didn't respond (${err.message})`);
+    throw new ApiError('start.gg', `start.gg didn't respond (${err.message})`);
   }
   // still got limited, probably another copy running on the same token. everything waits
   if (res.status === 429 && retries > 0) {
@@ -118,9 +119,11 @@ async function query(text, variables, retries = 2) {
     nextSlot = Date.now() + 15_000;
     return query(text, variables, retries - 1);
   }
+  // start.gg's servers hiccup now and then, so a 502 gets the same retries as a timeout
+  if (res.status >= 500 && retries > 0) return query(text, variables, retries - 1);
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`start.gg: ${body.message ?? `HTTP ${res.status}`}`);
-  if (body.errors) throw new Error(`start.gg: ${body.errors[0].message}`);
+  if (!res.ok) throw new ApiError('start.gg', `start.gg: ${body.message ?? `HTTP ${res.status}`}`, res.status);
+  if (body.errors) throw new ApiError('start.gg', `start.gg: ${body.errors[0].message}`, res.status);
   return body.data;
 }
 
@@ -195,6 +198,9 @@ async function lookupGroup(group, toQuery, variables) {
 export async function checkToken() {
   await query('{ currentUser { id } }');
 }
+
+// start.gg refusing the token itself, which never fixes itself. anything else, like a timeout or a 502, can
+export const badToken = (err) => err instanceof ApiError && err.source === 'start.gg' && [401, 403].includes(err.status);
 
 // id is f64a83c8 or user/f64a83c8
 // a set only has the player id, so a button about someone from a set looks them up by it.
@@ -753,7 +759,7 @@ export async function getCharacterArt(name, videogameId) {
   if (!url) return null;
 
   const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) throw new Error(`start.gg image returned ${res.status}`);
+  if (!res.ok) throw new ApiError('start.gg', `start.gg image returned ${res.status}`, res.status);
   const extension = new URL(url).pathname.split('.').pop();
   // one per game, a verbose reply has several
   return { attachment: Buffer.from(await res.arrayBuffer()), name: `character-${videogameId}.${extension}` };
@@ -774,9 +780,9 @@ export function isStartggImage(url) {
 // name is the file's name without its extension
 export async function getImage(url, name, timeout) {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
-  if (!res.ok) throw new Error(`start.gg image returned ${res.status}`);
+  if (!res.ok) throw new ApiError('start.gg', `start.gg image returned ${res.status}`, res.status);
   const extension = PICTURE_TYPES[res.headers.get('content-type')?.split(';')[0].trim()];
-  if (!extension) throw new Error(`start.gg image came back as ${res.headers.get('content-type')}`);
+  if (!extension) throw new ApiError('start.gg', `start.gg image came back as ${res.headers.get('content-type')}`);
   return { attachment: Buffer.from(await res.arrayBuffer()), name: `${name}.${extension}` };
 }
 
@@ -863,6 +869,7 @@ function charactersPlayed(games, entrantId) {
   return [...names];
 }
 
+// venueName and venueAddress are strings, which don't count toward the object limit
 const TOURNAMENT_FIELDS = `
   id
   name
@@ -871,6 +878,8 @@ const TOURNAMENT_FIELDS = `
   endAt
   city
   addrState
+  venueName
+  venueAddress
   isOnline
   images(type: "profile") { url }
 `;
@@ -892,15 +901,6 @@ export async function getUpcomingTournaments(userIds) {
   }`);
 
   return userIds.map((userId) => [userId, data[`u${userId}`]?.tournaments?.nodes ?? []]);
-}
-
-// only ones they're an admin of, not ones they entered
-export async function getAdminTournaments(userIds) {
-  const data = await lookupMany(userIds, (group) => `{
-    ${group.map((id) => `u${cleanId(id)}: user(id: ${cleanId(id)}) { tournaments(query: { perPage: 20, filter: { tournamentView: "admin", upcoming: true, past: false } }) { nodes { id name slug startAt endAt } } }`).join('\n')}
-  }`);
-
-  return Object.values(data).flatMap((user) => user?.tournaments?.nodes ?? []);
 }
 
 // every player in every event at a major goes over the object limit
@@ -983,31 +983,46 @@ export async function getTopEight(eventIds) {
   }));
 }
 
+const REGISTRATION_FIELDS = `
+  id
+  name
+  slug
+  startAt
+  endAt
+  registrationClosesAt
+  isRegistrationOpen
+  numAttendees
+  city
+  addrState
+  venueName
+  venueAddress
+  isOnline
+  images { type url }
+  events { name slug }
+`;
+
 // slug is genesis-x, tournament/genesis-x or a short link name
 export async function getRegistration(slug) {
   const missed = missedCache.get(`registration:${slug}`);
   if (missed && Date.now() - missed < MISS_CACHE_MS) return null;
   const data = await query(`
     query ($slug: String) {
-      tournament(slug: $slug) {
-        id
-        name
-        slug
-        startAt
-        endAt
-        registrationClosesAt
-        isRegistrationOpen
-        numAttendees
-        city
-        addrState
-        isOnline
-        images { type url }
-        events { name slug }
-      }
+      tournament(slug: $slug) { ${REGISTRATION_FIELDS} }
     }
   `, { slug });
 
   if (!data.tournament) miss(`registration:${slug}`);
+  return data.tournament;
+}
+
+// the same by id, for a tournament already saved. a TO can change the link, never the id, so null here
+// means it was deleted or unpublished
+export async function getRegistrationById(id) {
+  const data = await query(`
+    query ($id: ID!) {
+      tournament(id: $id) { ${REGISTRATION_FIELDS} }
+    }
+  `, { id });
   return data.tournament;
 }
 

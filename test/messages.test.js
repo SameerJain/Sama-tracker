@@ -148,7 +148,7 @@ test('turning Discord events on checks for Manage Events first', async () => {
   assert.equal(state.messages.events, undefined);
 
   const turnedOn = await configure({ events: true }, true, guild(true));
-  assert.match(turnedOn.content, /Discord events for admin tournaments:\*\* on/);
+  assert.match(turnedOn.content, /Discord events for tracked tournaments:\*\* on/);
   assert.equal(state.messages.events, true);
   // already on, so turning something else on doesn't check again
   const other = await configure({ sets: true }, true, guild(false));

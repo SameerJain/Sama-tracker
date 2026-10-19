@@ -1,6 +1,8 @@
 import { EmbedBuilder, escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
-import { colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, shortRecord, count } from './shared.js';
+import {
+  colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, shortRecord, count, venueText, mapUrl,
+} from './shared.js';
 
 const MAJOR_UPSET = 7; // seed 13 beating seed 1, or seed 17 beating seed 2
 
@@ -20,9 +22,15 @@ function timeText(seconds) {
   return `<t:${seconds}:F> (<t:${seconds}:R>)`;
 }
 
+// the venue and its street address when the TO put them on start.gg, linked to a map, otherwise the city.
+// brackets come out of the link text so a venue name can't break the link
 function locationText(tournament) {
   if (tournament.isOnline) return 'Online';
   const place = [tournament.city, tournament.addrState].filter(Boolean).join(', ');
+  const venue = venueText(tournament);
+  const address = tournament.venueAddress?.trim();
+  if (address) return `[${escapeMarkdown(venue.replace(/[[\]]/g, ''))}](${mapUrl(address)})`;
+  if (venue) return [escapeMarkdown(venue), place].filter(Boolean).join(', ');
   return place || 'Location TBA';
 }
 

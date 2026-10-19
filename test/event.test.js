@@ -12,6 +12,8 @@ delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleCommand } = await import('../src/commands/index.js');
 const tracker = await import('../src/tracker.js');
+const { ensureDiscordEvent, syncDiscordEvents } = await import('../src/discord-events.js');
+const embeds = await import('../src/embeds/index.js');
 const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
@@ -29,9 +31,17 @@ const notimed = { ...soon, id: 7, name: 'Timeless', slug: 'tournament/timeless',
 let lastFetch = 0;
 // what got asked, by the kind of lookup
 const asked = [];
+// what start.gg has for a tournament looked up by id, for the sync. one left out is soon under that id, and null
+// means it was deleted
+let byId = {};
 globalThis.fetch = async (_url, options) => {
   lastFetch = Date.now();
   const { query, variables } = JSON.parse(options.body);
+  if (query.includes('registrationClosesAt') && variables.id !== undefined) {
+    asked.push(`registration ${variables.id}`);
+    const tournament = Object.hasOwn(byId, variables.id) ? byId[variables.id] : { ...soon, id: Number(variables.id) };
+    return { ok: true, json: async () => ({ data: { tournament } }) };
+  }
   if (query.includes('registrationClosesAt')) {
     asked.push('registration');
     const tournament = variables.slug === 'live' ? live : variables.slug === 'notimed' ? notimed : soon;
@@ -62,35 +72,48 @@ globalThis.fetch = async (_url, options) => {
   throw new Error(`no fake for ${query.slice(0, 80)}`);
 };
 
-// a server whose scheduled events live in store. allowed is whether the bot has Manage Events
-function fakeGuild({ events = null, guildId = 'guild-1', allowed = true } = {}) {
+// a server whose scheduled events live in store. allowed is whether the bot has Manage Events. roles is the
+// server's roles, edited what the sync changed
+function fakeGuild({ events = null, guildId = 'guild-1', allowed = true, roles = new Map() } = {}) {
   const created = [];
+  const edited = [];
   const store = events ?? new Map();
   const guild = {
     id: guildId,
+    roles: { cache: Object.assign(roles, { find: (fn) => [...roles.values()].find(fn) }) },
     members: { me: { permissions: { has: () => allowed } } },
     scheduledEvents: {
       fetch: async () => store,
       create: async (options) => {
-        const event = { id: `event-${created.length + 1}`, url: `https://discord.com/events/${guildId}/event-${created.length + 1}`, ...options };
+        const event = { id: `event-${created.length + 1}`, url: `https://discord.com/events/${guildId}/event-${created.length + 1}`, status: 1, ...options };
         created.push(event);
         store.set(event.id, event);
         return event;
       },
+      edit: async (event, options) => {
+        edited.push([event.id, options]);
+        Object.assign(event, options);
+        return event;
+      },
     },
   };
-  return { guild, created };
+  return { guild, created, edited };
 }
 
-// manager is Manage Server. /discord_event by default, or a /tournament subcommand
-function interaction(values, { user = 'crew-discord', manager = true, events = null, command = 'discord_event', subcommand = null } = {}) {
+// the TO role, for a server that has one
+const TO_ROLE = { id: 'to-role', name: 'TO' };
+
+// manager is Manage Server, and to whether they have the TO role, which only counts once the server has one.
+// /tournament event by default, or another /tournament subcommand
+function interaction(values, { user = 'crew-discord', manager = true, to = null, events = null, command = 'tournament', subcommand = 'event' } = {}) {
   const calls = [];
-  const { guild, created } = fakeGuild({ events });
+  const { guild, created } = fakeGuild({ events, roles: new Map(to === null ? [] : [[TO_ROLE.id, TO_ROLE]]) });
   const run = {
     calls, created,
     commandName: command,
     user: { id: user, bot: false, displayName: 'Crew' },
     guild,
+    member: { roles: { cache: new Set(to ? [TO_ROLE.id] : []) } },
     memberPermissions: { has: () => manager },
     options: { getSubcommandGroup: () => null, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null },
     reply: async (result) => calls.push(['reply', result]),
@@ -113,13 +136,15 @@ async function reset() {
   await settle();
   state.players = {};
   state.links = {};
-  state.regAdmins = {};
   state.tournaments = {};
+  state.discordEvents = {};
+  state.toRole = { id: null, members: [], seeded: false };
   state.messages = {};
+  byId = {};
   asked.length = 0;
 }
 
-test('a manager makes a discord event from a start.gg link', async () => {
+test('with no TO role yet, a manager makes a discord event from a start.gg link', async () => {
   await reset();
   const run = interaction({ tournament: 'start.gg/tournament/soon' });
   await handleCommand(run);
@@ -142,18 +167,22 @@ test('a manager makes a discord event from a start.gg link', async () => {
   assert.deepEqual(reply.allowedMentions, { parse: [] });
 });
 
-test('a tournament admin without manage server can make one too', async () => {
+test('once the server has a TO role, a TO without Manage Server makes one, and Manage Server alone is not enough', async () => {
   await reset();
-  state.regAdmins = { 9: { userId: '9', slug: 'user/to', tag: 'To' } };
-  const run = interaction({ tournament: 'start.gg/tournament/soon' }, { user: 'to-discord', manager: false });
+  const run = interaction({ tournament: 'start.gg/tournament/soon' }, { user: 'to-discord', manager: false, to: true });
   await handleCommand(run);
   assert.equal(run.created.length, 1);
   assert.match(edited(run).content, /Made a Discord event for Soon/);
-  // one lookup for the admins' discord, nothing else about the caller
-  assert.deepEqual(asked.filter((kind) => kind === 'profiles'), ['profiles']);
+  // whoever used it with the role is remembered for /to list
+  assert.deepEqual(state.toRole.members, ['to-discord']);
+
+  const manager = interaction({ tournament: 'start.gg/tournament/soon' }, { user: 'manager-discord', manager: true, to: false });
+  await handleCommand(manager);
+  assert.equal(manager.created.length, 0);
+  assert.match(manager.calls[0][1].content, /^Only TOs can make Discord events/);
 });
 
-test('anyone else is told privately, with no lookup when there are no admins', async () => {
+test('anyone else is told privately, with no lookup', async () => {
   await reset();
   const lone = interaction({ tournament: 'start.gg/tournament/soon' }, { user: 'stranger-discord', manager: false });
   await handleCommand(lone);
@@ -161,18 +190,8 @@ test('anyone else is told privately, with no lookup when there are no admins', a
   assert.deepEqual(asked, []);
   const [[kind, reply]] = lone.calls;
   assert.equal(kind, 'reply');
-  assert.match(reply.content, /Only tournament admins/);
+  assert.match(reply.content, /^Only TOs can make Discord events\. `\/to list` shows who they are\.$/);
   assert.equal(reply.flags, MessageFlags.Ephemeral);
-
-  // with admins to check, the thinking reply goes and the answer is still private
-  state.regAdmins = { 9: { userId: '9', slug: 'user/to', tag: 'To' } };
-  const checked = interaction({ tournament: 'start.gg/tournament/soon' }, { user: 'stranger-discord', manager: false });
-  await handleCommand(checked);
-  assert.equal(checked.created.length, 0);
-  assert.ok(!asked.includes('registration'));
-  assert.deepEqual(checked.calls.map(([each]) => each), ['defer', 'delete', 'followUp']);
-  assert.match(checked.calls[2][1].content, /Only tournament admins/);
-  assert.equal(checked.calls[2][1].flags, MessageFlags.Ephemeral);
 });
 
 test('a tournament that already has an event links it instead of making another', async () => {
@@ -182,8 +201,9 @@ test('a tournament that already has an event links it instead of making another'
   await handleCommand(run);
   assert.equal(run.created.length, 0);
   assert.match(edited(run).content, /already has a Discord event/);
-  // nothing tracked to save the id on, the link in its description finds it next time
+  // not tracked, but saved by tournament id so the sync follows it, and found by link it gets start.gg's details then
   assert.deepEqual(state.tournaments, {});
+  assert.deepEqual(state.discordEvents[6], { eventId: 'event-9', slug: 'tournament/soon', startAt: soon.startAt, synced: null });
 });
 
 test('an event for a tournament whose link starts the same is not the same event', async () => {
@@ -245,7 +265,7 @@ test('an event for an already tracked tournament keeps its switches and saves th
   const tournament = state.tournaments[6];
   assert.equal(tournament.tracked.reminders, false);
   assert.equal(tournament.lastCheck, lastCheck);
-  assert.equal(tournament.discordEventId, 'event-1');
+  assert.equal(state.discordEvents[6].eventId, 'event-1');
   assert.match(edited(run).content, /^Made a Discord event for Soon/);
 });
 
@@ -262,13 +282,13 @@ test('adding with add_event makes the event, without it does not', async () => {
   await handleCommand(flagged);
   assert.equal(flagged.created.length, 1);
   assert.ok(state.tournaments[6].tracked);
-  assert.equal(state.tournaments[6].discordEventId, 'event-1');
+  assert.equal(state.discordEvents[6].eventId, 'event-1');
   const reply = edited(flagged);
   assert.match(reply.content, /Tracking Soon/);
   assert.match(reply.content, /Made a Discord event for Soon/);
 });
 
-test('discord_event then add_event lands on the same event, and only the add tracks', async () => {
+test('/tournament event then add_event lands on the same event, and only the add tracks', async () => {
   await reset();
   const store = new Map();
   const first = interaction({ tournament: 'start.gg/tournament/soon' }, { events: store });
@@ -282,59 +302,176 @@ test('discord_event then add_event lands on the same event, and only the add tra
   assert.match(reply.content, /Tracking Soon/);
   assert.match(reply.content, /already has a Discord event/);
   assert.deepEqual(Object.keys(state.tournaments), ['6']);
-  assert.equal(state.tournaments[6].discordEventId, first.created[0].id);
+  assert.equal(state.discordEvents[6].eventId, first.created[0].id);
 });
 
-// /messages events, for tournaments the reg admin list tracks
-function adminTournaments() {
+// /messages events, for tracked tournaments. 6 was tracked for a tournament admin before the TO role
+function trackedTournaments() {
   const tracked = (by) => ({ by, at: now, sets: true, stream: true, top8: true, reminders: true });
+  state.discordEvents = { 11: { eventId: 'event-old', slug: 'tournament/has-one', startAt: soon.startAt, synced: null } };
   return {
     6: { ...soon, entries: [], userIds: [], tracked: tracked('admin'), reminder: {} },
     10: { ...soon, id: 10, slug: 'tournament/manual', entries: [], userIds: [], tracked: tracked('manual'), reminder: {} },
-    11: { ...soon, id: 11, slug: 'tournament/has-one', entries: [], userIds: [], tracked: tracked('admin'), reminder: {}, discordEventId: 'event-old' },
-    12: { ...live, id: 12, slug: 'tournament/started', entries: [], userIds: [], tracked: tracked('admin'), reminder: {} },
+    11: { ...soon, id: 11, slug: 'tournament/has-one', entries: [], userIds: [], tracked: tracked('manual'), reminder: {} },
+    12: { ...live, id: 12, slug: 'tournament/started', entries: [], userIds: [], tracked: tracked('manual'), reminder: {} },
     13: { ...soon, id: 13, slug: 'tournament/untracked', entries: [], userIds: [] },
   };
 }
 
-test('with /messages events off, admin tournaments get no events and nothing is asked', async () => {
+test('with /messages events off, tracked tournaments get no events and nothing is asked', async () => {
   await reset();
-  state.tournaments = adminTournaments();
+  state.tournaments = trackedTournaments();
   const { guild, created } = fakeGuild();
-  await tracker.makeAdminEvents(guild);
+  await tracker.makeTournamentEvents(guild);
   assert.equal(created.length, 0);
   assert.deepEqual(asked, []);
 });
 
-test('with /messages events on, each upcoming admin tournament gets one event, once', async () => {
+test('with /messages events on, each upcoming tracked tournament gets one event, once', async () => {
   await reset();
   state.messages = { events: true };
-  state.tournaments = adminTournaments();
+  state.tournaments = trackedTournaments();
+  byId = { 10: { ...soon, id: 10, slug: 'tournament/manual' } };
   const { guild, created } = fakeGuild();
-  await tracker.makeAdminEvents(guild);
-  assert.deepEqual(created.map((event) => event.name), ['Soon']);
-  assert.equal(state.tournaments[6].discordEventId, 'event-1');
-  // tracked by hand, already has one, already started or not tracked: none of those
-  assert.equal(state.tournaments[10].discordEventId, undefined);
-  assert.equal(state.tournaments[11].discordEventId, 'event-old');
-  assert.equal(state.tournaments[12].discordEventId, undefined);
-  assert.equal(state.tournaments[13].discordEventId, undefined);
+  await tracker.makeTournamentEvents(guild);
+  assert.equal(created.length, 2);
+  assert.equal(state.discordEvents[6].eventId, 'event-1');
+  assert.equal(state.discordEvents[10].eventId, 'event-2');
+  // already has one, already started or not tracked: none of those
+  assert.equal(state.discordEvents[11].eventId, 'event-old');
+  assert.equal(state.discordEvents[12], undefined);
+  assert.equal(state.discordEvents[13], undefined);
 
-  // a mod deleting it doesn't bring it back, the saved id says it was made
-  await tracker.makeAdminEvents(fakeGuild().guild);
-  assert.equal(created.length, 1);
-  assert.deepEqual(asked, ['registration']);
+  // a mod deleting them doesn't bring them back, the saved ids say they were made
+  await tracker.makeTournamentEvents(fakeGuild().guild);
+  assert.equal(created.length, 2);
+  assert.deepEqual(asked, ['registration 6', 'registration 10']);
 });
 
 test('without Manage Events, automatic events ask start.gg nothing', async () => {
   await reset();
   state.messages = { events: true };
-  state.tournaments = adminTournaments();
+  state.tournaments = trackedTournaments();
   const { guild, created } = fakeGuild({ allowed: false });
-  await tracker.makeAdminEvents(guild);
+  await tracker.makeTournamentEvents(guild);
   assert.equal(created.length, 0);
   assert.deepEqual(asked, []);
   state.messages = {};
+});
+
+test('an event shows the venue and its address when start.gg has them, and the city otherwise', async () => {
+  await reset();
+  const addressed = { ...soon, venueName: 'Gamers Lounge', venueAddress: '123 Main St, Buffalo, NY 14201, USA' };
+  const { guild, created } = fakeGuild();
+  await ensureDiscordEvent(addressed, guild);
+  assert.equal(created[0].entityMetadata.location, 'Gamers Lounge, 123 Main St, Buffalo, NY 14201, USA');
+  assert.ok(created[0].description.split('\n').includes('Gamers Lounge, 123 Main St, Buffalo, NY 14201, USA'));
+
+  // the name left off when the address starts with it, and the address alone when both don't fit in discord's 100
+  state.discordEvents = {};
+  const long = { ...soon, id: 8, slug: 'tournament/long', venueName: 'V'.repeat(70), venueAddress: '123 Main St, Buffalo, NY 14201, USA' };
+  await ensureDiscordEvent(long, guild);
+  assert.equal(created[1].entityMetadata.location, '123 Main St, Buffalo, NY 14201, USA');
+  const named = { ...soon, id: 9, slug: 'tournament/named', venueName: 'Main St Arcade', venueAddress: 'Main St Arcade, 5 Elm St, Buffalo, NY' };
+  await ensureDiscordEvent(named, guild);
+  assert.equal(created[2].entityMetadata.location, 'Main St Arcade, 5 Elm St, Buffalo, NY');
+});
+
+test('reminders, DMs and roll calls show the venue and address as a map link, or the city without them', async () => {
+  const addressed = { ...soon, venueName: 'Gamers [Lounge]', venueAddress: '123 Main St (rear), Buffalo, NY' };
+  const location = (card) => card.data.description.split('\n').find((line) => line.startsWith('**Location:**'));
+  // brackets come out of the text, and parens in the link get encoded, so neither can break it
+  const link = '[Gamers Lounge, 123 Main St (rear), Buffalo, NY](https://www.google.com/maps/search/?api=1&query=123%20Main%20St%20%28rear%29%2C%20Buffalo%2C%20NY)';
+  assert.equal(location(embeds.startReminder(addressed)), `**Location:** ${link}`);
+  assert.equal(location(embeds.regReminder(addressed, soon.registrationClosesAt, false)), `**Location:** ${link}`);
+  assert.equal(embeds.rollCall({ ...addressed, entries: [] }, {})[0].data.description.split('\n')[1], link);
+
+  // a venue name with no address goes with the city, and neither leaves the city
+  assert.equal(location(embeds.startReminder({ ...soon, venueName: 'Gamers Lounge' })), '**Location:** Gamers Lounge, Buffalo, NY');
+  assert.equal(location(embeds.startReminder(soon)), '**Location:** Buffalo, NY');
+  assert.equal(location(embeds.startReminder({ ...addressed, isOnline: true })), '**Location:** Online');
+});
+
+// a made event the sync keeps up with, from a tournament start.gg has as soon
+async function madeEvent() {
+  const { guild, created, edited } = fakeGuild();
+  await ensureDiscordEvent(soon, guild);
+  return { guild, event: created[0], edited };
+}
+
+test('the sync moves a discord event when the TO moves the tournament on start.gg, and leaves it alone otherwise', async () => {
+  await reset();
+  const { guild, event, edited } = await madeEvent();
+  // nothing changed on start.gg, so nothing gets edited, even with a mod's own description on it
+  event.description = 'a mod wrote this';
+  await syncDiscordEvents(guild);
+  assert.deepEqual(edited, []);
+  assert.deepEqual(asked, ['registration 6']);
+
+  const moved = { ...soon, startAt: soon.startAt + 7200, endAt: soon.endAt + 7200, venueName: 'Gamers Lounge', venueAddress: '123 Main St, Buffalo, NY' };
+  byId = { 6: moved };
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
+  const [[id, changes]] = edited;
+  assert.equal(id, 'event-1');
+  assert.deepEqual(changes.scheduledStartTime, new Date(moved.startAt * 1000));
+  assert.deepEqual(changes.scheduledEndTime, new Date(moved.endAt * 1000));
+  assert.equal(changes.entityMetadata.location, 'Gamers Lounge, 123 Main St, Buffalo, NY');
+  assert.equal(state.discordEvents[6].startAt, moved.startAt);
+
+  // once synced, the same start.gg details don't edit it again
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
+});
+
+test('the sync cancels the event of a tournament deleted on start.gg, and stops there', async () => {
+  await reset();
+  const { guild, event, edited } = await madeEvent();
+  byId = { 6: null };
+  await syncDiscordEvents(guild);
+  assert.deepEqual(edited, [['event-1', { status: 4 }]]);
+  assert.equal(event.status, 4);
+  assert.equal(state.discordEvents[6].gone, true);
+  asked.length = 0;
+  await syncDiscordEvents(guild);
+  assert.deepEqual(asked, []);
+});
+
+test('the sync leaves alone an event a mod deleted or that started, without asking start.gg, and forgets old ones', async () => {
+  await reset();
+  const { guild, event, edited } = await madeEvent();
+  // started in discord, which won't move an event that's going
+  event.status = 2;
+  await syncDiscordEvents(guild);
+  assert.equal(state.discordEvents[6].gone, true);
+  assert.deepEqual(asked, []);
+
+  const deleted = await madeEvent();
+  state.discordEvents[6].gone = false;
+  deleted.guild.scheduledEvents.fetch = async () => new Map();
+  await syncDiscordEvents(deleted.guild);
+  assert.equal(state.discordEvents[6].gone, true);
+  assert.deepEqual(asked, []);
+  assert.deepEqual([...edited, ...deleted.edited], []);
+
+  // a week after the start it's forgotten
+  await syncDiscordEvents(guild, soon.startAt + 8 * 86400);
+  assert.deepEqual(state.discordEvents, {});
+});
+
+test('an event saved before the sync gets start.gg\'s details once', async () => {
+  await reset();
+  const { guild, created, edited } = fakeGuild();
+  const event = await guild.scheduledEvents.create({ name: 'Old name', description: 'old', entityMetadata: { location: 'Buffalo, NY' } });
+  state.tournaments = { 6: { ...soon, entries: [], userIds: [], discordEventId: event.id } };
+  tracker.migrateTracking();
+  assert.equal(state.tournaments[6].discordEventId, undefined);
+  assert.deepEqual(state.discordEvents[6], { eventId: event.id, slug: 'tournament/soon', startAt: soon.startAt, synced: null });
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
+  assert.equal(created[0].name, 'Soon');
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
 });
 
 // let the last ones finish while the fake is still in place

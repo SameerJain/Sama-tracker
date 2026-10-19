@@ -4,8 +4,9 @@ import { missingThreadPermissions, secondsNow } from '../tracker.js';
 import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS, messageEnabled, messageSettings } from '../message-settings.js';
 import { cantMakeEvents } from '../discord-events.js';
 import { count } from '../embeds/shared.js';
-import { linkedPlayer, readChoice, replyEphemeral, replyNoPlayer } from './shared.js';
+import { isSelf, linkedPlayer, readTracked, replyEphemeral, replyNotTracked } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
+import { isTO, notTO } from './to.js';
 
 // remove autocompletes with the link as the value, which discord caps at 100
 const SOCIAL_URL_LENGTH = 100;
@@ -81,7 +82,7 @@ function configureMessages(interaction) {
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
-    '-# `events` makes a Discord event for each upcoming tournament tracked from `/tournament admin`, once each. Needs Manage Events',
+    '-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events',
     '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. One per tournament pins its channel card until the tournament ends.');
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
@@ -184,14 +185,11 @@ function postsText(choice) {
   return `Set results are on for ${on('setResults')} and stream alerts for ${on('streamAlerts')} of the ${count(players.length, 'tracked player')}.`;
 }
 
-// /track posts: a tracked player's set results and stream alerts, or everyone's with all. anyone can change them
+// /track posts: a tracked player's set results and stream alerts, or everyone's with all. anyone can see them and
+// change their own, only TOs can change someone else's or everyone's
 function trackPosts(interaction) {
-  const choice = readChoice(interaction, 'player', { trackedOnly: true });
-  if (!choice) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
-  // someone from /link, their sets and streams never get posted
-  if (choice !== 'all' && !state.players[choice.userId]) {
-    return replyEphemeral(interaction, `${escapeMarkdown(choice.tag)} isn't tracked, so nothing about them gets posted. \`/track add\` them first.`);
-  }
+  const choice = interaction.options.getString('player')?.toLowerCase() === 'all' ? 'all' : readTracked(interaction);
+  if (!choice) return replyNotTracked(interaction);
 
   const changes = {};
   for (const name of Object.keys(POST_SWITCHES)) {
@@ -199,6 +197,8 @@ function trackPosts(interaction) {
     if (value) changes[name] = value === 'on';
   }
   if (!Object.keys(changes).length) return interaction.reply({ content: postsText(choice), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+  if (choice === 'all' && !isTO(interaction)) return notTO(interaction, 'change everyone\'s posts');
+  if (choice !== 'all' && !isSelf(interaction, choice) && !isTO(interaction)) return notTO(interaction, 'change someone else\'s posts. Leave out `player` to change yours');
 
   // nothing to lose when it's already off for everyone
   const players = Object.values(state.players);

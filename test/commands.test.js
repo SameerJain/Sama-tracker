@@ -170,7 +170,10 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
       getBoolean: (name) => values[name] ?? null,
       getInteger: (name) => values[name] ?? null,
       getUser: () => values.user ?? null,
-      getMember: () => (values.user ? { displayName: values.user.displayName, displayAvatarURL: () => 'https://cdn.example/member.png' } : null),
+      getMember: () => (values.user ? {
+        displayName: values.user.displayName, displayAvatarURL: () => 'https://cdn.example/member.png',
+        roles: { cache: { has: () => false }, add: discord('discord role add'), remove: discord('discord role remove') },
+      } : null),
     },
     reply: async (result) => { calls.push(['reply', result]); run.replied = true; },
     deferReply: async () => { calls.push(['defer']); run.deferred = true; },
@@ -185,8 +188,8 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
   ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/],
-  ['messages', { values: { events: true } }, /Discord events for admin tournaments:\*\* on/],
-  ['messages', { values: { events: false } }, /Discord events for admin tournaments:\*\* off/], ['socials', {}, /Nothing yet/],
+  ['messages', { values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
+  ['messages', { values: { events: false } }, /Discord events for tracked tournaments:\*\* off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
   ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results and stream alerts start off/],
@@ -245,12 +248,12 @@ const runs = [
   ['doubles', { values: { melee: true } }, /^(?!.*Slippi ranked).*No Melee doubles sets on start\.gg yet\./],
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
   ['characters', { values: { game: 1 } }, /Slippi ranked.*Fox\*\* · 30 games.*CREW#1/],
-  ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /How it adds up/],
+  ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /^(?!.*Slippi ranked).*How it adds up/],
   ['predict', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles on start\.gg\..*Leave out `melee` for Ultimate odds.*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
   ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
   ['predict', { values: { opponent: '2', verbose: true, since: '2026-01-01', venue: 'offline' } }, /How it adds up.*Offline only/],
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
-  ['predict_explained', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival.*How it adds up.*How sure it is/],
+  ['predict_explained', { values: { opponent: '2' } }, /^(?!.*Slippi ranked).*Crew \d+% · \d+% Rival.*How it adds up.*How sure it is/],
   ['predict_explained', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles/],
   ['predict_explained', { values: { opponent: '2', since: '2026-01-01', venue: 'offline' } }, /give or take.*Offline only/],
   ['predict_explained', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
@@ -279,16 +282,17 @@ const runs = [
   ['slippi', { subcommand: 'leaderboard' }, /"thumbnail":\{"url":"attachment:\/\/slippi\.png"\}.*Nobody on the watchlist yet.*"files":\[\{"attachment":"[^"]+slippi\.png","name":"slippi\.png"\}\]/],
   ['slippi', { subcommand: 'add', values: { code: 'crew-1' } }, /Added Crew to the Slippi watchlist/],
   ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 6 hours before registration ends/],
-  ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on.*Tracked by hand/],
+  ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on/],
   ['tournament', { subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
-  ['discord_event', { values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
+  ['tournament', { subcommand: 'event', values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
   ['tournament', { subcommand: 'add', values: { tournament: 'start.gg/tournament/soon', add_event: 'on' } }, /Already tracking Soon.*Made a Discord event for Soon/],
   ['track', { subcommand: 'list' }, /Tracked tournaments · 1.*Soon.*top 8s off/],
   ['bracket', {}, /No tracked tournaments going on right now/],
   ['tournament', { subcommand: 'remove', values: { tournament: 'soon' }, press: 'Stop tracking' }, /Stop tracking Soon\?.*"update",\{"content":"Stopped tracking Soon\."/],
-  ['tournament', { group: 'admin', subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Upcoming tournaments Opponent is an admin of/],
-  ['tournament', { group: 'admin', subcommand: 'list' }, /Tournament admins · 1/],
-  ['tournament', { group: 'admin', subcommand: 'remove', values: { admin: '3' } }, /won't get tracked on their own/],
+  // no TO role yet, so Manage Server counts as one, and /to add makes the role
+  ['to', { subcommand: 'list' }, /There's no TO role yet/],
+  ['to', { subcommand: 'add', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone is a TO now/],
+  ['to', { subcommand: 'remove', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone isn't a TO/],
   ['stream_link', {}, /twitch\.tv\/localstream/],
   ['registered', { values: { tournament: 'start.gg/tournament/soon' } }, /Registered from this server · 1/],
   ['reg_warn', { values: { tournament: 'start.gg/tournament/soon', user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /"content":"<@someone>"/],
@@ -334,7 +338,7 @@ test('every command and subcommand answers without throwing', async () => {
   }
 
   // user commands run from the Apps menu, not chat, so the runs table only covers slash commands.
-  // a subcommand group's subcommands count one by one, like /tournament admin add
+  // a subcommand group's subcommands would count one by one, like /tournament admin add was
   const every = commands.flatMap((command) => {
     const nested = (command.options ?? []).flatMap((option) => {
       if (option.type === 1) return [`${command.name} ${option.name}`];

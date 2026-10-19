@@ -15,10 +15,11 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 ## Get started
 
 1. **Link yourself.** Connect Discord on your start.gg profile, then run `/link`. Commands then know who you are, and nothing gets posted about you. Tracked players with Discord connected can skip this.
-2. **Track your tournaments.** `/tournament add tournament:<link>` posts every set, stream alert and top 8 from a tournament in its own thread, plus registration reminders. `/tournament admin add` does that for every tournament a TO runs. Both need Manage Server. `/discord_event tournament:<link>` makes a Discord event from a link, and tournament admins can use it too.
-3. **Track your crew.** `/track add profile:<link>` posts a player's placements wherever they play. Anyone can add someone. `/track posts` turns on their set results and stream alerts too.
-4. **Pick your pings.** `/notify` pings you when your match is called, for every stream alert, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
-5. **Follow Slippi ranked.** `/slippi add` puts a connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
+2. **Hand out the TO role.** TOs run `/tournament` and can change tracking for anyone. Everyone else only changes their own. `/to add user:@someone` gives someone the role. See [TOs](#tos).
+3. **Track your tournaments.** A TO's `/tournament add tournament:<link>` posts every set, stream alert and top 8 from a tournament in its own thread, plus registration reminders. `/tournament event tournament:<link>` makes a Discord event from a link that keeps up with start.gg.
+4. **Track yourself.** `/track add` posts your placements wherever you play, found by the Discord on your start.gg. `/track posts` turns on your set results and stream alerts too. TOs can do both for anyone.
+5. **Pick your pings.** `/notify` pings you when your match is called, for every stream alert, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
+6. **Follow Slippi ranked.** `/slippi add` puts your connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
 
 `/help` in Discord lists every command in short form.
 
@@ -29,8 +30,8 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 | Option | What it does |
 | --- | --- |
 | `profile` | A start.gg profile link or its final ID, like `start.gg/user/f64a83c8` or `f64a83c8`. `/scout` also takes a tracked or linked player. |
-| `player`, `opponent` | A tracked or linked player. Leave an optional `player` blank to look yourself up. `/track remove` and `/track posts` take tracked players only. |
-| `player:all` | Everyone tracked, on `/upcoming`, `/recent` and `/track posts`. |
+| `player`, `opponent` | A tracked or linked player. Leave an optional `player` blank to look yourself up. `/track remove` and `/track posts` take tracked players only, and only TOs can pick someone else to change. |
+| `player:all` | Everyone tracked, on `/upcoming`, `/recent` and `/track posts`. Changing everyone's posts takes a TO. |
 | `verbose:True` | The longer report in the stats table below. Short reports with anything to show, other than `/progress`, have a **Full report** button that swaps in the verbose one. |
 | `melee:True` | Limits `/stats`, `/h2h`, `/predict`, `/predict_explained`, `/scout`, `/progress` and `/doubles` to Melee. All but `/doubles` add [Slippi ranked](#slippi-ranked) info. Slippi ranked is singles, so `/doubles` leaves it out. `/characters` uses `game:Melee` or `game:Ultimate` instead. |
 | `since:2026-01-01` | Counts only sets since that date, on `/stats`, `/h2h`, `/scout`, `/predict` and `/predict_explained`. |
@@ -44,20 +45,32 @@ Player pickers start with the last 5 people you picked. Once you type, names tha
 
 | Command | What it does |
 | --- | --- |
-| `/track add profile:<link or ID>` | Post a player's placements, wherever they play. Set results and stream alerts start off. |
-| `/track remove player:<name>` | Stop tracking them. Asks first, then an **Undo** button puts them back with all their settings for a minute. |
+| `/track add` | Post your placements, wherever you play. Leave out `profile` to find your start.gg by its Discord, or give your own link. TOs can add anyone with `profile:<link or ID>`. Set results and stream alerts start off. |
+| `/track remove` | Stop tracking yourself, or anyone with `player:` if you're a TO. Asks first, then an **Undo** button puts them back with all their settings for a minute. |
 | `/track list` | Tracked players, who has set results or stream alerts on, and the tracked tournaments. |
-| `/track posts player:<name or all> sets:<on or off> stream:<on or off>` | A tracked player's set results and stream alerts. Leave both out to see them. Sets finished before you turn results on aren't posted. `player:all sets:off` asks first unless it's already off for everyone. |
-| `/track cleanup` | Untrack everyone whose start.gg Discord isn't in this server. Names them and asks first, then **Undo** puts them back for a minute. Players with no Discord on start.gg stay unless you add `no_discord:True`. Needs Manage Server. |
+| `/track posts sets:<on or off> stream:<on or off>` | Your set results and stream alerts. Leave both out to see them. A TO can change anyone's with `player:<name>`, or everyone's with `player:all`, which asks first for `sets:off` unless it's already off for everyone. Anyone can look at anyone's. Sets finished before results go on aren't posted. |
+| `/track cleanup` | Untrack everyone whose start.gg Discord isn't in this server. Names them and asks first, then **Undo** puts them back for a minute. Players with no Discord on start.gg stay unless you add `no_discord:True`. TOs only. |
 | `/link profile:<link or ID>` | Link your own start.gg account. Leave out `profile` to find it by the Discord connected on start.gg, among the accounts `/profile` searches. |
 | `/unlink` | Remove your link, with an **Undo** button for a minute. Tracking stays as it was. |
 | `/upcoming` | Tracked tournaments, and any other live or upcoming tournament with 3 or more of the crew registered. `player:` checks one person instead, live from start.gg when they're linked but not tracked. |
 | `/recent` | Your last 5 sets. With `player:all`, up to 20 sets, at most 3 per player, from up to 40 players: those with set results on first, then whoever played most recently. |
 | `/run` | Your run and next opponent in each current bracket, with the station and scheduled time when the TO set them. Each next opponent gets a head-to-head button, up to 5, singles only. |
 
-Anyone can change `/track posts` for any tracked player. New players start with both off. Players with no reported sets in 6 months come off the track list on their own.
+Anyone can track, untrack and change posts for themselves. Yourself means the start.gg you `/link`ed, or the one whose Discord is yours. Only TOs can do it for someone else. New players start with both off. Players with no reported sets in 6 months come off the track list on their own.
 
 `/track remove`, `/track posts player:all sets:off`, `/track cleanup` and `/tournament remove` ask "Are you sure?" with buttons first, unless there'd be nothing to change. Only whoever ran the command can press them.
+
+### TOs
+
+| Command | What it does |
+| --- | --- |
+| `/to add user:<@someone>` | Give someone the **TO** role. TOs only. |
+| `/to remove user:<@someone>` | Take the TO role off someone, or off yourself. TOs only. |
+| `/to list` | The TOs. Anyone can look. |
+
+TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and run `/tournament` and `/track cleanup`. Only TOs add or remove TOs. The role grants nothing in Discord itself. The bot checks for it.
+
+The bot makes the TO role the first time it's needed. A role named `TO` made by hand counts too, and keeps counting if it's renamed later. Until the server has a TO role, anyone with Manage Server counts as a TO, so nobody gets locked out before it exists. Once it does, Manage Server alone isn't enough. A server admin can still hand the role out in server settings, and `/to list` shows those TOs once they've used a command. Samatron gets the role once when the bot first starts, found by the Discord on their start.gg, and another TO can take it off them for good.
 
 ### Your pings
 
@@ -108,8 +121,8 @@ These reports count singles and leave DQs out of set records. `/doubles` counts 
 
 | Command | What it does |
 | --- | --- |
-| `/slippi add code:<ABCD#123>` | Add a connect code to the watchlist. Leave out `code` to use the one on your start.gg, if you're tracked or linked. |
-| `/slippi remove player:<name>` | Take someone off the watchlist. The automatic search won't add them back, but `/slippi add` will. |
+| `/slippi add code:<ABCD#123>` | Add your connect code to the watchlist, one per person. Leave out `code` to use the one on your start.gg, if you're tracked or linked. TOs can add anyone's. |
+| `/slippi remove` | Take yourself off the watchlist, or anyone with `player:<name>` if you're a TO. The automatic search won't add them back, but `/slippi add` will. |
 | `/slippi rank` | Rank, rating, this season's record, daily leaderboard placement, top 3 characters and the last 3 seasons. `player:` takes someone on the watchlist or any connect code. Leave it out for yourself if you're tracked or linked. |
 | `/slippi leaderboard` | The watchlist by rank, then rating, with each player's most played character. Shows the top 50. |
 
@@ -140,22 +153,23 @@ A tracked tournament posts every set, whoever played, plus its stream alerts and
 | Command | What it does |
 | --- | --- |
 | `/tournament add tournament:<link>` | Track a tournament: every finished set, stream alerts, top 8s and registration reminders. `reminders:off` leaves out the reminders, `add_event:on` also makes a Discord event. |
-| `/tournament remove tournament:<name>` | Stop tracking it. Asks first, then **Undo** puts it back for a minute. A tournament admin's stays untracked after. |
+| `/tournament remove tournament:<name>` | Stop tracking it. Asks first, then **Undo** puts it back for a minute. |
 | `/tournament posts tournament:<name>` | Turn its `sets`, `stream`, `top8` and `reminders` on or off. Leave them all out to see them. |
-| `/tournament admin add profile:<link or ID>` | Track every upcoming tournament this start.gg user admins, on its own. |
-| `/tournament admin remove admin:<name>` | Stop tracking their new tournaments. Ones already tracked stay. |
-| `/tournament admin list` | List tournament admins. |
+| `/tournament event tournament:<link>` | Make a Discord event from a start.gg link, with the time, venue, close time and events. It doesn't track the tournament. |
 | `/bracket` | Bracket links for tracked tournaments, from 30 minutes before the start until 6 hours after the end. |
 | `/stream_link` | Streams added on start.gg for tracked tournaments and tournaments tracked players entered, in the same window as `/bracket`. Twitch streams are links, and other sites show the stream name. If none are going on, none have a stream, or start.gg doesn't answer, it says to ask a TO in another channel. |
 | `/registered tournament:<link>` | Registered server members, by name so nobody gets pinged. `by_event:True` groups them by event. |
-| `/discord_event tournament:<link>` | Make a Discord event from a start.gg link, with the time, location, close time and events. It doesn't track the tournament. For tournament admins and Manage Server. |
-| `/reg_warn tournament:<link> user:<@someone>` | Ping someone with a registration link if they haven't registered. Each person gets one warning per tournament every 12 hours. |
+| `/reg_warn tournament:<link> user:<@someone>` | Ping someone with a registration link if they haven't registered. Each person gets one warning per tournament every 12 hours. Anyone can use it. |
 
-`/tournament` needs **Manage Server** by default. You can hand it to other roles, like your TOs, under Server Settings > Integrations > Sama-tracker, and the bot goes by that. `/discord_event` is its own command so tournament admins can use it without Manage Server: anyone in `/tournament admin list` whose start.gg has their Discord connected. Anyone else gets a private no.
+`/tournament` is for [TOs](#tos). Discord shows it to everyone, since the bot checks the TO role itself, and anyone else gets a private no. Tournaments only get tracked by a TO running `/tournament add`, never on their own.
 
-`tournament` takes a start.gg link, or a tournament the bot already knows from the list: tracked ones and ones tracked players are in, soonest first. Tournaments nobody tracks are forgotten a month after they end. `/tournament add` lists only ones that aren't tracked yet, and `/tournament remove` and `/tournament posts` only tracked ones. `/tournament add add_event:on` tracks the tournament and makes its Discord event. `/discord_event` only makes the event, so a tournament admin can't start every-set posts for any link. Both find an event made earlier for the same link instead of making another.
+`tournament` takes a start.gg link, or a tournament the bot already knows from the list: tracked ones and ones tracked players are in, soonest first. Tournaments nobody tracks are forgotten a month after they end. `/tournament add` lists only ones that aren't tracked yet, and `/tournament remove` and `/tournament posts` only tracked ones. `/tournament add add_event:on` tracks the tournament and makes its Discord event. `/tournament event` only makes the event. Both find an event made earlier for the same link instead of making another.
 
-`/messages events:True` makes a Discord event on its own for each upcoming tournament tracked from `/tournament admin`, once. An event a mod deletes isn't made again. It's off by default.
+Discord events keep up with start.gg until they start. Once an hour the bot checks each one it made, and when the TO changes the time, name, venue, close time or events on start.gg, it edits them into the event. A tournament deleted or unpublished on start.gg gets its event cancelled. It goes by the tournament's start.gg ID, so a TO changing the link doesn't count as deleting it. An edit a mod makes in Discord stays until something changes on start.gg. An event a mod deletes, or one that has started, is left alone.
+
+`/messages events:True` makes a Discord event on its own for each upcoming tracked tournament, once. An event a mod deletes isn't made again. It's off by default.
+
+Roll calls, registration reminders, the 1-hour DMs, `/upcoming` and `/registered` show the venue and its street address when the TO put them on start.gg, as a link that opens the address in Google Maps. Without an address they show the city. Discord events put the venue and address in their location, or the address alone when both don't fit Discord's 100 characters.
 
 At a tracked tournament, the crew for the roll call and the placements post is tracked players and anyone registered whose start.gg Discord is in this server. Linking alone does not add someone. A hidden entrant list leaves just the tracked players.
 
@@ -206,7 +220,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Registration reminders | At the deadlines under [Tournaments](#tournaments). | The card lists no players. `/notify registration` controls pings and skips subscribers already registered when start.gg has their Discord. |
 | Registration DMs | 1 hour before registration closes at a tracked tournament. | DM with the tournament link, location and image. `/notify dm_registration` controls who gets one, skipped once registered when start.gg has their Discord. Needs the tournament's reg reminders on. |
 | Start DMs | 1 hour before a tracked tournament starts. | DM with the tournament link, location and image. `/notify dm_start` controls who gets one. Needs the tournament's reg reminders on. When registration closes within an hour of the start, only this one goes out. |
-| Discord events | Off by default. Within 15 minutes of a tournament admin's upcoming tournament getting tracked. | `/messages events` controls it. Tournaments tracked by hand only get one from `/discord_event` or `add_event:on`. |
+| Discord events | Off by default. Within 15 minutes of an upcoming tournament getting tracked. | `/messages events` controls it. With it off, a tournament only gets one from `/tournament event` or `add_event:on`. |
 | Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank. A new season reset is not posted. | `/slippi add` and `/slippi remove` control the watchlist. Tracked players can be discovered from connect codes entered on start.gg. Linked-only players cannot. |
 | Bills final results | Off by default. After each Bills game, with quarters and yards. | No player appears. |
 | Weekly crew recap | Sunday at 9 pm New York time by default. | Tracked players with a non-DQ singles set that week appear. There is no separate player switch. |
@@ -227,6 +241,7 @@ TOs report the wrong winner, fix it a minute later, or call a set and take it ba
 | --- | --- |
 | Set results | For an hour after a result posts, the bot checks it again every 2 minutes. If the TO changes the winner or score, the card is replaced with the new result marked **Corrected by TO**. If the TO resets or deletes the set, the card turns grey and its title starts with **Reset by TO**. If the set is reported again within that hour, the card shows the new result. |
 | Match call pings | For 15 minutes after a call, the bot checks it every 2 minutes. If the set goes back to waiting, the ping is crossed out with "Uncalled by the TO", and calling it again pings again. If the set is still called 5 minutes in, the players get pinged once more in a reply ("You're still up, 5 min in. TOs usually DQ at 10"). This needs the `calls` switch on. |
+| Discord events | Checked hourly until they start. A new time, name, venue, close time or event list on start.gg gets edited in, and a tournament deleted there gets its event cancelled. Nothing is posted about it. |
 | Placements and top 8s | Projected placements are checked hourly for 3 days. Once start.gg has every placement final, or every event in the top 8 finished, the post is edited to the final standings. If the final version no longer splits into the same number of messages, it goes out as a new post saying so. A top 8 with nothing reported when placements posted goes out as a new message once the bracket is finished. |
 
 Some TOs tag an event with the wrong game, like a "Melee Singles" tagged as Ultimate. When an event's name says Melee and its tag says Ultimate, or the other way around, the bot goes by the name. That covers `melee:True`, `game:` and the game shown on cards. Events whose name mentions both games, or another game like Project+, keep their tag.
@@ -260,7 +275,7 @@ The bot needs **Create Public Threads** and **Send Messages in Threads** in the 
 
 You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
 
-1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications). Invite it with the `bot` and `applications.commands` scopes and these permissions: View Channel, Send Messages, Embed Links and Attach Files. For threads, add Create Public Threads and Send Messages in Threads, plus Manage Messages so tournament thread cards get pinned. For `/discord_event`, `add_event:on` and `/messages events`, add Manage Events so it can make scheduled events. Manage Roles lets `/notify registration` hand out the Reg Reminders role, and `/matchmaking_role` make and hand out the matchmaking roles. Reg reminder pings work without it. It needs no privileged intents.
+1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications). Invite it with the `bot` and `applications.commands` scopes and these permissions: View Channel, Send Messages, Embed Links and Attach Files. For threads, add Create Public Threads and Send Messages in Threads, plus Manage Messages so tournament thread cards get pinned. For `/tournament event`, `add_event:on` and `/messages events`, add Manage Events so it can make and update scheduled events. Manage Roles lets `/to` make and hand out the TO role, `/notify registration` hand out the Reg Reminders role, and `/matchmaking_role` make and hand out the matchmaking roles. Reg reminder pings work without it, and without a TO role Manage Server counts as a TO. It needs no privileged intents.
 2. Create a start.gg API token under Settings > Developer Settings.
 3. Copy [.env.example](.env.example) to `.env` and fill it in. With Discord Developer Mode on, right-click the server and channel to copy their IDs.
 4. Install and start it:
@@ -270,7 +285,8 @@ You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
    npm start
    ```
 
-5. Move the bot's role above **Reg Reminders** so it can hand out that role. Keep the name `Reg Reminders`, since `/notify registration` looks for it. The matchmaking roles the bot makes start below its own. If you make them yourself, name them `Ultimate Matchmaking` and `Melee Matchmaking` and keep them below the bot's role.
+5. Move the bot's role above **Reg Reminders** so it can hand out that role. Keep the name `Reg Reminders`, since `/notify registration` looks for it. The TO and matchmaking roles the bot makes start below its own. If you make them yourself, name them `TO`, `Ultimate Matchmaking` and `Melee Matchmaking` and keep them below the bot's role.
+6. The bot gives Samatron's start.gg account the TO role on its first start. On your own copy, change `FIRST_TO` in `src/commands/to.js` to your start.gg profile, or hand yourself the role in server settings.
 
 | Variable | Required | What it's for |
 | --- | --- | --- |
@@ -286,6 +302,8 @@ You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
 > Run one copy of the bot per server. A second copy posts everything twice and shares start.gg's rate limit with the first.
 
 ### Hosting
+
+The bot quits at startup only when start.gg turns down `STARTGG_TOKEN`. If start.gg is down or slow when it starts, it logs that and starts anyway, and every check picks back up once start.gg answers.
 
 Keep `state.json` on persistent storage so tracking and settings survive redeploys. Every save also refreshes an hourly `state.json.bak`, which the bot falls back to if the main file ever reads corrupt. The bot stores it in `STATE_DIR`, else Railway's `RAILWAY_VOLUME_MOUNT_PATH` if set, else `data/` in the project folder.
 
@@ -321,6 +339,8 @@ start.gg allows 80 requests a minute. A first lookup can take tens of seconds, o
 Your commands take turns with start.gg one at a time. A command sent while your last one is still loading answers right away. If it needs start.gg, it says **Queued** with about how long your last one has left, counting everyone else's commands, and starts when that one finishes. Commands that don't need start.gg, like `/help`, don't wait. Up to 3 can wait behind the one running, and past that the bot asks you to try again. When start.gg is backed up for everyone, new commands ask you to try again in a minute instead of queueing. Every 10th request goes to the background checks, so automatic posts keep moving on busy nights.
 
 A public report that finishes more than a minute after you ran it goes out as a new message that pings you, and the loading reply is removed. Private answers, like `/scout`, stay private and don't ping.
+
+A command that fails says whose side it failed on: start.gg not answering, start.gg having trouble or limiting the bot, start.gg turning down the bot's token, Slippi, Discord missing a permission, or a bug in the bot itself. The details go in the bot's logs. A start.gg request that times out or gets a 5xx error is tried twice more before that. Keeping Discord events up to date costs one start.gg request per upcoming event an hour.
 
 <details>
 <summary>History limits and placement math</summary>

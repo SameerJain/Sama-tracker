@@ -202,7 +202,7 @@ export function prediction(a, b, odds, verbose, filters = {}, explained = false)
   } else if (level.a && level.b) {
     lines.push(`**Usual seed:** ${tagA} ${topText(level.a.share)} of their brackets · ${tagB} ${topText(level.b.share)}`);
   }
-  if (slippi) lines.push(`**Slippi ranked:** ${tagA} ${escapeMarkdown(slippi.aRank)} ${slippi.aRating.toFixed(1)} · ${tagB} ${escapeMarkdown(slippi.bRank)} ${slippi.bRating.toFixed(1)}`);
+  if (filters.melee && slippi) lines.push(`**Slippi ranked:** ${tagA} ${escapeMarkdown(slippi.aRank)} ${slippi.aRating.toFixed(1)} · ${tagB} ${escapeMarkdown(slippi.bRank)} ${slippi.bRating.toFixed(1)}`);
   lines.push(`**Form, last ${FORM_SETS} sets:** ${formText(tagA, form.a)} · ${formText(tagB, form.b)}`);
   const line = filterLine(filters);
   if (!verbose && !explained) {
@@ -212,7 +212,7 @@ export function prediction(a, b, odds, verbose, filters = {}, explained = false)
 
   const counted = (share) => (explained ? `${shareBar(share)} ${percent(share, 1)}` : `counts for ${percent(share, 1)}`);
   section(lines, 'How it adds up', [
-    ...odds.factors.map(({ key, n, share, chance }) => {
+    ...odds.factors.filter(({ key }) => filters.melee || key !== 'slippi').map(({ key, n, share, chance }) => {
       if (!n) return `**${FACTORS[key]}:** nothing to go on, so it doesn't count`;
       const lean = Math.round(chance * 100);
       let says = 'even';
@@ -231,7 +231,7 @@ export function prediction(a, b, odds, verbose, filters = {}, explained = false)
   const basis = odds.seededSets ? `Going by the ${count(odds.seededSets, 'seeded set')} the two of them played in ${game}` : `With none of their ${game} sets seeded`;
   lines.push(`-# Newer sets count more, a year old counts half. ${basis}, when one seed number is double the other's, `
     + `the player with the lower one wins about ${percent(odds.seedEdge, 1)}. That's how much seeding counts`);
-  if (slippi) lines.push('-# Slippi ratings are netplay Elo, so they count conservatively and only for Melee when both players are ranked');
+  if (filters.melee && slippi) lines.push('-# Slippi ratings are netplay Elo, so they count conservatively and only for Melee when both players are ranked');
   if (line) lines.push(line);
   return withLines(embed, lines);
 }

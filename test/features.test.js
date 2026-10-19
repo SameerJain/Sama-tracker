@@ -950,7 +950,7 @@ test('a top 8 that fails to send is retried by the fail-safe instead of being lo
   assert.equal(sent.length, 0);
   assert.equal(muted.top8Failed, true);
 
-  // a start.gg failure waits an hour before trying again
+  // a start.gg failure waits an hour before trying again. the one lookup is 3 requests, since a 5xx gets 2 retries
   state.messages = { top8: true };
   let fetches = 0;
   globalThis.fetch = async () => {
@@ -962,7 +962,7 @@ test('a top 8 that fails to send is retried by the fail-safe instead of being lo
   assert.equal(await tracker.verifyTopEight(flaky, channel), false);
   assert.equal(flaky.top8Failed, true);
   assert.equal(await tracker.verifyTopEight(flaky, channel), false);
-  assert.equal(fetches, 1);
+  assert.equal(fetches, 3);
 
   // after 3 days it gives up without sending
   const stale = { name: 'Local', slug: 'tournament/local', tracked, startAt: now - 14 * 3600, endAt: now - 13 * 3600,
@@ -1187,7 +1187,6 @@ test('muted automatic messages are consumed without posting or replaying them la
   await tracker.postResults(finished, channel);
   assert.equal(finished.resultsPosted, true);
 
-  state.regAdmins = {};
   state.tournaments = { 1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, entries: [], tracked, reminder: { next: 0 } } };
   mockApi(() => ({ tournament: { id: 1, startAt: now + 86400, endAt: now + 2 * 86400,
     registrationClosesAt: now + 3600, isRegistrationOpen: true, events: [] } }));
@@ -1209,7 +1208,8 @@ function mockSetCheck(nodesFor) {
 
 const setsCommand = (values) => {
   const interaction = {
-    commandName: 'track', user: { id: 'someone' },
+    // Manage Server counts as a TO while the server has no TO role, and only a TO can change someone else's posts
+    commandName: 'track', user: { id: 'someone' }, memberPermissions: { has: () => true },
     options: { getSubcommand: () => 'posts', getString: name => values[name] ?? null },
     reply: async r => { interaction.replied = r; },
   };
@@ -1335,7 +1335,6 @@ test('re-enabling between polls skips events that became due before re-enabling'
     entries: [1, 2, 3].map(userId => ({ userId, event: 'Singles', eventSlug: event.slug, entrants: 32 })) }, channel);
   await tracker.postResults({ name: 'Local', slug: 'tournament/local', startAt: now - 14 * 3600, endAt: now - 13 * 3600,
     entries: [{ userId: 1, event: 'Singles', eventSlug: event.slug, entrants: 32, started: true, placement: 5, final: true }] }, channel);
-  state.regAdmins = {};
   state.tournaments = { 1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, entries: [], tracked, reminder: { next: 0 } } };
   mockApi(() => ({ tournament: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 2 * 86400,
     registrationClosesAt: now + 3600, isRegistrationOpen: true, events: [] } }));
@@ -1530,7 +1529,8 @@ test('stream alerts start off, keeping a new player out of the stream check and 
   assert.equal(sent.length, 1);
 
   const interaction = {
-    commandName: 'track', user: { id: 'someone' },
+    // a TO, since it's someone else's
+    commandName: 'track', user: { id: 'someone' }, memberPermissions: { has: () => true },
     options: { getSubcommand: () => 'posts', getString: name => ({ player: '1', stream: 'on' })[name] ?? null },
     reply: async r => { interaction.replied = r; },
   };

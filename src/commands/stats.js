@@ -211,8 +211,9 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
   // own game out of these, so since and venue narrow them but melee doesn't
   const inScopeOdds = (list) => scopeSets(filters)(list ?? []);
   const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: shown };
-  // the odds went with melee as the game they share, so it's a melee matchup even without the option
-  const { odds, profiles } = await oddsWithSlippi(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options, ranked, allMelee(melee, shown));
+  const { odds, profiles } = melee
+    ? await oddsWithSlippi(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options, ranked, true)
+    : { odds: predictOdds(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options), profiles: null };
   // never having played, the full report would say the same thing. the odds stay one line in both,
   // run /predict for the reasoning behind them
   const buttons = buttonRow(!verbose && shown.length && fullReport('h2h', { player: a, opponent: b, melee, since: sinceText, venue }));
@@ -399,7 +400,9 @@ async function oddsFor(interaction, a, b, { melee, since, venue, doing }) {
   const scopedA = scopeSets(filters)(historyA ?? []);
   const scopedB = scopeSets(filters)(historyB ?? []);
   const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: inScope(meetings) };
-  const found = await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, melee);
+  const found = melee
+    ? await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, true)
+    : { odds: predictOdds(a, b, scopedA, scopedB, options), profiles: null };
   return { ...found, filters, scopedA, scopedB, historyA, historyB };
 }
 
@@ -418,7 +421,7 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
   if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
 
   const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee, since: sinceText, venue }));
-  await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, filters), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }), more);
+  await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, { ...filters, melee }), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }), more);
 }
 
 async function predictExplainedReport(interaction, { player: a, opponent: b, melee, since, venue }) {
@@ -427,7 +430,7 @@ async function predictExplainedReport(interaction, { player: a, opponent: b, mel
   if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
 
   // no Full report button, this is the full one
-  await sendEmbeds(interaction, embeds.withSlippi(embeds.predictionExplained(a, b, odds, filters), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }));
+  await sendEmbeds(interaction, embeds.withSlippi(embeds.predictionExplained(a, b, odds, { ...filters, melee }), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }));
 }
 
 // long-press someone in the server, then Apps. nothing to type, which is the point on a phone. checks the

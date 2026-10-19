@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { MELEE, getCharacterArt, isBackground } from './startgg.js';
+import { ApiError } from './errors.js';
 
 // slippi.gg's own API. there's no public one: no docs, introspection off, and the host is called
 // internal. it already moved once, from gql-gateway-dot-slippi.uc.r.appspot.com, which now answers
@@ -112,13 +113,13 @@ async function query(text, variables) {
       signal: AbortSignal.timeout(30_000),
     });
   } catch (err) {
-    throw new Error(`Slippi didn't respond (${err.message})`);
+    throw new ApiError('Slippi', `Slippi didn't respond (${err.message})`);
   }
   // when the API moved, the old address sent back the website. anything that isn't json means it moved again
   const body = await res.json().catch(() => null);
-  if (!body) throw new Error(`Slippi sent back something that isn't its API (HTTP ${res.status}), it may have moved`);
-  if (body.errors) throw new Error(`Slippi: ${body.errors[0].message}`);
-  if (!res.ok) throw new Error(`Slippi: HTTP ${res.status}`);
+  if (!body) throw new ApiError('Slippi', `Slippi sent back something that isn't its API (HTTP ${res.status}), it may have moved`, res.status);
+  if (body.errors) throw new ApiError('Slippi', `Slippi: ${body.errors[0].message}`, res.status);
+  if (!res.ok) throw new ApiError('Slippi', `Slippi: HTTP ${res.status}`, res.status);
   return body.data;
 }
 

@@ -1,12 +1,16 @@
-import { MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
+import { MessageFlags, escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { ROLL_CALL_MIN_PLAYERS, RUNS_LATE_HOURS, checkTournaments, crewOf, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
 import { findAccount, serverMembers } from '../accounts.js';
 import { count } from '../embeds/shared.js';
-import { buttonRow, findPlayer, flag, h2hButton, linkedPlayer, readChoice, readPlayer, replyEphemeral, replyNoPlayer, sendEmbeds } from './shared.js';
+import {
+  buttonRow, findPlayer, flag, h2hButton, isSelf, linkedPlayer, readChoice, readPlayer, readTracked, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer,
+  replyNotTracked, sendEmbeds,
+} from './shared.js';
 import { askFirst, confirmable, undoRow } from './confirm.js';
+import { isTO, notTO } from './to.js';
 
 // /recent all only asks start.gg about whoever played most recently
 const RECENT_ALL_PLAYERS = 40;
@@ -14,14 +18,22 @@ const RECENT_ALL_PLAYERS = 40;
 // /track cleanup's Are you sure names this many, then says how many more
 const CLEANUP_NAMED = 10;
 
+// anyone can track themselves: profile left out finds theirs, and a link counts when it has their discord
+// connected. only TOs can track someone else
 async function trackAdd(interaction) {
-  const input = interaction.options.getString('profile', true);
+  const input = interaction.options.getString('profile');
+  const to = isTO(interaction);
 
   await interaction.deferReply();
-  const player = await findPlayer(interaction, input);
+  const player = input ? await findPlayer(interaction, input) : await ownAccount(interaction, '/track add');
   if (!player) return;
+  if (!to && player.discordId !== interaction.user.id) {
+    const tag = escapeMarkdown(player.tag);
+    const why = player.discordId ? `${tag}'s start.gg has a different Discord connected.` : `If ${tag} is you, connect this Discord on your start.gg first.`;
+    return replyEphemeralAfterDefer(interaction, `Only TOs can track someone else. ${why}`);
+  }
   if (state.players[player.userId]) {
-    return interaction.editReply({ content: `Already tracking ${player.tag}.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: `Already tracking ${escapeMarkdown(player.tag)}.`, allowedMentions: { parse: [] } });
   }
 
   state.players[player.userId] = newTracked(player);
@@ -32,10 +44,12 @@ async function trackAdd(interaction) {
   checkTournaments();
 }
 
-// asks first, then has an Undo button for a minute that puts them back with every setting they had
+// asks first, then has an Undo button for a minute that puts them back with every setting they had.
+// anyone can untrack themselves, only TOs can untrack someone else
 function trackRemove(interaction) {
-  const player = readPlayer(interaction, 'player', { trackedOnly: true });
-  if (!player) return replyNoPlayer(interaction, 'player', { trackedOnly: true });
+  const player = readTracked(interaction);
+  if (!player) return replyNotTracked(interaction);
+  if (!isSelf(interaction, player) && !isTO(interaction)) return notTO(interaction, 'untrack someone else. Leave out `player` to untrack yourself');
   return askFirst(interaction, 'untrack', player.userId, `Stop tracking ${escapeMarkdown(player.tag)}? Their set result and stream alert settings go with them.`, 'Stop tracking');
 }
 
@@ -64,9 +78,9 @@ const cleanups = new Map();
 
 // tracked players whose start.gg discord isn't in this server, which is most of a track list that grew from bulk
 // adds. no discord on start.gg says nothing about where someone is, so they stay unless no_discord says otherwise.
-// asks first, then Undo puts everyone back for a minute
+// asks first, then Undo puts everyone back for a minute. TOs only, since it untracks other people
 async function trackCleanup(interaction) {
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return replyEphemeral(interaction, 'You need Manage Server permission to clean up the track list.');
+  if (!isTO(interaction)) return notTO(interaction, 'clean up the track list');
   const noDiscord = flag(interaction, 'no_discord');
 
   await interaction.deferReply();
@@ -120,7 +134,7 @@ async function link(interaction) {
   const input = interaction.options.getString('profile');
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const player = input ? await findPlayer(interaction, input, 'your') : await ownAccount(interaction);
+  const player = input ? await findPlayer(interaction, input, 'your') : await ownAccount(interaction, '/link');
   if (!player) return;
   if (player.discordId !== interaction.user.id) {
     return interaction.editReply(player.discordId
@@ -144,14 +158,14 @@ async function link(interaction) {
   return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.linked(player, previous)]), allowedMentions: { parse: [] } });
 }
 
-// /link with the profile left out, so nobody has to copy a link over. start.gg can't be searched by
-// discord, so it's the same search /profile does: accounts the bot has already seen. null and a reply if none
-async function ownAccount(interaction) {
+// /link or /track add with the profile left out, so nobody has to copy a link over. start.gg can't be searched
+// by discord, so it's the same search /profile does: accounts the bot has already seen. null and a reply if none
+async function ownAccount(interaction, command) {
   const account = await findAccount(interaction.user.id);
   const player = account && await startgg.getPlayer(account.slug);
   if (!player) {
     await interaction.editReply('Couldn\'t find a start.gg with this Discord connected among the accounts I\'ve seen. '
-      + 'Connect it on your start.gg profile if you haven\'t, then run `/link` with your profile link, like start.gg/user/f64a83c8.');
+      + `Connect it on your start.gg profile if you haven't, then run \`${command}\` with your profile link, like start.gg/user/f64a83c8.`);
   }
   return player;
 }
