@@ -6,10 +6,12 @@ export const stateDir = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUN
 const FILE = `${stateDir}/state.json`;
 
 // players and regAdmins are keyed by start.gg user id. regAdmins are TOs whose upcoming tournaments get tracked on their own. posted/streamed/called/dqs are ids already announced.
-// regPings, streamPings and callPings are discord ids that turned on /notify registration, streams or calls. regSkipped are tournament ids /tournament remove
+// regPings, streamPings and callPings are discord ids that turned on /notify registration, streams or calls. regDmPings and startDmPings are the 1-hour
+// DM versions for registration and the start. regSkipped are tournament ids /tournament remove
 // untracked, so an admin's doesn't come back.
 // tournaments are keyed by id: the ones tracked players are in, and tracked ones. tracked: { by, at, sets, stream, top8, reminders } says it's tracked,
-// by being 'manual' or 'admin' and the rest its /tournament posts switches. reminder: { deadline, next } is its reg reminder progress, next being the
+// by being 'manual' or 'admin' and the rest its /tournament posts switches. discordEventId is the Discord scheduled event made for it, by /tournament event
+// or /tournament add with add_event, so either order lands on the same one. reminder: { deadline, next } is its reg reminder progress, next being the
 // index into REG_REMINDER_HOURS. events are all its events from start.gg. crew is the registered server members who aren't tracked,
 // keyed by user id as { userId, slug, tag }, so cards can name them. lastCheck is when its sets were last checked, the way it is on a player.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
@@ -23,13 +25,14 @@ const FILE = `${stateDir}/state.json`;
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
 // buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }, with at when it was sent
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
-// callPosts are match calls still watched for the set going back to waiting or not starting: { setId, channelId, messageId, calledAt, discordIds, warned }.
+// callPosts are match calls still watched for the set going back to waiting or not starting: { setId, channelId, messageId, calledAt, discordIds, warned, text }.
+// text is the You're up ping as it went out, so the follow-ups match it
 // a tournament with projected: { at, checkedAt, results, top8 } had placements go out projected, each list being the { channelId, messageId } posts to edit once they're final.
 // an empty top8 list with top8Posted unset means nothing was reported yet, and the final goes out as a new message once every event is finished.
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
 const empty = {
-  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regAdmins: {}, regSkipped: [],
+  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [], regAdmins: {}, regSkipped: [],
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
   resultPosts: [], callPosts: [], regWarned: [], billsPosted: [],
 };
@@ -64,11 +67,16 @@ export function save() {
   fs.mkdirSync(stateDir, { recursive: true });
   const text = JSON.stringify(state, null, 2);
   fs.writeFileSync(`${FILE}.tmp`, text, { mode: 0o600 });
-  const fd = fs.openSync(`${FILE}.tmp`, 'r');
+  // best effort: windows temp files refuse this, the rename below is the real safety
   try {
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
+    const fd = fs.openSync(`${FILE}.tmp`, 'r');
+    try {
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    // keep going, the tmp file is fully written either way
   }
   fs.renameSync(`${FILE}.tmp`, FILE);
   saveCount++;

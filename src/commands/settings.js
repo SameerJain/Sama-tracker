@@ -217,6 +217,16 @@ const PINGS = {
     on: 'You\'ll get pinged for reg reminders. If your Discord is connected on start.gg, not for ones you\'re already registered for.',
     off: 'No more reg reminder pings.',
   },
+  dm_registration: {
+    list: 'regDmPings',
+    on: 'You\'ll get a DM 1 hour before registration closes, with the link, location and tournament image. Skipped once you\'re registered.',
+    off: 'No more registration DMs.',
+  },
+  dm_start: {
+    list: 'startDmPings',
+    on: 'You\'ll get a DM 1 hour before the tournament starts, with the link, location and tournament image.',
+    off: 'No more start DMs.',
+  },
 };
 
 // the role that shows who has reg pings on. pings go off the list, not the role, so people already
@@ -225,7 +235,7 @@ const REG_ROLE = 'Reg Reminders';
 
 // where someone's pings are at, plus their own posts if they're tracked
 function notifyText(discordId, me) {
-  const has = (name) => state[PINGS[name].list].includes(discordId);
+  const has = (name) => (state[PINGS[name].list] ?? []).includes(discordId);
   let calls = has('calls') ? 'on' : 'off';
   if (has('calls') && !me) calls += ', but nothing to go by until you `/link`';
   const lines = [
@@ -233,6 +243,8 @@ function notifyText(discordId, me) {
     `**Match calls:** ${calls}`,
     `**Stream alerts:** ${has('streams') ? 'on' : 'off'}`,
     `**Reg reminders:** ${has('registration') ? 'on' : 'off'}`,
+    `**Registration DMs:** ${has('dm_registration') ? 'on' : 'off'}`,
+    `**Start DMs:** ${has('dm_start') ? 'on' : 'off'}`,
   ];
   if (me && state.players[me.userId]) {
     lines.push(`-# You're tracked as ${escapeMarkdown(me.tag)}, with set results ${isOn(me, 'setResults') ? 'on' : 'off'} and stream alerts ${isOn(me, 'streamAlerts') ? 'on' : 'off'}. \`/track posts\` changes those`);
@@ -261,6 +273,7 @@ async function notify(interaction) {
       continue;
     }
     const list = PINGS[name].list;
+    state[list] ??= [];
     state[list] = state[list].filter((each) => each !== id);
     if (on) state[list].push(id);
     lines.push(PINGS[name][on ? 'on' : 'off']);

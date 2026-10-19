@@ -12,11 +12,13 @@ const { state } = await import('../src/store.js');
 const { commands, handleAutocomplete, handleCommand } = await import('../src/commands/index.js');
 const embeds = await import('../src/embeds/index.js');
 const { predict } = await import('../src/predict.js');
-const { queueLength } = await import('../src/startgg.js');
+const { queueLength, forgetMisses } = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
 function mockApi(respond) {
+  // a new fake answers everything again, including links that missed before
+  forgetMisses();
   globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
 }
 
@@ -141,6 +143,8 @@ test('h2h and predict stop at the first link that matches nobody', async () => {
   });
   for (const commandName of ['h2h', 'predict']) {
     lookups = 0;
+    // the miss from the last command stays cached for 5 minutes, so start fresh
+    forgetMisses();
     const replies = [];
     let deleted = false;
     const interaction = {
@@ -355,6 +359,8 @@ test('/notify only changes whoever ran it, and match calls need their start.gg',
   state.callPings = [];
   state.streamPings = [];
   state.regPings = [];
+  state.regDmPings = [];
+  state.startDmPings = [];
   state.messages = {};
   globalThis.fetch = async () => assert.fail('no start.gg lookup');
 
@@ -373,13 +379,23 @@ test('/notify only changes whoever ran it, and match calls need their start.gg',
   // nothing given shows where theirs are at, and a tracked player's own posts
   const mine = await run('notify', 'crew-discord');
   assert.ok(mine.flags);
-  assert.match(mine.content, /\*\*Match calls:\*\* on\n\*\*Stream alerts:\*\* off\n\*\*Reg reminders:\*\* off\n-# You're tracked as Crew, with set results on and stream alerts on/);
+  assert.match(mine.content, /\*\*Match calls:\*\* on\n\*\*Stream alerts:\*\* off\n\*\*Reg reminders:\*\* off\n\*\*Registration DMs:\*\* off\n\*\*Start DMs:\*\* off\n-# You're tracked as Crew, with set results on and stream alerts on/);
   assert.doesNotMatch((await run('notify', 'me-discord')).content, /You're tracked/);
+
+  // DMs opt in and out per person
+  assert.match((await run('notify', 'me-discord', { dm_registration: 'on', dm_start: 'on' })).content, /DM 1 hour before registration closes.*\n.*DM 1 hour before the tournament starts/);
+  assert.deepEqual(state.regDmPings, ['me-discord']);
+  assert.deepEqual(state.startDmPings, ['me-discord']);
+  assert.match((await run('notify', 'me-discord', { dm_registration: 'off' })).content, /^No more registration DMs\.$/);
+  assert.deepEqual(state.regDmPings, []);
+  assert.deepEqual(state.startDmPings, ['me-discord']);
 
   assert.match((await run('notify', 'me-discord', { calls: 'off' })).content, /^No more match call pings\.$/);
   assert.deepEqual(state.callPings, ['crew-discord']);
   state.callPings = [];
   state.streamPings = [];
+  state.regDmPings = [];
+  state.startDmPings = [];
 });
 
 test('/track add starts set results and stream alerts off and says how to turn them on', async () => {

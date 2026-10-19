@@ -84,6 +84,7 @@ export function status(info) {
   }
   if (info.threadError) lines.push(`**Threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
   if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
+  if (info.stateSize) lines.push(`**State:** ${(info.stateSize / 1024).toFixed(0)} KB · ${count(info.saves ?? 0, 'save')} since start`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
 
@@ -121,9 +122,9 @@ export function help() {
       '`/track add` track someone by start.gg link or ID. Their placements post here',
       '`/track remove` stop tracking someone. Asks first, then Undo puts them back with their settings for a minute',
       '`/track list` everyone tracked, and the tracked tournaments',
-      '`/track posts` someone\'s set results and stream alerts on or off. Off for everyone asks first',
+       '`/track posts` someone\'s set results and stream alerts on or off. Off for everyone asks first unless already off',
       '`/track cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. Needs Manage Server',
-      '`/upcoming` tracked tournaments, and any other with 3 or more of the crew',
+       '`/upcoming` tracked tournaments, and any other with 3 or more of the crew. `player:` checks one person, live from start.gg when linked but not tracked',
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
       '-# New players start with set results and stream alerts off. `player:all` works with posts, upcoming and recent',
@@ -131,8 +132,8 @@ export function help() {
     ],
     [
       '**Your pings**',
-      '`/notify` your pings. `calls` when your match is called, `streams` for every stream alert, `registration` for reg reminders, `all` for all three. Leave them out to see yours',
-      '-# Only ever changes you. `calls` needs you linked, or tracked with Discord on start.gg. Reg reminders skip you once you\'re registered, if start.gg has your Discord',
+      '`/notify` your pings. `calls` when your match is called, `streams` for every stream alert, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. Leave them out to see yours',
+      '-# Only ever changes you. `calls` needs you linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
     ],
     [
       '**Linking yourself**',
@@ -146,13 +147,14 @@ export function help() {
       '`/doubles` one player\'s 2v2 record, partners and placements',
       '`/h2h` record against someone, with one-line odds',
       '`/predict` odds of beating someone, and why',
-      '`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked',
+      '`/predict_explained` full breakdown of the odds, with shares, model numbers and bars',
+       '`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg',
       '`/progress` last 30 days vs the 30 before, by game',
       '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more',
       '-# `verbose:True` shows more, same as the Full report button on short reports. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. Melee cards say Melee at the top, other games show nothing there since Ultimate is the default. Melee `/predict`, `/h2h` and `/scout` odds count them when both players are ranked, even with no Melee sets to go on. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out',
       '-# `since:2026-01-01` counts only sets since that date, and `venue:` only offline or online tournaments, on `/stats`, `/h2h`, `/scout` and `/predict`. Full report buttons keep them',
       '-# `/h2h`, `/predict` and `/scout` also take a start.gg link or ID, for players nobody tracks',
-      '-# Your commands take start.gg turns one at a time. One sent while another loads says Queued and starts after it, up to 3 waiting. A public report done over a minute after you asked comes in a new message that pings you',
+       '-# Your commands take start.gg turns one at a time. One sent while another loads says Queued and starts after it, up to 3 waiting. When start.gg is backed up for everyone, new commands ask you to try again in a minute. A public report done over a minute after you asked comes in a new message that pings you',
       '-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, match calls and stream alerts have head-to-head buttons for the set coming up, which come off when it ends',
       '-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation. A name that matches nobody gets the closest one suggested',
       '-# An event named for Melee but tagged on start.gg as Ultimate counts as Melee, and the other way around',
@@ -167,13 +169,14 @@ export function help() {
     ],
     [
       '**Tournaments**',
-      '`/tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders',
+      '`/tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `add_event:on` also makes a Discord event',
       '`/tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute',
       '`/tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off',
+      '`/tournament event` track a tournament and make a Discord event from its start.gg link. Tournament admins and Manage Server',
       '`/tournament admin` TOs whose upcoming start.gg tournaments get tracked on their own',
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
       '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours',
-      '`/bracket` bracket links for tracked tournaments that are live or start within 30 min',
+       '`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end',
       '`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min',
       '-# `/tournament` needs Manage Server, which can hand it to other roles under Server Settings > Integrations. `tournament:` takes a link or one the bot knows',
     ],
@@ -193,11 +196,11 @@ export function help() {
       '**Posted here automatically**',
       '**Set results.** Every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked',
       '**Stream alerts.** Sets on stream or up next in the stream queue for 30 seconds, at tracked tournaments and for tracked players with stream alerts on, pinging everyone with `/notify streams` on',
-      '**Match call pings.** Called sets, pinging whoever has `/notify calls` on, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
+      '**Match call pings.** Called sets, pinging whoever has `/notify calls` on with You\'re up and the station when start.gg has one, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
       '**Tournament roll calls.** An hour before a tournament with 3+ of the crew. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server',
       '**Tournament placements.** Where the crew placed, 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
-      '**Registration reminders.** Tracked tournaments a week, 3 days and a day out, then a last call 12 hours before',
+      '**Registration reminders.** Tracked tournaments a week, 3 days and a day out, then a last call 12 hours before. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start. When registration closes within an hour of the start there\'s one DM, the start one',
       '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg',
       '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',
       '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',

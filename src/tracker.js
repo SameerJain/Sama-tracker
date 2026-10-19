@@ -26,10 +26,14 @@ const CATCH_UP_HOURS = 3;
 const MAX_TOURNAMENT_DAYS = 7;
 // tournaments over a day out barely change, so they get looked at less
 const FAR_OFF_CHECK_HOURS = 6;
+// untracked tournaments a month past their end are forgotten, so the map can't grow forever
+const TOURNAMENT_FORGOTTEN_DAYS = 30;
 // discord allows 100 mentions a message, and 2000 chars fits about 80
 const MENTIONS_PER_MESSAGE = 80;
 // hours before registration closes. the last one is the last call
 export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 12];
+// DMs go out this long before registration closes and before the start
+export const DM_HOURS_BEFORE = 1;
 // locals run late, so a tournament still counts as live this long after its end time
 export const RUNS_LATE_HOURS = 6;
 // slippi ranks only change after ranked sets, and its API isn't public, so it gets asked less than start.gg
@@ -122,6 +126,7 @@ export function startTracking(postChannel) {
   checkSets();
   checkProfiles();
   checkRegReminders();
+  checkDmReminders();
   checkWeeklyRecap();
   checkSlippiCodes();
   checkSlippiRanks();
@@ -129,6 +134,7 @@ export function startTracking(postChannel) {
   checkPrune();
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
+  setInterval(checkDmReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
   setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
   setInterval(checkSlippiCodes, PROFILE_CHECK_HOURS * HOUR * 1000);
@@ -257,6 +263,7 @@ const checkSets = queued(async () => {
 export const checkTournaments = queued(updateTournaments);
 const checkProfiles = queued(updateProfiles);
 export const checkRegReminders = queued(postRegReminders);
+export const checkDmReminders = queued(postDmReminders);
 const checkWeeklyRecap = queued(postWeeklyRecap);
 const checkSlippiCodes = queued(findSlippiCodes);
 const checkSlippiRanks = queued(postRankChanges);
@@ -490,6 +497,12 @@ export async function pruneInactive(now = secondsNow()) {
   save();
   if (pruned.length) console.log(`pruned ${pruned.length} inactive player${pruned.length === 1 ? '' : 's'} from the track`);
   return pruned;
+}
+
+// untracked tournaments a month past their end are forgotten, so the map of every tournament
+// tracked players were once in can't grow forever. tracked ones stay for their posts
+export function shouldForgetTournament(tournament, now = secondsNow()) {
+  return !tournament.tracked && !tournament.resultsPosted && now > endTime(tournament) + TOURNAMENT_FORGOTTEN_DAYS * DAY;
 }
 
 // tracked tournaments going on now with this switch on. sets keep getting looked at for one check after every
@@ -888,14 +901,16 @@ export async function postMatchCalls(postChannel = channel) {
         const components = h2hRow(set, inSet[0]);
         // the card goes by whoever it's for, tracked or only linked
         const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
+        // the station shows only when the TO set one, otherwise just the ping
+        const text = set.station ? `You're up — Station ${set.station}` : `You're up`;
         const sent = await postChannel.send({
-          content: discordIds.length ? `${mentions(discordIds)} your match was called` : undefined,
+          content: discordIds.length ? `${mentions(discordIds)} ${text}` : undefined,
           embeds: embeds.withImage([embeds.matchCall(set, people)]),
           components,
           allowedMentions: { users: discordIds },
         });
         rememberButton(sent, set, components);
-        watchCall(sent, set, discordIds);
+        watchCall(sent, set, discordIds, text);
       }
       state.called.push(set.id);
       save();
@@ -908,11 +923,12 @@ export async function postMatchCalls(postChannel = channel) {
   save();
 }
 
-// saved so followCalls can find the call again. a called set was last updated when it got called
-function watchCall(message, set, discordIds) {
+// saved so followCalls can find the call again. a called set was last updated when it got called.
+// text is the ping as it went out, so the uncalled edit and the still-up warning match it
+function watchCall(message, set, discordIds, text) {
   if (!message?.id || !/^\d+$/.test(set.id)) return;
   const [ref] = postRefs([message]);
-  state.callPosts.push({ setId: set.id, ...ref, calledAt: Math.min(set.updatedAt ?? Infinity, secondsNow()), discordIds, warned: false });
+  state.callPosts.push({ setId: set.id, ...ref, calledAt: Math.min(set.updatedAt ?? Infinity, secondsNow()), discordIds, warned: false, text });
   state.callPosts = state.callPosts.slice(-200);
   save();
 }
@@ -941,8 +957,9 @@ export async function followCalls(postChannel = channel) {
         save();
         if (messageEnabled('calls', each.calledAt + CALL_WARN_MINUTES * 60)) {
           const users = each.discordIds.filter(mentionable);
+          const still = (each.text ?? `You're up`).replace(`You're up`, `You're still up`);
           await postChannel.send({
-            content: `${mentions(each.discordIds)} called ${minutes} min ago, TOs usually DQ at ${CALL_DQ_MINUTES}`,
+            content: `${mentions(each.discordIds)} ${still} — ${minutes} min later, TOs usually DQ at ${CALL_DQ_MINUTES}`,
             reply: { messageReference: each.messageId, failIfNotExists: false },
             allowedMentions: { users },
           });
@@ -957,7 +974,8 @@ export async function followCalls(postChannel = channel) {
       // uncalled: edit first so a failed edit stays watched for the next check
       state.called = state.called.filter((id) => id !== each.setId);
       // an edit never pings, the mentions just stay so they can see it was theirs
-      const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~your match was called~~ Uncalled by the TO, wait for the next call` : 'Uncalled by the TO, wait for the next call';
+      const struck = each.text ?? `You're up`;
+      const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~${struck}~~ Uncalled by the TO, wait for the next call` : 'Uncalled by the TO, wait for the next call';
       await editPost(postChannel, each, { content, allowedMentions: { parse: [] } });
       state.callPosts = state.callPosts.filter((other) => other !== each);
     }
@@ -1123,6 +1141,11 @@ async function updateTournaments() {
             .catch((err) => console.error(`verifying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message));
         }
       }
+      continue;
+    }
+    if (shouldForgetTournament(tournament)) {
+      await unpinTournamentThread(channel, tournament);
+      delete state.tournaments[tournament.id];
       continue;
     }
     const farOff = tournament.startAt - secondsNow() > DAY;
@@ -1444,4 +1467,78 @@ export async function postRegReminders(postChannel = channel) {
     }
   }
   save();
+}
+
+// 1-hour DMs for tracked tournaments with reminders on. reg DMs go to /notify dm_registration on
+// who isn't registered yet, start DMs to everyone with /notify dm_start on. when registration
+// closes within an hour of the start there's one DM, the start one, since it carries the register link too
+export async function postDmReminders(postChannel = channel) {
+  const client = (postChannel ?? channel)?.client;
+  if (!client) return;
+  state.regDmPings ??= [];
+  state.startDmPings ??= [];
+  if (!state.regDmPings.length && !state.startDmPings.length) return;
+
+  for (const tournament of Object.values(state.tournaments)) {
+    if (!posting(tournament, 'reminders')) continue;
+    // over means neither DM is left
+    if (secondsNow() > endTime(tournament)) continue;
+    let latest;
+    try {
+      // TOs move the close time and the start, so always go off the latest
+      latest = await startgg.getRegistration(tournament.slug);
+      if (!latest) continue;
+    } catch (err) {
+      console.error(`DM reminder for ${tournament.name ?? tournament.id} failed:`, err.message);
+      continue;
+    }
+    const deadline = regDeadline(latest);
+    const { startAt } = latest;
+
+    try {
+      // registration closes more than an hour before the start, so the start DM can't cover it
+      const separateReg = deadline < startAt - DM_HOURS_BEFORE * HOUR;
+      if (state.regDmPings.length && separateReg && tournament.dmRegSentFor !== deadline
+        && secondsNow() >= deadline - DM_HOURS_BEFORE * HOUR && secondsNow() < deadline) {
+        const dueAt = deadline - DM_HOURS_BEFORE * HOUR;
+        // came due while off stays skipped after it's back on
+        tournament.dmRegSentFor = deadline;
+        if (latest.isRegistrationOpen && messageEnabled('registration', dueAt)) {
+          const participants = await startgg.getParticipants(latest.id);
+          rememberAccounts(participants);
+          const registered = new Set(participants.map((participant) => participant.discordId));
+          const targets = state.regDmPings.filter((id) => !registered.has(id) && mentionable(id));
+          const embed = embeds.regReminder(latest, deadline, true);
+          for (const discordId of targets) await dmUser(client, discordId, embed);
+        }
+      }
+    } catch (err) {
+      console.error(`registration DM for ${tournament.name ?? tournament.id} failed:`, err.message);
+    }
+
+    try {
+      if (state.startDmPings.length && tournament.dmStartSentFor !== startAt
+        && secondsNow() >= startAt - DM_HOURS_BEFORE * HOUR && secondsNow() < startAt) {
+        const dueAt = startAt - DM_HOURS_BEFORE * HOUR;
+        tournament.dmStartSentFor = startAt;
+        if (messageEnabled('rollcall', dueAt)) {
+          const embed = embeds.startReminder(latest);
+          for (const discordId of state.startDmPings.filter(mentionable)) await dmUser(client, discordId, embed);
+        }
+      }
+    } catch (err) {
+      console.error(`start DM for ${tournament.name ?? tournament.id} failed:`, err.message);
+    }
+  }
+  save();
+}
+
+// one DM, skipped when DMs are closed or the user left. failures stay in the logs, the rest still go out
+async function dmUser(client, discordId, embed) {
+  try {
+    const user = await client.users.fetch(discordId);
+    await user.send({ embeds: embeds.withImage([embed]) });
+  } catch (err) {
+    console.error(`DM to ${discordId} failed:`, err.message);
+  }
 }

@@ -152,7 +152,8 @@ test('a match call that goes back to waiting is taken back, and one not started 
     : { p10: { sets: { nodes: setState === 6 ? [setNode('801', { setState: 6 })] : [] } } }));
   await tracker.postMatchCalls(channel);
   assert.equal(channel.sent.length, 1);
-  assert.deepEqual(state.callPosts.map(({ setId, messageId, discordIds, warned }) => [setId, messageId, discordIds, warned]), [['801', 'm1', ['crew-discord'], false]]);
+  assert.equal(channel.sent[0].content, `<@crew-discord> You're up`);
+  assert.deepEqual(state.callPosts.map(({ setId, messageId, discordIds, warned, text }) => [setId, messageId, discordIds, warned, text]), [['801', 'm1', ['crew-discord'], false, `You're up`]]);
 
   // a minute in, still called, so nothing yet
   await tracker.followCalls(channel);
@@ -162,7 +163,7 @@ test('a match call that goes back to waiting is taken back, and one not started 
   await tracker.followCalls(channel);
   assert.equal(channel.sent.length, 2);
   const warning = channel.sent[1];
-  assert.equal(warning.content, '<@crew-discord> called 6 min ago, TOs usually DQ at 10');
+  assert.equal(warning.content, `<@crew-discord> You're still up — 6 min later, TOs usually DQ at 10`);
   assert.deepEqual(warning.allowedMentions, { users: ['crew-discord'] });
   assert.equal(warning.reply.messageReference, 'm1');
   await tracker.followCalls(channel);
@@ -171,13 +172,13 @@ test('a match call that goes back to waiting is taken back, and one not started 
   // uncalled: the ping gets crossed out, and calling it again pings again
   setState = 1;
   await tracker.followCalls(channel);
-  assert.deepEqual(channel.edits, [['m1', { content: '<@crew-discord> ~~your match was called~~ Uncalled by the TO, wait for the next call', allowedMentions: { parse: [] } }]]);
+  assert.deepEqual(channel.edits, [['m1', { content: `<@crew-discord> ~~You're up~~ Uncalled by the TO, wait for the next call`, allowedMentions: { parse: [] } }]]);
   assert.deepEqual(state.callPosts, []);
   assert.ok(!state.called.includes('801'));
   setState = 6;
   await tracker.postMatchCalls(channel);
   assert.equal(channel.sent.length, 3);
-  assert.match(channel.sent[2].content, /your match was called/);
+  assert.match(channel.sent[2].content, /You're up/);
 
   // started, so there's nothing left to say
   setState = 2;

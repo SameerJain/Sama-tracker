@@ -60,4 +60,4 @@ async function showQueued(interaction, ahead) {
   await interaction.editReply(`**Queued** behind your ${ahead.label}${left}. This one starts when it's done.`).catch(() => {});
 }
 
-export { inTurn, QUEUED_PER_PERSON };
+export { inTurn, QUEUED_PER_PERSON, QUEUED_GLOBAL_MAX };

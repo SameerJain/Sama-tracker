@@ -1,7 +1,7 @@
 import { escapeMarkdown } from 'discord.js';
 import { singles, startggUrl } from '../startgg.js';
 import { characterUsage } from '../characters.js';
-import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, vodLink, filterLine, filtersOn, scoreText, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
+import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, vodLink, filterLine, filtersOn, scoreText, sparkline, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
 
 const RECENT_EVENTS = 4;
 
@@ -85,6 +85,9 @@ export function progress(player, periods, { verbose = false, characterSets = nul
     section(lines, 'What changed', [winRate, ...changeLines(recent, before, verbose)].filter(Boolean));
     if (verbose) {
       section(lines, `Every ${days} days, newest first`, periods.map((period) => `${range(period)} · ${trendText(inGame(period, game))}`));
+      // oldest first so the graph reads left to right, · where a period had no sets
+      const trend = [...periods].reverse().map((period) => setRate(inGame(period, game)));
+      if (trend.some((rate) => rate != null)) lines.push(`**Trend, oldest → newest:** ${sparkline(trend)} win rate`);
       lines.push(`-# Singles only, DQs left out. Events count toward the ${days} days they started in. Seeds go by placement tier, `
         + 'close sets are ones that went to the last game, and characters only show up if the TO reported them');
     } else {

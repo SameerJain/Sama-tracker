@@ -521,6 +521,22 @@ test('progress verbose digs into both periods, says what changed, and shows six 
   ].join('\n')), short);
 });
 
+test('progress verbose shows a win-rate trend graph, short does not', async () => {
+  const { sparkline } = await import('../src/embeds/shared.js');
+  assert.equal(sparkline([0, 0.5, 1]), '▁▅█');
+  assert.equal(sparkline([null, 1]), '·█');
+  const until = 200 * DAY;
+  const sets = [
+    ...[1, 2, 3].map((days) => result(`now-${days}`, until - days * DAY, [10, 'Active', 1], [20, 'Rival', 2], true, [2, 0])),
+    ...[40, 41].map((days) => result(`before-${days}`, until - days * DAY, [10, 'Active', 1], [20, 'Rival', 2], false, [0, 2])),
+  ];
+  const periods = periodsFor(crewPlayer, sets, [], until, 6);
+  const verbose = embeds.progress(crewPlayer, periods, { verbose: true }).map(e => e.toJSON().description).join('\n');
+  assert.match(verbose, /\*\*Trend, oldest → newest:\*\* [▁▂▃▄▅▆▇█·]+ win rate/);
+  const short = embeds.progress(crewPlayer, periods.slice(0, 2)).map(e => e.toJSON().description).join('\n');
+  assert.doesNotMatch(short, /Trend, oldest/);
+});
+
 test('progress describes streaks at the end of each period', () => {
   const until = 200 * DAY;
   const sets = [
@@ -1520,9 +1536,9 @@ test('match call pings mention connected discords, one message per set', async (
   state.links = { 'quiet-discord': { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', discordId: 'quiet-discord' } };
   state.callPings = ['crew-discord', 'rival-discord', 'quiet-discord'];
   state.called = [];
-  // both tracked players in the same called set
+  // both tracked players in the same called set, on a station
   const both = {
-    id: 'both-called', state: 6, completedAt: null, updatedAt: now - 60, fullRoundText: 'Winners round 1', winnerId: null, stream: null, event,
+    id: 'both-called', state: 6, completedAt: null, updatedAt: now - 60, fullRoundText: 'Winners round 1', winnerId: null, stream: null, station: { number: 4 }, event,
     slots: [[1, 10, 'Active'], [2, 20, 'Rival']].map(([entrant, player, name]) => ({
       entrant: { id: entrant, name, initialSeedNum: entrant, participants: [{ player: { id: player } }] },
       standing: null,
@@ -1543,11 +1559,14 @@ test('match call pings mention connected discords, one message per set', async (
   assert.equal(sent.length, 2);
   // one message for the shared set, with both pings in it
   assert.match(sent[0].content, /<@crew-discord>.*<@rival-discord>|<@rival-discord>.*<@crew-discord>/);
-  assert.match(sent[0].content, /your match was called/);
+  assert.match(sent[0].content, /You're up — Station 4/);
   assert.deepEqual(sent[0].allowedMentions, { users: ['crew-discord', 'rival-discord'] });
   assert.match(sent[0].embeds[0].data.title, /Match call · /);
-  // only linked, and the card and button are still about them
-  assert.equal(sent[1].content, '<@quiet-discord> your match was called');
+  assert.match(sent[0].embeds[0].data.description, /Station 4/);
+  // only linked, and the card and button are still about them. no station on start.gg, so none shows
+  assert.equal(sent[1].content, `<@quiet-discord> You're up`);
+  assert.doesNotMatch(sent[1].content, /Station/);
+  assert.doesNotMatch(sent[1].embeds[0].data.description, /Station/);
   assert.deepEqual(sent[1].allowedMentions, { users: ['quiet-discord'] });
   assert.equal(sent[1].embeds[0].data.author.name, 'Quiet');
   assert.deepEqual([...state.called].sort(), ['both-called', 'solo-called']);
@@ -1598,7 +1617,7 @@ test('match call pings put all four doubles players in one message', async () =>
   assert.equal(sent.length, 2);
   // one message for the 2v2 set, with every connected discord in it
   assert.deepEqual(sent[0].allowedMentions, { users: ['crew-discord', 'partner-discord', 'rival-discord'] });
-  assert.match(sent[0].content, /your match was called/);
+  assert.match(sent[0].content, /You're up/);
   assert.match(sent[0].embeds[0].data.title, /Match call · /);
   // the untracked stranger adds no ping, still one message
   assert.deepEqual(sent[1].allowedMentions, { users: ['crew-discord', 'rival-discord'] });

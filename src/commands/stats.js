@@ -369,6 +369,18 @@ async function predict(interaction) {
   return predictReport(interaction, { player, opponent, ...reportOptions(interaction), ...filters });
 }
 
+// the full breakdown lives here, so /predict stays short. same odds, more detail
+async function predictExplained(interaction) {
+  const filters = filterOptions(interaction);
+  if (filters.error) return replyEphemeral(interaction, filters.error);
+  const players = await pair(interaction);
+  if (!players) return;
+  const [player, opponent] = players;
+
+  if (!interaction.deferred) await interaction.deferReply();
+  return predictExplainedReport(interaction, { player, opponent, melee: flag(interaction, 'melee'), ...filters });
+}
+
 async function predictReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
   const only = onlyMelee(melee);
   const filters = { since, venue };
@@ -398,6 +410,31 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
 
   const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee, since: sinceText, venue }));
   await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, filters), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }), more);
+}
+
+async function predictExplainedReport(interaction, { player: a, opponent: b, melee, since, venue }) {
+  const only = onlyMelee(melee);
+  const filters = { since, venue };
+  const inScope = (list) => scopeSets(filters)(only(list));
+  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
+  const ranked = slippiLookup([a, b], melee);
+  const [historyA, historyB, meetings, eventsA, eventsB] = await withCountdown(interaction, `Explaining ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s odds`,
+    Promise.all([
+      setHistory(a.playerId), setHistory(b.playerId), h2hHistory(a.playerId, b.playerId).catch(() => []),
+      eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
+    ]));
+  const scopedA = scopeSets(filters)(historyA ?? []);
+  const scopedB = scopeSets(filters)(historyB ?? []);
+  const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: inScope(meetings) };
+  const { odds, profiles } = await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, melee);
+  if (!odds) {
+    const ranks = embeds.slippiMatchup([a, b], profiles);
+    const hinted = noOdds(a, b, scopedA, scopedB, melee, filters, scopeSets(filters)(historyA), scopeSets(filters)(historyB));
+    return interaction.editReply(ranks.length ? { content: hinted, embeds: ranks, files: [slippiLogo], allowedMentions: { parse: [] } } : { content: hinted, allowedMentions: { parse: [] } });
+  }
+
+  // already the fullest report, so no Full report button
+  await sendEmbeds(interaction, embeds.withSlippi(embeds.predictionExplained(a, b, odds, filters), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }));
 }
 
 // long-press someone in the server, then Apps. nothing to type, which is the point on a phone. checks the
@@ -455,4 +492,4 @@ const reports = {
   progress: progressReport, scout: scoutReport, h2h: headToHeadReport, stats: statsReport, doubles: doublesReport, characters: charactersReport, predict: predictReport,
 };
 
-export { progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED };
+export { progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED };

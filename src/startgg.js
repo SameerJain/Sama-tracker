@@ -25,6 +25,7 @@ const background = [];
 let REQUEST_GAP_MS = 800;
 let nextSlot = 0;
 let timer;
+let dispatched = 0;
 
 // tests run through hundreds of queued requests, so commands.test.js sets this to 0.
 // the rate limit itself is still covered by requests.test.js and queue.test.js on the real gap
@@ -73,7 +74,10 @@ function sendNext() {
     timer = null;
     // a 429 pushed everything back since this was scheduled
     if (Date.now() < nextSlot) return sendNext();
-    const queue = commandQueues.shift() ?? background;
+    // commands go ahead, but every 10th slot goes to the background checks when
+    // they have something waiting, so a busy night can't starve match calls
+    dispatched++;
+    const queue = (dispatched % 10 === 0 && background.length ? background : commandQueues.shift() ?? background);
     const next = queue.shift();
     if (!next) return;
     // back of the line for its next one
@@ -151,6 +155,19 @@ async function fitPage(getPage, page, perPage) {
   }
 }
 
+// lookups that came back empty, so a retried typo or dead link doesn't cost a
+// request every time. 5 minutes, room for a few hundred. cleared lookups just ask again
+const MISS_CACHE_MS = 5 * 60 * 1000;
+const MISS_CACHE_SIZE = 300;
+const missedCache = new Map();
+function miss(key) {
+  missedCache.delete(key);
+  missedCache.set(key, Date.now());
+  for (const old of [...missedCache.keys()].slice(0, -MISS_CACHE_SIZE)) missedCache.delete(old);
+}
+// for tests, which change who's registered between cases
+export const forgetMisses = () => missedCache.clear();
+
 // a bunch of lookups per request, aliased by id. start.gg's 1000 object limit counts what comes back
 // and most checks come back empty, so groups start big and get split in half when they go over
 // ids go straight into the query text, so only numeric start.gg ids get through
@@ -208,6 +225,8 @@ export async function getPlayerById(id) {
 
 export async function getPlayer(id) {
   const slug = id.startsWith('user/') ? id : `user/${id}`;
+  const missed = missedCache.get(`player:${slug}`);
+  if (missed && Date.now() - missed < MISS_CACHE_MS) return null;
   const data = await query(`
     query ($slug: String) {
       user(slug: $slug) {
@@ -221,7 +240,10 @@ export async function getPlayer(id) {
   `, { slug });
 
   const user = data.user;
-  if (!user?.player) return null;
+  if (!user?.player) {
+    miss(`player:${slug}`);
+    return null;
+  }
 
   return {
     userId: user.id,
@@ -261,6 +283,7 @@ const SET_FIELDS = `
   winnerId
   vodUrl
   stream { streamName streamSource }
+  station { number }
   event {
     name
     slug
@@ -941,6 +964,8 @@ export async function getTopEight(eventIds) {
 
 // slug is genesis-x, tournament/genesis-x or a short link name
 export async function getRegistration(slug) {
+  const missed = missedCache.get(`registration:${slug}`);
+  if (missed && Date.now() - missed < MISS_CACHE_MS) return null;
   const data = await query(`
     query ($slug: String) {
       tournament(slug: $slug) {
@@ -961,6 +986,7 @@ export async function getRegistration(slug) {
     }
   `, { slug });
 
+  if (!data.tournament) miss(`registration:${slug}`);
   return data.tournament;
 }
 

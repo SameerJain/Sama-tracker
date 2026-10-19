@@ -87,15 +87,20 @@ export function onStream(set, players) {
 }
 
 // a called set for someone with match call pings on. both sides can be tracked, still one card.
-// doubles shows the team names the way start.gg reports them
+// doubles shows the team names the way start.gg reports them. the station shows only when the TO set one
 export function matchCall(set, players) {
   const [a, b] = set.sides;
   const trackedA = findTracked(a, players);
   const [me, them] = trackedA ? [a, b] : [b, a];
 
-  return setEmbed(set, colors.live, trackedA ?? findTracked(b, players))
+  const card = setEmbed(set, colors.live, trackedA ?? findTracked(b, players))
     .setTitle(`Match call · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
     .setURL(setUrl(set));
+  if (set.station) {
+    const [first, ...rest] = (card.data.description ?? '').split('\n');
+    card.setDescription([`${first} · **Station ${set.station}**`, ...rest].join('\n'));
+  }
+  return card;
 }
 
 export function setResult(set, players) {
@@ -177,6 +182,29 @@ export function regReminder(tournament, deadline, lastCall) {
     .setAuthor({ name: lastCall ? 'Last call to register' : 'Registration reminder' })
     .setTitle(`Registration reminder · ${tournament.name}`.slice(0, 256))
     .setURL(register)
+    .setDescription(lines.join('\n'));
+
+  // a big picture so it stands out, the logo if there's no banner
+  const image = (type) => tournament.images?.find((each) => each.type === type)?.url;
+  const banner = image('banner');
+  const logo = image('profile');
+  if (banner ?? logo) embed.setImage(banner ?? logo);
+  if (banner && logo) embed.setThumbnail(logo);
+  return embed;
+}
+
+// DM 1 hour before the start, with the same picture, link and location as the reg reminder
+export function startReminder(tournament) {
+  const page = startggUrl(tournament.slug);
+  const register = startggUrl(`${tournament.slug}/register`);
+  const lines = [`## Starts <t:${tournament.startAt}:R>`, `**Starts:** <t:${tournament.startAt}:F>`, `**Location:** ${locationText(tournament)}`];
+  if (tournament.numAttendees) lines.push(`**Registered so far:** ${tournament.numAttendees}`);
+  lines.push('', `**[Tournament page on start.gg](${page})**`, `**[Register on start.gg](${register})**`);
+
+  const embed = baseEmbed(colors.live)
+    .setAuthor({ name: 'Tournament starts soon' })
+    .setTitle(`Starts soon · ${tournament.name}`.slice(0, 256))
+    .setURL(page)
     .setDescription(lines.join('\n'));
 
   // a big picture so it stands out, the logo if there's no banner

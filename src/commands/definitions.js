@@ -112,7 +112,7 @@ export const commands = [
         description: 'A tracked player\'s set results and stream alerts on or off. Leave both out to see them',
         options: [
           playerOption('Tracked player, or all'),
-          switchOption('sets', 'Their finished sets. Off for everyone asks first'),
+          switchOption('sets', 'Their finished sets. Asks first unless already off for everyone'),
           switchOption('stream', 'Their sets on stream or up next in the stream queue'),
         ],
       },
@@ -126,12 +126,14 @@ export const commands = [
   },
   {
     name: 'notify',
-    description: 'What pings you: match calls, stream alerts and reg reminders. Leave all out to see yours',
+    description: 'What pings you: match calls, stream alerts, reg reminders and 1-hour DMs. Leave all out to see yours',
     options: [
       switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('streams', 'Every stream alert posted here'),
       switchOption('registration', 'Reg reminders for tracked tournaments, skipped once you\'re registered'),
-      switchOption('all', 'All three at once'),
+      switchOption('dm_registration', 'DM 1 hour before registration closes, with link, location and image'),
+      switchOption('dm_start', 'DM 1 hour before the tournament starts, with link, location and image'),
+      switchOption('all', 'All five at once'),
     ],
   },
   {
@@ -221,6 +223,15 @@ export const commands = [
     ],
   },
   {
+    name: 'predict_explained',
+    description: 'Full breakdown of the odds, with shares, model numbers and bars',
+    options: [
+      playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
+      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks which count toward them' },
+      sinceOption(), venueOption(),
+    ],
+  },
+  {
     name: 'slippi',
     description: 'Slippi ranked: a watchlist with rank change posts, rank cards and a leaderboard',
     options: [
@@ -240,7 +251,7 @@ export const commands = [
         type: Option.Subcommand,
         name: 'rank',
         description: 'Rank, rating, record, characters and past seasons',
-        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist or any connect code. Leave out for yourself', autocomplete: true }],
+        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist or any connect code. Leave out for yourself if tracked or linked', autocomplete: true }],
       },
       { type: Option.Subcommand, name: 'leaderboard', description: 'Everyone on the watchlist, best rank first' },
     ],
@@ -258,6 +269,7 @@ export const commands = [
         options: [
           { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
           switchOption('reminders', 'Reg reminders for people with /notify registration on. On unless you turn them off'),
+          switchOption('add_event', 'Also make a Discord event from it. Off unless you turn it on'),
         ],
       },
       {
@@ -276,6 +288,14 @@ export const commands = [
           switchOption('stream', 'Every set on stream or up next in the stream queue'),
           switchOption('top8', 'Each event\'s top 8 once the bracket is finished'),
           switchOption('reminders', 'Reg reminders for people with /notify registration on'),
+        ],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'event',
+        description: 'Make a Discord event from a start.gg link, and track the tournament',
+        options: [
+          { type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true },
         ],
       },
       {
@@ -300,7 +320,7 @@ export const commands = [
       },
     ],
   },
-  { name: 'bracket', description: 'Bracket links for tracked tournaments that are live or start within 30 min' },
+  { name: 'bracket', description: 'Bracket links for tracked tournaments, 30 min before start to 6 hours after the end' },
   { name: 'stream_link', description: 'Stream links for tournaments that are tracked or have tracked players, live or starting soon' },
   {
     name: 'registered',

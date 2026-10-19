@@ -2,14 +2,14 @@ import { hostname } from 'node:os';
 import { MessageFlags } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
-import { state } from '../store.js';
+import { state, saveCount } from '../store.js';
 import { deployedAt, health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, recent, run } from './players.js';
-import { progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
+import { progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
-import { tournamentAdd, tournamentRemove, tournamentPosts, adminAdd, adminRemove, adminList } from './tournaments.js';
+import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, adminAdd, adminRemove, adminList } from './tournaments.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches } from './shared.js';
@@ -24,7 +24,7 @@ const TRACKED_ONLY = ['track remove', 'track posts'];
 // all means everyone tracked
 const TAKES_ALL = ['upcoming', 'recent', 'track posts'];
 // a tournament link, or one the bot already knows. new is the ones /tournament add can still track, tracked the ones it does
-const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', registered: 'known', reg_warn: 'known' };
+const TAKES_TOURNAMENT = { 'tournament add': 'new', 'tournament remove': 'tracked', 'tournament posts': 'tracked', 'tournament event': 'known', registered: 'known', reg_warn: 'known' };
 
 // "track add", "tournament admin add", or just the command for the ones without subcommands
 function commandName(interaction) {
@@ -58,6 +58,7 @@ const handlers = new Map([
   ['doubles', doubles],
   ['characters', characters],
   ['predict', predict],
+  ['predict_explained', predictExplained],
   ['slippi add', slippiAdd],
   ['slippi remove', slippiRemove],
   ['slippi rank', slippiRank],
@@ -66,6 +67,7 @@ const handlers = new Map([
   ['tournament add', tournamentAdd],
   ['tournament remove', tournamentRemove],
   ['tournament posts', tournamentPosts],
+  ['tournament event', tournamentEvent],
   ['tournament admin add', adminAdd],
   ['tournament admin remove', adminRemove],
   ['tournament admin list', adminList],
@@ -244,6 +246,8 @@ function status(interaction) {
     slippi: Object.keys(state.slippi).length,
     tournaments: tournaments.length,
     queued: startgg.queueLength(),
+    stateSize: Buffer.byteLength(JSON.stringify(state)),
+    saves: saveCount,
   };
   return interaction.reply({ embeds: [embeds.status(info)] });
 }

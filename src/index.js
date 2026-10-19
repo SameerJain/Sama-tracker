@@ -40,6 +40,7 @@ client.once(Events.ClientReady, async () => {
     PermissionFlagsBits.ViewChannel,
     PermissionFlagsBits.SendMessages,
     PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.AttachFiles,
   ]);
   if (missing.length) quit(`missing permissions in #${channel.name}: ${missing.join(', ')}`);
 

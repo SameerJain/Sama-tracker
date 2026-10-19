@@ -263,6 +263,12 @@ export function section(lines, title, list) {
   lines.push(`### ${title}`, ...list);
 }
 
+// win rates 0-1, oldest first, null for no sets. higher blocks mean better
+export function sparkline(rates) {
+  const blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+  return rates.map((rate) => (rate == null ? '·' : blocks[Math.min(7, Math.max(0, Math.round(rate * 7)))])).join('');
+}
+
 // player names stand out in a line full of numbers
 export function bold(name) {
   return `**${escapeMarkdown(name)}**`;

@@ -53,7 +53,7 @@ function maximize(slopeAndBend, start = 0) {
 }
 
 // odds for a gap of mean with this much uncertainty. unsure pulls it toward 50%
-const chanceOf = (mean, variance) => sigmoid(mean / Math.sqrt(1 + (Math.PI * variance) / 8));
+export const chanceOf = (mean, variance) => sigmoid(mean / Math.sqrt(1 + (Math.PI * variance) / 8));
 
 // the game they've both played the most singles sets in. DQs don't count, or a game someone only got
 // DQ'd out of could win and leave nothing to predict with
@@ -379,7 +379,7 @@ export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, hist
   });
 
   return {
-    game, chance: chanceOf(gap, variance), h2h, common, seeding, level, form, factors, slippi,
+    game, chance: chanceOf(gap, variance), gap, variance, h2h, common, seeding, level, form, factors, slippi,
     // the starting point of even odds, for how much thin evidence keeps it near 50%
     prior: 1 / GAP_PRIOR ** 2 / everything,
     // what a seed twice as high won, by their sets in this game

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { predict } from '../src/predict.js';
+import { predict, chanceOf } from '../src/predict.js';
 import * as embeds from '../src/embeds/index.js';
 
 const DAY = 86400;
@@ -191,6 +191,42 @@ test('slippi stays out unless it is melee with two ranked ratings', () => {
   assert.doesNotMatch(embeds.prediction(a, b, plain, false)[0].data.description, /Slippi ranked:/);
   const verbose = embeds.prediction(a, b, plain, true).map((embed) => embed.data.description).join('\n');
   assert.match(verbose, /\*\*Slippi ranked:\*\* nothing to go on/);
+});
+
+test('the gap and variance match the chance, and thin evidence stays near 50%', () => {
+  const sets = [set(1, 2, true, { daysAgo: 5 }), set(1, 2, false, { daysAgo: 6 })];
+  const odds = predict(a, b, sets, mirror(sets), { now });
+  assert.ok(Number.isFinite(odds.gap) && Number.isFinite(odds.variance) && odds.variance > 0);
+  assert.ok(Math.abs(odds.chance - chanceOf(odds.gap, odds.variance)) < 1e-9);
+  // 1-1 with little else is mostly prior, so it stays near even
+  assert.ok(Math.abs(odds.chance - 0.5) < 0.1, `${odds.chance}`);
+  assert.ok(odds.prior > 0.1, `${odds.prior}`);
+  const text = embeds.predictionExplained(a, b, odds).map((embed) => embed.data.description).join('\n');
+  assert.match(text, /\*\*Gap:\*\* -?\d+\.\d+ log-odds · \*\*Uncertainty:\*\* \d+\.\d+/);
+  assert.match(text, /Starting from even:/);
+});
+
+test('more slippi updates mean the same rating gap counts for more', () => {
+  const historyA = [set(1, 100, true, { game: 'Melee' }), set(1, 101, false, { game: 'Melee' })];
+  const historyB = [set(2, 200, true, { game: 'Melee' }), set(2, 201, false, { game: 'Melee' })];
+  const few = predict(a, b, historyA, historyB, { now, game: 'Melee', slippiA: { rating: 1800, updates: 5 }, slippiB: { rating: 1400, updates: 5 } });
+  const many = predict(a, b, historyA, historyB, { now, game: 'Melee', slippiA: { rating: 1800, updates: 50 }, slippiB: { rating: 1400, updates: 50 } });
+  assert.ok(many.chance > few.chance, `${few.chance} -> ${many.chance}`);
+  assert.ok(many.variance < few.variance, `${few.variance} -> ${many.variance}`);
+});
+
+test('explained shows bars and model numbers behind the same odds', () => {
+  const sets = Array.from({ length: 8 }, (_, i) => set(1, 2, i < 6, { mySeed: 2, theirSeed: 6, event: `w${i}`, daysAgo: i * 7 }));
+  const odds = predict(a, b, sets, mirror(sets), { now });
+  const short = embeds.prediction(a, b, odds, false)[0].data.description;
+  const text = embeds.predictionExplained(a, b, odds).map((embed) => embed.data.description).join('\n');
+  // same title odds as the short card
+  assert.equal(embeds.predictionExplained(a, b, odds)[0].data.title, embeds.prediction(a, b, odds, false)[0].data.title);
+  assert.match(text, /How it adds up/);
+  assert.match(text, /█.*░.*Head-to-head|Head-to-head.*█/);
+  assert.match(text, /\*\*Form detail:\*\*/);
+  assert.match(text, /\*\*Gap:\*\*/);
+  assert.doesNotMatch(short, /Gap:/);
 });
 
 test('slippi alone predicts melee when both are ranked with no sets on start.gg', () => {
