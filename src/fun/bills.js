@@ -4,8 +4,10 @@ const API = 'https://commons.wikimedia.org/w/api.php';
 // selected player galleries add photos without pulling in every former Bill's other teams
 const CATEGORIES = [
   'Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Highmark Stadium (Orchard Park, New York)', 'New Highmark Stadium', 'Billy Buffalo',
+  'Buffalo Bills coaches', 'War Memorial Stadium (Buffalo, New York)',
   'Josh Allen in 2018', 'Josh Allen in 2019', 'Josh Allen in 2021', 'Josh Allen in 2025',
   'James Cook (running back)', 'Terrel Bernard', 'Christian Benford', 'Dawson Knox', 'Greg Rousseau',
+  'Dalton Kincaid', 'Khalil Shakir', 'Keon Coleman', 'Ed Oliver',
 ];
 // checked links, not live searches, so unrelated memes stay out of the mix
 const MEMES = [
@@ -24,6 +26,12 @@ const GIFS = [
   ['elqUYc9nQYRCEuL2Gq', 'Josh Allen thumbs up'],
   ['2t9lXRcMnr2Wt8D1LU', 'Josh Allen dancing'],
   ['WVWAcn33b93kO6hNvX', 'Bills dancing'],
+  ['TgmwKWhG18tcOqJhN7', 'Josh Allen reaction'],
+  ['J6205HegEoe5VPdpPk', 'Josh Allen celebration'],
+  ['VhPxOrVh5ps5ExWtPJ', 'Josh Allen game day'],
+  ['P50teGDm254KLd1xMK', 'Bills sideline reaction'],
+  ['ElWkVF5A4A0SiMabcd', 'Bills reaction'],
+  ['gTAXtUgxmE6yebkumf', 'Bills celebration'],
 ].map(([id, name]) => ({ name, image: `https://media.giphy.com/media/${id}/giphy.gif`, page: `https://giphy.com/gifs/${id}`, source: 'GIPHY' }));
 const TITLES = [
   'GO BILLS! 🦬🔥',
@@ -100,6 +108,7 @@ function cycle(load) {
 
 const pools = [cycle(billsImagePool), cycle(() => MEMES), cycle(() => GIFS)];
 let kinds = [];
+let lastImage;
 
 // upload the original bytes so gifs keep their animation
 async function download(image) {
@@ -120,6 +129,8 @@ async function takePost() {
     console.error('bills photos failed:', err.message);
     picked = await pools[1 + Math.floor(Math.random() * 2)]();
   }
+  if (picked.image === lastImage) picked = await pools[kind]();
+  lastImage = picked.image;
   // a failed download falls back to the url, which discord usually still loads
   let file;
   try {
@@ -133,7 +144,7 @@ async function takePost() {
 export default {
   name: 'bills',
   line: 'GO BILLS! 🦬🔥',
-  description: 'Bills photos, memes and GIFs with a rally cry',
+  description: 'Bills photos, memes and GIFs with a message',
   enabled: true,
   takePost,
   format: ({ title, image, file, page, name, source }) => ({

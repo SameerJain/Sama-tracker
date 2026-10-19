@@ -166,7 +166,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 `/64`, `/melee`, `/brawl`, `/sm4sh`, `/ult` and `/pplus` are each a different character with their own Smash take. With `ANTHROPIC_API_KEY` set, Claude Haiku writes each post in that character from the game's talking points. Every post comes with a SmashWiki screenshot. Without `ANTHROPIC_API_KEY`, each command replies with its catchphrase.
 
-`/bills` posts a Bills photo, meme or GIF with a rally cry and a link to the source. Photos come from Wikimedia Commons, memes from selected Imgflip posts, and GIFs from the official Bills and NFL GIPHY channels. It rotates the three types evenly and uses every image in a pool before repeating one. The pools and rotation reset when the bot restarts. It needs no AI or API keys.
+`/bills` posts a Bills photo, meme or GIF with a message and a link to the source. Photos come from a broad set of Wikimedia Commons categories, memes from selected Imgflip posts, and GIFs from the official Bills and NFL GIPHY channels. It rotates the three types evenly, uses every image in a pool before repeating one and never sends the same image twice in a row. The pools and rotation reset when the bot restarts. It needs no AI or API keys.
 
 `/messages bills:True` posts the Bills final score here after each game, with the other team's logo, green for a win and red for a loss. Scores come from ESPN's public scoreboard, with quarters and yards. Off by default. It needs no AI or API keys.
 

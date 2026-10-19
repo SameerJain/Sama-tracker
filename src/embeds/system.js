@@ -180,7 +180,7 @@ export function help() {
       '`/sm4sh` a love letter to Smash 4',
       '`/ult` an Ultimate player who hates Ultimate',
       '`/pplus` a Project+ player who wants you on netplay',
-      '`/bills` Bills photos, memes and GIFs with a rally cry. Uses each image in a pool before repeating',
+      '`/bills` Bills photos, memes and GIFs with a message. Never sends the same image twice in a row',
       '`/view_pfp` my profile picture, full size',
       '-# `/messages bills:True` posts Bills final scores here after each game, green for a win and red for a loss',
     ],

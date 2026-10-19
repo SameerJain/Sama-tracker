@@ -135,7 +135,7 @@ test('bills images come from the fan, player, team, stadium and mascot Commons c
   assert.deepEqual(await billsImagePool(), [{
     name: 'Bills fan', image: 'https://images.example/fan.jpg', page: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg',
   }]);
-  for (const category of ['Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Highmark Stadium (Orchard Park, New York)', 'New Highmark Stadium', 'Billy Buffalo', 'Josh Allen in 2021', 'Josh Allen in 2025', 'James Cook (running back)', 'Terrel Bernard']) {
+  for (const category of ['Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Highmark Stadium (Orchard Park, New York)', 'New Highmark Stadium', 'Billy Buffalo', 'Buffalo Bills coaches', 'War Memorial Stadium (Buffalo, New York)', 'Josh Allen in 2021', 'Josh Allen in 2025', 'James Cook (running back)', 'Terrel Bernard', 'Dalton Kincaid', 'Khalil Shakir', 'Keon Coleman', 'Ed Oliver']) {
     assert.ok(asked.includes(`Category:${category}`), category);
   }
 });
@@ -235,7 +235,7 @@ test('bills rotates photos, memes and animated gifs, using each pool before repe
     return { ok: true, arrayBuffer: async () => new Uint8Array([71, 73, 70, 56]).buffer };
   };
   const posts = [];
-  for (let i = 0; i < 24; i++) posts.push(await bills.takePost());
+  for (let i = 0; i < 36; i++) posts.push(await bills.takePost());
   for (let i = 0; i < posts.length; i += 3) {
     assert.match(posts[i].page, /^https:\/\/commons\.wikimedia\.org\//);
     assert.match(posts[i + 1].page, /^https:\/\/imgflip\.com\//);
@@ -247,14 +247,29 @@ test('bills rotates photos, memes and animated gifs, using each pool before repe
   assert.equal(new Set(memes.slice(0, 7)).size, 7);
   assert.notEqual(memes[6], memes[7]);
   const gifs = posts.filter((_, i) => i % 3 === 2);
-  assert.equal(new Set(gifs.slice(0, 5).map(({ image }) => image)).size, 5);
-  assert.notEqual(gifs[4].image, gifs[5].image);
+  assert.equal(new Set(gifs.slice(0, 11).map(({ image }) => image)).size, 11);
+  assert.notEqual(gifs[10].image, gifs[11].image);
   const reply = bills.format(gifs[0]);
   assert.equal(reply.embeds[0].data.image.url, 'attachment://bills.gif');
   assert.match(reply.embeds[0].data.footer.text, /GIPHY/);
   assert.doesNotMatch(reply.embeds[0].data.footer.text, /Wikimedia Commons/);
   assert.equal(reply.files[0].attachment.toString(), 'GIF8');
   assert.match(bills.format(posts[1]).embeds[0].data.footer.text, /Imgflip/);
+});
+
+test('bills never sends the same image twice in a row across different pools', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const { default: bills } = await import('../src/fun/bills.js?consecutive-repeat');
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('commons.wikimedia.org')) return json({ query: { pages: [{
+      title: 'File:Duplicate.jpg',
+      imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://i.imgflip.com/72v69k.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Duplicate.jpg' }],
+    }] } });
+    return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
+  };
+  const first = await bills.takePost();
+  const second = await bills.takePost();
+  assert.notEqual(first.image, second.image);
 });
 
 test('bills still posts memes and gifs when Commons is down, then retries the photos', async (t) => {
