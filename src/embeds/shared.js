@@ -3,6 +3,7 @@ import { startggUrl } from '../startgg.js';
 
 export const colors = {
   brand: 0x5b21b6,
+  thread: 0x2563eb,
   win: 0x22c55e,
   loss: 0xef4444,
   clash: 0xf59e0b, // tracked vs tracked

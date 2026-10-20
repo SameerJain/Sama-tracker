@@ -1130,7 +1130,7 @@ test('set result cards put the winner on the left with a W and the loser on the 
   const loss = card('l', [10, 'Active', 2], [99, 'Opponent', 3], false, [1, 3]);
   assert.equal(loss.title, 'Set result · W · Opponent 3-1 Active · L');
   assert.equal(loss.color, colors.win);
-  assert.equal(loss.author.name, 'Active');
+  assert.equal(loss.author, undefined);
   assert.equal(loss.fields.find((field) => field.name === 'Characters').value, 'Opponent: Wario\nActive: Pac-Man');
   assert.doesNotMatch(loss.description, /Major upset/);
 
@@ -1262,7 +1262,8 @@ test('set results off keeps a player out of the set check and /track posts sets:
 
   await tracker.postNewSets(channel);
   assert.deepEqual(asked, [['p20']]);
-  assert.deepEqual(sent.map(({ embeds: [card] }) => card.data.author.name), ['Rival']);
+  assert.ok(sent.every(({ embeds: [card] }) => card.data.author === undefined));
+  assert.match(sent[0].embeds[0].data.title, /^Set result · /);
   // the set's over, so no head to head button
   assert.equal(sent[0].components, undefined);
 
@@ -1277,7 +1278,8 @@ test('set results off keeps a player out of the set check and /track posts sets:
 
   nodes.p10.push({ ...node('after-on', state.players[1].setResultsOnAt), state: 3 });
   await tracker.postNewSets(channel);
-  assert.deepEqual(sent.map(({ embeds: [card] }) => card.data.author.name), ['Rival', 'Active']);
+  assert.ok(sent.every(({ embeds: [card] }) => card.data.author === undefined));
+  assert.deepEqual(sent.map(({ embeds: [card] }) => card.data.title.slice(0, 12)), ['Set result ·', 'Set result ·']);
 });
 
 test('the set check sends nothing to start.gg when nobody has set results on', async () => {

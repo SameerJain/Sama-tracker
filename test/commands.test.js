@@ -60,8 +60,8 @@ function respond(query, variables) {
   const aliases = [...query.matchAll(/\b([pu])(\d+): /g)].map(([, kind, id]) => `${kind}${id}`);
   const each = (value) => Object.fromEntries(aliases.map((alias) => [alias, value]));
   if (query.includes('currentUser')) return { currentUser: { id: 1 } };
-  // /stream_link: the streams on each tournament's page
-  if (query.includes('streams { streamName')) return Object.fromEntries([...query.matchAll(/\bt(\d+): tournament/g)].map(([, id]) => [`t${id}`, { streams: [{ streamName: 'localstream', streamSource: 'TWITCH' }] }]));
+  // /stream_link: the streams on each tournament's page. registration lookups carry streams too now
+  if (query.includes('streams { streamName') && !query.includes('registrationClosesAt')) return Object.fromEntries([...query.matchAll(/\bt(\d+): tournament/g)].map(([, id]) => [`t${id}`, { streams: [{ streamName: 'localstream', streamSource: 'TWITCH' }] }]));
   // /doubles: 2v2 sets, then the events they were in with crew's team
   if (query.includes('entrantSize: [2]')) return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [doublesNode('d1', now - 900), doublesNode('d2', now - 8000)] } } };
   if (/\be\d+: event\(id: \d+\)/.test(query) && query.includes('userEntrant')) {

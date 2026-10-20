@@ -49,14 +49,14 @@ function groupByEvent(tournament, players) {
   return [...Map.groupBy(entries, (entry) => entry.eventSlug).values()];
 }
 
-function setEmbed(set, color, player) {
+function setEmbed(set, color, player, { author = true } = {}) {
   const game = set.event.videogame?.displayName;
   const tournament = set.event.tournament;
 
   const embed = baseEmbed(color, game ? `${FOOTER} · ${game}` : undefined)
     .setDescription(`**${set.round}** · ${escapeMarkdown(set.event.name)}\n[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})`);
 
-  if (player) embed.setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) });
+  if (player && author) embed.setAuthor({ name: player.tag, iconURL: player.image, url: startggUrl(player.slug) });
 
   // the player's picture big when the tournament has none
   const image = tournament.images?.[0]?.url ?? player?.image;
@@ -66,14 +66,14 @@ function setEmbed(set, color, player) {
 
 // heads a /messages threads thread in the channel. tournament is the one sets carry under event
 export function tournamentThread(tournament) {
-  return tournamentEmbed(colors.brand, 'Tournament thread', tournament)
+  return tournamentEmbed(colors.thread, 'Tournament thread', tournament)
     .setDescription('Set results and stream alerts from this tournament go in the thread.');
 }
 
 // heads one event's thread with /messages threads set to one per event
 export function eventThread(event) {
   const game = event.videogame?.displayName;
-  return tournamentEmbed(colors.brand, 'Event thread', event.tournament)
+  return tournamentEmbed(colors.thread, 'Event thread', event.tournament)
     .setDescription(`**${escapeMarkdown(event.name)}**${game ? ` · ${game}` : ''}\nSet results and stream alerts from this event go in the thread.`);
 }
 
@@ -87,7 +87,7 @@ export function onStream(set, players) {
   const twitch = streamSource === 'TWITCH' && streamName ? `https://twitch.tv/${encodeURIComponent(streamName)}` : null;
   const watch = streamName ? (twitch ? `[twitch.tv/${escapeMarkdown(streamName)}](${twitch})` : escapeMarkdown(streamName)) : null;
 
-  const card = setEmbed(set, colors.stream, trackedA ?? findTracked(b, players))
+  const card = setEmbed(set, colors.stream, trackedA ?? findTracked(b, players), { author: false })
     .setTitle(`Stream alert · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
     .setURL(twitch ?? setUrl(set));
   if (watch) card.addFields({ name: 'Watch', value: watch });
@@ -120,10 +120,10 @@ export function setResult(set, players, { setColors = false } = {}) {
   const bWon = b.id === set.winnerId;
   const winner = bWon ? b : a;
   const loser = bWon ? a : b;
-  // the card is still about the tracked one: their picture when someone tracked played
+  // no author, the title already names both sides. the thumbnail still falls back to the tracked player's picture
   const player = (bWon ? trackedB : trackedA) ?? (bWon ? trackedA : trackedB);
 
-  const embed = setEmbed(set, setColors ? resultColor(trackedA, trackedB, bWon) : colors.win, player)
+  const embed = setEmbed(set, setColors ? resultColor(trackedA, trackedB, bWon) : colors.win, player, { author: false })
     .setTitle(`Set result · W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
     .setURL(setUrl(set))
     .setTimestamp(set.completedAt * 1000);

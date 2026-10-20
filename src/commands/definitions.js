@@ -193,7 +193,7 @@ export const commands = [
           {
             type: Option.Subcommand,
             name: 'event',
-            description: 'Make a Discord event without tracking it. Time, end time and cover from start.gg',
+            description: 'Make a Discord event without tracking it. Time, end time, cover and streams from start.gg',
             options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
           },
         ],

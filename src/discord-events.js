@@ -32,9 +32,18 @@ function timeText(seconds) {
   }).format(new Date(seconds * 1000));
 }
 
+// twitch names link to the channel, anything already a link stays one, the rest show with their source
+function streamLink({ streamName, streamSource }) {
+  if (streamSource === 'TWITCH') return `https://twitch.tv/${encodeURIComponent(streamName)}`;
+  if (/^https?:\/\//i.test(streamName)) return streamName;
+  return streamSource ? `${streamName} (${streamSource.charAt(0)}${streamSource.slice(1).toLowerCase()})` : streamName;
+}
+
 // the start.gg link gets a line to itself, which is how an event made earlier gets found again
 function eventDescription(tournament) {
   const lines = [`${tournament.name} on start.gg`, startggUrl(tournament.slug), eventLocation(tournament)];
+  const streams = (tournament.streams ?? []).filter((stream) => stream?.streamName).map(streamLink);
+  if (streams.length) lines.push(`Streams: ${streams.join(', ')}`);
   if (tournament.registrationClosesAt && tournament.registrationClosesAt < tournament.startAt) {
     lines.push(`Registration closes ${timeText(tournament.registrationClosesAt)}`);
   }
@@ -135,7 +144,7 @@ export async function ensureDiscordEvent(found, guild) {
 }
 
 // the discord events the bot made keep up with start.gg until they start: a new time, end time, cover, name,
-// venue, close time or event list gets edited in, and a tournament deleted or unpublished on start.gg cancels
+// venue, close time, streams or event list gets edited in, and a tournament deleted or unpublished on start.gg cancels
 // its event. it goes by tournament id, since a TO can change the link. an event a mod deleted, or one that
 // started, is left alone. nothing gets posted, and each event costs one start.gg request a run
 export async function syncDiscordEvents(guild, now = secondsNow()) {

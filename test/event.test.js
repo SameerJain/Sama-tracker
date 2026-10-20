@@ -385,6 +385,26 @@ test('an event shows the venue and its address when start.gg has them, and the c
   assert.equal(created[2].entityMetadata.location, 'Main St Arcade, 5 Elm St, Buffalo, NY');
 });
 
+test('a made event lists the tournament\'s streams in its description', async () => {
+  await reset();
+  const { guild, created } = fakeGuild();
+  const streamed = {
+    ...soon, id: 30, slug: 'tournament/streamed',
+    streams: [
+      { streamName: 'buffalosmash', streamSource: 'TWITCH' },
+      { streamName: 'https://youtube.com/@buffalosmash/live', streamSource: 'YOUTUBE' },
+      { streamName: 'somestreamer', streamSource: 'YOUTUBE' },
+    ],
+  };
+  await ensureDiscordEvent(streamed, guild);
+  assert.ok(created[0].description.split('\n').includes('Streams: https://twitch.tv/buffalosmash, https://youtube.com/@buffalosmash/live, somestreamer (Youtube)'));
+
+  // none on start.gg, so no line
+  state.discordEvents = {};
+  await ensureDiscordEvent({ ...soon, id: 31, slug: 'tournament/quiet', streams: [] }, guild);
+  assert.doesNotMatch(created[1].description, /Streams:/);
+});
+
 test('a made event carries start.gg\'s banner as its cover, the logo when there\'s no banner, and none without either', async () => {
   await reset();
   const { guild, created } = fakeGuild();
@@ -491,6 +511,21 @@ test('the sync edits in a new cover photo when the TO changes it on start.gg', a
   assert.deepEqual(downloaded, ['https://images.example/new.png']);
 
   // once synced, the same cover doesn't edit it again
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
+});
+
+test('the sync edits in streams the TO adds on start.gg', async () => {
+  await reset();
+  const { guild, event, edited } = await madeEvent();
+  assert.doesNotMatch(event.description, /Streams:/);
+
+  byId = { 6: { ...soon, streams: [{ streamName: 'buffalosmash', streamSource: 'TWITCH' }] } };
+  await syncDiscordEvents(guild);
+  assert.equal(edited.length, 1);
+  assert.ok(edited[0][1].description.split('\n').includes('Streams: https://twitch.tv/buffalosmash'));
+
+  // once synced, the same streams don't edit it again
   await syncDiscordEvents(guild);
   assert.equal(edited.length, 1);
 });

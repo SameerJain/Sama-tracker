@@ -1000,6 +1000,7 @@ const REGISTRATION_FIELDS = `
   isOnline
   images { type url }
   events { name slug }
+  streams { streamName streamSource }
 `;
 
 // slug is genesis-x, tournament/genesis-x or a short link name

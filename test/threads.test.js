@@ -100,7 +100,8 @@ test('with threads off, set results post in the channel and no thread starts', a
   sets = [node('off', now(), tournament('Local'))];
   await tracker.postNewSets(channel);
   assert.equal(channel.sent.length, 1);
-  assert.equal(channel.sent[0].embeds[0].data.author.name, 'Active');
+  assert.equal(channel.sent[0].embeds[0].data.author, undefined);
+  assert.match(channel.sent[0].embeds[0].data.title, /^Set result · /);
   assert.equal(channel.threads.all.size, 0);
 });
 
@@ -111,6 +112,7 @@ test('one thread per tournament, started by a card in the channel and reused by 
 
   // the two cards that start threads, nothing else in the channel
   assert.deepEqual(channel.sent.map(message => message.embeds[0].data.title), ['Local', 'Weekly']);
+  assert.deepEqual(channel.sent.map(message => message.embeds[0].data.color), [0x2563eb, 0x2563eb]);
   assert.deepEqual(channel.sent.map(message => message.allowedMentions), [{ parse: [] }, { parse: [] }]);
   const [local, weekly] = channel.threads.all.values();
   assert.equal(local.name, 'Local');
@@ -132,6 +134,7 @@ test('one thread per event, named for the tournament and event, apart from the p
   await tracker.postNewSets(channel);
 
   assert.deepEqual(channel.sent.map(message => message.embeds[0].data.author.name), ['Event thread', 'Event thread', 'Event thread']);
+  assert.deepEqual(channel.sent.map(message => message.embeds[0].data.color), [0x2563eb, 0x2563eb, 0x2563eb]);
   assert.deepEqual(channel.sent.map(message => message.embeds[0].data.title), ['Local', 'Local', 'Weekly']);
   assert.match(channel.sent[1].embeds[0].data.description, /^\*\*Doubles\*\* · Ultimate\n/);
   const [singles, doubles, weekly] = channel.threads.all.values();
@@ -200,7 +203,8 @@ test('without thread permissions posts go in the channel, with no card left behi
     sets = [node(`perms-${allowed.length}`, now(), tournament('Local'))];
     await tracker.postNewSets(channel);
     assert.equal(channel.sent.length, 1);
-    assert.equal(channel.sent[0].embeds[0].data.author.name, 'Active', 'the set itself, not a thread card');
+    assert.equal(channel.sent[0].embeds[0].data.author, undefined, 'the set itself, not a thread card');
+    assert.match(channel.sent[0].embeds[0].data.title, /^Set result · /);
     assert.equal(channel.threads.all.size, 0);
     assert.match(tracker.health.threadError, /^missing /);
     for (const name of BOTH) {
@@ -220,7 +224,8 @@ test('a thread that rejects the post sends it to the channel, and a working one 
   sets = [node('locked', now() - 10, tournament('Local'))];
   await tracker.postNewSets(channel);
   assert.equal(channel.sent.length, 2);
-  assert.equal(channel.sent[1].embeds[0].data.author.name, 'Active');
+  assert.equal(channel.sent[1].embeds[0].data.author, undefined);
+  assert.match(channel.sent[1].embeds[0].data.title, /^Set result · /);
   assert.equal(tracker.health.threadError, 'Thread is locked');
 
   thread.locked = false;

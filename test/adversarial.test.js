@@ -145,6 +145,7 @@ test('a twitch name with spaces and parens still links instead of breaking', asy
     ],
   };
   const card = embeds.onStream(set, { 1: { userId: 1, playerId: 10, tag: 'Crew' } });
+  assert.equal(card.data.author, undefined);
   const watch = card.data.fields?.find((field) => field.name === 'Watch');
   assert.ok(watch.value.includes('https://twitch.tv/my%20stream%20(live)'.replace('(', '%28').replace(')', '%29')) || watch.value.includes('twitch.tv/'));
   assert.ok(!watch.value.includes('](https://twitch.tv/my stream'));
