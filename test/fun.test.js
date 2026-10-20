@@ -316,6 +316,34 @@ test('bills still posts official gifs when Commons is down, then retries the pho
   }
 });
 
+test('bills keeps posts queued so bursts reply right away', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const { default: bills } = await import('../src/fun/bills.js?queued');
+  let commons = 0;
+  let giphy = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('commons.wikimedia.org')) {
+      commons++;
+      return json({ query: { pages: ['one', 'two', 'three'].map((name) => ({ title: `File:${name}.jpg`, imageinfo: [{ mime: 'image/jpeg', thumburl: `https://images.example/${name}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:${name}.jpg` }] })) } });
+    }
+    if (url === 'https://giphy.com/buffalobills') {
+      giphy++;
+      return { ok: true, text: async () => Array.from({ length: 20 }, (_, i) => String.raw`\"id\":\"liveGif${i}\",\"title\":\"Bills Celebration ${i} GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media.giphy.com/media/liveGif${i}/giphy.gif\"}}`).join(',') };
+    }
+    return { ok: true, arrayBuffer: async () => new Uint8Array([71, 73, 70, 56]).buffer };
+  };
+  const first = await bills.takePost();
+  assert.ok(first.title);
+  const loaded = { commons, giphy };
+  assert.ok(loaded.commons > 0, 'the first post loads the photo pool');
+  const second = await bills.takePost();
+  assert.ok(second.title);
+  assert.notEqual(second.image, first.image);
+  // the second post was already queued in the backend: no new pool loads
+  assert.equal(commons, loaded.commons);
+  assert.equal(giphy, loaded.giphy);
+});
+
 test('the message lists the game\'s points, then the video and article as more of them', () => {
   const message = funMessage({
     style: 'a copypasta',

@@ -149,7 +149,7 @@ function shortHelp() {
     '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered',
     '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks',
     '`/messages` automatic posts and threads, needs Manage Server · `/status` uptime and last checks',
-    '`/matchmaking_role game:` get game pings · `/matchmaking_search game:` find games',
+    '`/matchmaking_role game:` get game pings · `/matchmaking_search game:` find games · `/matchmaking_channel` where searches go',
     '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun',
   ];
   return [baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'))];
@@ -197,8 +197,9 @@ export function help(verbose = false) {
     ],
     [
       '**Matchmaking**',
-      '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many minutes, then it comes off on its own',
+      '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many hours, like 2 or 0.5 for 30 minutes, then it comes off on its own',
       '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them. Only people with the role can',
+      '`/matchmaking_channel` where a game\'s searches post with `game:` and `channel:`. TOs only to change it, anyone can look. Left out means wherever the command runs. `clear:True` goes back to that',
       '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it',
     ],
     [

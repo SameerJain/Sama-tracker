@@ -3,15 +3,16 @@ import * as embeds from '../embeds/index.js';
 import { colors, count } from '../embeds/shared.js';
 import { state, save } from '../store.js';
 import { serverMembers } from '../accounts.js';
+import { isTO, notTO } from './to.js';
 import { MATCHMAKING } from './definitions.js';
 import { replyEphemeral } from './shared.js';
 
 // discord's code for missing permissions, which includes a role sitting above the bot's
 const MISSING_PERMISSIONS = 50013;
 
-// minutes a timed role can last, 1 minute to a day
-export const MATCHMAKING_DURATION_MIN = 1;
-export const MATCHMAKING_DURATION_MAX = 1440;
+// hours a timed role can last, 30 minutes to a day. decimals work, like 0.5 for 30 minutes
+export const MATCHMAKING_DURATION_MIN = 0.5;
+export const MATCHMAKING_DURATION_MAX = 24;
 
 // a timed role, so a restart doesn't cancel it
 export const expiryKey = (discordId, game) => `${discordId}:${game}`;
@@ -51,11 +52,12 @@ async function makeRole(guild, game) {
 // making and handing out roles can take discord past the 3 seconds a command gets, so it defers first
 async function matchmakingRole(interaction) {
   const game = interaction.options.getString('game', true);
-  const duration = interaction.options.getInteger?.('duration');
+  const hours = interaction.options.getNumber?.('duration');
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  if (duration != null && (!Number.isInteger(duration) || duration < MATCHMAKING_DURATION_MIN || duration > MATCHMAKING_DURATION_MAX)) {
-    return interaction.editReply(`Duration is minutes to keep the role, ${MATCHMAKING_DURATION_MIN}-${MATCHMAKING_DURATION_MAX}. Leave it out to keep it until you take it off.`);
+  if (hours != null && (!Number.isFinite(hours) || hours < MATCHMAKING_DURATION_MIN || hours > MATCHMAKING_DURATION_MAX)) {
+    return interaction.editReply(`Duration is hours to keep the role, ${MATCHMAKING_DURATION_MIN}-${MATCHMAKING_DURATION_MAX}. Leave it out to keep it until you take it off.`);
   }
+  const minutes = hours == null ? null : Math.round(hours * 60);
   const { guild, member } = interaction;
   const key = expiryKey(interaction.user.id, game);
   let role = findRole(guild, game);
@@ -63,7 +65,7 @@ async function matchmakingRole(interaction) {
   let reply;
   try {
     if (role && member.roles.cache.has(role.id)) {
-      if (duration == null) {
+      if (minutes == null) {
         await member.roles.remove(role);
         if (state.matchmakingExpiry?.[key]) {
           delete state.matchmakingExpiry[key];
@@ -72,14 +74,14 @@ async function matchmakingRole(interaction) {
         reply = `Took off your **${name}** role, so it won't ping you anymore.`;
       } else {
         state.matchmakingExpiry ??= {};
-        state.matchmakingExpiry[key] = Math.floor(Date.now() / 1000) + duration * 60;
+        state.matchmakingExpiry[key] = Math.floor(Date.now() / 1000) + minutes * 60;
         save();
-        reply = `Keeping your **${name}** role for ${formatDuration(duration)}, then it comes off on its own.`;
+        reply = `Keeping your **${name}** role for ${formatDuration(minutes)}, then it comes off on its own.`;
       }
     } else {
       role ??= await makeRole(guild, game);
       await member.roles.add(role);
-      if (duration == null) {
+      if (minutes == null) {
         // a stale timer from a role taken off by hand
         if (state.matchmakingExpiry?.[key]) {
           delete state.matchmakingExpiry[key];
@@ -88,9 +90,9 @@ async function matchmakingRole(interaction) {
         reply = `You have the **${name}** role now, so you'll get pinged when someone wants games. \`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
       } else {
         state.matchmakingExpiry ??= {};
-        state.matchmakingExpiry[key] = Math.floor(Date.now() / 1000) + duration * 60;
+        state.matchmakingExpiry[key] = Math.floor(Date.now() / 1000) + minutes * 60;
         save();
-        reply = `You have the **${name}** role now for ${formatDuration(duration)}, so you'll get pinged when someone wants games. It comes off on its own after that. \`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
+        reply = `You have the **${name}** role now for ${formatDuration(minutes)}, so you'll get pinged when someone wants games. It comes off on its own after that. \`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
       }
     }
   } catch (err) {
@@ -166,7 +168,9 @@ export async function checkMatchmakingExpiry(guild, now = Math.floor(Date.now() 
 }
 
 // /matchmaking_search: pings the role with a card saying who's looking. only people with the role can, so it can't
-// be used to ping a group someone isn't in. thread:True starts a thread on the ping to arrange games
+// be used to ping a group someone isn't in. thread:True starts a thread on the ping to arrange games.
+// a TO can point each game's searches at their own channel with /matchmaking_channel, otherwise they
+// post wherever the command ran
 async function matchmakingSearch(interaction) {
   const game = interaction.options.getString('game', true);
   const { label } = MATCHMAKING[game];
@@ -186,13 +190,42 @@ async function matchmakingSearch(interaction) {
     message: interaction.options.getString('message')?.trim(),
   });
   // the role is the only thing that pings, not a name or @everyone typed into the message
-  await interaction.reply({ content: `<@&${role.id}>`, embeds: [card], allowedMentions: { roles: [role.id] } });
+  const ping = { content: `<@&${role.id}>`, embeds: [card], allowedMentions: { roles: [role.id] } };
+  const channelId = state.matchmakingChannels?.[game];
+  if (channelId && channelId !== interaction.channelId) {
+    const target = await interaction.guild.channels.fetch(channelId).catch(() => null);
+    if (!target || (typeof target.isTextBased === 'function' && !target.isTextBased())) {
+      // saved channel gone: drop it, post here, say so privately
+      if (state.matchmakingChannels) {
+        delete state.matchmakingChannels[game];
+        save();
+      }
+      await interaction.reply(ping);
+      await interaction.followUp({ content: `The saved ${label} channel is gone, so this posted here. A TO can set a new one with \`/matchmaking_channel\`.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+      if (!interaction.options.getBoolean?.('thread')) return;
+      return startSearchThread(interaction, await interaction.fetchReply(), label);
+    }
+    try {
+      const posted = await target.send(ping);
+      await replyEphemeral(interaction, `Posted your ${label} search in <#${target.id}>.`);
+      if (!interaction.options.getBoolean?.('thread')) return;
+      return startSearchThread(interaction, posted, label);
+    } catch (err) {
+      console.error(`posting a ${label} search in <#${channelId}> failed:`, err.message);
+      return replyEphemeral(interaction, `I couldn't post in <#${channelId}>. Give me View Channel and Send Messages there, then try again.`);
+    }
+  }
+  await interaction.reply(ping);
   if (!interaction.options.getBoolean?.('thread')) return;
-  // the ping stays even when the thread can't start, so a permission change never loses the search
+  return startSearchThread(interaction, await interaction.fetchReply(), label);
+}
+
+// thread:True starts a thread on the search to arrange games
+// the ping stays even when the thread can't start, so a permission change never loses the search
+async function startSearchThread(interaction, posted, label) {
   try {
-    const message = await interaction.fetchReply();
     const name = interaction.member?.displayName ?? interaction.user?.username ?? 'someone';
-    const thread = await message.startThread({ name: `${label} games with ${name}`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
+    const thread = await posted.startThread({ name: `${label} games with ${name}`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
     if (thread?.id) {
       state.matchmakingThreads.push({ id: thread.id, at: Math.floor(Date.now() / 1000) });
       save();
@@ -203,4 +236,48 @@ async function matchmakingSearch(interaction) {
   }
 }
 
-export { matchmakingRole, matchmakingSearch };
+// /matchmaking_channel: where a game's searches post. anyone can look, only TOs change it.
+// left out means wherever the command runs. the channel gets checked when it's set, so a missing
+// permission fails there instead of on the next search
+async function matchmakingChannel(interaction) {
+  const game = interaction.options.getString('game', true);
+  const { label } = MATCHMAKING[game];
+  const channel = interaction.options.getChannel?.('channel');
+  const clear = interaction.options.getBoolean?.('clear') ?? false;
+  const saved = state.matchmakingChannels?.[game];
+  if (!channel && !clear) {
+    return replyEphemeral(interaction, saved ? `**${label}** searches post in <#${saved}>.` : `**${label}** searches post wherever the command runs.`);
+  }
+  if (channel && clear) {
+    return replyEphemeral(interaction, 'Pick either a channel or `clear:True`, not both.');
+  }
+  if (!isTO(interaction)) return notTO(interaction, 'set matchmaking channels');
+  if (clear) {
+    if (state.matchmakingChannels?.[game]) {
+      delete state.matchmakingChannels[game];
+      save();
+    }
+    return replyEphemeral(interaction, `**${label}** searches post wherever the command runs now.`);
+  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const target = await interaction.guild.channels.fetch(channel.id).catch(() => null);
+  if (!target) {
+    return interaction.editReply({ content: `Couldn't use that channel for **${label}** searches. Pick one in this server.`, allowedMentions: { parse: [] } });
+  }
+  if (typeof target.isTextBased === 'function' && !target.isTextBased()) {
+    return interaction.editReply({ content: `**${label}** searches need a text channel.`, allowedMentions: { parse: [] } });
+  }
+  const me = interaction.guild.members?.me;
+  if (me) {
+    const perms = target.permissionsFor?.(me);
+    if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms?.has(PermissionFlagsBits.SendMessages)) {
+      return interaction.editReply({ content: `I can't post in <#${target.id}>. Give me View Channel and Send Messages there first.`, allowedMentions: { parse: [] } });
+    }
+  }
+  state.matchmakingChannels ??= {};
+  state.matchmakingChannels[game] = target.id;
+  save();
+  return interaction.editReply({ content: `**${label}** searches will post in <#${target.id}>.`, allowedMentions: { parse: [] } });
+}
+
+export { matchmakingRole, matchmakingSearch, matchmakingChannel };

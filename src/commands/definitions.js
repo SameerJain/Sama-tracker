@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType as Option, ApplicationCommandType, PermissionFlagsBits } from 'discord.js';
+import { ApplicationCommandOptionType as Option, ApplicationCommandType, ChannelType, PermissionFlagsBits } from 'discord.js';
 import * as startgg from '../startgg.js';
 import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS } from '../message-settings.js';
 import { funCommands } from '../fun/index.js';
@@ -228,7 +228,7 @@ export const commands = [
     description: 'Get the Ultimate or Melee role for a while, or take it off if you have it',
     options: [
       matchmakingGame('Which role'),
-      { type: Option.Integer, name: 'duration', description: 'Minutes to keep it, 1-1440. Leave out to keep it until you take it off', min_value: 1, max_value: 1440 },
+      { type: Option.Number, name: 'duration', description: 'Hours to keep it, like 2 or 0.5 for 30 minutes. Leave out to keep it until you take it off', min_value: 0.5, max_value: 24 },
     ],
   },
   {
@@ -238,6 +238,18 @@ export const commands = [
       matchmakingGame('Which role to ping'),
       { type: Option.String, name: 'message', description: 'What you want, like netplay with your connect code or where you\'re playing', max_length: 300 },
       { type: Option.Boolean, name: 'thread', description: 'Start a thread on your search to arrange games' },
+    ],
+  },
+  {
+    name: 'matchmaking_channel',
+    description: 'Where Ultimate or Melee searches post. Anyone can look, TOs only to change',
+    options: [
+      matchmakingGame('Which searches'),
+      {
+        type: Option.Channel, name: 'channel', description: 'Channel for these searches. Leave out to see where they go',
+        channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
+      },
+      { type: Option.Boolean, name: 'clear', description: 'Back to posting where the command runs' },
     ],
   },
   {

@@ -13,7 +13,7 @@ import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } fro
 import { toAdd, toRemove, toList } from './to.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
-import { matchmakingRole, matchmakingSearch } from './matchmaking.js';
+import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
@@ -52,6 +52,7 @@ const handlers = new Map([
   ['notify', notify],
   ['matchmaking_role', matchmakingRole],
   ['matchmaking_search', matchmakingSearch],
+  ['matchmaking_channel', matchmakingChannel],
   ['link', link],
   ['unlink', unlink],
   ['profile', profile],

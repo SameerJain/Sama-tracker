@@ -16,13 +16,16 @@ after(() => rmSync(directory, { recursive: true, force: true }));
 
 beforeEach(() => {
   state.matchmaking = {};
+  state.matchmakingChannels = {};
   state.matchmakingExpiry = {};
   state.matchmakingThreads = [];
+  state.toRole = { id: null, members: [], seeded: false };
 });
 
 // a server with these roles. made is what the bot asked discord to create.
-// members is discord id to member, for the background expiry check
-function server(roles = [], members = new Map()) {
+// members is discord id to member, for the background expiry check, and
+// channels is channel id to channel, for the per-game search channels
+function server(roles = [], members = new Map(), channels = new Map()) {
   const made = [];
   const cache = new Collection(roles.map((role) => [role.id, role]));
   const create = async (options) => {
@@ -34,7 +37,33 @@ function server(roles = [], members = new Map()) {
   return {
     made, roles: { cache, create },
     members: { fetch: async ({ user: ids }) => new Map(ids.filter((id) => members.has(id)).map((id) => [id, members.get(id)])) },
+    channels: { fetch: async (id) => channels.get(id) ?? null },
   };
+}
+
+// a text channel the bot can post in. sent is what went there. canPost false
+// is a channel whose permissions keep the bot out
+function textChannel(id, canPost = true) {
+  const sent = [];
+  const threads = [];
+  const channel = {
+    id, sent, threads,
+    isTextBased: () => true,
+    permissionsFor: () => ({ has: () => canPost }),
+    send: async (payload) => {
+      if (!canPost) throw Object.assign(new Error('Missing Access'), { code: 50001 });
+      const message = {
+        id: `sent-${sent.length + 1}`, channelId: id, ...payload,
+        startThread: async (options) => {
+          threads.push(options);
+          return { id: `channel-thread-${threads.length}` };
+        },
+      };
+      sent.push(message);
+      return message;
+    },
+  };
+  return channel;
 }
 
 // a member holding the role ids in held. fail is what discord throws when the bot changes their roles
@@ -51,16 +80,17 @@ function person(held = [], fail = null) {
   };
 }
 
-async function run(commandName, { guild = server(), member = person(), values = {}, appPermissions, user, threadFail = null } = {}) {
+async function run(commandName, { guild = server(), member = person(), values = {}, appPermissions, user, threadFail = null, channelId = 'here-channel', memberPermissions = null } = {}) {
   const calls = [];
   const threads = [];
   const interaction = {
-    commandName, guild, member, appPermissions,
+    commandName, guild, member, appPermissions, channelId, memberPermissions,
     user: user ?? { id: 'me-discord', username: 'Me' },
     options: {
       getSubcommandGroup: () => null, getSubcommand: () => null,
       getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null,
-      getInteger: (name) => values[name] ?? null,
+      getInteger: (name) => values[name] ?? null, getNumber: (name) => values[name] ?? null,
+      getChannel: (name) => values[name] ?? null,
     },
     deferReply: async (options) => {
       calls.push(['defer', options]);
@@ -92,23 +122,28 @@ const lastText = (calls) => {
   return typeof result === 'string' ? result : result.content;
 };
 
-test('the toggle takes a required game first, with an optional duration in minutes', () => {
+test('the toggle takes a required game first, with an optional duration in hours', () => {
   const toggle = commands.find((command) => command.name === 'matchmaking_role');
   const ping = commands.find((command) => command.name === 'matchmaking_search');
-  for (const command of [toggle, ping]) {
+  const channel = commands.find((command) => command.name === 'matchmaking_channel');
+  for (const command of [toggle, ping, channel]) {
     assert.equal(command.options[0].name, 'game');
     assert.equal(command.options[0].required, true);
     assert.deepEqual(command.options[0].choices, [{ name: 'Ultimate', value: 'ult' }, { name: 'Melee', value: 'melee' }]);
   }
   assert.deepEqual(toggle.options.map((option) => option.name), ['game', 'duration']);
   const duration = toggle.options.find((option) => option.name === 'duration');
-  assert.equal(duration.type, 4);
+  assert.equal(duration.type, 10);
   assert.equal(duration.required ?? false, false);
-  assert.equal(duration.min_value, 1);
-  assert.equal(duration.max_value, 1440);
+  assert.equal(duration.min_value, 0.5);
+  assert.equal(duration.max_value, 24);
   assert.ok(duration.description.length <= 100);
   assert.deepEqual(ping.options.map((option) => [option.name, option.required ?? false]), [['game', true], ['message', false], ['thread', false]]);
   assert.equal(ping.options.find((option) => option.name === 'thread').type, 5);
+  assert.deepEqual(channel.options.map((option) => option.name), ['game', 'channel', 'clear']);
+  assert.equal(channel.options.find((option) => option.name === 'channel').type, 7);
+  assert.equal(channel.options.find((option) => option.name === 'channel').required ?? false, false);
+  assert.equal(channel.options.find((option) => option.name === 'clear').type, 5);
 });
 
 test('the first toggle makes a mentionable role that grants nothing, saves its id and hands it out', async () => {
@@ -282,7 +317,7 @@ test('duration hands out the role and saves when it comes off', async () => {
   const guild = server();
   const member = person();
   const before = Math.floor(Date.now() / 1000);
-  const calls = await run('matchmaking_role', { guild, member, values: { game: 'melee', duration: 30 } });
+  const calls = await run('matchmaking_role', { guild, member, values: { game: 'melee', duration: 0.5 } });
 
   assert.ok(member.held.has('made-1'));
   const key = expiryKey('me-discord', 'melee');
@@ -300,11 +335,11 @@ test('duration on someone who has the role keeps it and moves the timer', async 
   assert.ok(member.held.has('made-1'));
   assert.equal(state.matchmakingExpiry[expiryKey('me-discord', 'ult')], undefined);
 
-  const kept = await run('matchmaking_role', { guild, member, values: { game: 'ult', duration: 60 } });
+  const kept = await run('matchmaking_role', { guild, member, values: { game: 'ult', duration: 2 } });
   assert.ok(member.held.has('made-1'));
   assert.equal(guild.made.length, 1);
   assert.ok(state.matchmakingExpiry[expiryKey('me-discord', 'ult')] > Math.floor(Date.now() / 1000));
-  assert.match(lastText(kept), /Keeping your \*\*Ultimate Matchmaking\*\* role for 1 hour, then it comes off on its own/);
+  assert.match(lastText(kept), /Keeping your \*\*Ultimate Matchmaking\*\* role for 2 hours, then it comes off on its own/);
 
   const off = await run('matchmaking_role', { guild, member, values: { game: 'ult' } });
   assert.equal(member.held.size, 0);
@@ -315,9 +350,9 @@ test('duration on someone who has the role keeps it and moves the timer', async 
 test('a bad duration says so and changes nothing', async () => {
   const guild = server();
   const member = person();
-  for (const duration of [0, 1441]) {
+  for (const duration of [0.1, 25]) {
     const calls = await run('matchmaking_role', { guild, member, values: { game: 'melee', duration } });
-    assert.match(lastText(calls), /Duration is minutes to keep the role, 1-1440/);
+    assert.match(lastText(calls), /Duration is hours to keep the role, 0\.5-24/);
   }
   assert.equal(guild.made.length, 0);
   assert.equal(member.held.size, 0);
@@ -359,4 +394,163 @@ test('someone who left or took it off by hand just clears the timer', async () =
   const removed = await checkMatchmakingExpiry(guild, now);
   assert.deepEqual(removed, []);
   assert.deepEqual(state.matchmakingExpiry, {});
+});
+
+// a TO's member for /matchmaking_channel, on a server with the role and these channels
+function toServer(channels = new Map()) {
+  const guild = server([{ id: 'to-role', name: 'TO' }], new Map(), channels);
+  return { guild, member: person(['to-role']) };
+}
+
+test('anyone can see where searches go, only TOs change it', async () => {
+  const nobody = { has: () => false };
+
+  const unset = await run('matchmaking_channel', { values: { game: 'melee' }, memberPermissions: nobody });
+  assert.equal(unset.length, 1);
+  assert.equal(unset[0][0], 'reply');
+  assert.equal(unset[0][1].flags, MessageFlags.Ephemeral);
+  assert.match(unset[0][1].content, /\*\*Melee\*\* searches post wherever the command runs\./);
+
+  state.matchmakingChannels = { melee: 'lfg-melee' };
+  const set = await run('matchmaking_channel', { values: { game: 'melee' }, memberPermissions: nobody });
+  assert.match(set[0][1].content, /\*\*Melee\*\* searches post in <#lfg-melee>\./);
+
+  const denied = await run('matchmaking_channel', { values: { game: 'melee', channel: { id: 'lfg-melee' } }, memberPermissions: nobody });
+  assert.match(lastText(denied), /Only TOs can set matchmaking channels/);
+  assert.equal(state.matchmakingChannels.melee, 'lfg-melee');
+
+  const deniedClear = await run('matchmaking_channel', { values: { game: 'melee', clear: true }, memberPermissions: nobody });
+  assert.match(lastText(deniedClear), /Only TOs can set matchmaking channels/);
+  assert.equal(state.matchmakingChannels.melee, 'lfg-melee');
+
+  const both = await run('matchmaking_channel', { values: { game: 'melee', channel: { id: 'lfg-melee' }, clear: true }, memberPermissions: nobody });
+  assert.match(lastText(both), /Pick either a channel or `clear:True`, not both\./);
+});
+
+test('a TO sets, then clears, a game channel', async () => {
+  const lfg = textChannel('lfg-melee');
+  const { guild, member } = toServer(new Map([['lfg-melee', lfg]]));
+  guild.members.me = { id: 'bot' };
+
+  const calls = await run('matchmaking_channel', { guild, member, values: { game: 'melee', channel: { id: 'lfg-melee' } } });
+  assert.deepEqual(calls[0], ['defer', { flags: MessageFlags.Ephemeral }]);
+  assert.match(lastText(calls), /\*\*Melee\*\* searches will post in <#lfg-melee>\./);
+  assert.equal(state.matchmakingChannels.melee, 'lfg-melee');
+  assert.equal(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmakingChannels.melee, 'lfg-melee');
+
+  const cleared = await run('matchmaking_channel', { guild, member, values: { game: 'melee', clear: true } });
+  assert.match(lastText(cleared), /\*\*Melee\*\* searches post wherever the command runs now\./);
+  assert.deepEqual(state.matchmakingChannels, {});
+});
+
+test('a channel the bot cannot use or see is refused', async () => {
+  const quiet = textChannel('quiet', false);
+  const { guild, member } = toServer(new Map([['quiet', quiet]]));
+  guild.members.me = { id: 'bot' };
+
+  const denied = await run('matchmaking_channel', { guild, member, values: { game: 'ult', channel: { id: 'quiet' } } });
+  assert.match(lastText(denied), /I can't post in <#quiet>\. Give me View Channel and Send Messages there first\./);
+  assert.deepEqual(state.matchmakingChannels, {});
+
+  const missing = await run('matchmaking_channel', { guild, member, values: { game: 'ult', channel: { id: 'gone' } } });
+  assert.match(lastText(missing), /Couldn't use that channel for \*\*Ultimate\*\* searches\. Pick one in this server\./);
+  assert.deepEqual(state.matchmakingChannels, {});
+
+  const voice = { id: 'voice', isTextBased: () => false };
+  const notText = await run('matchmaking_channel', { guild: { ...guild, channels: { fetch: async (id) => (id === 'voice' ? voice : null) } }, member, values: { game: 'ult', channel: { id: 'voice' } } });
+  assert.match(lastText(notText), /\*\*Ultimate\*\* searches need a text channel\./);
+  assert.deepEqual(state.matchmakingChannels, {});
+});
+
+test('a search posts in its game channel', async () => {
+  state.matchmaking = { melee: 'melee-role' };
+  state.matchmakingChannels = { melee: 'lfg-melee' };
+  const lfg = textChannel('lfg-melee');
+  const guild = server(
+    [{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }],
+    new Map(),
+    new Map([['lfg-melee', lfg]]),
+  );
+  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'here-channel' });
+
+  assert.equal(lfg.sent.length, 1);
+  assert.equal(lfg.sent[0].content, '<@&melee-role>');
+  assert.deepEqual(lfg.sent[0].allowedMentions, { roles: ['melee-role'] });
+  assert.equal(lfg.sent[0].embeds[0].data.title, 'Melee matchmaking');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'reply');
+  assert.equal(calls[0][1].flags, MessageFlags.Ephemeral);
+  assert.match(calls[0][1].content, /Posted your Melee search in <#lfg-melee>\./);
+});
+
+test('a search run in its own channel stays there', async () => {
+  state.matchmaking = { melee: 'melee-role' };
+  state.matchmakingChannels = { melee: 'lfg-melee' };
+  const lfg = textChannel('lfg-melee');
+  const guild = server(
+    [{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }],
+    new Map(),
+    new Map([['lfg-melee', lfg]]),
+  );
+  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'lfg-melee' });
+
+  assert.equal(lfg.sent.length, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1].content, '<@&melee-role>');
+  assert.equal(calls[0][1].flags, undefined);
+});
+
+test('a deleted search channel posts here and clears itself', async () => {
+  state.matchmaking = { melee: 'melee-role' };
+  state.matchmakingChannels = { melee: 'gone' };
+  const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }]);
+  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'here-channel' });
+
+  assert.equal(calls[0][1].content, '<@&melee-role>');
+  assert.equal(calls[1][0], 'followUp');
+  assert.equal(calls[1][1].flags, MessageFlags.Ephemeral);
+  assert.match(calls[1][1].content, /The saved Melee channel is gone, so this posted here\. A TO can set a new one/);
+  assert.deepEqual(state.matchmakingChannels, {});
+});
+
+test('a search the bot cannot post fails privately', async () => {
+  state.matchmaking = { ult: 'ult-role' };
+  state.matchmakingChannels = { ult: 'quiet' };
+  const quiet = textChannel('quiet', false);
+  const guild = server(
+    [{ id: 'ult-role', name: 'Ultimate Matchmaking', mentionable: true }],
+    new Map(),
+    new Map([['quiet', quiet]]),
+  );
+  const calls = await run('matchmaking_search', { guild, member: person(['ult-role']), values: { game: 'ult' }, channelId: 'here-channel' });
+
+  assert.equal(quiet.sent.length, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1].flags, MessageFlags.Ephemeral);
+  assert.match(calls[0][1].content, /I couldn't post in <#quiet>\./);
+  // kept, so it retries once the permission is fixed instead of silently moving
+  assert.equal(state.matchmakingChannels.ult, 'quiet');
+});
+
+test('a redirected search still starts its thread', async () => {
+  state.matchmaking = { melee: 'melee-role' };
+  state.matchmakingChannels = { melee: 'lfg-melee' };
+  const lfg = textChannel('lfg-melee');
+  const guild = server(
+    [{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }],
+    new Map(),
+    new Map([['lfg-melee', lfg]]),
+  );
+  const member = { ...person(['melee-role']), displayName: 'Sam' };
+  const calls = await run('matchmaking_search', {
+    guild, member, values: { game: 'melee', thread: true },
+    user: { id: 'me-discord', username: 'Sam' }, channelId: 'here-channel',
+  });
+
+  assert.equal(lfg.sent.length, 1);
+  assert.equal(lfg.threads.length, 1);
+  assert.equal(lfg.threads[0].name, 'Melee games with Sam');
+  assert.equal(state.matchmakingThreads.length, 1);
+  assert.equal(state.matchmakingThreads[0].id, 'channel-thread-1');
+  assert.match(calls[0][1].content, /Posted your Melee search in <#lfg-melee>\./);
 });

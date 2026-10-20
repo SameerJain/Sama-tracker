@@ -159,7 +159,7 @@ async function download(image) {
   return { attachment: Buffer.from(await res.arrayBuffer()), name: `bills.${extension}` };
 }
 
-async function takePost() {
+async function runPost() {
   // one of each per round, so the larger photo pool doesn't crowd out gifs
   if (!kinds.length) kinds = [0, 1];
   const kind = kinds.splice(Math.floor(Math.random() * kinds.length), 1)[0];
@@ -180,6 +180,33 @@ async function takePost() {
     console.error('bills image download failed:', err.message);
   }
   return { ...picked, file, title: TITLES[Math.floor(Math.random() * TITLES.length)] };
+}
+
+// one at a time, so the round-robin and the no-repeat check see each finished post
+let tail = Promise.resolve();
+function makePost() {
+  const next = tail.then(runPost, runPost);
+  tail = next.catch(() => {}); // the chain keeps going, failures are handled in takePost
+  return next;
+}
+
+// made ahead of time so the command replies right away, kept full for busy servers
+const QUEUE_SIZE = 3;
+const queue = [];
+
+function prepare() {
+  while (queue.length < QUEUE_SIZE) {
+    const pending = makePost();
+    pending.catch(() => {}); // handled in takePost
+    queue.push(pending);
+  }
+}
+
+function takePost() {
+  const ready = queue.shift() ?? makePost();
+  prepare();
+  // if the prefetched one failed, try again now
+  return ready.catch(makePost);
 }
 
 export default {

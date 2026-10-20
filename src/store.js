@@ -33,6 +33,8 @@ const FILE = `${stateDir}/state.json`;
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
 // matchmaking is the discord role id of each game's matchmaking role, keyed ult and melee, so a role renamed in server settings still counts.
+// matchmakingChannels is the discord channel id each game's searches post in, keyed ult and melee. left out
+// means wherever the command ran.
 // matchmakingExpiry are timed roles from /matchmaking_role duration, keyed by discord id and game as
 // `discordId:game` to unix seconds when the role comes off, so a restart doesn't cancel them.
 // matchmakingThreads are { id, at } for threads the bot deletes 24 hours after /matchmaking_search made them.
@@ -44,7 +46,7 @@ const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
   toRole: { id: null, members: [], seeded: false },
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
-  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
+  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
 };
 
 function load() {

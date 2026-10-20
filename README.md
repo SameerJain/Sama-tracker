@@ -91,10 +91,11 @@ The bot makes the TO role the first time it's needed. A role named `TO` made by 
 
 | Command | What it does |
 | --- | --- |
-| `/matchmaking_role game:<Ultimate or Melee> duration:<minutes>` | Give yourself the **Ultimate Matchmaking** or **Melee Matchmaking** role, or take it off if you have it. `duration` keeps it 1-1440 minutes, then it comes off on its own. Running it again without `duration` takes it off right away. Only you see the reply. |
-| `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role here, with a card naming you and your message, like a netplay connect code or where you're playing. `message` is optional. `thread:True` starts a thread on your search to arrange games. Only people with the role can use it. |
+| `/matchmaking_role game:<Ultimate or Melee> duration:<hours>` | Give yourself the **Ultimate Matchmaking** or **Melee Matchmaking** role, or take it off if you have it. `duration` keeps it 0.5-24 hours, like 2 or 0.5 for 30 minutes, then it comes off on its own. Running it again without `duration` takes it off right away. Only you see the reply. |
+| `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role with a card naming you and your message, like a netplay connect code or where you're playing. Posts where the command runs, or in that game's channel from `/matchmaking_channel`. `message` is optional. `thread:True` starts a thread on your search to arrange games. Only people with the role can use it. |
+| `/matchmaking_channel game:<Ultimate or Melee> channel:<#channel>` | Set which channel that game's searches post in. Leave out `channel` to see where they go. `clear:True` goes back to posting where the command runs. Anyone can look, only TOs can change it. |
 
-The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. Timed roles are saved, so a restart doesn't cancel them. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets. Threads need **Create Public Threads** and **Send Messages in Threads** in the channel, and the search still posts when they are missing.
+The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. Timed roles are saved, so a restart doesn't cancel them. A saved search channel that gets deleted posts where the command runs instead, until a TO sets a new one. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets. Threads need **Create Public Threads** and **Send Messages in Threads** in the channel, and the search still posts when they are missing.
 
 ### Stats and matchups
 

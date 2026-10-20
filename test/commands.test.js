@@ -151,10 +151,17 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
     commandName, calls, waitedOn: [],
     user: { id: user, bot: false, displayName: 'Crew' },
     targetUser: target, targetMember: target && { displayName: target.displayName },
+    channelId: 'channel-1',
     guild: {
       id: 'guild-1',
       members: { fetch: async ({ user: ids }) => { beforeAnswer(run, 'discord members'); return new Map(ids.map((id) => [id, {}])); } },
       roles: { cache: { get: () => undefined, find: () => undefined }, create: discord('discord role create', { id: 'role-1', mentionable: true }) },
+      channels: {
+        fetch: async (id) => {
+          beforeAnswer(run, 'discord channels');
+          return { id, isTextBased: () => true, permissionsFor: () => ({ has: () => true }) };
+        },
+      },
       scheduledEvents: {
         fetch: async () => { beforeAnswer(run, 'discord events'); return new Map(); },
         create: async (options) => { beforeAnswer(run, 'discord events'); return { id: 'event-1', url: 'https://discord.com/events/guild-1/event-1', ...options }; },
@@ -169,6 +176,8 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
       getString: (name) => values[name] ?? null,
       getBoolean: (name) => values[name] ?? null,
       getInteger: (name) => values[name] ?? null,
+      getNumber: (name) => values[name] ?? null,
+      getChannel: (name) => values[name] ?? null,
       getUser: () => values.user ?? null,
       getMember: () => (values.user ? {
         displayName: values.user.displayName, displayAvatarURL: () => 'https://cdn.example/member.png',
@@ -272,8 +281,11 @@ const runs = [
   ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your set is on stream.*pinged for reg reminders.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['notify', { values: { dm_registration: 'on', dm_start: 'on' } }, /DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['matchmaking_role', { values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
-  ['matchmaking_role', { values: { game: 'melee', duration: 30 } }, /for 30 minutes.*comes off on its own/],
+  ['matchmaking_role', { values: { game: 'melee', duration: 0.5 } }, /for 30 minutes.*comes off on its own/],
   ['matchmaking_search', { values: { game: 'ult' } }, /You need the \*\*Ultimate Matchmaking\*\* role to ping it\. `\/matchmaking_role game:Ultimate`/],
+  ['matchmaking_channel', { values: { game: 'melee' } }, /searches post wherever the command runs/],
+  ['matchmaking_channel', { values: { game: 'melee', channel: { id: 'lfg-1' } } }, /searches will post in <#lfg-1>/],
+  ['matchmaking_channel', { values: { game: 'melee' } }, /searches post in <#lfg-1>/],
   ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1","thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}/],
   // left out, it's the code on crew's start.gg netplay registrations
   ['slippi', { subcommand: 'add' }, /Crew is already on the Slippi watchlist.*Crew · CREW#1.*Gold 2/],
