@@ -114,6 +114,12 @@ test('running messages without options shows defaults without writing settings',
   assert.deepEqual(state.messages, {});
 });
 
+test('threads footnote says each thread pins its card until the tournament or event ends', async () => {
+  state.messages = {};
+  const reply = await configure();
+  assert.match(reply.content, /Each thread pins its channel card until the tournament or event ends/);
+});
+
 test('message timezone labels follow daylight saving', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-07-15T12:00:00Z') });
   state.messages = {};

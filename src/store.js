@@ -28,6 +28,7 @@ const FILE = `${stateDir}/state.json`;
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
 // callPosts are match calls still watched for the set going back to waiting or not starting: { setId, channelId, messageId, calledAt, discordIds, warned, text }.
 // text is the You're up ping as it went out, so the follow-ups match it
+// streamPinged is who already got pinged for a live streamed set: { setId, discordIds }.
 // a tournament with projected: { at, checkedAt, results, top8 } had placements go out projected, each list being the { channelId, messageId } posts to edit once they're final.
 // an empty top8 list with top8Posted unset means nothing was reported yet, and the final goes out as a new message once every event is finished.
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
@@ -42,11 +43,16 @@ const FILE = `${stateDir}/state.json`;
 // with add_event or /messages events, so every path lands on the same one: { eventId, slug, startAt, synced, gone }. synced is start.gg's side
 // as of the last sync, null until one ran, and gone means a mod deleted it, it started or start.gg deleted the tournament, so it's left alone
 // slippi watchlist entries a non-TO added by typed code have discordId, whoever claimed it as theirs
+// funQueue are the prefetched fun and bills posts still waiting to be served, keyed by command name,
+// so a restart serves them instead of discarding paid-for Claude posts. each entry is the post without
+// its image bytes, which get downloaded again on restore. billsMeta is the bills rotation across restarts:
+// { lastImage, kinds }, so the no-repeat and even photo/gif rotation survive one too
 const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
   toRole: { id: null, members: [], seeded: false },
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
-  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
+   resultPosts: [], callPosts: [], streamPinged: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
+   funQueue: {}, billsMeta: {},
 };
 
 function load() {

@@ -1,16 +1,35 @@
 import assert from 'node:assert/strict';
 import test, { after, beforeEach } from 'node:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
+const directory = mkdtempSync(join(tmpdir(), 'sama-fun-'));
+process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../src/fun/smashwiki.js');
 const { addCommunity, searchVideos } = await import('../src/fun/youtube.js');
 const { billsImagePool } = await import('../src/fun/bills.js');
 const { SCENARIOS, funMessage, makeFun, pickStyle } = await import('../src/fun/generated.js');
+const { state } = await import('../src/store.js');
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
-after(() => { globalThis.fetch = originalFetch; console.error = originalError; });
-beforeEach(() => { delete process.env.YOUTUBE_API_KEY; });
+after(() => { globalThis.fetch = originalFetch; console.error = originalError; rmSync(directory, { recursive: true, force: true }); });
+beforeEach(async () => {
+  delete process.env.YOUTUBE_API_KEY;
+  // the last test's background prefetches land here, then get dropped with its queue,
+  // so a fresh module never restores posts from another test
+  console.error = () => {};
+  try {
+    for (let i = 0; i < 100; i++) await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    console.error = originalError;
+  }
+  // queued fun posts persist across restarts, so each test starts without the last one's
+  if (state.funQueue) for (const key of Object.keys(state.funQueue)) delete state.funQueue[key];
+  if (state.billsMeta) for (const key of Object.keys(state.billsMeta)) delete state.billsMeta[key];
+});
 
 const json = (data, ok = true) => ({ ok, status: ok ? 200 : 500, json: async () => data, arrayBuffer: async () => new ArrayBuffer(4) });
 const paragraph = (words) => `${words} ${'and then some more words about it '.repeat(4)}`.trim();
@@ -532,4 +551,87 @@ test('more than one post stays queued so bursts reply right away', async (t) => 
   await nextPostWritten(sent);
   assert.equal((await fun.takePost()).text, 'post');
   await nextPostWritten(sent);
+});
+
+async function untilSaved(name, count) {
+  for (let i = 0; i < 2000 && (state.funQueue?.[name]?.length ?? 0) < count; i++) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.ok((state.funQueue?.[name]?.length ?? 0) >= count, `${name} queue never saved`);
+}
+
+// a fake Claude that numbers its posts, so a restored queue is told apart from fresh ones
+function countingClient(sent, prefix) {
+  let n = 0;
+  return { messages: { create: async (request) => {
+    const content = request.messages[0].content;
+    if (!content.startsWith('Style: ')) return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'a lighthouse keeper signaling ships about the take' }] };
+    sent.push(content);
+    return { stop_reason: 'end_turn', content: [{ type: 'text', text: `${prefix}-${n++}` }] };
+  } } };
+}
+
+function countingFun(name, sent, prefix) {
+  return makeFun({
+    name, line: 'LINE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: [], points: ['one', 'two', 'three'],
+    articles: ['Techniques (SSBM)'], videos: [],
+  }, countingClient(sent, prefix));
+}
+
+test('queued fun posts survive a restart instead of discarding paid-for Claude posts', async (t) => {
+  fakeSites();
+  t.mock.method(Math, 'random', () => 0.5);
+  const sent1 = [];
+  const first = countingFun('queue-test', sent1, 'saved');
+  await untilSaved('queue-test', 3);
+  const saved = state.funQueue['queue-test'].map((each) => each.text);
+  assert.equal(new Set(saved).size, 3);
+
+  // a new run for the same command serves the saved posts, without asking Claude again for them
+  const sent2 = [];
+  const second = countingFun('queue-test', sent2, 'fresh');
+  const served = [await second.takePost(), await second.takePost(), await second.takePost()];
+  assert.deepEqual(served.map((post) => post.text), saved);
+  assert.ok(served.every((post) => Buffer.isBuffer(post.image.attachment)));
+  // taking them consumes the saved queue
+  assert.deepEqual(state.funQueue['queue-test'] ?? [], []);
+});
+
+test('queued bills posts survive a restart without reloading the pools', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('commons.wikimedia.org')) {
+      return json({ query: { pages: ['one', 'two', 'three'].map((name) => ({ title: `File:${name}.jpg`, imageinfo: [{ mime: 'image/jpeg', thumburl: `https://images.example/${name}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:${name}.jpg` }] })) } });
+    }
+    if (url === 'https://giphy.com/buffalobills') {
+      return { ok: true, text: async () => Array.from({ length: 20 }, (_, i) => String.raw`\"id\":\"liveGif${i}\",\"title\":\"Bills Celebration ${i} GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media.giphy.com/media/liveGif${i}/giphy.gif\"}}`).join(',') };
+    }
+    return { ok: true, arrayBuffer: async () => new Uint8Array([71, 73, 70, 56]).buffer };
+  };
+  const { default: before } = await import('../src/fun/bills.js?queue-before');
+  const first = await before.takePost();
+  assert.ok(first.title);
+  await untilSaved('bills', 1);
+  const saved = state.funQueue.bills.map((each) => each.image);
+  assert.ok(saved.length >= 1);
+
+  // a fresh module, as after a redeploy, serves the saved posts with the pools down.
+  // only the image bytes download again, so the queued posts are not lost with the pools
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([71, 73, 70, 56]).buffer });
+  console.error = () => {};
+  let served;
+  try {
+    const { default: afterRestart } = await import('../src/fun/bills.js?queue-after');
+    served = [];
+    for (let i = 0; i < saved.length; i++) served.push(await afterRestart.takePost());
+  } finally {
+    console.error = originalError;
+  }
+  assert.deepEqual(served.map((post) => post.image), saved);
+  assert.ok(served.every((post) => Buffer.isBuffer(post.file.attachment)));
+  // taking them consumes the saved queue, and the rotation spot is kept
+  assert.deepEqual(state.funQueue.bills ?? [], []);
+  assert.equal(typeof state.billsMeta?.lastImage, 'string');
+  // no repeat across the restart
+  assert.notEqual(served[0]?.image, first.image);
 });

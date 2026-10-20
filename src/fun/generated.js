@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { articleExcerpt, categoryPages, fetchScreenshots, wiki } from './smashwiki.js';
 import * as youtube from './youtube.js';
+import { state, save } from '../store.js';
 
 // short timeout so it falls back to the line fast if claude is down
 const defaultClient = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 20_000, maxRetries: 1 }) : null;
@@ -265,13 +266,74 @@ export function makeFun({ name, line, category, prompt, styles, scenarios = [], 
     return { text, screenshot, image };
   }
 
-  // made ahead of time so the command replies right away, kept full for busy servers
+  // made ahead of time so the command replies right away, kept full for busy servers.
+  // completed ones are saved without their image bytes, so a restart serves them instead of
+  // discarding paid-for Claude posts. the bytes download again on restore
   const QUEUE_SIZE = 3;
   const queue = [];
+  let nextId = 0;
+
+  function persist(id, post) {
+    try {
+      state.funQueue ??= {};
+      const saved = state.funQueue[name] ??= [];
+      // a retry after a save failure shouldn't pile up the same post
+      if (!saved.some((each) => each.id === id)) saved.push({ id, text: post.text, screenshot: post.screenshot });
+      state.funQueue[name] = saved.slice(-QUEUE_SIZE);
+      save();
+    } catch (err) {
+      console.error(`${name} queued post save failed:`, err.message);
+    }
+  }
+
+  function unpersist(id) {
+    try {
+      const saved = state.funQueue?.[name];
+      if (!saved?.some((each) => each.id === id)) return;
+      state.funQueue[name] = saved.filter((each) => each.id !== id);
+      save();
+    } catch (err) {
+      console.error(`${name} queued post save failed:`, err.message);
+    }
+  }
+
+  // posts saved by the run before this one. a screenshot that won't download again falls back
+  // to a fresh post when taken, and corrupt entries are dropped
+  function restore() {
+    const saved = state.funQueue?.[name] ?? [];
+    const kept = [];
+    for (const entry of saved.slice(-QUEUE_SIZE)) {
+      if (typeof entry?.id !== 'number' || typeof entry?.text !== 'string' || typeof entry?.screenshot?.url !== 'string') continue;
+      kept.push(entry);
+      nextId = Math.max(nextId, entry.id + 1);
+      const pending = download(entry.screenshot).then(
+        (image) => ({ text: entry.text, screenshot: entry.screenshot, image }),
+      );
+      pending._queueId = entry.id;
+      pending.catch(() => {}); // handled in takePost
+      queue.push(pending);
+    }
+    if (kept.length !== saved.length) {
+      try {
+        state.funQueue ??= {};
+        state.funQueue[name] = kept;
+        save();
+      } catch (err) {
+        console.error(`${name} queued post save failed:`, err.message);
+      }
+    }
+  }
 
   function prepare() {
     while (queue.length < QUEUE_SIZE) {
-      const pending = makePost();
+      const id = nextId++;
+      const pending = makePost().then(
+        (post) => {
+          persist(id, post);
+          return post;
+        },
+      );
+      pending._queueId = id;
       pending.catch(() => {}); // handled in takePost
       queue.push(pending);
     }
@@ -280,10 +342,27 @@ export function makeFun({ name, line, category, prompt, styles, scenarios = [], 
   function takePost() {
     const ready = queue.shift() ?? makePost();
     prepare();
-    // if the prefetched one failed, try again now
+    // the persist above lands before this removal, so a post taken while still pending
+    // saves then removes itself instead of lingering. a failed prefetch tries again now
+    if (ready._queueId !== undefined) {
+      const id = ready._queueId;
+      return ready.then(
+        (post) => {
+          unpersist(id);
+          return post;
+        },
+        (err) => {
+          unpersist(id);
+          throw err;
+        },
+      ).catch(makePost);
+    }
     return ready.catch(makePost);
   }
 
-  if (client) prepare();
+  if (client) {
+    restore();
+    prepare();
+  }
   return { name, line, enabled: Boolean(client), takePost };
 }

@@ -501,6 +501,28 @@ test('/notify lets TOs look at and change anyone\'s pings', async () => {
   state.startDmPings = [];
 });
 
+test('/notify lets TOs pick a tracked player without a member mention', async () => {
+  state.players = {
+    1: { ...crew, discordId: 'crew-discord' },
+    2: { userId: 2, playerId: 20, tag: 'No Discord', slug: 'user/no-discord' },
+  };
+  state.links = {};
+  state.callPings = [];
+  state.streamPings = [];
+
+  const refused = await run('notify', 'someone', { player: '1', calls: 'on' });
+  assert.equal(refused.content, 'Only TOs can see or change a tracked player\'s pings. Leave out `player` for yours. `/t-o role list` shows who they are.');
+  assert.deepEqual(state.callPings, []);
+
+  const changed = await run('notify', 'to-discord', { player: '1', calls: 'on', streams: 'on' });
+  assert.match(changed.content, /^They'll get pinged when their match is called\.\nThey'll get pinged when their set is on stream\.$/);
+  assert.deepEqual(state.callPings, ['crew-discord']);
+  assert.deepEqual(state.streamPings, ['crew-discord']);
+  assert.match((await run('notify', 'to-discord', { player: '1' })).content, /^\*\*Crew's pings\*\*/);
+  assert.equal((await run('notify', 'to-discord', { player: '2', calls: 'on' })).content, 'No Discord has no Discord connected on start.gg, so there is nobody to ping.');
+  assert.equal((await run('notify', 'to-discord', { player: '1', user: { id: 'crew-discord' } })).content, 'Pick either `user` or `player`, not both.');
+});
+
 test('/track add starts set results and stream alerts off and says how to turn them on', async () => {
   state.players = {};
   state.links = {};

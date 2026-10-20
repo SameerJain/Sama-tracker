@@ -192,8 +192,8 @@ export function help(verbose = false) {
     ],
     [
       '**Your pings**',
-      '`/notify` your pings, or anyone\'s for a TO with `user:`. `calls` when your match is called, `streams` when your set is on stream, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. Leave them out to see yours',
-      '-# Only TOs can see or change someone else\'s with `user:`. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
+      '`/notify` your pings, or anyone\'s for a TO with `user:` or `player:`. `calls` when your match is called, `streams` when your set is on stream, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. `player:all` changes everyone tracked and asks first. Changes apply during a tournament. Leave them out to see yours',
+      '-# Only TOs can see or change someone else\'s with `user:` or `player:`, and only `user:` or `player:`, not both. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
     ],
     [
       '**Matchmaking**',
@@ -264,7 +264,7 @@ export function help(verbose = false) {
       '**Stream alerts.** Sets on stream or up next in the stream queue for 30 seconds, at tracked tournaments and for tracked players with stream alerts on, pinging whoever is playing with `/notify streams` on',
       '**Match call pings.** Called sets, pinging whoever has `/notify calls` on with You\'re up and the station when start.gg has one, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
       '**Tournament roll calls.** An hour before a tournament with 3+ of the crew, with the streams from its start.gg page. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server',
-      '**Tournament placements.** Where the crew placed, 12 hours after it ends. Projected placements get edited once start.gg has them final',
+      '**Tournament placements.** Where the crew placed, with the top 8 when every event finishes at a tracked tournament, even if top 8 posts are off. Otherwise 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
       '**Registration reminders.** Tracked tournaments a week, 3 days and a day out, then a last call 6 hours before. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start. When registration closes within an hour of the start there\'s one DM, the start one',
       '**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/messages events` turns it on',

@@ -521,5 +521,11 @@ test('a tracked tournament announces everything in its stream queue, with nobody
   asked.length = 0;
   await tracker.postStreamAlerts(channel, 0);
   assert.deepEqual(asked, []);
+
+  // turning it back on mid-tournament catches a set still on stream
+  state.tournaments[5].tracked.stream = true;
+  await tracker.postStreamAlerts(channel, 0);
+  assert.deepEqual(asked, ['queue', 'queue']);
+  assert.equal(thread.sent.length, 2);
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { sets: { nodes: sets } } } }) });
 });

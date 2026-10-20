@@ -57,7 +57,7 @@ function trackLines(interaction, found, reminders, now = secondsNow()) {
   trackTournament(tournament, 'manual', now);
   tournament.tracked.reminders = reminders;
 
-  const lines = [`Tracking ${name}. Every set and stream alert from it posts in its own thread, and each event's top 8 once the bracket is finished.`];
+  const lines = [`Tracking ${name}. Every set and stream alert from it posts in its own thread, then results and each event's top 8 once the bracket is finished.`];
   const deadline = regDeadline(found);
   const next = nextRegReminder(deadline);
   const firstAt = deadline - REG_REMINDER_HOURS[next] * HOUR;

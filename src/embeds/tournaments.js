@@ -320,7 +320,7 @@ export function results(tournament, players) {
   return groupByEvent(tournament, players).flatMap((entries) => {
     entries.sort((a, b) => (a.placement ?? Infinity) - (b.placement ?? Infinity));
     return withLines(tournamentEmbed(colors.results, `Results · ${eventTitle(entries[0])}`, tournament)
-      .setTitle(`Tournament placements · ${escapeMarkdown(tournament.name)}`.slice(0, 256)), entries.map(placementText));
+      .setTitle(`Tracked players' results from ${escapeMarkdown(tournament.name)}`.slice(0, 256)), entries.map(placementText));
   });
 }
 
@@ -335,7 +335,7 @@ export function topEight(tournament, events) {
     if (!lines.length) lines.push('No placements reported on start.gg.');
     else if (!event.done) lines.push('-# The bracket wasn\'t finished on start.gg, so unfinished placements are projected');
     return tournamentEmbed(colors.results, `Top 8 · ${eventTitle(event)}`, tournament)
-      .setTitle(`Top 8 · ${escapeMarkdown(tournament.name)}`.slice(0, 256))
+      .setTitle(`Top 8 from ${escapeMarkdown(tournament.name)}`.slice(0, 256))
       .setURL(startggUrl(`${event.eventSlug}/standings`))
       .setDescription(lines.join('\n'));
   });

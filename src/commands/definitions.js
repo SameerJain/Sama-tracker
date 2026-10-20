@@ -168,7 +168,7 @@ export const commands = [
           {
             type: Option.Subcommand,
             name: 'add',
-            description: 'Track every set, stream alert and top 8, plus registration reminders',
+            description: 'Track every set, stream alert, results and top 8, plus registration reminders',
             options: [
               { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
               switchOption('reminders', 'Reg reminders for people with /notify registration on. On unless you turn them off'),
@@ -214,6 +214,7 @@ export const commands = [
     description: 'Your pings for match calls, streams, reg reminders and 1-hour DMs. TOs can set anyone\'s',
     options: [
       { type: Option.User, name: 'user', description: 'Server member. Leave out for yourself. Someone else needs a TO' },
+      playerOption('Tracked player or all, leave out for yourself. Someone else needs a TO', 'player', false),
       switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('streams', 'When your set is on stream. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('registration', 'Reg reminders for tracked tournaments, skipped once you\'re registered'),

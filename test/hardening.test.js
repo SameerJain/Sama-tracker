@@ -65,6 +65,7 @@ test('a start.gg id with graphql in it never reaches the query', async () => {
 test('a bad discord id from start.gg never becomes a mention or a ping', async () => {
   // a warned call with one good id and two bad values: only the good one pings
   state.messages = { calls: true };
+  state.callPings = ['@everyone', '123', 'bad id'];
   state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: ['@everyone', '123', 'bad id'], warned: false }];
   mockStartgg(() => ({ s802: { state: 6 } }));
   const channel = fakeChannel();

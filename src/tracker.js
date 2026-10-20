@@ -711,7 +711,27 @@ async function streamedNow() {
 const STREAM_CONFIRM_MS = 30_000;
 
 export async function postStreamAlerts(postChannel = channel, confirmAfter = STREAM_CONFIRM_MS) {
-  const seen = [...(await streamedNow()).values()].filter((set) => !state.streamed.includes(set.id));
+  state.streamPinged ??= [];
+  const current = [...(await streamedNow()).values()];
+  for (const set of current.filter((each) => state.streamed.includes(each.id))) {
+    const ids = streamPingIds(set);
+    const pinged = state.streamPinged.find((each) => each.setId === set.id);
+    // old saved alerts have no per-person history, so don't replay them on upgrade
+    if (!pinged) {
+      state.streamPinged.push({ setId: set.id, discordIds: ids });
+      continue;
+    }
+    const newIds = ids.filter((id) => !pinged.discordIds.includes(id));
+    if (!newIds.length) continue;
+    if (messageEnabled('streams', wentLiveAt(set))) {
+      const components = h2hRow(set);
+      const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', newIds, 'on stream', embeds.onStream(set, state.players), components);
+      rememberButton(sent, set, components);
+    }
+    pinged.discordIds.push(...newIds);
+  }
+
+  const seen = current.filter((set) => !state.streamed.includes(set.id));
   if (seen.length) {
     await sleep(confirmAfter);
     const still = await streamedNow();
@@ -722,14 +742,17 @@ export async function postStreamAlerts(postChannel = channel, confirmAfter = STR
       // only whoever is playing and has /notify streams on
       if (messageEnabled('streams', wentLiveAt(set))) {
         const components = h2hRow(set);
-        const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', streamPingIds(set), 'on stream', embeds.onStream(set, state.players), components);
+        const ids = streamPingIds(set);
+        const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', ids, 'on stream', embeds.onStream(set, state.players), components);
         rememberButton(sent, set, components);
+        state.streamPinged.push({ setId: set.id, discordIds: ids });
       }
       state.streamed.push(id);
     }
   }
 
   state.streamed = state.streamed.slice(-200);
+  state.streamPinged = (state.streamPinged ?? []).filter((each) => state.streamed.includes(each.setId)).slice(-200);
   save();
 }
 
@@ -948,26 +971,23 @@ export async function postMatchCalls(postChannel = channel) {
     if (!players.length) return;
     const playerIds = new Set(players.map((player) => player.playerId));
     for (const set of await startgg.getCalledSets([...playerIds])) {
-      if ((state.called ??= []).includes(set.id)) continue;
       // both sides can have pings on, still one message for the set.
       // doubles sides hold two player ids each, so all four land in the same message
       const inSet = players.filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
       if (!inSet.length) continue;
+      const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(mentionable))];
+      if ((state.called ??= []).includes(set.id)) {
+        const watched = state.callPosts.find((each) => each.setId === set.id);
+        const newIds = watched ? discordIds.filter((id) => !watched.discordIds.includes(id)) : [];
+        if (newIds.length) {
+          if (messageEnabled('calls', set.updatedAt)) await sendMatchCall(set, inSet, newIds, postChannel);
+          watched.discordIds.push(...newIds);
+          save();
+        }
+        continue;
+      }
       if (messageEnabled('calls', set.updatedAt)) {
-        // discord ids come from discord, but the filter stays so nothing with mention syntax gets through
-        const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(mentionable))];
-        const components = h2hRow(set, inSet[0]);
-        // the card goes by whoever it's for, tracked or only linked
-        const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
-        // the station shows only when the TO set one, otherwise just the ping
-        const text = set.station ? `You're up - Station ${set.station}` : `You're up`;
-        const sent = await postChannel.send({
-          content: discordIds.length ? `${mentions(discordIds)} ${text}` : undefined,
-          embeds: embeds.withImage([embeds.matchCall(set, people)]),
-          components,
-          allowedMentions: { users: discordIds },
-        });
-        rememberButton(sent, set, components);
+        const { sent, text } = await sendMatchCall(set, inSet, discordIds, postChannel);
         watchCall(sent, set, discordIds, text);
       }
       state.called.push(set.id);
@@ -979,6 +999,20 @@ export async function postMatchCalls(postChannel = channel) {
 
   state.called = (state.called ?? []).slice(-200);
   save();
+}
+
+async function sendMatchCall(set, inSet, discordIds, postChannel) {
+  const components = h2hRow(set, inSet[0]);
+  const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
+  const text = set.station ? `You're up - Station ${set.station}` : `You're up`;
+  const sent = await postChannel.send({
+    content: discordIds.length ? `${mentions(discordIds)} ${text}` : undefined,
+    embeds: embeds.withImage([embeds.matchCall(set, people)]),
+    components,
+    allowedMentions: { users: discordIds },
+  });
+  rememberButton(sent, set, components);
+  return { sent, text };
 }
 
 // saved so followCalls can find the call again. a called set was last updated when it got called.
@@ -1014,10 +1048,11 @@ export async function followCalls(postChannel = channel) {
         each.warned = true;
         save();
         if (messageEnabled('calls', each.calledAt + CALL_WARN_MINUTES * 60)) {
-          const users = each.discordIds.filter(mentionable);
+          const users = each.discordIds.filter((id) => (state.callPings ?? []).includes(id) && mentionable(id));
+          if (!users.length) continue;
           const still = (each.text ?? `You're up`).replace(`You're up`, `You're still up`);
           await postChannel.send({
-            content: `${mentions(each.discordIds)} ${still}, ${minutes} min in. TOs usually DQ at ${CALL_DQ_MINUTES}`,
+            content: `${mentions(users)} ${still}, ${minutes} min in. TOs usually DQ at ${CALL_DQ_MINUTES}`,
             reply: { messageReference: each.messageId, failIfNotExists: false },
             allowedMentions: { users },
           });
@@ -1273,14 +1308,15 @@ export async function postRollCall(tournament, postChannel = channel) {
 }
 
 export async function postResults(tournament, postChannel = channel) {
+  if (tournament.resultsPosted) return;
   const now = secondsNow();
   if (now < tournament.startAt) return;
 
   const scope = eventsOf(tournament);
   if (scope.length && scope.every((entry) => entry.done)) tournament.doneAt ??= now;
-  // only tracked tournaments get a top 8. it goes out as soon as every event is finished, without waiting 12 hours for placements
+  // tracked tournaments post results and top 8 together as soon as every event is finished
   const topEightOn = posting(tournament, 'top8');
-  if (!tournament.top8Posted && topEightOn) await postEarlyTopEight(tournament, postChannel, now);
+  if (tournament.tracked && !tournament.resultsPosted && await postFinishedResults(tournament, postChannel, now, topEightOn)) return;
 
   const waited = now - overAt(tournament);
   if (waited < RESULTS_WAIT_HOURS * HOUR) return;
@@ -1329,34 +1365,47 @@ export async function postResults(tournament, postChannel = channel) {
   if (projected.results.length || projected.top8.length || !tournament.top8Posted) tournament.projected = projected;
 }
 
-// posts the top 8 as soon as every event is finished, before placements are due.
-// true once it went out or was consumed while switched off, so later placements skip it
-async function postEarlyTopEight(tournament, postChannel, now) {
+// posts results and the top 8 together as soon as every event is finished.
+// the results timing does not depend on whether top 8 posts are switched on
+async function postFinishedResults(tournament, postChannel, now, topEightOn) {
   const scope = eventsOf(tournament);
   const started = scope.filter((entry) => entry.started);
   if (!started.length || !started.every((entry) => entry.done)) return false;
   // one that hasn't started might still run, like doubles after singles, so it waits for those until the end time
   if (started.length < scope.length && now <= endTime(tournament)) return false;
-  // switched off counts as posted, so turning it back on doesn't replay it
-  if (!messageEnabled('top8', now)) {
+  const sendTopEight = topEightOn && messageEnabled('top8', now);
+  let events = [];
+  if (sendTopEight) {
+    try {
+      events = await fetchDoneTopEight(started);
+    } catch (err) {
+      console.error(`early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+      return false;
+    }
+    if (!events) return false;
+  }
+
+  const entries = tournament.entries.filter((entry) => entry.started);
+  const results = messageEnabled('results', now) ? await post(embeds.results({ ...tournament, entries }, crewOf(tournament)), 'results', now, postChannel) : [];
+  tournament.resultsPosted = true;
+
+  if (sendTopEight) {
+    const sent = await post(embeds.topEight(tournament, events), 'top8', now, postChannel).catch((err) => {
+      console.error(`posting the early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+      return null;
+    });
+    if (sent) tournament.top8Posted = true;
+    else {
+      tournament.top8Failed = true;
+      tournament.top8FailedAt ??= now;
+    }
+  } else {
+    // switched off counts as posted, so turning it back on doesn't replay it
     tournament.top8Posted = true;
-    return true;
   }
-  let events;
-  try {
-    events = await fetchDoneTopEight(started);
-  } catch (err) {
-    console.error(`early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
-    return false;
-  }
-  if (!events) return false;
-  try {
-    await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
-  } catch (err) {
-    console.error(`posting the early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
-    return false;
-  }
-  tournament.top8Posted = true;
+
+  const projectedResults = entries.every(placed) ? [] : postRefs(results);
+  if (projectedResults.length || !tournament.top8Posted) tournament.projected = { at: now, results: projectedResults, top8: [] };
   return true;
 }
 

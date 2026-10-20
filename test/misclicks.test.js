@@ -204,6 +204,11 @@ test('the DQ warning stays quiet with match call pings switched off, or nobody t
   assert.equal(state.callPosts[0].warned, true);
 
   state.messages = { calls: true };
+  state.callPings = [];
+  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: ['crew-discord'], warned: false }];
+  await tracker.followCalls(channel);
+  assert.equal(channel.sent.length, 0);
+
   state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: [], warned: false }];
   await tracker.followCalls(channel);
   assert.equal(channel.sent.length, 0);
@@ -273,7 +278,7 @@ function command(commandName, { group = null, subcommand = null, values = {}, us
   const calls = [];
   const run = {
     calls, commandName, user: { id: user }, memberPermissions: { has: () => true },
-    options: { getSubcommandGroup: () => group, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null, getInteger: () => null },
+    options: { getSubcommandGroup: () => group, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null, getInteger: () => null, getUser: () => null, getMember: () => null },
     reply: async (result) => calls.push(['reply', result]),
     deferReply: async () => { run.deferred = true; },
     editReply: async (result) => calls.push(['edit', result]),
@@ -426,6 +431,31 @@ test('/track posts for everyone off and /tournament remove ask first, and /track
   assert.equal((await press(stopped, 'Undo')).calls[0][1].content, 'Tracking Soon again, with the same settings as before.');
   assert.deepEqual(state.tournaments[6].tracked, switches);
   assert.deepEqual(state.tournaments[6].reminder, { next: 1 });
+});
+
+test('/notify player:all asks first and changes every tracked player with Discord', async () => {
+  state.players = {
+    1: crew,
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', discordId: 'rival-discord' },
+    3: { userId: 3, playerId: 30, tag: 'No Discord', slug: 'user/no-discord' },
+  };
+  state.callPings = [];
+  state.streamPings = ['old-discord'];
+  state.regPings = [];
+  state.regDmPings = [];
+  state.startDmPings = [];
+
+  const run = command('notify', { values: { player: 'all', calls: 'on', streams: 'off' } });
+  await handleCommand(run);
+  const asked = run.calls[0][1];
+  assert.equal(asked.content, 'Change /notify for 2 tracked players? Match calls on and stream alerts off. 1 tracked player without Discord on start.gg will be skipped.');
+  assert.deepEqual(labels(asked), ['Change pings', 'Cancel']);
+  assert.deepEqual(state.callPings, []);
+
+  const changed = (await press(asked, 'Change pings')).calls[0][1];
+  assert.equal(changed.content, 'Updated /notify for 2 tracked players. Skipped 1 without Discord on start.gg.');
+  assert.deepEqual(state.callPings.toSorted(), ['crew-discord', 'rival-discord']);
+  assert.deepEqual(state.streamPings, ['old-discord']);
 });
 
 test('/t-o cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {
