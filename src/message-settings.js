@@ -30,6 +30,10 @@ export function messageSettings() {
   return { ...defaults, ...DEFAULT_RECAP_SCHEDULE, ...state.messages, threads };
 }
 
+// the role /notify registration hands out and reg reminders ping, so one ping reaches everyone
+// who opted in instead of naming each of them
+export const REG_ROLE = 'Reg Reminders';
+
 // green for a tracked win, red for a loss, gold when two tracked players meet and purple when
 // nobody tracked played. off, every set result card stays green. small crews turn it on to see
 // each member at a glance, big servers leave it off

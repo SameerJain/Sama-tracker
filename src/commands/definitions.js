@@ -70,7 +70,6 @@ export const commands = [
   },
   {
     name: 'messages', description: 'Show or change automatic posts, threads, set result colors and the weekly recap schedule',
-    default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),
     options: [
       ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
       { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green for a win, red for a loss, gold for crew vs crew' },
@@ -153,6 +152,12 @@ export const commands = [
           },
           {
             type: Option.Subcommand,
+            name: 'set',
+            description: 'Use an existing server role as the T.O. role. Needs Manage Server',
+            options: [{ type: Option.Role, name: 'role', description: 'Existing role to use for T.O. privileges', required: true }],
+          },
+          {
+            type: Option.Subcommand,
             name: 'remove',
             description: 'Take the T.O. role off someone, or yourself. T.O.s only',
             options: [{ type: Option.User, name: 'user', description: 'A T.O.', required: true }],
@@ -172,6 +177,7 @@ export const commands = [
             options: [
               { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
               switchOption('reminders', 'Reg reminders for people with /notify registration on. On unless you turn them off'),
+              { type: Option.String, name: 'schedule', description: 'Custom reminder times, like 7d,3d,1d,6h. Leave out for the usual four' },
               switchOption('add_event', 'Also make a Discord event from it. Off unless you turn it on'),
             ],
           },
@@ -191,6 +197,7 @@ export const commands = [
               switchOption('stream', 'Every set on stream or up next in the stream queue'),
               switchOption('top8', 'Each event\'s top 8 once the bracket is finished'),
               switchOption('reminders', 'Reg reminders for people with /notify registration on'),
+              { type: Option.String, name: 'schedule', description: 'Custom reminder times, like 7d,3d,1d,6h. default goes back to the usual four' },
             ],
           },
           {
@@ -217,7 +224,7 @@ export const commands = [
       playerOption('Tracked player or all, leave out for yourself. Someone else needs a TO', 'player', false),
       switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('streams', 'When your set is on stream. Needs you linked, or tracked with Discord on start.gg'),
-      switchOption('registration', 'Reg reminders for tracked tournaments, skipped once you\'re registered'),
+      switchOption('registration', 'Reg Reminders role and its pings for tracked tournaments'),
       switchOption('dm_registration', 'DM 1 hour before registration closes, with link, location and image'),
       switchOption('dm_start', 'DM 1 hour before the tournament starts, with link, location and image'),
       switchOption('all', 'All five at once'),

@@ -197,6 +197,9 @@ export function upsetFactor(winner, loser) {
   return step(winner.seed) - step(loser.seed);
 }
 
+// seed 13 beating seed 1, or seed 17 beating seed 2. set results and crew cards only call this big a win notable
+export const MAJOR_UPSET = 7;
+
 export function winLoss(wins, losses) {
   return `${wins}-${losses}${wins + losses ? ` (${percent(wins, wins + losses)})` : ''}`;
 }

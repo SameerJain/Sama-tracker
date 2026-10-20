@@ -74,8 +74,8 @@ const guild = {
   },
 };
 
-// a command run by someone in the server. manager is Manage Server. picked is the member a user: option picked
-async function run(commandName, user, { group = commandName === 't-o' ? 'role' : null, subcommand = null, values = {}, manager = false, picked = null } = {}) {
+// a command run by someone in the server. manager is Manage Server. picked is the member or role an option picked
+async function run(commandName, user, { group = commandName === 't-o' ? 'role' : null, subcommand = null, values = {}, manager = false, picked = null, pickedRole = null } = {}) {
   const calls = [];
   const interaction = {
     calls, commandName, guild,
@@ -87,6 +87,7 @@ async function run(commandName, user, { group = commandName === 't-o' ? 'role' :
       getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null,
       getUser: () => picked && { id: picked.id, bot: Boolean(picked.bot), displayName: picked.displayName },
       getMember: () => (picked && !picked.bot ? picked : null),
+      getRole: () => pickedRole,
     },
     reply: async (result) => calls.push(['reply', result]),
     deferReply: async () => { interaction.deferred = true; calls.push(['defer']); },
@@ -118,7 +119,7 @@ test('until the server has a TO role Manage Server counts as one, and /t-o role 
   const x = member('x-discord');
   members.set(x.id, x);
   const first = said(await run('t-o', 'admin-discord', { subcommand: 'add', manager: true, picked: x }));
-  assert.equal(first.content, 'x is a TO now. TOs can track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.');
+  assert.equal(first.content, 'x is a TO now. TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.');
   assert.equal(first.private, false);
   assert.deepEqual([...roles.values()], [{ id: 'made-role', name: 'TO' }]);
   assert.ok(x.roles.cache.has('made-role'));
@@ -152,7 +153,26 @@ test('a TO role made by hand counts by its name, and keeps counting once renamed
   assert.match(said(await run('t-o', 'z-discord', { subcommand: 'remove', picked: x })).content, /^x isn't a TO anymore\.$/);
 });
 
-test('/t-o role remove takes it off another TO or yourself, and says so for someone who isn\'t one', async () => {
+test('a server manager can set any existing role as the TO role', async () => {
+  const buffalo = { id: 'buffalo-role', name: 'TO(Buffalo)' };
+  roles.set(buffalo.id, buffalo);
+  const x = member('x-discord', { roles: [buffalo.id] });
+  members.set(x.id, x);
+
+  assert.deepEqual(said(await run('t-o', 'admin-discord', { subcommand: 'set', manager: true, pickedRole: buffalo })), {
+    content: 'TO(Buffalo) is the TO role now.', private: false,
+  });
+  assert.equal(state.toRole.id, buffalo.id);
+  const y = member('y-discord');
+  members.set(y.id, y);
+  assert.match(said(await run('t-o', x.id, { subcommand: 'add', picked: y })).content, /^y is a TO now/);
+
+  const refused = said(await run('t-o', x.id, { subcommand: 'set', pickedRole: { id: 'other', name: 'Other' } }));
+  assert.deepEqual(refused, { content: 'You need Manage Server permission to set the TO role.', private: true });
+  assert.equal(state.toRole.id, buffalo.id);
+});
+
+test('/t-o role remove refuses to remove the last known TO', async () => {
   roles.set('to-role', { id: 'to-role', name: 'TO' });
   const x = member('x-discord', { roles: ['to-role'] });
   const y = member('y-discord', { roles: ['to-role'] });
@@ -165,8 +185,9 @@ test('/t-o role remove takes it off another TO or yourself, and says so for some
 
   assert.equal(said(await run('t-o', 'x-discord', { subcommand: 'remove', picked: y })).content, 'y isn\'t a TO anymore.');
   assert.ok(!y.roles.cache.has('to-role'));
-  assert.equal(said(await run('t-o', 'x-discord', { subcommand: 'remove', picked: x })).content, 'x isn\'t a TO anymore. That was you, so another TO has to add you back.');
-  assert.deepEqual(state.toRole.members, []);
+  assert.equal(said(await run('t-o', 'x-discord', { subcommand: 'remove', picked: x })).content, 'x is the last known TO. Add another TO first, or have someone with Manage Server set the TO role.');
+  assert.ok(x.roles.cache.has('to-role'));
+  assert.deepEqual(state.toRole.members, ['x-discord']);
 });
 
 test('a role discord won\'t let the bot hand out says what it needs', async () => {

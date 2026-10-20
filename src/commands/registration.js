@@ -26,16 +26,16 @@ function tournamentNotFound(input) {
 
 // autocomplete, so nobody has to paste a link for a tournament the bot already knows: tracked ones and ones
 // tracked players are in, soonest first. only says which: new is the ones /t-o tournament add can still track, tracked
-// the ones it already does, event is every tracked one plus the upcoming ones for /t-o tournament event. a pasted
-// link of one of them shows its name, and anything else typed is offered back as it is
+// the ones it already does, event is the upcoming ones for /t-o tournament event, since discord events have to
+// start in the future. a pasted link of one of them shows its name, and anything else typed is offered back as it is
 function tournamentChoices(typed, { only = 'known' } = {}) {
   const now = secondsNow();
   const search = typed.trim().toLowerCase();
   const known = Object.values(state.tournaments).filter((tournament) => {
     if (!tournament.slug || !tournament.name) return false;
     if (only === 'tracked') return Boolean(tournament.tracked);
-    // the event list keeps every tracked tournament, even a finished one, so a TO can still make its discord event
-    if (only === 'event' && tournament.tracked) return true;
+    // discord events have to start in the future, so started and finished ones would only fail
+    if (only === 'event' && tournament.startAt && tournament.startAt <= now) return false;
     // one saved without dates is let through
     if (tournament.startAt && endTime(tournament) < now) return false;
     return only !== 'new' || !tournament.tracked;

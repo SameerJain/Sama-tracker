@@ -3,8 +3,8 @@ import * as startgg from '../startgg.js';
 import { state, save } from '../store.js';
 import { ensureDiscordEvent } from '../discord-events.js';
 import {
-  REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, missingThreadPermissions, nextRegReminder, regDeadline,
-  secondsNow, trackTournament,
+  MAX_REMINDER_HOURS, MAX_REMINDERS, REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, missingThreadPermissions, nextRegReminder, regDeadline,
+  reminderSchedule, secondsNow, shortSchedule, trackTournament,
 } from '../tracker.js';
 import { lookup, replyEphemeral } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
@@ -21,6 +21,24 @@ function inWords(hours) {
   return hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`;
 }
 
+// custom reminder times before registration closes, like 7d,3d,1d,6h. bare numbers mean hours.
+// null when left out, { error } when it doesn't parse, otherwise hours before the deadline, most first
+export function parseSchedule(input) {
+  if (!input) return null;
+  const hours = [];
+  for (const part of input.split(/[\s,]+/).filter(Boolean)) {
+    const match = part.match(/^(\d+(?:\.\d+)?)(h|d)?$/i);
+    const at = match && Number(match[1]) * (match[2]?.toLowerCase() === 'd' ? 24 : 1);
+    if (!match || !(at > 0)) return { error: `Couldn't read \`${part}\` as a reminder time. Use hours or days, like 7d,3d,1d,6h.` };
+    hours.push(at);
+  }
+  const schedule = [...new Set(hours)].sort((a, b) => b - a);
+  if (!schedule.length || schedule.length > MAX_REMINDERS || schedule.some((at) => at < 1 || at > MAX_REMINDER_HOURS)) {
+    return { error: `Reminders run 1 hour to 30 days out, up to ${MAX_REMINDERS} of them, like 7d,3d,1d,6h.` };
+  }
+  return schedule;
+}
+
 // a tracked tournament picked from the list, which sends its slug, or typed by name or link
 function trackedPick(interaction) {
   const value = interaction.options.getString('tournament', true).trim().toLowerCase();
@@ -29,9 +47,15 @@ function trackedPick(interaction) {
     ?? lookup(Object.fromEntries(tracked.map((tournament) => [String(tournament.id), tournament])), value, 'name');
 }
 
-// what a tracked tournament posts, on one line
+// what a tracked tournament posts, on one line. a custom reminder schedule shows with it
 function postsText(tournament) {
-  return Object.entries(POSTS).map(([name, label]) => `**${label}:** ${tournament.tracked[name] === false ? 'off' : 'on'}`).join(' · ');
+  const lines = Object.entries(POSTS).map(([name, label]) => {
+    if (name === 'reminders' && tournament.tracked[name] !== false && tournament.tracked.schedule) {
+      return `**${label}:** on (${shortSchedule(tournament.tracked.schedule)})`;
+    }
+    return `**${label}:** ${tournament.tracked[name] === false ? 'off' : 'on'}`;
+  });
+  return lines.join(' · ');
 }
 
 // every set and stream alert goes in its thread, so say when that can't happen yet
@@ -47,7 +71,7 @@ function threadWarning(interaction) {
 
 // tracks a tournament from getRegistration by hand for /t-o tournament add, and says what that set up. one
 // already tracked keeps its switches and reminder schedule
-function trackLines(interaction, found, reminders, now = secondsNow()) {
+function trackLines(interaction, found, reminders, schedule, now = secondsNow()) {
   const name = escapeMarkdown(found.name);
   if (state.tournaments[found.id]?.tracked) return [`Already tracking ${name}.`];
 
@@ -56,11 +80,12 @@ function trackLines(interaction, found, reminders, now = secondsNow()) {
   const tournament = state.tournaments[id] ??= { id, name: found.name, slug, startAt, endAt, city, addrState, venueName, venueAddress, isOnline, images, entries: [], userIds: [] };
   trackTournament(tournament, 'manual', now);
   tournament.tracked.reminders = reminders;
+  if (schedule) tournament.tracked.schedule = schedule;
 
   const lines = [`Tracking ${name}. Every set and stream alert from it posts in its own thread, then results and each event's top 8 once the bracket is finished.`];
   const deadline = regDeadline(found);
-  const next = nextRegReminder(deadline);
-  const firstAt = deadline - REG_REMINDER_HOURS[next] * HOUR;
+  const next = nextRegReminder(deadline, schedule ?? REG_REMINDER_HOURS);
+  const firstAt = deadline - (schedule ?? REG_REMINDER_HOURS)[next] * HOUR;
   // further out it might just not be open yet
   const open = deadline > now && (firstAt > now || found.isRegistrationOpen);
   if (open) tournament.reminder = { deadline, next };
@@ -68,7 +93,7 @@ function trackLines(interaction, found, reminders, now = secondsNow()) {
   else if (!open) lines.push('Registration is closed, so no reg reminders.');
   else if (firstAt <= now) lines.push(`Registration ends <t:${deadline}:R>, sending the last call now.`);
   else {
-    const when = new Intl.ListFormat('en').format(REG_REMINDER_HOURS.slice(next).map(inWords));
+    const when = new Intl.ListFormat('en').format((schedule ?? REG_REMINDER_HOURS).slice(next).map(inWords));
     lines.push(`Everyone with \`/notify registration\` on gets pinged ${when} before registration ends, starting <t:${firstAt}:R>.`);
   }
   const warning = threadWarning(interaction);
@@ -82,6 +107,8 @@ async function tournamentAdd(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'track tournaments');
   const input = interaction.options.getString('tournament', true).trim();
   const reminders = interaction.options.getString('reminders') !== 'off';
+  const schedule = parseSchedule(interaction.options.getString('schedule'));
+  if (schedule?.error) return replyEphemeral(interaction, schedule.error);
   const addEvent = interaction.options.getString('add_event') === 'on';
 
   await interaction.deferReply();
@@ -95,7 +122,7 @@ async function tournamentAdd(interaction) {
     return interaction.editReply({ content: `${name} is already tracked. \`/t-o tournament posts\` changes what it posts.`, allowedMentions: { parse: [] } });
   }
 
-  const lines = trackLines(interaction, found, reminders, now);
+  const lines = trackLines(interaction, found, reminders, schedule, now);
   if (addEvent) lines.push(...await eventLines(interaction, found));
   save();
   await interaction.editReply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
@@ -140,18 +167,23 @@ confirmable('untrack_tournament', {
 });
 
 // with no switches it says what's on. sets turned back on start from now, the way a newly tracked tournament does,
-// and reminders turned back on start from the next one still to come, so nothing missed goes out late
+// and reminders turned back on start from the next one still to come, so nothing missed goes out late.
+// a new schedule starts from its next one still to come the same way, and default goes back to the usual four
 function tournamentPosts(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'change what tournaments post');
   const tournament = trackedPick(interaction);
   if (!tournament) return replyEphemeral(interaction, 'That tournament isn\'t tracked. `/t-o tournament add` it first.');
+  const rawSchedule = interaction.options.getString('schedule');
+  const resetting = rawSchedule?.trim().toLowerCase() === 'default';
+  const schedule = resetting ? null : parseSchedule(rawSchedule);
+  if (schedule?.error) return replyEphemeral(interaction, schedule.error);
   const changes = {};
   for (const name of Object.keys(POSTS)) {
     const value = interaction.options.getString(name);
     if (value) changes[name] = value === 'on';
   }
   const name = escapeMarkdown(tournament.name);
-  if (!Object.keys(changes).length) return replyEphemeral(interaction, `**${name}**\n${postsText(tournament)}`);
+  if (!Object.keys(changes).length && !schedule && !resetting) return replyEphemeral(interaction, `**${name}**\n${postsText(tournament)}`);
 
   const { tracked } = tournament;
   if (changes.sets && tracked.sets === false) tournament.lastCheck = secondsNow();
@@ -159,9 +191,18 @@ function tournamentPosts(interaction) {
     tournament.reminder ??= {};
     delete tournament.reminder.next;
   }
+  if (schedule || resetting) {
+    if (schedule) tracked.schedule = schedule;
+    else delete tracked.schedule;
+    tournament.reminder ??= {};
+    delete tournament.reminder.next;
+  }
   Object.assign(tracked, changes);
   save();
-  return interaction.reply({ content: `**${name}**\n${postsText(tournament)}`, allowedMentions: { parse: [] } });
+  const lines = [`**${name}**`, postsText(tournament)];
+  if (schedule) lines.push(`-# Reg reminders go out ${new Intl.ListFormat('en').format(schedule.map(inWords))} before registration ends, starting from the next one still to come`);
+  else if (resetting) lines.push('-# Reg reminders are back to the usual 7 days, 3 days, 1 day and 6 hours before registration ends');
+  return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
 // one line about the discord event, made or found. errors go in the reply the same way

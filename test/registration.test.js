@@ -339,6 +339,69 @@ test('/t-o tournament add with reminders off or registration closed still tracks
   assert.match(closed.calls.find(([kind]) => kind === 'edit')[1].content, /Registration is closed, so no reg reminders\./);
 });
 
+test('/t-o tournament add takes a custom reminder schedule, and rejects a bad one', async () => {
+  state.tournaments = {};
+  state.messages = { registration: false };
+  mockStartgg();
+  const run = interaction('t-o', { tournament: 'start.gg/tournament/local', schedule: '7d, 12h' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
+  await handleCommand(run);
+  assert.deepEqual(state.tournaments[5].tracked.schedule, [168, 12]);
+  // closes in an hour, so only the last call is left and it goes now
+  assert.deepEqual(state.tournaments[5].reminder, { deadline: now + 3600, next: 1 });
+  assert.match(run.calls.find(([kind]) => kind === 'edit')[1].content, /sending the last call now/);
+
+  state.tournaments = {};
+  const bad = interaction('t-o', { tournament: 'start.gg/tournament/local', schedule: 'soon' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
+  await handleCommand(bad);
+  assert.deepEqual(bad.calls.map(([kind]) => kind), ['reply']);
+  assert.match(bad.calls[0][1].content, /Couldn't read `soon` as a reminder time/);
+  assert.deepEqual(state.tournaments, {});
+});
+
+test('/t-o tournament posts sets, shows and clears a custom reminder schedule', async () => {
+  state.tournaments = { 5: { id: 5, name: 'Local', slug: 'tournament/local', startAt: now + 86400, tracked: { by: 'manual', reminders: true }, reminder: { deadline: now + 3600, next: 3 } } };
+  const run = interaction('t-o', { tournament: 'local', schedule: '2d,6h' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' });
+  await handleCommand(run);
+  assert.deepEqual(state.tournaments[5].tracked.schedule, [48, 6]);
+  // the new schedule starts from its next one still to come
+  assert.equal(state.tournaments[5].reminder.next, undefined);
+  const [, reply] = run.calls.at(-1);
+  assert.match(reply.content, /\*\*Reg reminders:\*\* on \(2d, 6h\)/);
+  assert.match(reply.content, /Reg reminders go out 2 days and 6 hours before registration ends/);
+
+  // with nothing to change it says what's on, schedule included
+  const status = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' });
+  await handleCommand(status);
+  assert.match(status.calls.at(-1)[1].content, /\*\*Reg reminders:\*\* on \(2d, 6h\)/);
+
+  const reset = interaction('t-o', { tournament: 'local', schedule: 'default' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' });
+  await handleCommand(reset);
+  assert.equal(state.tournaments[5].tracked.schedule, undefined);
+  assert.match(reset.calls.at(-1)[1].content, /Reg reminders:\*\* on\n/);
+  assert.match(reset.calls.at(-1)[1].content, /usual 7 days, 3 days, 1 day and 6 hours/);
+
+  const bad = interaction('t-o', { tournament: 'local', schedule: '100d' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' });
+  await handleCommand(bad);
+  assert.deepEqual(bad.calls.map(([kind]) => kind), ['reply']);
+  assert.match(bad.calls[0][1].content, /Reminders run 1 hour to 30 days out/);
+  assert.deepEqual(state.tournaments[5].tracked.schedule, undefined);
+});
+
+test('reminder schedules read hours and days, most first, and reject nonsense', async () => {
+  const { parseSchedule } = await import('../src/commands/tournaments.js');
+  const { shortSchedule } = await import('../src/tracker.js');
+  assert.deepEqual(parseSchedule('7d,3d,1d,6h'), [168, 72, 24, 6]);
+  assert.deepEqual(parseSchedule('6h, 7d'), [168, 6]);
+  assert.deepEqual(parseSchedule('48'), [48]);
+  assert.deepEqual(parseSchedule('7d,7d,168h'), [168]);
+  assert.equal(parseSchedule(null), null);
+  assert.equal(shortSchedule([168, 72, 24, 6]), '7d, 3d, 1d, 6h');
+  assert.match(parseSchedule('soon').error, /Couldn't read `soon` as a reminder time/);
+  assert.match(parseSchedule('1h,2h,3h,4h,5h,6h,7h,8h,9h,10h,11h').error, /up to 10/);
+  assert.match(parseSchedule('100d').error, /1 hour to 30 days out/);
+  assert.match(parseSchedule('0h').error, /Couldn't read `0h`/);
+});
+
 test('/t-o tournament commands go by the TO role once the server has one, and Manage Server only before then', async () => {
   mockStartgg();
   state.messages = { registration: false };
@@ -389,12 +452,12 @@ test('tournament options offer tracked ones and tracked players\' tournaments, s
   // and untracking or changing one only the tracked ones, over or not
   assert.deepEqual((await autocomplete('t-o', '', 'remove', 'tournament')).map(({ name }) => name), ['Last Week', 'Local', 'Admin Weekly']);
   assert.deepEqual((await autocomplete('t-o', 'week', 'posts', 'tournament')).map(({ name }) => name), ['Last Week', 'Admin Weekly']);
-  // making a discord event lists every tracked one plus the upcoming ones, soonest first
-  assert.deepEqual((await autocomplete('t-o', '', 'event', 'tournament')).map(({ name }) => name), ['Last Week', 'Live Now', 'Local', 'Next Month', 'Admin Weekly']);
-  assert.deepEqual((await autocomplete('t-o', 'week', 'event', 'tournament')).map(({ name }) => name), ['Last Week', 'Admin Weekly']);
+  // making a discord event lists only upcoming ones, since discord events have to start in the future
+  assert.deepEqual((await autocomplete('t-o', '', 'event', 'tournament')).map(({ name }) => name), ['Local', 'Next Month', 'Admin Weekly']);
+  assert.deepEqual((await autocomplete('t-o', 'week', 'event', 'tournament')).map(({ name }) => name), ['Admin Weekly']);
   // a tournament saved twice still lists once
   state.tournaments[10] = { id: 10, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600 };
-  assert.deepEqual((await autocomplete('t-o', '', 'event', 'tournament')).map(({ name }) => name), ['Last Week', 'Live Now', 'Local', 'Next Month', 'Admin Weekly']);
+  assert.deepEqual((await autocomplete('t-o', '', 'event', 'tournament')).map(({ name }) => name), ['Local', 'Next Month', 'Admin Weekly']);
   delete state.tournaments[10];
 
   // anything else typed comes back as it is, so a pasted link still goes through

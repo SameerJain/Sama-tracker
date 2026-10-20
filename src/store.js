@@ -11,8 +11,9 @@ const FILE = `${stateDir}/state.json`;
 // toRole is the TO role: { id, members, seeded }, id being the discord role, members the discord ids the bot has seen with it, for /t-o role list,
 // and seeded whether the first TO got it.
 // tournaments are keyed by id: the ones tracked players are in, and tracked ones. tracked: { by, at, sets, stream, top8, reminders } says it's tracked,
-// by being 'manual', or 'admin' from before the TO role, and the rest its /t-o tournament posts switches. reminder: { deadline, next } is its reg reminder progress, next being the
-// index into REG_REMINDER_HOURS. dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for. events are all its events from start.gg. crew is the registered server members who aren't tracked,
+// by being 'manual', or 'admin' from before the TO role, and the rest its /t-o tournament posts switches. schedule is the TO's custom
+// reminder times in hours before registration closes, most first, when it's not the default. reminder: { deadline, next } is its reg reminder progress, next being the
+// index into that schedule. dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for. events are all its events from start.gg. crew is the registered server members who aren't tracked,
 // keyed by user id as { userId, slug, tag }, so cards can name them. lastCheck is when its sets were last checked, the way it is on a player.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
 // accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.

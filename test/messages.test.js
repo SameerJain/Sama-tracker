@@ -14,10 +14,11 @@ const { commands, handleCommand } = await import('../src/commands/index.js');
 const { postWeeklyRecap } = await import('../src/tracker.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 
-async function configure(values = {}, allowed = true, guild = undefined) {
+async function configure(values = {}, allowed = true, guild = undefined, user = 'manager') {
   let reply;
   await handleCommand({
-    commandName: 'messages', guild, memberPermissions: { has: permission => allowed && permission === PermissionFlagsBits.ManageGuild },
+    commandName: 'messages', guild, user: { id: user }, member: guild?.members?.cache?.get(user),
+    memberPermissions: { has: permission => allowed && permission === PermissionFlagsBits.ManageGuild },
     options: { getSubcommand: () => null, getBoolean: name => values[name] ?? null,
       getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
     reply: async result => { reply = result; },
@@ -25,9 +26,9 @@ async function configure(values = {}, allowed = true, guild = undefined) {
   return reply;
 }
 
-test('message controls are registered for server managers', () => {
+test('message controls are visible to TOs', () => {
   const command = commands.find(c => c.name === 'messages');
-  assert.equal(command?.default_member_permissions, PermissionFlagsBits.ManageGuild.toString());
+  assert.equal(command?.default_member_permissions, undefined);
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
     ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
   // three modes, picked by name
@@ -49,12 +50,23 @@ test('status answers where everyone sees it', async () => {
   assert.equal(reply.flags, undefined);
 });
 
-test('only managers can change settings', async () => {
+test('only managers or TOs can change settings', async () => {
   state.messages = {};
   const reply = await configure({ sets: false }, false);
-  assert.match(reply.content, /Manage Server/);
+  assert.match(reply.content, /TO or have Manage Server/);
   assert.ok(reply.flags);
   assert.deepEqual(state.messages, {});
+
+  const role = { id: 'to-role', name: 'TO(Buffalo)' };
+  const to = { id: 'to-user', roles: { cache: new Set([role.id]) } };
+  const guild = {
+    roles: { cache: Object.assign(new Map([[role.id, role]]), { find: fn => [role].find(fn) }) },
+    members: { cache: new Map([[to.id, to]]) },
+  };
+  state.toRole = { id: role.id, members: [], seeded: true };
+  const changed = await configure({ sets: false }, false, guild, to.id);
+  assert.match(changed.content, /Set results:\*\* off/);
+  assert.equal(state.messages.sets, false);
 });
 
 test('message switches and recap schedule save immediately and answer where everyone sees them', async (t) => {

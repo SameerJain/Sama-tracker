@@ -1,7 +1,7 @@
 import { escapeMarkdown } from 'discord.js';
 import { singles, startggUrl } from '../startgg.js';
 import { characterUsage } from '../characters.js';
-import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, vodLink, filterLine, filtersOn, scoreText, sparkline, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
+import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, MAJOR_UPSET, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, vodLink, filterLine, filtersOn, scoreText, sparkline, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
 
 const RECENT_EVENTS = 4;
 
@@ -197,13 +197,14 @@ function characterLine(sets) {
   return `**Game record by character:** ${shown.join(' · ')}`;
 }
 
-// upcoming is [{ tournament, players }] for the active players' entries before the next recap
+// upcoming is [{ tournament, players }] for the active players' entries before the next recap.
+// only notable wins show, the same major upsets as set result cards, tracked vs tracked included
 export function weeklyRecap(crew, upcoming, { since, until }) {
   const lines = [`<t:${since}:d> to <t:${until}:d> · ${count(crew.length, 'active player')}`];
   const wins = crew.flatMap(({ player, summary }) => summary.played.filter((result) => result.won).map((result) => ({ ...result, player })));
-  const upset = wins.filter(({ me, them }) => upsetFactor(me, them) > 0)
+  const upset = wins.filter(({ me, them }) => upsetFactor(me, them) >= MAJOR_UPSET)
     .sort((a, b) => upsetFactor(b.me, b.them) - upsetFactor(a.me, a.them))[0];
-  if (upset) lines.push('', `**Biggest upset:** ${playerLink(upset.player)} ${upsetLine(upset)}`);
+  if (upset) lines.push('', `**Notable upset:** ${playerLink(upset.player)} ${upsetLine(upset)}`);
   const finishes = crew.flatMap(({ player, summary }) => summary.finishes.map((entry) => ({ ...entry, player })))
     .filter(({ event }) => event.numEntrants).sort(byFinish);
   if (finishes.length) lines.push(`**Best finish:** ${playerLink(finishes[0].player)} · ${placementLine(finishes[0])}`);

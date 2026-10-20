@@ -178,6 +178,7 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
       getInteger: (name) => values[name] ?? null,
       getNumber: (name) => values[name] ?? null,
       getChannel: (name) => values[name] ?? null,
+      getRole: (name) => values[name] ?? null,
       getUser: () => values.user ?? null,
       getMember: () => (values.user ? {
         displayName: values.user.displayName, displayAvatarURL: () => 'https://cdn.example/member.png',
@@ -278,7 +279,7 @@ const runs = [
   ['t-o', { subcommand: 'cleanup' }, /Everyone tracked has their start\.gg Discord in this server/],
   ['notify', {}, /Your pings.*Match calls:\*\* off.*Registration DMs:\*\* off.*Start DMs:\*\* off/],
   ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off for the whole server/],
-  ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your set is on stream.*pinged for reg reminders.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
+  ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your set is on stream.*Reg Reminders role and its pings.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['notify', { values: { dm_registration: 'on', dm_start: 'on' } }, /DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['matchmaking_role', { values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
   ['matchmaking_role', { values: { game: 'melee', duration: 0.5 } }, /for 30 minutes.*comes off on its own/],
@@ -299,6 +300,8 @@ const runs = [
   ['t-o', { group: 'tournament', subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 6 hours before registration ends/],
   ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on/],
   ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
+  ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', schedule: '2d,6h' } }, /Reg reminders:\*\* on \(2d, 6h\).*Reg reminders go out 2 days and 6 hours/],
+  ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', schedule: 'soon' } }, /Couldn't read `soon` as a reminder time/],
   ['t-o', { group: 'tournament', subcommand: 'event', values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
   ['t-o', { group: 'tournament', subcommand: 'add', values: { tournament: 'start.gg/tournament/soon', add_event: 'on' } }, /Already tracking Soon.*Made a Discord event for Soon/],
   ['track', { subcommand: 'list' }, /Tracked tournaments · 1.*Soon.*top 8s off/],
@@ -306,6 +309,7 @@ const runs = [
   ['t-o', { group: 'tournament', subcommand: 'remove', values: { tournament: 'soon' }, press: 'Stop tracking' }, /Stop tracking Soon\?.*"update",\{"content":"Stopped tracking Soon\."/],
   // no TO role yet, so Manage Server counts as one, and /t-o role add makes the role
   ['t-o', { group: 'role', subcommand: 'list' }, /There's no TO role yet/],
+  ['t-o', { group: 'role', subcommand: 'set', values: { role: { id: 'role-existing', name: 'TO Buffalo' } } }, /TO Buffalo is the TO role now/],
   ['t-o', { group: 'role', subcommand: 'add', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone is a TO now/],
   ['t-o', { group: 'role', subcommand: 'remove', values: { user: { id: 'someone', bot: false, displayName: 'Someone' } } }, /Someone isn't a TO/],
   ['stream_link', {}, /twitch\.tv\/localstream/],

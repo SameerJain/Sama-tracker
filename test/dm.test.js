@@ -20,9 +20,20 @@ function mockApi(respond) {
   globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
 }
 
-// a fake post channel whose client DMs into sent instead of discord
-function dmChannel(sent) {
+// a fake post channel whose client DMs into sent instead of discord. inServer lists
+// the discord ids still in the server, null for no guild. fetchFails makes the check fail
+function dmChannel(sent, inServer = null, fetchFails = false) {
   return {
+    ...(inServer !== null || fetchFails ? {
+      guild: {
+        members: {
+          fetch: async ({ user: ids }) => {
+            if (fetchFails) throw new Error('discord down');
+            return new Map(ids.filter((id) => inServer.includes(id)).map((id) => [id, {}]));
+          },
+        },
+      },
+    } : {}),
     client: {
       users: {
         fetch: async (id) => ({
@@ -264,4 +275,95 @@ test('the start DM drops the register link once registration is closed', () => {
   const closed = embeds.startReminder({ ...tournament, isRegistrationOpen: false }).data.description;
   assert.doesNotMatch(closed, /Register on start\.gg/);
   assert.match(closed, /Tournament page on start\.gg/);
+});
+
+test('DMs only go to current server members, keeping leavers opted in', async () => {
+  reset();
+  const now = Math.floor(Date.now() / 1000);
+  state.regDmPings = ['in-server', 'left-server'];
+  state.startDmPings = ['in-server', 'left-server'];
+  state.tournaments = {
+    1: {
+      id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 90000,
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: { deadline: now + 1800, next: 4 },
+    },
+  };
+  mockApi(({ query }) => {
+    if (query.includes('registrationClosesAt')) {
+      return {
+        tournament: {
+          id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 90000,
+          registrationClosesAt: now + 1800, isRegistrationOpen: true, images, numAttendees: 5, events: [],
+          city: 'Buffalo', addrState: 'NY', isOnline: false,
+        },
+      };
+    }
+    if (query.includes('participants(')) {
+      return { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    }
+    throw new Error(`no fake for ${query.slice(0, 60)}`);
+  });
+  const sent = [];
+  await tracker.postDmReminders(dmChannel(sent, ['in-server']));
+  assert.deepEqual(sent.map((each) => each.to), ['in-server']);
+  assert.deepEqual(state.regDmPings.toSorted(), ['in-server', 'left-server']);
+  assert.deepEqual(state.startDmPings.toSorted(), ['in-server', 'left-server']);
+  assert.equal(state.tournaments[1].dmRegSentFor, now + 1800);
+});
+
+test('start DMs only go to current server members', async () => {
+  reset();
+  const now = Math.floor(Date.now() / 1000);
+  state.startDmPings = ['in-server', 'left-server'];
+  state.tournaments = {
+    1: {
+      id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: {},
+    },
+  };
+  mockApi(({ query }) => {
+    if (query.includes('registrationClosesAt')) {
+      return {
+        tournament: {
+          id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+          registrationClosesAt: now + 1800, isRegistrationOpen: true, images, numAttendees: 5, events: [],
+          city: 'Buffalo', addrState: 'NY', isOnline: false,
+        },
+      };
+    }
+    throw new Error(`no fake for ${query.slice(0, 60)}`);
+  });
+  const sent = [];
+  await tracker.postDmReminders(dmChannel(sent, ['in-server']));
+  assert.deepEqual(sent.map((each) => each.to), ['in-server']);
+  assert.deepEqual(state.startDmPings.toSorted(), ['in-server', 'left-server']);
+  assert.equal(state.tournaments[1].dmStartSentFor, now + 1800);
+});
+
+test('a failed membership check sends no DMs and leaves them unsent', async () => {
+  reset();
+  const now = Math.floor(Date.now() / 1000);
+  state.startDmPings = ['fan'];
+  state.tournaments = {
+    1: {
+      id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: {},
+    },
+  };
+  mockApi(({ query }) => {
+    if (query.includes('registrationClosesAt')) {
+      return {
+        tournament: {
+          id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+          registrationClosesAt: now + 1800, isRegistrationOpen: true, images, numAttendees: 5, events: [],
+          city: 'Buffalo', addrState: 'NY', isOnline: false,
+        },
+      };
+    }
+    throw new Error(`no fake for ${query.slice(0, 60)}`);
+  });
+  const sent = [];
+  await tracker.postDmReminders(dmChannel(sent, [], true));
+  assert.equal(sent.length, 0);
+  assert.equal(state.tournaments[1].dmStartSentFor, undefined);
 });

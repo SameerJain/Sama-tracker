@@ -1,10 +1,8 @@
 import { EmbedBuilder, escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
 import {
-  colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, shortRecord, count, venueText, mapUrl,
+  colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, MAJOR_UPSET, shortRecord, count, venueText, mapUrl,
 } from './shared.js';
-
-const MAJOR_UPSET = 7; // seed 13 beating seed 1, or seed 17 beating seed 2
 
 function tournamentEmbed(color, label, tournament) {
   const embed = baseEmbed(color)

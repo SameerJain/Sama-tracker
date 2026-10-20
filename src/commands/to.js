@@ -16,7 +16,7 @@ const MISSING_PERMISSIONS = 50013;
 const KNOWN_KEPT = 100;
 
 // what the role lets someone do, for the replies that hand it out
-const TO_POWERS = 'TOs can track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.';
+const TO_POWERS = 'TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.';
 
 // the saved id first, so renaming it in server settings keeps it, then the name. whichever turns up gets saved
 function findRole(guild) {
@@ -109,6 +109,19 @@ async function toAdd(interaction) {
   return interaction.editReply({ content: `${name} is a TO now. ${TO_POWERS}`, allowedMentions: { parse: [] } });
 }
 
+// /t-o role set: a server manager can point the bot at a role that already exists
+async function toSet(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    return replyEphemeral(interaction, 'You need Manage Server permission to set the TO role.');
+  }
+  const role = interaction.options.getRole('role', true);
+  state.toRole.id = role.id;
+  state.toRole.members = [];
+  if (hasRole(interaction.member, role)) state.toRole.members.push(interaction.user.id);
+  save();
+  return interaction.reply({ content: `${escapeMarkdown(role.name)} is the TO role now.`, allowedMentions: { parse: [] } });
+}
+
 // /t-o role remove: any TO can take it off another, or off themselves
 async function toRemove(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'remove TOs');
@@ -122,6 +135,11 @@ async function toRemove(interaction) {
   }
 
   await interaction.deferReply();
+  const known = await serverMembers(interaction.guild, state.toRole.members);
+  const others = [...known].some(([id, knownMember]) => id !== user.id && hasRole(knownMember, role));
+  if (!others) {
+    return interaction.editReply({ content: `${name} is the last known TO. Add another TO first, or have someone with Manage Server set the TO role.`, allowedMentions: { parse: [] } });
+  }
   try {
     await member.roles.remove(role, 'removed with /t-o role remove');
   } catch (err) {
@@ -129,8 +147,7 @@ async function toRemove(interaction) {
     return interaction.editReply({ content: `I couldn't take the TO role off ${name}. That needs Manage Roles, with my role above TO.`, allowedMentions: { parse: [] } });
   }
   forget(user.id);
-  const self = user.id === interaction.user.id ? ' That was you, so another TO has to add you back.' : '';
-  return interaction.editReply({ content: `${name} isn't a TO anymore.${self}`, allowedMentions: { parse: [] } });
+  return interaction.editReply({ content: `${name} isn't a TO anymore.`, allowedMentions: { parse: [] } });
 }
 
 // /t-o role list: anyone can see who the TOs are. each one the bot has seen gets checked against the server, so
@@ -171,4 +188,4 @@ async function seedFirstTO(guild) {
   }
 }
 
-export { isTO, notTO, toAdd, toRemove, toList, seedFirstTO, TO_ROLE, FIRST_TO, TO_POWERS };
+export { isTO, notTO, toAdd, toSet, toRemove, toList, seedFirstTO, TO_ROLE, FIRST_TO, TO_POWERS };

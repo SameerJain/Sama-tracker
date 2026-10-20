@@ -1343,6 +1343,7 @@ test('/status shows when the latest version was deployed, and a local run shows 
   const lines = (more) => embeds.status({ ...info, ...more }).data.description.split('\n');
   assert.deepEqual(lines({ host: null, deployedAt: 90 }).slice(0, 2), ['**Started:** <t:100:R>', '**Latest version deployed:** <t:90:R>']);
   assert.deepEqual(lines({ host: 'DESKTOP-1', deployedAt: null }).slice(0, 2), ['**Started:** <t:100:R> on DESKTOP-1', '**Last set check:** <t:200:R>']);
+  assert.equal(lines({}).at(-1), '-# [GitHub](https://github.com/SameerJain/Sama-tracker)');
 });
 
 test('/track posts sets:on only marks when results came on for players switching from off', async () => {
@@ -2018,6 +2019,66 @@ test('the last call waits until 6 hours before registration closes', async () =>
   assert.equal(sent.length, 1);
   assert.equal(sent[0].content, '<@fan> last call');
   assert.equal(state.tournaments[1].reminder.next, 4);
+  state.regPings = [];
+  state.tournaments = {};
+});
+
+test('a custom reminder schedule sends that many reminders at those times', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.messages = {};
+  state.regPings = ['fan'];
+  state.tournaments = { 1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 10 * 86400, entries: [], tracked: { ...tracked, schedule: [48, 6] }, reminder: {} } };
+  let closesAt = now + 50 * 3600;
+  mockApi(({ query }) => {
+    if (query.includes('participants(')) return { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { tournament: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 10 * 86400, endAt: now + 10 * 86400 + 3600, registrationClosesAt: closesAt, isRegistrationOpen: true, images: [], events: [] } };
+  });
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+
+  // 50 hours out is past the 48 hour one, so nothing yet
+  await tracker.postRegReminders(channel);
+  assert.equal(sent.length, 0);
+  assert.equal(state.tournaments[1].reminder.next, 0);
+  assert.equal(tracker.nextRegReminder(closesAt, [48, 6]), 0);
+
+  // the first one goes out as a plain reminder, not the last call
+  closesAt = now + 47 * 3600;
+  await tracker.postRegReminders(channel);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].content, '<@fan> registration reminder');
+  assert.equal(state.tournaments[1].reminder.next, 1);
+
+  // the last entry in a custom schedule is the last call
+  closesAt = now + 5 * 3600;
+  await tracker.postRegReminders(channel);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].content, '<@fan> last call');
+  assert.equal(state.tournaments[1].reminder.next, 2);
+  state.regPings = [];
+  state.tournaments = {};
+});
+
+test('reg reminders ping the Reg Reminders role instead of each person, even when registered', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.messages = {};
+  state.regPings = ['fan', 'registered-fan'];
+  state.tournaments = { 1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, entries: [], tracked, reminder: {} } };
+  mockApi(({ query }) => {
+    if (query.includes('participants(')) {
+      return { tournament: { participants: { pageInfo: { totalPages: 1 }, nodes: [
+        { gamerTag: 'Registered', user: { id: 2, slug: 'user/registered', authorizations: [{ externalId: 'registered-fan' }] } },
+      ] } } };
+    }
+    return { tournament: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 90000, registrationClosesAt: now + 3600, isRegistrationOpen: true, images: [], events: [] } };
+  });
+  const sent = [];
+  const role = { id: 'reg-role', name: 'Reg Reminders' };
+  const channel = { send: async (payload) => { sent.push(payload); return {}; }, guild: { roles: { cache: { find: (fn) => (fn(role) ? role : undefined) } } } };
+  await tracker.postRegReminders(channel);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].content, '<@&reg-role> last call');
+  assert.deepEqual(sent[0].allowedMentions, { roles: ['reg-role'] });
   state.regPings = [];
   state.tournaments = {};
 });

@@ -458,6 +458,34 @@ test('/notify player:all asks first and changes every tracked player with Discor
   assert.deepEqual(state.streamPings, ['old-discord']);
 });
 
+test('/notify player:all all:on fits discord\'s button limit and changes all five', async () => {
+  state.players = {
+    1: crew,
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', discordId: 'rival-discord' },
+    3: { userId: 3, playerId: 30, tag: 'No Discord', slug: 'user/no-discord' },
+  };
+  state.callPings = [];
+  state.streamPings = [];
+  state.regPings = [];
+  state.regDmPings = [];
+  state.startDmPings = [];
+
+  const run = command('notify', { values: { player: 'all', all: 'on' }, user: 'runner-with-a-long-discord-id-1234567890' });
+  await handleCommand(run);
+  const asked = run.calls[0][1];
+  assert.match(asked.content, /Change \/notify for 2 tracked players\?.*Match calls on.*stream alerts on.*reg reminders on.*registration DMs on.*start DMs on/);
+  for (const row of asked.components) {
+    for (const button of row.toJSON().components) assert.ok(button.custom_id.length <= 100, `button id too long: ${button.custom_id.length}`);
+  }
+  const changed = (await press(asked, 'Change pings', 'runner-with-a-long-discord-id-1234567890')).calls[0][1];
+  assert.equal(changed.content, 'Updated /notify for 2 tracked players. Skipped 1 without Discord on start.gg.');
+  assert.deepEqual(state.callPings.toSorted(), ['crew-discord', 'rival-discord']);
+  assert.deepEqual(state.streamPings.toSorted(), ['crew-discord', 'rival-discord']);
+  assert.deepEqual(state.regPings.toSorted(), ['crew-discord', 'rival-discord']);
+  assert.deepEqual(state.regDmPings.toSorted(), ['crew-discord', 'rival-discord']);
+  assert.deepEqual(state.startDmPings.toSorted(), ['crew-discord', 'rival-discord']);
+});
+
 test('/t-o cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {
   state.players = {
     1: { ...crew },

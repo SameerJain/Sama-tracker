@@ -1,8 +1,10 @@
 import { escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
+import { shortSchedule } from '../tracker.js';
 import { colors, FOOTER, baseEmbed, withLines, withSections, playerLink, count } from './shared.js';
 
-// /t-o tournament posts switches a tracked tournament can have off, named for the list
+// /t-o tournament posts switches a tracked tournament can have off, named for the list.
+// a custom reminder schedule shows with it, so TOs can see which tournaments don't use the default
 const TOURNAMENT_POSTS = { sets: 'sets off', stream: 'stream alerts off', top8: 'top 8s off', reminders: 'reg reminders off' };
 
 // tracked players, then tracked tournaments that aren't over. linked is how many people linked their own start.gg without being tracked
@@ -23,6 +25,9 @@ export function trackedList(players, linked = 0, tournaments = {}) {
     .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
   const tournamentLines = tracked.map((tournament) => {
     const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => tournament.tracked[name] === false).map(([, note]) => note);
+    if (tournament.tracked.reminders !== false && Array.isArray(tournament.tracked.schedule)) {
+      notes.push(`reminders ${shortSchedule(tournament.tracked.schedule)}`);
+    }
     const when = tournament.startAt ? ` · <t:${tournament.startAt}:d>` : '';
     return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
   });
@@ -37,8 +42,8 @@ export function toList(tos, role) {
   const embed = baseEmbed(colors.brand).setTitle(`TOs · ${tos.length}`);
   const lines = role
     ? (tos.length ? tos.map((id) => `<@${id}>`) : ['Nobody the bot has seen yet.'])
-    : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role.'];
-  lines.push('', '-# TOs can track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
+    : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role, or `/t-o role set` uses one already in the server.'];
+  lines.push('', '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
   if (role) lines.push(`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
   return embed.setDescription(lines.join('\n'));
 }
@@ -91,6 +96,7 @@ export function status(info) {
   if (info.stateSize) lines.push(`**State:** ${(info.stateSize / 1024).toFixed(0)} KB · ${count(info.saves ?? 0, 'save')} since start`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
+  lines.push('-# [GitHub](https://github.com/SameerJain/Sama-tracker)');
 
   return baseEmbed(colors.brand).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
@@ -141,14 +147,14 @@ function shortHelp() {
     '`/characters` reported characters · `/doubles` 2v2 record · `/upcoming` tournaments',
     '',
     '**TOs**',
-    '`/t-o role add user:` hand out the TO role · `/t-o tournament add tournament:` track one',
+    '`/t-o role add user:` hand out the TO role · `/t-o role set role:` use an existing role',
     '`/t-o tournament event tournament:` make a Discord event · `/track posts` results and alerts on or off',
-    '-# TOs can track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one',
+    '-# TOs can control `/messages`, track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one',
     '',
     '**Tournaments**',
     '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered',
     '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks',
-    '`/messages` automatic posts and threads, needs Manage Server · `/status` uptime and last checks',
+    '`/messages` automatic posts and threads, for TOs or Manage Server · `/status` uptime and last checks',
     '`/matchmaking_role game:` get game pings · `/matchmaking_search game:` find games · `/matchmaking_channel` where searches go',
     '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun',
   ];
@@ -168,7 +174,7 @@ export function help(verbose = false) {
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
-      '`/messages` automatic posts on or off, threads, set result colors and the recap schedule. Needs Manage Server',
+      '`/messages` automatic posts on or off, threads, set result colors and the recap schedule. T.O.s or Manage Server',
     ],
     [
       '**Tracking players**',
@@ -186,14 +192,15 @@ export function help(verbose = false) {
     [
       '**TOs**',
       '`/t-o role add` give someone the TO role. T.O.s only',
-      '`/t-o role remove` take the TO role off someone. T.O.s only',
+      '`/t-o role set` use an existing server role for TO privileges. Needs Manage Server',
+      '`/t-o role remove` take the TO role off someone. Refuses to remove the last known T.O. T.O.s only',
       '`/t-o role list` who the TOs are',
-      '-# TOs can track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
+      '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
     ],
     [
       '**Your pings**',
       '`/notify` your pings, or anyone\'s for a TO with `user:` or `player:`. `calls` when your match is called, `streams` when your set is on stream, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. `player:all` changes everyone tracked and asks first. Changes apply during a tournament. Leave them out to see yours',
-      '-# Only TOs can see or change someone else\'s with `user:` or `player:`, and only `user:` or `player:`, not both. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
+      '-# Only TOs can see or change someone else\'s with `user:` or `player:`, and only `user:` or `player:`, not both. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. `registration` pings the Reg Reminders role for everyone with it. Registration DMs skip you once you\'re registered, if start.gg has your Discord. DMs only go to current server members',
     ],
     [
       '**Matchmaking**',
@@ -236,9 +243,9 @@ export function help(verbose = false) {
     ],
     [
       '**Tournaments**',
-      '`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `add_event:on` also makes a Discord event',
+      '`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event',
       '`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute',
-      '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off',
+      '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off. `schedule:` changes the reminder times, `default` goes back to the usual four',
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
       '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours',
       '`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end',
@@ -266,7 +273,7 @@ export function help(verbose = false) {
       '**Tournament roll calls.** An hour before a tournament with 3+ of the crew, with the streams from its start.gg page. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server',
       '**Tournament placements.** Where the crew placed, with the top 8 when every event finishes at a tracked tournament, even if top 8 posts are off. Otherwise 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
-      '**Registration reminders.** Tracked tournaments a week, 3 days and a day out, then a last call 6 hours before. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start. When registration closes within an hour of the start there\'s one DM, the start one',
+      '**Registration reminders.** Tracked tournaments 7 days, 3 days and a day out, then a last call 6 hours before, pinging the Reg Reminders role, unless a TO sets custom times with `schedule:`. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start, both only while you\'re in this server. When registration closes within an hour of the start there\'s one DM, the start one',
       '**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/messages events` turns it on',
       '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg',
       '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',

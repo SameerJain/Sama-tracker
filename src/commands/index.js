@@ -10,7 +10,7 @@ import { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, r
 import { progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
-import { toAdd, toRemove, toList } from './to.js';
+import { toAdd, toSet, toRemove, toList } from './to.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
@@ -48,6 +48,7 @@ const handlers = new Map([
   ['track posts', trackPosts],
   ['t-o cleanup', trackCleanup],
   ['t-o role add', toAdd],
+  ['t-o role set', toSet],
   ['t-o role remove', toRemove],
   ['t-o role list', toList],
   ['notify', notify],

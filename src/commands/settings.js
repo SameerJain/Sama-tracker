@@ -1,7 +1,7 @@
 import { MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import { state, save } from '../store.js';
 import { missingThreadPermissions, secondsNow } from '../tracker.js';
-import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS, messageEnabled, messageSettings } from '../message-settings.js';
+import { MESSAGE_TYPES, REG_ROLE, THREAD_MODES, WEEKDAYS, messageEnabled, messageSettings } from '../message-settings.js';
 import { cantMakeEvents } from '../discord-events.js';
 import { count } from '../embeds/shared.js';
 import { isSelf, linkedPlayer, readTracked, replyEphemeral, replyNotTracked } from './shared.js';
@@ -21,7 +21,9 @@ function zoneLabel(timezone) {
 function configureMessages(interaction) {
   // failures stay private, but the settings themselves post where everyone sees them
   const fail = (content) => replyEphemeral(interaction, content);
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return fail('You need Manage Server permission to control automatic messages.');
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
+    return fail('You need to be a TO or have Manage Server permission to control automatic messages.');
+  }
   const previous = messageSettings();
   const changes = {};
   for (const type of Object.keys(MESSAGE_TYPES)) {
@@ -219,7 +221,7 @@ const PINGS = {
   streams: { list: 'streamPings', on: 'You\'ll get pinged when your set is on stream.', off: 'No more stream alert pings.' },
   registration: {
     list: 'regPings',
-    on: 'You\'ll get pinged for reg reminders. If your Discord is connected on start.gg, not for ones you\'re already registered for.',
+    on: 'You\'ll get the Reg Reminders role and its pings for tracked tournaments.',
     off: 'No more reg reminder pings.',
   },
   dm_registration: {
@@ -243,9 +245,7 @@ const PING_LABELS = {
   dm_start: 'start DMs',
 };
 
-// the role that shows who has reg pings on. pings go off the list, not the role, so people already
-// registered can be left out
-const REG_ROLE = 'Reg Reminders';
+// imported from message-settings, so the tracker pings the same role /notify hands out
 
 // where someone's pings are at, plus their posts if they're tracked. name is whose when
 // it isn't whoever ran it, already escaped
@@ -284,11 +284,22 @@ function notifyChangesText(changes) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+// short so the button id stays under discord's 100 characters, even with all five and a long discord id.
+// one char per ping in PINGS order: 1 on, 0 off, - left alone. the old longer form still decodes for buttons already out
+const PING_ORDER = Object.keys(PINGS);
 function encodeNotifyChanges(changes) {
-  return Object.entries(changes).map(([ping, on]) => `${ping}-${on ? 'on' : 'off'}`).join('_');
+  return PING_ORDER.map((ping) => (changes[ping] === undefined ? '-' : changes[ping] ? '1' : '0')).join('');
 }
 
 function decodeNotifyChanges(target) {
+  if (target.length === PING_ORDER.length && /^[01-]+$/.test(target)) {
+    const changes = {};
+    PING_ORDER.forEach((ping, i) => {
+      if (target[i] === '1') changes[ping] = true;
+      else if (target[i] === '0') changes[ping] = false;
+    });
+    return changes;
+  }
   const changes = {};
   for (const part of target.split('_')) {
     const [ping, on] = part.split('-');
@@ -398,10 +409,12 @@ async function notify(interaction) {
         ?? interaction.guild?.members?.cache?.get?.(id);
       const role = interaction.guild?.roles?.cache?.find?.((each) => each.name === REG_ROLE);
       if (member && role) {
-        if (changes.registration) await member.roles.add(role);
-        else await member.roles.remove(role);
+        if (changes.registration) {
+          if (!role.mentionable && role.edit) await role.edit({ mentionable: true }, 'reg reminders ping this role').catch(() => {});
+          await member.roles.add(role);
+        } else await member.roles.remove(role);
       } else if (member && changes.registration && interaction.guild?.roles?.create) {
-        const made = await interaction.guild.roles.create({ name: REG_ROLE, reason: 'shows who has /notify registration on' });
+        const made = await interaction.guild.roles.create({ name: REG_ROLE, permissions: [], mentionable: true, reason: 'shows who has /notify registration on' });
         await member.roles.add(made);
       }
     } catch (err) {
@@ -447,7 +460,8 @@ async function notify(interaction) {
   try {
     let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
     if (changes.registration) {
-      role ??= await guild.roles.create({ name: REG_ROLE, reason: 'shows who has /notify registration on' });
+      role ??= await guild.roles.create({ name: REG_ROLE, permissions: [], mentionable: true, reason: 'shows who has /notify registration on' });
+      if (!role.mentionable && role.edit) await role.edit({ mentionable: true }, 'reg reminders ping this role').catch(() => {});
       await member.roles.add(role);
     } else if (role) {
       await member.roles.remove(role);

@@ -501,6 +501,41 @@ test('/notify lets TOs look at and change anyone\'s pings', async () => {
   state.startDmPings = [];
 });
 
+test('/notify registration makes its role mentionable so the role ping notifies', async () => {
+  state.regPings = [];
+  let created = null;
+  let edited = null;
+  const guild = {
+    roles: {
+      cache: { get: () => undefined, find: () => undefined, },
+      create: async (args) => { created = args; return { id: 'reg-role', name: 'Reg Reminders', ...args }; },
+    },
+  };
+  const member = { displayName: 'Me', roles: { add: async () => {}, remove: async () => {} } };
+  const interaction = {
+    commandName: 'notify', user: { id: 'me-discord' }, memberPermissions: { has: () => false },
+    guild, member,
+    options: {
+      getSubcommand: () => null, getString: (name) => (name === 'registration' ? 'on' : null),
+      getBoolean: () => null, getUser: () => null, getMember: () => member,
+    },
+    reply: async () => {}, deferReply: async () => {}, editReply: async () => {},
+  };
+  const { handleCommand } = await import('../src/commands/index.js');
+  state.links = { 'me-discord': { userId: 7, playerId: 70, tag: 'Me', slug: 'user/me' } };
+  await handleCommand(interaction);
+  assert.equal(created?.name, 'Reg Reminders');
+  assert.equal(created?.mentionable, true);
+
+  // an existing role that isn't mentionable gets fixed on the next opt-in
+  const existing = { id: 'reg-role', name: 'Reg Reminders', mentionable: false, edit: async (args) => { edited = args; return existing; } };
+  const guild2 = { roles: { cache: { get: () => undefined, find: (fn) => (fn(existing) ? existing : undefined) }, create: async () => assert.fail('role already exists') } };
+  const interaction2 = { ...interaction, guild: guild2 };
+  await handleCommand(interaction2);
+  assert.deepEqual(edited, { mentionable: true });
+  state.regPings = [];
+});
+
 test('/notify lets TOs pick a tracked player without a member mention', async () => {
   state.players = {
     1: { ...crew, discordId: 'crew-discord' },

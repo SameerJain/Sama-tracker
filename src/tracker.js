@@ -6,7 +6,7 @@ import * as bills from './bills.js';
 import * as embeds from './embeds/index.js';
 import { state, save } from './store.js';
 import { periodSummary, weeklyPeriod } from './reports.js';
-import { messageEnabled, messageSettings, setResultColors } from './message-settings.js';
+import { REG_ROLE, messageEnabled, messageSettings, setResultColors } from './message-settings.js';
 import { rememberAccounts, serverMembers } from './accounts.js';
 import { cantMakeEvents, ensureDiscordEvent, syncDiscordEvents } from './discord-events.js';
 import { buttonRow, h2hButton, linkedPlayer } from './commands/shared.js';
@@ -34,6 +34,9 @@ const TOURNAMENT_FORGOTTEN_DAYS = 30;
 const MENTIONS_PER_MESSAGE = 80;
 // hours before registration closes. the last one is the last call
 export const REG_REMINDER_HOURS = [7 * 24, 3 * 24, 24, 6];
+// a custom schedule runs 1 hour to 30 days out, and at most this many reminders
+export const MAX_REMINDERS = 10;
+export const MAX_REMINDER_HOURS = 30 * 24;
 // DMs go out this long before registration closes and before the start
 export const DM_HOURS_BEFORE = 1;
 // the saved times can be a little stale, so start.gg gets asked this much before a DM is due. further out costs no request
@@ -1545,21 +1548,48 @@ export function regDeadline(tournament) {
   return Math.min(tournament.registrationClosesAt ?? tournament.startAt, tournament.startAt);
 }
 
-// index of the first reminder still to come. ones already past get skipped,
-// except the last call, so setting it late sends that right away
-export function nextRegReminder(deadline) {
-  const next = REG_REMINDER_HOURS.findIndex((hours) => secondsNow() < deadline - hours * HOUR);
-  return next === -1 ? REG_REMINDER_HOURS.length - 1 : next;
+// a schedule the way /track list shows it: 7d, 3d, 1d, 6h
+export function shortSchedule(schedule) {
+  return schedule.map((hours) => (hours % 24 ? `${hours}h` : `${hours / 24}d`)).join(', ');
 }
 
-// reminders for tracked tournaments with reminders on, pinging everyone with /notify registration on
-// who isn't registered yet
+// hours before the deadline each reminder goes out, most first. a tournament with a custom
+// schedule from /t-o tournament uses that, everything else the default above
+export function reminderSchedule(tournament) {
+  const custom = tournament?.tracked?.schedule;
+  return Array.isArray(custom) && custom.length ? custom : REG_REMINDER_HOURS;
+}
+
+// index of the first reminder still to come. ones already past get skipped,
+// except the last call, so setting it late sends that right away
+export function nextRegReminder(deadline, schedule = REG_REMINDER_HOURS) {
+  const next = schedule.findIndex((hours) => secondsNow() < deadline - hours * HOUR);
+  return next === -1 ? schedule.length - 1 : next;
+}
+
+// the Reg Reminders role in this server, by name since /notify looks it up that way. null when
+// the channel has no guild, like in tests
+function regRole(postChannel) {
+  try {
+    const cache = postChannel?.guild?.roles?.cache;
+    if (!cache) return null;
+    if (typeof cache.find === 'function') return cache.find((each) => each?.name === REG_ROLE) ?? null;
+    for (const each of cache.values()) if (each?.name === REG_ROLE) return each;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// reminders for tracked tournaments with reminders on, pinging the Reg Reminders role. everyone
+// with it gets pinged, even when start.gg already has them registered. reg DMs still skip them
 export async function postRegReminders(postChannel = channel) {
   for (const tournament of Object.values(state.tournaments)) {
     const { reminder } = tournament;
     if (!posting(tournament, 'reminders') || !reminder) continue;
+    const schedule = reminderSchedule(tournament);
     // past the last call, or started, means none are left
-    if (reminder.next >= REG_REMINDER_HOURS.length || secondsNow() > tournament.startAt) continue;
+    if (reminder.next >= schedule.length || secondsNow() > tournament.startAt) continue;
     try {
       // TOs move the close time, so always go off the latest. a deleted one is the tournament check's to drop
       const latest = await startgg.getRegistration(tournament.slug);
@@ -1567,24 +1597,33 @@ export async function postRegReminders(postChannel = channel) {
       const deadline = regDeadline(latest);
       reminder.deadline = deadline;
       // registration wasn't open yet when it was tracked, or reminders just turned back on
-      reminder.next ??= nextRegReminder(deadline);
+      reminder.next ??= nextRegReminder(deadline, schedule);
       // it closed, maybe while the bot was down
       if (deadline <= secondsNow()) continue;
 
       // only the latest one if the bot was down through a few
-      const due = REG_REMINDER_HOURS.findLastIndex((hours, i) => i >= reminder.next && secondsNow() >= deadline - hours * HOUR);
+      const due = schedule.findLastIndex((hours, i) => i >= reminder.next && secondsNow() >= deadline - hours * HOUR);
       if (due === -1) continue;
-      const lastCall = due === REG_REMINDER_HOURS.length - 1;
+      const lastCall = due === schedule.length - 1;
 
       // not open means it filled up, or for the early ones that it hasn't opened yet
-      const dueAt = deadline - REG_REMINDER_HOURS[due] * HOUR;
+      const dueAt = deadline - schedule[due] * HOUR;
       if (latest.isRegistrationOpen && messageEnabled('registration', dueAt)) {
-        // people one by one, a role ping would hit the ones already registered
+        // still remembered for /profile, but the ping goes to the role so registered members get it too
         const participants = await startgg.getParticipants(latest.id);
         rememberAccounts(participants);
-        const registered = new Set(participants.map((participant) => participant.discordId));
-        const ping = state.regPings.filter((id) => !registered.has(id));
-        await sendPinging(postChannel, 'registration', ping, lastCall ? 'last call' : 'registration reminder', embeds.regReminder(latest, deadline, lastCall));
+        const text = lastCall ? 'last call' : 'registration reminder';
+        const card = embeds.regReminder(latest, deadline, lastCall);
+        const role = regRole(postChannel);
+        if (role && state.regPings.length) {
+          await postChannel.send({ content: `<@&${role.id}> ${text}`, embeds: embeds.withImage([card]), allowedMentions: { roles: [role.id] } });
+        } else if (!role) {
+          const registered = new Set(participants.map((participant) => participant.discordId));
+          const ping = state.regPings.filter((id) => !registered.has(id));
+          await sendPinging(postChannel, 'registration', ping, text, card);
+        } else {
+          await postChannel.send({ embeds: embeds.withImage([card]), allowedMentions: { parse: [] } });
+        }
       }
       reminder.next = due + 1;
     } catch (err) {
@@ -1601,6 +1640,21 @@ export async function postRegReminders(postChannel = channel) {
 export async function postDmReminders(postChannel = channel) {
   const client = postChannel?.client;
   if (!client || (!state.regDmPings.length && !state.startDmPings.length)) return;
+
+  // only current server members get DMs, so leavers get nothing until they rejoin. prefs stay saved.
+  // a failed membership check sends nothing and retries next time, so nobody is marked as sent
+  let inServer = null;
+  const guild = postChannel?.guild;
+  if (guild) {
+    try {
+      const ids = [...new Set([...state.regDmPings, ...state.startDmPings])].filter(mentionable);
+      inServer = new Set((await serverMembers(guild, ids)).keys());
+    } catch (err) {
+      console.error('DM membership check failed:', err.message);
+      return;
+    }
+  }
+  const memberOnly = (id) => !inServer || inServer.has(id);
 
   for (const tournament of Object.values(state.tournaments)) {
     if (!posting(tournament, 'reminders') || !dmSoon(tournament)) continue;
@@ -1629,7 +1683,7 @@ export async function postDmReminders(postChannel = channel) {
           rememberAccounts(participants);
           const registered = new Set(participants.map((participant) => participant.discordId));
           const embed = embeds.regReminder(latest, deadline, true);
-          for (const discordId of state.regDmPings.filter((id) => !registered.has(id) && mentionable(id))) await dmUser(client, discordId, embed);
+          for (const discordId of state.regDmPings.filter((id) => !registered.has(id) && mentionable(id) && memberOnly(id))) await dmUser(client, discordId, embed);
         }
       }
     } catch (err) {
@@ -1640,7 +1694,7 @@ export async function postDmReminders(postChannel = channel) {
       if (state.startDmPings.length && tournament.dmStartSentFor !== startAt && dmDue(startAt)) {
         tournament.dmStartSentFor = startAt;
         const embed = embeds.startReminder(latest);
-        for (const discordId of state.startDmPings.filter(mentionable)) await dmUser(client, discordId, embed);
+        for (const discordId of state.startDmPings.filter((id) => mentionable(id) && memberOnly(id))) await dmUser(client, discordId, embed);
       }
     } catch (err) {
       console.error(`start DMs for ${tournament.name ?? tournament.id} failed:`, err.message);
