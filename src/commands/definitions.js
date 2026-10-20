@@ -208,8 +208,9 @@ export const commands = [
   },
   {
     name: 'notify',
-    description: 'What pings you: match calls, stream alerts, reg reminders and 1-hour DMs. Leave all out to see yours',
+    description: 'Your pings for match calls, streams, reg reminders and 1-hour DMs. TOs can set anyone\'s',
     options: [
+      { type: Option.User, name: 'user', description: 'Server member. Leave out for yourself. Someone else needs a TO' },
       switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('streams', 'When your set is on stream. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('registration', 'Reg reminders for tracked tournaments, skipped once you\'re registered'),

@@ -118,7 +118,7 @@ test('until the server has a TO role Manage Server counts as one, and /t-o role 
   const x = member('x-discord');
   members.set(x.id, x);
   const first = said(await run('t-o', 'admin-discord', { subcommand: 'add', manager: true, picked: x }));
-  assert.equal(first.content, 'x is a TO now. TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.');
+  assert.equal(first.content, 'x is a TO now. TOs can track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.');
   assert.equal(first.private, false);
   assert.deepEqual([...roles.values()], [{ id: 'made-role', name: 'TO' }]);
   assert.ok(x.roles.cache.has('made-role'));

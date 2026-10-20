@@ -82,9 +82,10 @@ The bot makes the TO role the first time it's needed. A role named `TO` made by 
 | `/notify registration:<on or off>` | Get pinged for registration reminders, and get the **Reg Reminders** role. Skipped for tournaments you're already registered for, if start.gg has your Discord. |
 | `/notify dm_registration:<on or off>` | Get a DM 1 hour before registration closes, with the tournament link, location and image. Skipped once you're registered, if start.gg has your Discord. |
 | `/notify dm_start:<on or off>` | Get a DM 1 hour before the tournament starts, with the tournament link, location and image. |
+| `/notify user:<@someone>` | Someone else's pings instead of yours. Anyone can look, changing them needs a TO. |
 | `/notify all:<on or off>` | All five at once. |
 
-`/notify` only ever changes whoever ran it, and registration and DM pings need no tracking or linking. Calls and streams need your start.gg linked, or you tracked with Discord connected on start.gg.
+`/notify` changes you unless a TO picks someone in `user:`, and registration and DM pings need no tracking or linking. Calls and streams need whoever it's for linked, or tracked with Discord connected on start.gg.
 
 ### Matchmaking
 
@@ -207,7 +208,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 ## Automatic posts
 
-`/link` identifies you for commands. `/track` follows a player publicly. `/notify` controls only your pings. Tracking a tournament covers its whole bracket. A registered server member can still appear in a tracked tournament's roll call or placements, and anyone can appear in its sets, streams or top 8.
+`/link` identifies you for commands. `/track` follows a player publicly. `/notify` controls your pings, or anyone's for a TO with `user:`. Tracking a tournament covers its whole bracket. A registered server member can still appear in a tracked tournament's roll call or placements, and anyone can appear in its sets, streams or top 8.
 
 | Automatic message | When it posts | Who appears and what controls it |
 | --- | --- | --- |

@@ -1460,7 +1460,7 @@ test('stream alerts ping only whoever is playing with /notify streams on', async
   const streamed = id => ({ ...node(id, null), state: 2, updatedAt: now, stream: { streamName: 'local', streamSource: 'TWITCH' } });
 
   const replies = [];
-  const fromInteraction = (id, ping) => ({ user: { id }, options: { getString: (name) => (name === 'streams' ? ping : null) }, reply: async (result) => replies.push(result) });
+  const fromInteraction = (id, ping) => ({ user: { id }, options: { getString: (name) => (name === 'streams' ? ping : null), getUser: () => null }, reply: async (result) => replies.push(result) });
   const { notify } = await import('../src/commands/settings.js');
   // nobody to look up, so it stays off
   await notify(fromInteraction('fan', 'on'));

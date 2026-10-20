@@ -31,12 +31,17 @@ async function settle() {
 }
 
 // a command run by discordId, values are its options. returns the last reply or edit
-// to-discord is a TO: the server has no TO role here, so Manage Server counts as one. anyone else isn't
+// to-discord is a TO: the server has no TO role here, so Manage Server counts as one. anyone else isn't.
+// values.user is the member a user: option picked, values.member their server membership for role changes
 async function run(commandName, discordId, values = {}, subcommand = null) {
   let reply;
   const interaction = {
     commandName, user: { id: discordId }, memberPermissions: { has: () => discordId === 'to-discord' },
-    options: { getSubcommand: () => subcommand, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null },
+    guild: { roles: { cache: { get: () => undefined, find: (fn) => (values.role && fn(values.role) ? values.role : undefined) }, create: async ({ name }) => ({ id: `${name}-role`, name }) } },
+    options: {
+      getSubcommand: () => subcommand, getString: name => values[name] ?? null, getBoolean: name => values[name] ?? null,
+      getUser: name => values[name] ?? null, getMember: name => name === 'user' ? values.member ?? null : null,
+    },
     reply: async result => { reply = result; },
     deferReply: async () => { interaction.deferred = true; },
     editReply: async result => { reply = result; },
@@ -380,7 +385,7 @@ test('/track posts lets anyone change their own and only TOs change someone else
   assert.equal(state.players[2].setResults, true);
 });
 
-test('/notify only changes whoever ran it, and match calls need their start.gg', async () => {
+test('/notify changes your own pings, and match calls need their start.gg', async () => {
   state.players = { 1: { ...crew, discordId: 'crew-discord' } };
   state.links = { 'me-discord': me };
   state.callPings = [];
@@ -423,6 +428,75 @@ test('/notify only changes whoever ran it, and match calls need their start.gg',
   assert.deepEqual(state.callPings, ['crew-discord']);
   state.callPings = [];
   state.streamPings = [];
+  state.regDmPings = [];
+  state.startDmPings = [];
+});
+
+test('/notify lets TOs look at and change anyone\'s pings', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = { 'me-discord': me };
+  state.callPings = [];
+  state.streamPings = [];
+  state.regPings = [];
+  state.regDmPings = [];
+  state.startDmPings = [];
+  state.messages = {};
+  const as = (id) => ({ id, displayName: id.replace('-discord', '') });
+  const membership = (displayName) => {
+    const changed = [];
+    return { displayName, changed, roles: { add: async (role) => changed.push(['add', role.name]), remove: async (role) => changed.push(['remove', role.name]) } };
+  };
+
+  // someone who isn't a TO changes nothing about someone else, but can still look
+  const refused = await run('notify', 'someone', { user: as('me-discord'), member: membership('Me'), calls: 'on' });
+  assert.ok(refused.flags);
+  assert.equal(refused.content, 'Only TOs can change someone else\'s pings. Leave out `user` to change yours. `/t-o role list` shows who they are.');
+  assert.deepEqual(state.callPings, []);
+  assert.match((await run('notify', 'someone', { user: as('me-discord'), member: membership('Me') })).content, /^\*\*Me's pings\*\*\n\*\*Match calls:\*\* off/);
+
+  // picking yourself in user: is the same as leaving it out
+  assert.match((await run('notify', 'me-discord', { user: as('me-discord'), member: membership('Me'), calls: 'on' })).content, /^You'll get pinged when your match is called\.$/);
+  assert.deepEqual(state.callPings, ['me-discord']);
+
+  // a TO sets someone else's, going by their start.gg
+  state.callPings = [];
+  const theirs = await run('notify', 'to-discord', { user: as('me-discord'), member: membership('Me'), calls: 'on', streams: 'on' });
+  assert.ok(theirs.flags);
+  assert.match(theirs.content, /^They'll get pinged when their match is called\.\nThey'll get pinged when their set is on stream\.$/);
+  assert.deepEqual(state.callPings, ['me-discord']);
+  assert.deepEqual(state.streamPings, ['me-discord']);
+
+  // nobody to look up, so theirs stay off with a nudge to link them
+  const stranger = await run('notify', 'to-discord', { user: as('stranger'), member: membership('stranger'), streams: 'on' });
+  assert.match(stranger.content, /^Stream alert pings need their start\.gg\. Ask them to run `\/link` with their profile link\.$/);
+  assert.deepEqual(state.streamPings, ['me-discord']);
+
+  // looking shows their pings and their tracked posts
+  const seen = await run('notify', 'to-discord', { user: as('crew-discord'), member: membership('Crew') });
+  assert.match(seen.content, /^\*\*Crew's pings\*\*\n\*\*Match calls:\*\* off.*-# They're tracked as Crew, with set results on and stream alerts on/s);
+
+  // DMs opt in the same way, and everything turns back off. registration defers, so those answers are strings
+  const all = await run('notify', 'to-discord', { user: as('me-discord'), member: membership('Me'), all: 'on' });
+  assert.match(all, /They'll get pinged when their match is called\..*They'll get a DM 1 hour before the tournament starts,/s);
+  assert.deepEqual(state.regDmPings, ['me-discord']);
+  assert.deepEqual(state.startDmPings, ['me-discord']);
+
+  // registration hands them the role, taking it off when it's turned back off
+  const member = membership('Me');
+  await run('notify', 'to-discord', { user: as('me-discord'), member, registration: 'on' });
+  assert.deepEqual(member.changed, [['add', 'Reg Reminders']]);
+  assert.deepEqual(state.regPings, ['me-discord']);
+  const off = await run('notify', 'to-discord', { user: as('me-discord'), member, role: { id: 'reg-role', name: 'Reg Reminders' }, registration: 'off' });
+  assert.match(off, /^No more reg reminder pings\.$/);
+  assert.deepEqual(member.changed, [['add', 'Reg Reminders'], ['remove', 'Reg Reminders']]);
+  assert.deepEqual(state.regPings, []);
+
+  // bots need no pings, and leavers aren't in the server to change
+  assert.equal((await run('notify', 'to-discord', { user: { id: 'bot-1', bot: true } })).content, 'Bots don\'t need pings.');
+  assert.equal((await run('notify', 'to-discord', { user: as('ghost') })).content, 'Pick someone in this server.');
+  state.callPings = [];
+  state.streamPings = [];
+  state.regPings = [];
   state.regDmPings = [];
   state.startDmPings = [];
 });

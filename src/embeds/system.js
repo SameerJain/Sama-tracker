@@ -38,7 +38,7 @@ export function toList(tos, role) {
   const lines = role
     ? (tos.length ? tos.map((id) => `<@${id}>`) : ['Nobody the bot has seen yet.'])
     : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role.'];
-  lines.push('', '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
+  lines.push('', '-# TOs can track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
   if (role) lines.push(`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
   return embed.setDescription(lines.join('\n'));
 }
@@ -147,12 +147,12 @@ export function help() {
       '`/t-o role add` give someone the TO role. T.O.s only',
       '`/t-o role remove` take the TO role off someone. T.O.s only',
       '`/t-o role list` who the TOs are',
-      '-# TOs can track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
+      '-# TOs can track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
     ],
     [
       '**Your pings**',
-      '`/notify` your pings. `calls` when your match is called, `streams` when your set is on stream, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. Leave them out to see yours',
-      '-# Only ever changes you. `calls` and `streams` need you linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
+      '`/notify` your pings, or anyone\'s for a TO with `user:`. `calls` when your match is called, `streams` when your set is on stream, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. Leave them out to see yours',
+      '-# Anyone can look at anyone\'s. Changing someone else\'s needs a TO. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
     ],
     [
       '**Matchmaking**',

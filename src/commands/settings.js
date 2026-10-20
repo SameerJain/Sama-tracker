@@ -238,15 +238,18 @@ const PINGS = {
 // registered can be left out
 const REG_ROLE = 'Reg Reminders';
 
-// where someone's pings are at, plus their own posts if they're tracked
-function notifyText(discordId, me) {
-  const has = (name) => (state[PINGS[name].list] ?? []).includes(discordId);
+// where someone's pings are at, plus their posts if they're tracked. name is whose when
+// it isn't whoever ran it, already escaped
+function notifyText(discordId, me, name = null) {
+  const has = (ping) => (state[PINGS[ping].list] ?? []).includes(discordId);
+  const yours = !name;
+  const linkHint = yours ? 'until you `/link`' : 'until they `/link`';
   let calls = has('calls') ? 'on' : 'off';
-  if (has('calls') && !me) calls += ', but nothing to go by until you `/link`';
+  if (has('calls') && !me) calls += `, but nothing to go by ${linkHint}`;
   let streams = has('streams') ? 'on' : 'off';
-  if (has('streams') && !me) streams += ', but nothing to go by until you `/link`';
+  if (has('streams') && !me) streams += `, but nothing to go by ${linkHint}`;
   const lines = [
-    '**Your pings**',
+    yours ? '**Your pings**' : `**${name}'s pings**`,
     `**Match calls:** ${calls}`,
     `**Stream alerts:** ${streams}`,
     `**Reg reminders:** ${has('registration') ? 'on' : 'off'}`,
@@ -254,43 +257,60 @@ function notifyText(discordId, me) {
     `**Start DMs:** ${has('dm_start') ? 'on' : 'off'}`,
   ];
   if (me && state.players[me.userId]) {
-    lines.push(`-# You're tracked as ${escapeMarkdown(me.tag)}, with set results ${isOn(me, 'setResults') ? 'on' : 'off'} and stream alerts ${isOn(me, 'streamAlerts') ? 'on' : 'off'}. \`/track posts\` changes those`);
+    const posts = `with set results ${isOn(me, 'setResults') ? 'on' : 'off'} and stream alerts ${isOn(me, 'streamAlerts') ? 'on' : 'off'}. \`/track posts\` changes those`;
+    lines.push(yours ? `-# You're tracked as ${escapeMarkdown(me.tag)}, ${posts}` : `-# They're tracked as ${escapeMarkdown(me.tag)}, ${posts}`);
   }
   return lines.join('\n');
 }
 
-// /notify: only ever changes whoever ran it. match calls and stream alerts go by their start.gg, so those
-// need them linked or tracked with their discord on start.gg. registration hands out the Reg Reminders role
-// too, which can take discord past the 3 seconds a command gets, so that one defers first
+// /notify: your pings, or anyone's for a TO with user:. anyone can look at anyone's, only
+// TOs can change someone else's. match calls and stream alerts go by start.gg, so those need
+// whoever it's for linked or tracked with their discord on start.gg. registration hands out the
+// Reg Reminders role too, which can take discord past the 3 seconds a command gets, so that one
+// defers first
 async function notify(interaction) {
-  const { id } = interaction.user;
+  const picked = interaction.options.getUser('user');
+  const target = picked ?? interaction.user;
+  const self = target.id === interaction.user.id;
+  if (picked?.bot) return replyEphemeral(interaction, 'Bots don\'t need pings.');
+  const member = picked ? interaction.options.getMember('user') : interaction.member;
+  if (picked && !member) return replyEphemeral(interaction, 'Pick someone in this server.');
+  const name = self ? null : escapeMarkdown(member.displayName ?? target.displayName ?? target.username);
+  const id = target.id;
+
   const all = interaction.options.getString('all');
   const changes = {};
-  for (const name of Object.keys(PINGS)) {
-    const value = interaction.options.getString(name) ?? all;
-    if (value) changes[name] = value === 'on';
+  for (const ping of Object.keys(PINGS)) {
+    const value = interaction.options.getString(ping) ?? all;
+    if (value) changes[ping] = value === 'on';
   }
   const me = linkedPlayer(id);
-  if (!Object.keys(changes).length) return replyEphemeral(interaction, notifyText(id, me));
+  if (!Object.keys(changes).length) return replyEphemeral(interaction, notifyText(id, me, name));
+  if (!self && !isTO(interaction)) return notTO(interaction, 'change someone else\'s pings. Leave out `user` to change yours');
 
   const lines = [];
-  for (const [name, on] of Object.entries(changes)) {
-    if ((name === 'calls' || name === 'streams') && on && !me) {
-      lines.push(`${name === 'calls' ? 'Match call' : 'Stream alert'} pings need your start.gg, so \`/link\` first. Leave out the link and it finds yours.`);
+  // the same words for someone else, with their pronouns
+  const say = (text) => (self ? text : text.replaceAll('You\'ll', 'They\'ll').replaceAll('your', 'their').replaceAll('you\'re', 'they\'re'));
+  for (const [ping, on] of Object.entries(changes)) {
+    if ((ping === 'calls' || ping === 'streams') && on && !me) {
+      const label = ping === 'calls' ? 'Match call' : 'Stream alert';
+      lines.push(self
+        ? `${label} pings need your start.gg, so \`/link\` first. Leave out the link and it finds yours.`
+        : `${label} pings need their start.gg. Ask them to run \`/link\` with their profile link.`);
       continue;
     }
-    const list = PINGS[name].list;
+    const list = PINGS[ping].list;
     state[list] ??= [];
     state[list] = state[list].filter((each) => each !== id);
     if (on) state[list].push(id);
-    lines.push(PINGS[name][on ? 'on' : 'off']);
+    lines.push(say(PINGS[ping][on ? 'on' : 'off']));
   }
   save();
   if (changes.calls && me && !messageEnabled('calls')) lines.push('-# Match calls are off for the whole server, `/messages calls` turns them on.');
   if (!Object.hasOwn(changes, 'registration')) return replyEphemeral(interaction, lines.join('\n'));
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const { guild, member } = interaction;
+  const { guild } = interaction;
   try {
     let role = guild.roles.cache.find((each) => each.name === REG_ROLE);
     if (changes.registration) {
