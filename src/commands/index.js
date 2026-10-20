@@ -25,8 +25,9 @@ export { commands } from './definitions.js';
 const TRACKED_ONLY = ['track remove', 'track posts', 'notify'];
 // all means everyone tracked
 const TAKES_ALL = ['upcoming', 'recent', 'track posts', 'notify'];
-// a tournament link, or one the bot already knows. new is the ones /t-o tournament add can still track, tracked the ones it does
-const TAKES_TOURNAMENT = { 't-o tournament add': 'new', 't-o tournament remove': 'tracked', 't-o tournament posts': 'tracked', 't-o tournament event': 'known', registered: 'known', reg_warn: 'known' };
+// a tournament link, or one the bot already knows. new is the ones /t-o tournament add can still track, tracked the ones it does,
+// event is every tracked one plus the upcoming ones for /t-o tournament event
+const TAKES_TOURNAMENT = { 't-o tournament add': 'new', 't-o tournament remove': 'tracked', 't-o tournament posts': 'tracked', 't-o tournament event': 'event', registered: 'known', reg_warn: 'known' };
 
 // "track add", or just the command for the ones without subcommands. a subcommand group would go in the middle
 function commandName(interaction) {

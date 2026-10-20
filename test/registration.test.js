@@ -389,6 +389,13 @@ test('tournament options offer tracked ones and tracked players\' tournaments, s
   // and untracking or changing one only the tracked ones, over or not
   assert.deepEqual((await autocomplete('t-o', '', 'remove', 'tournament')).map(({ name }) => name), ['Last Week', 'Local', 'Admin Weekly']);
   assert.deepEqual((await autocomplete('t-o', 'week', 'posts', 'tournament')).map(({ name }) => name), ['Last Week', 'Admin Weekly']);
+  // making a discord event lists every tracked one plus the upcoming ones, soonest first
+  assert.deepEqual((await autocomplete('t-o', '', 'event', 'tournament')).map(({ name }) => name), ['Last Week', 'Live Now', 'Local', 'Next Month', 'Admin Weekly']);
+  assert.deepEqual((await autocomplete('t-o', 'week', 'event', 'tournament')).map(({ name }) => name), ['Last Week', 'Admin Weekly']);
+  // a tournament saved twice still lists once
+  state.tournaments[10] = { id: 10, slug: 'tournament/local', name: 'Local', startAt: now + day, endAt: now + day + 3600 };
+  assert.deepEqual((await autocomplete('t-o', '', 'event', 'tournament')).map(({ name }) => name), ['Last Week', 'Live Now', 'Local', 'Next Month', 'Admin Weekly']);
+  delete state.tournaments[10];
 
   // anything else typed comes back as it is, so a pasted link still goes through
   assert.deepEqual(await autocomplete('registered', ' start.gg/tournament/genesis-x '), [{ name: 'start.gg/tournament/genesis-x', value: 'start.gg/tournament/genesis-x' }]);

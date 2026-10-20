@@ -26,20 +26,26 @@ function tournamentNotFound(input) {
 
 // autocomplete, so nobody has to paste a link for a tournament the bot already knows: tracked ones and ones
 // tracked players are in, soonest first. only says which: new is the ones /t-o tournament add can still track, tracked
-// the ones it already does. a pasted link of one of them shows its name, and anything else typed is offered back as it is
+// the ones it already does, event is every tracked one plus the upcoming ones for /t-o tournament event. a pasted
+// link of one of them shows its name, and anything else typed is offered back as it is
 function tournamentChoices(typed, { only = 'known' } = {}) {
   const now = secondsNow();
   const search = typed.trim().toLowerCase();
   const known = Object.values(state.tournaments).filter((tournament) => {
     if (!tournament.slug || !tournament.name) return false;
     if (only === 'tracked') return Boolean(tournament.tracked);
+    // the event list keeps every tracked tournament, even a finished one, so a TO can still make its discord event
+    if (only === 'event' && tournament.tracked) return true;
     // one saved without dates is let through
     if (tournament.startAt && endTime(tournament) < now) return false;
     return only !== 'new' || !tournament.tracked;
   });
+  // one slug once, so a tournament saved twice still lists once
+  const seen = new Set();
   const choices = known
     .filter((tournament) => tournament.name.toLowerCase().includes(search) || tournament.slug === `tournament/${tournamentSlug(search)}`)
     .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity))
+    .filter((tournament) => !seen.has(tournament.slug) && seen.add(tournament.slug))
     .map((tournament) => ({ name: tournament.name.slice(0, 100), value: tournament.slug }));
   if (choices.length) return choices.slice(0, 25);
   // picking the empty one gets the not found reply
