@@ -71,10 +71,11 @@ export function withLines(embed, lines) {
 }
 
 // the same for sections with a blank line between, so a card only ever starts at a section.
-// a section too long for a card of its own is the one thing that gets cut
-export function withSections(embed, sections) {
-  const blocks = sections.flatMap((lines) => split(lines, 4095).map((group) => `${group.join('\n')}\n`));
-  return continued(embed, split(blocks).map((group) => group.join('\n').trimEnd()));
+// a section too long for a card of its own is the one thing that gets cut. max leaves room
+// for a first line the caller adds after, like a page number
+export function withSections(embed, sections, max = 4096) {
+  const blocks = sections.flatMap((lines) => split(lines, max - 1).map((group) => `${group.join('\n')}\n`));
+  return continued(embed, split(blocks, max).map((group) => group.join('\n').trimEnd()));
 }
 
 // the bot's own avatar, set once discord says who it is. every message gets some picture, so one with

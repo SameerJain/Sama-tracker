@@ -1502,17 +1502,20 @@ test('stream alerts ping only whoever is playing with /notify streams on', async
 });
 
 test('/help is one short card by default, and verbose lists every command', () => {
-  const [short] = embeds.help();
+  const [short, ...shortRest] = embeds.help();
   assert.equal(short.data.title, 'Sama-tracker');
+  assert.deepEqual(shortRest, []);
   assert.ok(short.data.description.length < 4096);
   assert.match(short.data.description, /`\/help verbose:True`/);
   assert.match(short.data.description, /`\/track add`/);
+  assert.doesNotMatch(short.data.description, /Page \d+\//);
 
   const cards = embeds.help(true);
   assert.equal(cards[0].data.title, 'Sama-tracker');
-  for (const card of cards) {
+  assert.ok(cards.length > 1);
+  for (const [i, card] of cards.entries()) {
     assert.ok(card.data.description.length <= 4096);
-    assert.match(card.data.description, /^\*\*/);
+    assert.match(card.data.description, new RegExp(`^-# Page ${i + 1}/${cards.length}\\n\\*\\*`));
   }
   const text = cards.map(card => card.data.description).join('\n');
   for (const title of ['Set results', 'Stream alerts', 'Match call pings', 'Tournament roll calls', 'Tournament placements', 'Top 8s', 'Registration reminders', 'Slippi rank changes', 'Bills final results', 'Weekly crew recap']) {

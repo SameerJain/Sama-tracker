@@ -1,6 +1,7 @@
 import * as embeds from '../embeds/index.js';
 
 const API = 'https://commons.wikimedia.org/w/api.php';
+const GIPHY = 'https://giphy.com/buffalobills';
 // selected player galleries add photos without pulling in every former Bill's other teams
 const CATEGORIES = [
   'Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Highmark Stadium (Orchard Park, New York)', 'New Highmark Stadium', 'Billy Buffalo',
@@ -8,19 +9,12 @@ const CATEGORIES = [
   'Josh Allen in 2018', 'Josh Allen in 2019', 'Josh Allen in 2021', 'Josh Allen in 2025',
   'James Cook (running back)', 'Terrel Bernard', 'Christian Benford', 'Dawson Knox', 'Greg Rousseau',
   'Dalton Kincaid', 'Khalil Shakir', 'Keon Coleman', 'Ed Oliver',
+  'Dion Dawkins', 'Matt Milano', 'Taron Johnson',
+  'Jim Kelly', 'Thurman Thomas', 'Andre Reed', 'Bruce Smith (defensive end)',
+  'Marv Levy', 'Sean McDermott', 'Damar Hamlin', 'Tyler Bass',
 ];
-// checked links, not live searches, so unrelated memes stay out of the mix
-const MEMES = [
-  ['72v69k', 'Josh Allen in a big hat'],
-  ['8ct3uv', 'Bills by a billion'],
-  ['6srd64', 'Josh Allen vs the alarm clock'],
-  ['4t7yao', 'Bills Mafia and folding tables'],
-  ['1wyc1y', 'Circle the wagons'],
-  ['7pdz5j', 'The struggle was real'],
-  ['1qxu9q', 'Where else would you rather be?'],
-].map(([id, name]) => ({ name, image: `https://i.imgflip.com/${id}.jpg`, page: `https://imgflip.com/i/${id}`, source: 'Imgflip' }));
-// reactions from the official Buffalo Bills and NFL channels
-const GIFS = [
+// a small fallback if the official Bills channel is down
+const FALLBACK_GIFS = [
   ['zw3lIgxdVc0I6JMJ1x', 'Josh Allen hello'],
   ['Y3xviAHFL6GykaRu6B', 'Josh Allen finger guns'],
   ['elqUYc9nQYRCEuL2Gq', 'Josh Allen thumbs up'],
@@ -29,9 +23,17 @@ const GIFS = [
   ['TgmwKWhG18tcOqJhN7', 'Josh Allen reaction'],
   ['J6205HegEoe5VPdpPk', 'Josh Allen celebration'],
   ['VhPxOrVh5ps5ExWtPJ', 'Josh Allen game day'],
-  ['P50teGDm254KLd1xMK', 'Bills sideline reaction'],
   ['ElWkVF5A4A0SiMabcd', 'Bills reaction'],
   ['gTAXtUgxmE6yebkumf', 'Bills celebration'],
+  ['DJzagZbyMa8wpxqc7o', 'Josh Allen touchdown reaction'],
+  ['MG4xPu5dZpU3vxJxfL', 'Josh Allen says lets go'],
+  ['3McruKxflKTnKT7P8Q', 'Josh Allen celebration dance'],
+  ['xT39DfijnPhLm7RYw8', 'Bills touchdown celebration'],
+  ['l0CLT3OZ5eHOWcJiM', 'LeSean McCoy touchdown'],
+  ['JIX5lShrgLatcKhU4q', 'Bills playoff celebration'],
+  ['3o6fJa7A2t8oZ8XuqQ', 'Bills end zone celebration'],
+  ['hqTvpwsFCHHLiaHXUh', 'Bills touchdown'],
+  ['3o7TKW5SaCnLmbj5OU', 'Sammy Watkins touchdown'],
 ].map(([id, name]) => ({ name, image: `https://media.giphy.com/media/${id}/giphy.gif`, page: `https://giphy.com/gifs/${id}`, source: 'GIPHY' }));
 const TITLES = [
   'GO BILLS! 🦬🔥',
@@ -42,6 +44,26 @@ const TITLES = [
   'ONE BUFFALO! ❤️💙',
   'SQUISH THE FISH! 🦬',
   'HEY-EY-EY-EY! ❤️💙',
+  'THE BILLS MAKE ME WANNA SHOUT! 🦬',
+  'WHERE ELSE WOULD YOU RATHER BE? ❤️💙',
+  'BUFFALO ALL THE WAY! 🦬🔥',
+  'JOSH ALLEN IS OUR QUARTERBACK! ❤️💙',
+  'NOBODY CIRCLES THE WAGONS LIKE BUFFALO! 🦬',
+  'WELCOME TO BUFFALO! ❄️🦬',
+  'THE MAFIA IS EVERYWHERE! ❤️💙',
+  'THIS TEAM, THIS CITY! 🦬',
+  'BLUE CHEESE ONLY! ❤️💙',
+  'BREAK OUT THE FOLDING TABLES! 🦬🔥',
+  '17 LOOKING GOOD! ❤️💙',
+  'BUFFALO VS EVERYBODY! 🦬',
+  'STAMPEDE INCOMING! 🔥🦬',
+  'KEEP THE WAGONS MOVING! ❤️💙',
+  'ANOTHER DAY IN BILLS COUNTRY! 🦬',
+  'RED, WHITE AND BUFFALO BLUE! ❤️💙',
+  'THE HERD IS HERE! 🦬🔥',
+  'BILLS FOOTBALL IS BACK! ❤️💙',
+  'PLAY THE SHOUT SONG! 🦬',
+  'BUFFALO STANDS TOGETHER! ❤️💙',
 ];
 
 export async function billsImagePool() {
@@ -83,6 +105,16 @@ export async function billsImagePool() {
   return [...new Map(images.map((image) => [image.page, image])).values()];
 }
 
+export async function billsGifPool() {
+  const res = await fetch(GIPHY, { headers: { 'User-Agent': 'Sama-tracker' }, signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`GIPHY returned ${res.status}`);
+  const html = await res.text();
+  const gifs = [...html.matchAll(/\\"id\\":\\"([A-Za-z0-9]+)\\",\\"title\\":\\"([^"\\]+) (?:GIF|Sticker) by Buffalo Bills\\",\\"images\\":.*?\\"downsized\\":\{\\"url\\":\\"([^"\\]+\.gif)\\"/gs)]
+    .map(([, id, name, image]) => ({ name, image, page: `https://giphy.com/gifs/${id}`, source: 'GIPHY' }));
+  if (!gifs.length) throw new Error('GIPHY found no official Bills GIFs');
+  return [...new Map(gifs.map((gif) => [gif.image, gif])).values()];
+}
+
 // each pool gets used up before it repeats, with no repeat across the refill either
 function cycle(load) {
   let all;
@@ -106,7 +138,16 @@ function cycle(load) {
   };
 }
 
-const pools = [cycle(billsImagePool), cycle(() => MEMES), cycle(() => GIFS)];
+async function officialGifPool() {
+  try {
+    return await billsGifPool();
+  } catch (err) {
+    console.error('bills gifs failed:', err.message);
+    return FALLBACK_GIFS;
+  }
+}
+
+const pools = [cycle(billsImagePool), cycle(officialGifPool)];
 let kinds = [];
 let lastImage;
 
@@ -119,15 +160,15 @@ async function download(image) {
 }
 
 async function takePost() {
-  // one of each per round, so the larger photo pool doesn't crowd out memes and gifs
-  if (!kinds.length) kinds = [0, 1, 2];
+  // one of each per round, so the larger photo pool doesn't crowd out gifs
+  if (!kinds.length) kinds = [0, 1];
   const kind = kinds.splice(Math.floor(Math.random() * kinds.length), 1)[0];
   let picked;
   try {
     picked = await pools[kind]();
   } catch (err) {
-    console.error('bills photos failed:', err.message);
-    picked = await pools[1 + Math.floor(Math.random() * 2)]();
+    console.error('bills media failed:', err.message);
+    picked = await pools[1 - kind]();
   }
   if (picked.image === lastImage) picked = await pools[kind]();
   lastImage = picked.image;
@@ -144,7 +185,7 @@ async function takePost() {
 export default {
   name: 'bills',
   line: 'GO BILLS! 🦬🔥',
-  description: 'Bills photos, memes and GIFs with a message',
+  description: 'Live pro-Bills photos and official GIFs with a message',
   enabled: true,
   takePost,
   format: ({ title, image, file, page, name, source }) => ({

@@ -135,9 +135,29 @@ test('bills images come from the fan, player, team, stadium and mascot Commons c
   assert.deepEqual(await billsImagePool(), [{
     name: 'Bills fan', image: 'https://images.example/fan.jpg', page: 'https://commons.wikimedia.org/wiki/File:Bills_fan.jpg',
   }]);
-  for (const category of ['Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Highmark Stadium (Orchard Park, New York)', 'New Highmark Stadium', 'Billy Buffalo', 'Buffalo Bills coaches', 'War Memorial Stadium (Buffalo, New York)', 'Josh Allen in 2021', 'Josh Allen in 2025', 'James Cook (running back)', 'Terrel Bernard', 'Dalton Kincaid', 'Khalil Shakir', 'Keon Coleman', 'Ed Oliver']) {
+  for (const category of ['Bills Mafia', 'Buffalo Bills players', 'Buffalo Bills', 'Highmark Stadium (Orchard Park, New York)', 'New Highmark Stadium', 'Billy Buffalo', 'Buffalo Bills coaches', 'War Memorial Stadium (Buffalo, New York)', 'Josh Allen in 2021', 'Josh Allen in 2025', 'James Cook (running back)', 'Terrel Bernard', 'Dalton Kincaid', 'Khalil Shakir', 'Keon Coleman', 'Ed Oliver', 'Dion Dawkins', 'Matt Milano', 'Greg Rousseau', 'Christian Benford', 'Taron Johnson', 'Jim Kelly', 'Thurman Thomas', 'Andre Reed', 'Bruce Smith (defensive end)', 'Marv Levy', 'Sean McDermott', 'Damar Hamlin', 'Tyler Bass']) {
     assert.ok(asked.includes(`Category:${category}`), category);
   }
+});
+
+test('bills gifs come live from the official Buffalo Bills GIPHY channel', async () => {
+  const module = await import('../src/fun/bills.js?live-giphy-pool');
+  assert.equal(typeof module.billsGifPool, 'function');
+  globalThis.fetch = async (url) => {
+    assert.equal(url, 'https://giphy.com/buffalobills');
+    return {
+      ok: true,
+      text: async () => [
+        String.raw`\"id\":\"liveOne123\",\"title\":\"Josh Allen Celebration GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media1.giphy.com/media/liveOne123/giphy.gif\"}}`,
+        String.raw`\"id\":\"liveTwo456\",\"title\":\"Bills Mafia Sticker by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media2.giphy.com/media/liveTwo456/giphy.gif\"}}`,
+        String.raw`\"id\":\"otherTeam9\",\"title\":\"Chiefs Win GIF by NFL\",\"images\":{\"downsized\":{\"url\":\"https://media3.giphy.com/media/otherTeam9/giphy.gif\"}}`,
+      ].join(','),
+    };
+  };
+  assert.deepEqual(await module.billsGifPool(), [
+    { name: 'Josh Allen Celebration', image: 'https://media1.giphy.com/media/liveOne123/giphy.gif', page: 'https://giphy.com/gifs/liveOne123', source: 'GIPHY' },
+    { name: 'Bills Mafia', image: 'https://media2.giphy.com/media/liveTwo456/giphy.gif', page: 'https://giphy.com/gifs/liveTwo456', source: 'GIPHY' },
+  ]);
 });
 
 test('bills follows both thumbnail and category continuation without duplicating files', async () => {
@@ -227,34 +247,30 @@ test('bills falls back to the image url when the download fails', async (t) => {
   }
 });
 
-test('bills rotates photos, memes and animated gifs, using each pool before repeating', async (t) => {
+test('bills rotates live photos and official Bills gifs, using each pool before repeating', async (t) => {
   t.mock.method(Math, 'random', () => 0);
   const { default: bills } = await import('../src/fun/bills.js?rotation');
   globalThis.fetch = async (url) => {
     if (String(url).includes('commons.wikimedia.org')) return json({ query: { pages: ['one', 'two', 'three'].map((name) => ({ title: `File:${name}.jpg`, imageinfo: [{ mime: 'image/jpeg', thumburl: `https://images.example/${name}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:${name}.jpg` }] })) } });
+    if (url === 'https://giphy.com/buffalobills') return { ok: true, text: async () => Array.from({ length: 20 }, (_, i) => String.raw`\"id\":\"liveGif${i}\",\"title\":\"Bills Celebration ${i} GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media.giphy.com/media/liveGif${i}/giphy.gif\"}}`).join(',') };
     return { ok: true, arrayBuffer: async () => new Uint8Array([71, 73, 70, 56]).buffer };
   };
   const posts = [];
-  for (let i = 0; i < 36; i++) posts.push(await bills.takePost());
-  for (let i = 0; i < posts.length; i += 3) {
+  for (let i = 0; i < 40; i++) posts.push(await bills.takePost());
+  for (let i = 0; i < posts.length; i += 2) {
     assert.match(posts[i].page, /^https:\/\/commons\.wikimedia\.org\//);
-    assert.match(posts[i + 1].page, /^https:\/\/imgflip\.com\//);
-    assert.match(posts[i + 2].page, /^https:\/\/giphy\.com\//);
+    assert.match(posts[i + 1].page, /^https:\/\/giphy\.com\//);
   }
-  assert.equal(new Set([posts[0].image, posts[3].image, posts[6].image]).size, 3);
-  assert.notEqual(posts[6].image, posts[9].image);
-  const memes = posts.filter((_, i) => i % 3 === 1).map(({ image }) => image);
-  assert.equal(new Set(memes.slice(0, 7)).size, 7);
-  assert.notEqual(memes[6], memes[7]);
-  const gifs = posts.filter((_, i) => i % 3 === 2);
-  assert.equal(new Set(gifs.slice(0, 11).map(({ image }) => image)).size, 11);
-  assert.notEqual(gifs[10].image, gifs[11].image);
+  assert.equal(new Set([posts[0].image, posts[2].image, posts[4].image]).size, 3);
+  assert.notEqual(posts[4].image, posts[6].image);
+  const gifs = posts.filter((_, i) => i % 2 === 1);
+  assert.equal(new Set(gifs.map(({ image }) => image)).size, 20);
+  assert.ok(gifs.every(({ image }) => !image.includes('P50teGDm254KLd1xMK')));
   const reply = bills.format(gifs[0]);
   assert.equal(reply.embeds[0].data.image.url, 'attachment://bills.gif');
   assert.match(reply.embeds[0].data.footer.text, /GIPHY/);
   assert.doesNotMatch(reply.embeds[0].data.footer.text, /Wikimedia Commons/);
   assert.equal(reply.files[0].attachment.toString(), 'GIF8');
-  assert.match(bills.format(posts[1]).embeds[0].data.footer.text, /Imgflip/);
 });
 
 test('bills never sends the same image twice in a row across different pools', async (t) => {
@@ -263,8 +279,12 @@ test('bills never sends the same image twice in a row across different pools', a
   globalThis.fetch = async (url) => {
     if (String(url).includes('commons.wikimedia.org')) return json({ query: { pages: [{
       title: 'File:Duplicate.jpg',
-      imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://i.imgflip.com/72v69k.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Duplicate.jpg' }],
+      imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://media.giphy.com/media/sameImage/giphy.gif', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Duplicate.jpg' }],
     }] } });
+    if (url === 'https://giphy.com/buffalobills') return { ok: true, text: async () => [
+      String.raw`\"id\":\"sameImage\",\"title\":\"Bills Celebration GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media.giphy.com/media/sameImage/giphy.gif\"}}`,
+      String.raw`\"id\":\"otherImage\",\"title\":\"Josh Allen GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media.giphy.com/media/otherImage/giphy.gif\"}}`,
+    ].join(',') };
     return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
   };
   const first = await bills.takePost();
@@ -272,7 +292,7 @@ test('bills never sends the same image twice in a row across different pools', a
   assert.notEqual(first.image, second.image);
 });
 
-test('bills still posts memes and gifs when Commons is down, then retries the photos', async (t) => {
+test('bills still posts official gifs when Commons is down, then retries the photos', async (t) => {
   t.mock.method(Math, 'random', () => 0);
   const { default: bills } = await import('../src/fun/bills.js?commons-failure');
   let down = true;
@@ -283,9 +303,10 @@ test('bills still posts memes and gifs when Commons is down, then retries the ph
         if (down) return json({}, false);
         return json({ query: { pages: [{ title: 'File:Back.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/back.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Back.jpg' }] }] } });
       }
-      return json({});
+      if (url === 'https://giphy.com/buffalobills') return { ok: true, text: async () => String.raw`\"id\":\"liveBills1\",\"title\":\"Go Bills GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media.giphy.com/media/liveBills1/giphy.gif\"}}` };
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
     };
-    assert.match((await bills.takePost()).page, /^https:\/\/(imgflip|giphy)\.com\//);
+    assert.match((await bills.takePost()).page, /^https:\/\/giphy\.com\//);
     down = false;
     const posts = [];
     for (let i = 0; i < 3; i++) posts.push(await bills.takePost());

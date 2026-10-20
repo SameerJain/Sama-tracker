@@ -148,6 +148,9 @@ function shortHelp() {
   return [baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'))];
 }
 
+// '-# Page 99/99\n' is 15, so a card packed to this still fits its page line
+const PAGE_RESERVED = 16;
+
 export function help(verbose = false) {
   if (!verbose) return shortHelp();
   const sections = [
@@ -243,7 +246,7 @@ export function help(verbose = false) {
       '`/sm4sh` a love letter to Smash 4',
       '`/ult` an Ultimate player who hates Ultimate',
       '`/pplus` a Project+ player who wants you on netplay',
-      '`/bills` Bills photos, memes and GIFs with a message. Never sends the same image twice in a row',
+      '`/bills` Live pro-Bills photos and official Bills GIFs. Never sends the same image twice in a row',
       '`/view_pfp` my profile picture, full size',
       '-# `/messages bills:True` posts Bills final scores here after each game, green for a win and red for a loss',
     ],
@@ -263,5 +266,7 @@ export function help(verbose = false) {
       '-# Tracked tournaments post their set results and stream alerts in a thread. `/messages threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. One per tournament pins its channel card until the tournament ends. If a thread can\'t be used, they post here',
     ],
   ];
-  return withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections);
+  // the page number goes on top of every card, with room left so none passes 4096
+  const cards = withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections, 4096 - PAGE_RESERVED);
+  return cards.map((card, i) => card.setDescription(`-# Page ${i + 1}/${cards.length}\n${card.data.description}`));
 }
