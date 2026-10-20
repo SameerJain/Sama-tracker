@@ -186,6 +186,11 @@ export function medal(placement) {
   return '';
 }
 
+// reminder hours the way /track list shows them: 7d, 3d, 1d, 6h
+export function shortSchedule(schedule) {
+  return schedule.map((hours) => (hours % 24 ? `${hours}h` : `${hours / 24}d`)).join(', ');
+}
+
 export function scoreText(me, them) {
   if (me.score === -1 || them.score === -1) return 'DQ'; // start.gg's DQ score
   if (me.score === null || them.score === null) return 'vs';

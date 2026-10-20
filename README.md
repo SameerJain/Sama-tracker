@@ -68,8 +68,9 @@ Anyone can track, untrack and change posts for themselves. Yourself means the st
 | `/t-o role set role:<@role>` | Use any existing server role for TO privileges. Needs **Manage Server**. |
 | `/t-o role remove user:<@someone>` | Take the TO role off someone. Refuses to remove the last known TO. T.O.s only. |
 | `/t-o role list` | The TOs. Anyone can look. |
+| `/t-o calls` | When the DQ warning fires (`warn`) and what DQ time it names (`dq`). Leave both out to see them. T.O.s only. |
 
-TOs can control `/messages`, track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Only TOs add or remove TOs. The role grants nothing in Discord itself. The bot checks for it.
+TOs can control `/messages`, track, untrack and change posts for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament`, `/t-o calls` and `/t-o cleanup`. Only TOs add or remove TOs. The role grants nothing in Discord itself. The bot checks for it.
 
 The bot makes the TO role the first time it's needed. A role named `TO` made by hand counts too, and `/t-o role set` can select a role with any name. It keeps counting if renamed later. Until the server has a TO role, anyone with Manage Server counts as a TO, so nobody gets locked out before it exists. Once it does, Manage Server alone doesn't grant other TO tools, but it can still change the selected role. `/t-o role list` shows TOs once they've used a command. Samatron gets the role once when the bot first starts, found by the Discord on their start.gg.
 
@@ -80,15 +81,16 @@ The bot makes the TO role the first time it's needed. A role named `TO` made by 
 | `/notify` | Which of your pings are on, and the posts about you if you're tracked. Only you see it. |
 | `/notify calls:<on or off>` | Get pinged when your set is called, at any tournament. Needs your start.gg linked, or you tracked with Discord connected on start.gg. One message per called set, with everyone in it who has this on, all four players for doubles. |
 | `/notify streams:<on or off>` | Get pinged when your set is on stream, at any tournament. Needs your start.gg linked, or you tracked with Discord connected on start.gg. |
+| `/notify dq_warnings:<on or off>` | Get warned again if your called set still hasn't started. Off unless you turn it on. Needs match calls on too, and only fires for called sets. |
 | `/notify registration:<on or off>` | Get the **Reg Reminders** role and its pings for tracked tournaments. Everyone with the role gets pinged, even when already registered. |
 | `/notify dm_registration:<on or off>` | Get a DM 1 hour before registration closes, with the tournament link, location and image. Skipped once you're registered, if start.gg has your Discord. Only while you're in this server. |
 | `/notify dm_start:<on or off>` | Get a DM 1 hour before the tournament starts, with the tournament link, location and image. Only while you're in this server. |
 | `/notify user:<@someone>` | Someone else's pings instead of yours, by server member. TOs only. Pick either `user` or `player`, not both. |
 | `/notify player:<name>` | Someone else's pings instead of yours, by tracked player. TOs only. |
 | `/notify player:all` | Every tracked player with Discord on start.gg. TOs only. Asks first. Players without Discord are skipped. |
-| `/notify all:<on or off>` | All five at once. |
+| `/notify all:<on or off>` | All five at once, not DQ warnings, which stay a separate opt-in. |
 
-`/notify` changes you unless a TO picks someone in `user:` or `player:`, and registration and DM pings need no tracking or linking. Calls and streams need whoever it's for linked, or tracked with Discord connected on start.gg. Bulk `player:all` only touches tracked players, so someone who only `/link`ed keeps theirs. DMs only go to current server members, and leaving the server keeps your settings for when you rejoin.
+`/notify` changes you unless a TO picks someone in `user:` or `player:`, and registration and DM pings need no tracking or linking. Calls, streams and DQ warnings need whoever it's for linked, or tracked with Discord connected on start.gg. Bulk `player:all` only touches tracked players, so someone who only `/link`ed keeps theirs. DMs only go to current server members, and leaving the server keeps your settings for when you rejoin.
 
 ### Matchmaking
 
@@ -216,15 +218,15 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 `/link` identifies you for commands. `/track` follows a player publicly. `/notify` controls your pings, or anyone's for a TO with `user:` or `player:`. Tracking a tournament covers its whole bracket. A registered server member can still appear in a tracked tournament's roll call or placements, and anyone can appear in its sets, streams or top 8.
 
-Ping changes apply during a tournament. Turning match calls or stream alerts on catches one that is still active, even if its card already posted for someone else. Turning them off also stops the 5-minute match-call reminder.
+Ping changes apply during a tournament. Turning match calls or stream alerts on catches one that is still active, even if its card already posted for someone else. Turning them off also stops the match-call warning. `/t-o calls` sets when the warning fires and what DQ time it names, 5 minutes and DQ at 10 unless a TO changes them.
 
 | Automatic message | When it posts | Who appears and what controls it |
 | --- | --- | --- |
 | Set results | Every finished set at a tracked tournament. Anywhere else, when a tracked player with set results on finishes a set. | `/track posts sets` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. |
 | Stream alerts | Every set on stream or next in the stream queue at a tracked tournament. Anywhere else, when a tracked player with stream alerts on has a set there. A new alert waits 30 seconds to confirm. | `/track posts stream` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. `/notify streams` pings whoever is playing. |
-| Match call pings | When a set is called for someone with `/notify calls` on. The ping says You're up, with the station number when the TO set one on start.gg. Calls taken back get crossed out, and one still waiting after 5 minutes pings once more. | One card per set names everyone in it. `/notify calls` controls each person's ping subscription. |
+| Match call pings | When a set is called for someone with `/notify calls` on. The ping says You're up, with the station number when the TO set one on start.gg. Calls taken back get crossed out, and one still waiting when the warning comes due pings the warn-me players once more, naming the DQ time. | One card per set names everyone in it. `/notify calls` controls each person's ping subscription, and `/notify dq_warnings` controls the warning, which only goes to people with both on. |
 | Tournament roll calls | An hour before a tournament with at least 3 of the crew registered, with the stream links from its start.gg page. | Tracked players appear. At a tracked tournament, registered server members whose Discord is connected on start.gg count too. Linking alone does not add someone. |
-| Tournament placements | With the top 8 as soon as every event finishes at a tracked tournament, even when top 8 posts are off. Otherwise 12 hours after the tournament ends. Unfinished placements are marked as projected. | Tracked players appear. At a tracked tournament, the same registered server members as roll calls appear too. |
+| Tournament placements | With the top 8 as soon as every event finishes at a tracked tournament, even when top 8 posts are off. Otherwise 12 hours after the tournament ends. Unfinished placements are marked as projected. Notable upset wins by tracked players go under the placements. | Tracked players appear. At a tracked tournament, the same registered server members as roll calls appear too. |
 | Top 8s | As soon as every event finishes at a tracked tournament. Delayed or failed top 8s retry as described below. | Everyone in each top 8 appears, tracked or not. |
 | Registration reminders | At the deadlines under [Tournaments](#tournaments). | The card lists no players. `/notify registration` hands out the **Reg Reminders** role and pings it for everyone with it. |
 | Registration DMs | 1 hour before registration closes at a tracked tournament. | DM with the tournament link, location and image. `/notify dm_registration` controls who gets one, skipped once registered when start.gg has their Discord. Only to current server members. Needs the tournament's reg reminders on. |
@@ -232,10 +234,10 @@ Ping changes apply during a tournament. Turning match calls or stream alerts on 
 | Discord events | Off by default. Within 15 minutes of an upcoming tournament getting tracked. | `/messages events` controls it. With it off, a tournament only gets one from `/t-o tournament event` or `add_event:on`. |
 | Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank. A new season reset is not posted. | `/slippi add` and `/slippi remove` control the watchlist. Tracked players can be discovered from connect codes entered on start.gg. Linked-only players cannot. |
 | Bills final results | Off by default. After each Bills game, with quarters and yards. | No player appears. |
-| Weekly crew recap | Sunday at 9 pm New York time by default. | Tracked players with a non-DQ singles set that week appear. There is no separate player switch. |
+| Weekly crew recap | Sunday at 9 pm New York time by default. A notable upset win by a tracked player goes on top. | Tracked players with a non-DQ singles set that week appear. There is no separate player switch. |
 | Bot updates | When Railway starts a new deployment. | No player appears. Always posts, with when it deployed and the commit message. |
 
-Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. `/messages set_colors` colors them green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played, so a small crew sees each member at a glance. Off, every card stays green. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. A top 8 lookup that fails at placements time holds them back 12 hours, then they go without it. A top 8 that fails to send retries for up to 3 days.
+Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. Tournament placements and the weekly recap list the same kind of wins by tracked players as notable upsets. `/messages set_colors` colors them green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played, so a small crew sees each member at a glance. Off, every card stays green. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. A top 8 lookup that fails at placements time holds them back 12 hours, then they go without it. A top 8 that fails to send retries for up to 3 days.
 
 Singles stream alerts and match calls get a **Head to head** button for the short report that replies privately to whoever presses it. It comes off when the set ends or is deleted, or 12 hours after the post.
 

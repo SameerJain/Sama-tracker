@@ -159,6 +159,16 @@ test('bills images come from the fan, player, team, stadium and mascot Commons c
   }
 });
 
+test('bills leaves out a pageant photo from a charity event in the Damar Hamlin category', async () => {
+  globalThis.fetch = async () => json({ query: { pages: [
+    { title: 'File:Miss Black Michigan USA 2024 and Chasing M’s.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/pageant.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Miss_Black_Michigan_USA_2024_and_Chasing_M%E2%80%99s.jpg' }] },
+    { title: 'File:Damar Hamlin tackle.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/tackle.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Damar_Hamlin_tackle.jpg' }] },
+  ] } });
+  assert.deepEqual(await billsImagePool(), [{
+    name: 'Damar Hamlin tackle', image: 'https://images.example/tackle.jpg', page: 'https://commons.wikimedia.org/wiki/File:Damar_Hamlin_tackle.jpg',
+  }]);
+});
+
 test('bills gifs come live from the official Buffalo Bills GIPHY channel', async () => {
   const module = await import('../src/fun/bills.js?live-giphy-pool');
   assert.equal(typeof module.billsGifPool, 'function');

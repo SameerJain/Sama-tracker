@@ -11,6 +11,7 @@ import { rememberAccounts, serverMembers } from './accounts.js';
 import { cantMakeEvents, ensureDiscordEvent, syncDiscordEvents } from './discord-events.js';
 import { buttonRow, h2hButton, linkedPlayer } from './commands/shared.js';
 import { checkMatchmakingExpiry } from './commands/matchmaking.js';
+import { MAJOR_UPSET, scoreText, upsetFactor } from './embeds/shared.js';
 
 const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
@@ -62,11 +63,13 @@ const THREAD_KEPT_DAYS = 14;
 const BUTTON_KEPT_HOURS = 12;
 // TOs report the wrong winner or score and fix it, or reset the set, so set results get looked at again this long
 const RESULT_WATCH_MINUTES = 60;
-// a match call still called after this long pings again, since TOs usually DQ at 10
-const CALL_WARN_MINUTES = 5;
-const CALL_DQ_MINUTES = 10;
-// and calls get looked at this long for going back to waiting
+// and calls get looked at this long for going back to waiting, or to the DQ time when that's later
 const CALL_WATCH_MINUTES = 15;
+// a called set still not started this long after gets one warning naming the expected DQ minute.
+// both from /t-o calls, 5 and 10 unless a TO changes them
+const callWarnMinutes = () => state.messages.callsWarn ?? 5;
+const callDqMinutes = () => state.messages.callsDq ?? 10;
+const callWatchMinutes = () => Math.max(CALL_WATCH_MINUTES, callDqMinutes());
 // a set back to waiting, ready or queued isn't called anymore
 const UNCALLED_STATES = [1, 4, 7];
 // placements that went out projected get edited once they're final, for this long after
@@ -555,6 +558,33 @@ function trackedLive(kind, now = secondsNow()) {
     && !(tournament.doneAt && tournament.lastCheck >= tournament.doneAt));
 }
 
+// singles only, DQs left out, the same major upsets as set result cards. the winner has to be tracked,
+// the loser can be anyone tracked or not, so tracked vs tracked still shows as the winner's upset
+function recordNotableUpset(set) {
+  if (set.sides.some((side) => side.playerIds.length !== 1)) return;
+  const [a, b] = set.sides;
+  const winner = a.id === set.winnerId ? a : b.id === set.winnerId ? b : null;
+  if (!winner) return;
+  const loser = winner === a ? b : a;
+  if (scoreText(winner, loser) === 'DQ') return;
+  const factor = upsetFactor(winner, loser);
+  if (factor < MAJOR_UPSET) return;
+  const winnerPlayer = Object.values(state.players).find((player) => winner.playerIds.includes(player.playerId));
+  if (!winnerPlayer) return;
+  const tournament = Object.values(state.tournaments).find((each) => each.slug === set.event?.tournament?.slug);
+  if (!tournament) return;
+  const loserPlayer = Object.values(state.players).find((player) => loser.playerIds.includes(player.playerId));
+  tournament.notableUpsets ??= [];
+  if (tournament.notableUpsets.some((upset) => upset.setId === set.id)) return;
+  tournament.notableUpsets.push({
+    setId: set.id, winnerUserId: winnerPlayer.userId, winnerName: winner.name, winnerSeed: winner.seed,
+    loserUserId: loserPlayer?.userId ?? null, loserName: loser.name, loserSeed: loser.seed,
+    winnerScore: winner.score, loserScore: loser.score, eventSlug: set.event.slug, round: set.round, factor,
+  });
+  // rare and small, so a short cap keeps old state files small
+  tournament.notableUpsets = tournament.notableUpsets.sort((x, y) => y.factor - x.factor).slice(0, 10);
+}
+
 export async function postNewSets(postChannel = channel) {
   const players = Object.values(state.players);
   const playerIds = players.map((player) => player.playerId);
@@ -598,6 +628,7 @@ export async function postNewSets(postChannel = channel) {
         // edits bring back old sets
         player.lastSetAt = Math.max(player.lastSetAt ?? 0, set.completedAt);
       }
+      recordNotableUpset(set);
       if (state.posted.includes(set.id)) continue;
       // editing an old set brings it back
       if (set.completedAt < windows.get(set.id) - HOUR) continue;
@@ -1028,13 +1059,15 @@ function watchCall(message, set, discordIds, text) {
   save();
 }
 
-// match calls from the last 15 minutes, in one request. a call usually means go now, so there's no wait
+// recent match calls in one request. a call usually means go now, so there's no wait
 // before it goes out like stream alerts have. instead one whose set goes back to waiting gets edited to say
-// it was uncalled, and the next call pings again. one still called 5 minutes in pings its players once more
+// it was uncalled, and the next call pings again. one still called when the warning comes due pings the
+// warn-me players once more, naming the DQ time from /t-o calls
 export async function followCalls(postChannel = channel) {
   const now = secondsNow();
+  const warnAt = callWarnMinutes();
   const before = state.callPosts.length;
-  state.callPosts = state.callPosts.filter((each) => each.calledAt > now - CALL_WATCH_MINUTES * 60);
+  state.callPosts = state.callPosts.filter((each) => each.calledAt > now - callWatchMinutes() * 60);
   const watching = state.callPosts;
   if (!watching.length) {
     if (state.callPosts.length !== before) save();
@@ -1046,16 +1079,17 @@ export async function followCalls(postChannel = channel) {
       const setState = states.get(each.setId);
       if (setState === 6) {
         const minutes = Math.floor((now - each.calledAt) / 60);
-        if (each.warned || !each.discordIds.length || minutes < CALL_WARN_MINUTES) continue;
+        if (each.warned || !each.discordIds.length || minutes < warnAt) continue;
         // marked first, two of these would be worse than none
         each.warned = true;
         save();
-        if (messageEnabled('calls', each.calledAt + CALL_WARN_MINUTES * 60)) {
-          const users = each.discordIds.filter((id) => (state.callPings ?? []).includes(id) && mentionable(id));
+        if (messageEnabled('calls', each.calledAt + warnAt * 60)) {
+          // only whoever asked for the warning too, and turning either ping off stops it
+          const users = each.discordIds.filter((id) => (state.callPings ?? []).includes(id) && (state.dqWarnPings ?? []).includes(id) && mentionable(id));
           if (!users.length) continue;
           const still = (each.text ?? `You're up`).replace(`You're up`, `You're still up`);
           await postChannel.send({
-            content: `${mentions(users)} ${still}, ${minutes} min in. TOs usually DQ at ${CALL_DQ_MINUTES}`,
+            content: `${mentions(users)} ${still}, ${minutes} min in. TOs usually DQ at ${callDqMinutes()}`,
             reply: { messageReference: each.messageId, failIfNotExists: false },
             allowedMentions: { users },
           });
@@ -1546,11 +1580,6 @@ function overAt(tournament) {
 // lots of weeklies leave registration open after the start, but you still have to sign up before it
 export function regDeadline(tournament) {
   return Math.min(tournament.registrationClosesAt ?? tournament.startAt, tournament.startAt);
-}
-
-// a schedule the way /track list shows it: 7d, 3d, 1d, 6h
-export function shortSchedule(schedule) {
-  return schedule.map((hours) => (hours % 24 ? `${hours}h` : `${hours / 24}d`)).join(', ');
 }
 
 // hours before the deadline each reminder goes out, most first. a tournament with a custom

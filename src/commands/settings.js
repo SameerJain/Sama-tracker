@@ -234,6 +234,11 @@ const PINGS = {
     on: 'You\'ll get a DM 1 hour before the tournament starts, with the link, location and tournament image.',
     off: 'No more start DMs.',
   },
+  dq_warnings: {
+    list: 'dqWarnPings',
+    on: 'You\'ll get warned again if your called set still hasn\'t started. Needs match calls on too.',
+    off: 'No more DQ warning pings.',
+  },
 };
 
 // lowercase for the bulk question, which capitalizes only the first letter like /track posts
@@ -243,6 +248,7 @@ const PING_LABELS = {
   registration: 'reg reminders',
   dm_registration: 'registration DMs',
   dm_start: 'start DMs',
+  dq_warnings: 'DQ warnings',
 };
 
 // imported from message-settings, so the tracker pings the same role /notify hands out
@@ -261,6 +267,7 @@ function notifyText(discordId, me, name = null) {
     yours ? '**Your pings**' : `**${name}'s pings**`,
     `**Match calls:** ${calls}`,
     `**Stream alerts:** ${streams}`,
+    `**DQ warnings:** ${has('dq_warnings') ? 'on' : 'off'}`,
     `**Reg reminders:** ${has('registration') ? 'on' : 'off'}`,
     `**Registration DMs:** ${has('dm_registration') ? 'on' : 'off'}`,
     `**Start DMs:** ${has('dm_start') ? 'on' : 'off'}`,
@@ -333,6 +340,32 @@ confirmable('notify_all', {
   cancel: () => 'Bulk ping changes stay the way they were.',
 });
 
+// what /t-o calls shows without options
+function callsTimingText() {
+  const warn = state.messages.callsWarn ?? 5;
+  const dq = state.messages.callsDq ?? 10;
+  return `**Match call warnings**\n**Warn after:** ${warn} min · **DQ at:** ${dq} min\n`
+    + `-# One warning per called set while it's still called, for people with both \`/notify calls\` and \`/notify dq_warnings\` on`;
+}
+
+// /t-o calls: when the DQ warning fires and what DQ time it names, once for the server. TOs only.
+// warn fires that many minutes after the call while the set is still called, once, and dq is the minute
+// the warning names. warn has to come before dq, and calls watch at least to dq so it can fire
+function callsTiming(interaction) {
+  if (!isTO(interaction)) return notTO(interaction, 'change match call warnings');
+  const warn = interaction.options.getInteger('warn');
+  const dq = interaction.options.getInteger('dq');
+  if (warn === null && dq === null) return replyEphemeral(interaction, callsTimingText());
+  const next = { warn: warn ?? state.messages.callsWarn ?? 5, dq: dq ?? state.messages.callsDq ?? 10 };
+  if (next.warn >= 1 && next.warn < next.dq && next.dq <= 30) {
+    state.messages.callsWarn = next.warn;
+    state.messages.callsDq = next.dq;
+    save();
+    return interaction.reply({ content: callsTimingText(), allowedMentions: { parse: [] } });
+  }
+  return replyEphemeral(interaction, 'Pick `warn` before `dq`, with `dq` 30 minutes or less. The warning fires once, `warn` minutes after the call while the set is still called.');
+}
+
 // /notify: your pings, or anyone's for a TO with user: or player:. user: takes a server member,
 // player: a tracked player or all. only one of them, TOs only for anyone else. match calls and
 // stream alerts go by start.gg, so those need whoever it's for linked or tracked with their discord
@@ -346,7 +379,8 @@ async function notify(interaction) {
   const all = interaction.options.getString('all');
   const changes = {};
   for (const ping of Object.keys(PINGS)) {
-    const value = interaction.options.getString(ping) ?? all;
+    // dq warnings stay a separate opt-in, all keeps its five
+    const value = interaction.options.getString(ping) ?? (ping === 'dq_warnings' ? undefined : all);
     if (value) changes[ping] = value === 'on';
   }
   // the same words for someone else, with their pronouns
@@ -368,8 +402,8 @@ async function notify(interaction) {
         if (!players.length) return replyEphemeral(interaction, 'Nobody is tracked yet, `/track add` someone first.');
         const on = (ping) => eligible.filter((player) => (state[PINGS[ping].list] ?? []).includes(player.discordId)).length;
         return replyEphemeral(interaction, `**Pings for ${count(eligible.length, 'tracked player')}**\n`
-          + `**Match calls:** on for ${on('calls')} · **Stream alerts:** on for ${on('streams')} · **Reg reminders:** on for ${on('registration')}\n`
-          + `**Registration DMs:** on for ${on('dm_registration')} · **Start DMs:** on for ${on('dm_start')}`
+          + `**Match calls:** on for ${on('calls')} · **Stream alerts:** on for ${on('streams')} · **DQ warnings:** on for ${on('dq_warnings')}\n`
+          + `**Reg reminders:** on for ${on('registration')} · **Registration DMs:** on for ${on('dm_registration')} · **Start DMs:** on for ${on('dm_start')}`
           + (skipped ? `\n-# ${count(skipped, 'tracked player has', 'tracked players have')} no Discord on start.gg and stay${skipped === 1 ? 's' : ''} out` : ''));
       }
       if (!eligible.length) return replyEphemeral(interaction, 'No tracked players have Discord connected on start.gg, so there is nobody to ping.');
@@ -389,8 +423,9 @@ async function notify(interaction) {
 
     const lines = [];
     for (const [ping, on] of Object.entries(changes)) {
-      if ((ping === 'calls' || ping === 'streams') && on && !linkedPlayer(id)) {
-        lines.push(`${ping === 'calls' ? 'Match call' : 'Stream alert'} pings need their start.gg. Ask them to run \`/link\` with their profile link.`);
+      if ((ping === 'calls' || ping === 'streams' || ping === 'dq_warnings') && on && !linkedPlayer(id)) {
+        const label = ping === 'calls' ? 'Match call' : ping === 'streams' ? 'Stream alert' : 'DQ warning';
+        lines.push(`${label} pings need their start.gg. Ask them to run \`/link\` with their profile link.`);
         continue;
       }
       const list = PINGS[ping].list;
@@ -438,8 +473,8 @@ async function notify(interaction) {
 
   const lines = [];
   for (const [ping, on] of Object.entries(changes)) {
-    if ((ping === 'calls' || ping === 'streams') && on && !me) {
-      const label = ping === 'calls' ? 'Match call' : 'Stream alert';
+    if ((ping === 'calls' || ping === 'streams' || ping === 'dq_warnings') && on && !me) {
+      const label = ping === 'calls' ? 'Match call' : ping === 'streams' ? 'Stream alert' : 'DQ warning';
       lines.push(self
         ? `${label} pings need your start.gg, so \`/link\` first. Leave out the link and it finds yours.`
         : `${label} pings need their start.gg. Ask them to run \`/link\` with their profile link.`);
@@ -474,4 +509,4 @@ async function notify(interaction) {
   return interaction.editReply(lines.join('\n'));
 }
 
-export { configureMessages, socialsAdd, socialsRemove, trackPosts, notify };
+export { configureMessages, socialsAdd, socialsRemove, trackPosts, notify, callsTiming };

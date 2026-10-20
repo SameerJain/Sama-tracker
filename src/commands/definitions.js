@@ -214,6 +214,15 @@ export const commands = [
         description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. T.O.s only',
         options: [{ type: Option.Boolean, name: 'no_discord', description: 'Also untrack players with no Discord connected on start.gg' }],
       },
+      {
+        type: Option.Subcommand,
+        name: 'calls',
+        description: 'Match call DQ warning timing. Leave both out to see it. T.O.s only',
+        options: [
+          { type: Option.Integer, name: 'warn', description: 'Warn after this many minutes when a called set still hasn\'t started', min_value: 1, max_value: 29 },
+          { type: Option.Integer, name: 'dq', description: 'Expected DQ time in minutes, named in the warning', min_value: 2, max_value: 30 },
+        ],
+      },
     ],
   },
   {
@@ -224,6 +233,7 @@ export const commands = [
       playerOption('Tracked player or all, leave out for yourself. Someone else needs a TO', 'player', false),
       switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('streams', 'When your set is on stream. Needs you linked, or tracked with Discord on start.gg'),
+      switchOption('dq_warnings', 'Warn you again if your called set still hasn\'t started. Needs match calls on too'),
       switchOption('registration', 'Reg Reminders role and its pings for tracked tournaments'),
       switchOption('dm_registration', 'DM 1 hour before registration closes, with link, location and image'),
       switchOption('dm_start', 'DM 1 hour before the tournament starts, with link, location and image'),

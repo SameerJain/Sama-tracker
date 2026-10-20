@@ -1,7 +1,7 @@
 import { EmbedBuilder, escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
 import {
-  colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, MAJOR_UPSET, shortRecord, count, venueText, mapUrl,
+  colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, MAJOR_UPSET, shortRecord, count, venueText, mapUrl, bold,
 } from './shared.js';
 
 function tournamentEmbed(color, label, tournament) {
@@ -313,13 +313,26 @@ function registeredByEvent(entries, members) {
   return lines;
 }
 
-// one embed per event, best placement first
+// one embed per event, best placement first. notable upset wins saved while sets posted go under the placements
 export function results(tournament, players) {
   return groupByEvent(tournament, players).flatMap((entries) => {
     entries.sort((a, b) => (a.placement ?? Infinity) - (b.placement ?? Infinity));
+    const lines = entries.map(placementText);
+    const upsets = (tournament.notableUpsets ?? []).filter((upset) => upset.eventSlug === entries[0].eventSlug)
+      .sort((a, b) => b.factor - a.factor).slice(0, 3).map((upset) => upsetText(upset, players));
+    if (upsets.length) lines.push('', ...upsets);
     return withLines(tournamentEmbed(colors.results, `Results · ${eventTitle(entries[0])}`, tournament)
-      .setTitle(`Tracked players' results from ${escapeMarkdown(tournament.name)}`.slice(0, 256)), entries.map(placementText));
+      .setTitle(`Tracked players' results from ${escapeMarkdown(tournament.name)}`.slice(0, 256)), lines);
   });
+}
+
+// a tracked player's notable upset win. the loser links too when they're also tracked
+function upsetText(upset, players) {
+  const winner = players[upset.winnerUserId] ? playerLink(players[upset.winnerUserId]) : bold(upset.winnerName);
+  const loser = upset.loserUserId && players[upset.loserUserId] ? playerLink(players[upset.loserUserId]) : bold(upset.loserName);
+  const score = upset.winnerScore == null || upset.loserScore == null ? '' : ` ${upset.winnerScore}-${upset.loserScore}`;
+  const round = upset.round ? ` · [${escapeMarkdown(upset.round)}](${startggUrl(`${upset.eventSlug}/set/${upset.setId}`)})` : '';
+  return `**Notable upset:** ${winner} beat ${loser} (seed ${upset.loserSeed})${score} as seed ${upset.winnerSeed}${round}`;
 }
 
 // the event's own top 8, everyone in it whether they're tracked or not. one card per event

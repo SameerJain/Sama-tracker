@@ -11,7 +11,7 @@ import { progress, scout, headToHead, stats, doubles, characters, predict, predi
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
-import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
+import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify, callsTiming } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag } from './shared.js';
@@ -47,6 +47,7 @@ const handlers = new Map([
   ['track list', (interaction) => sendEmbeds(interaction, embeds.trackedList(state.players, Object.keys(pickable()).length - Object.keys(state.players).length, state.tournaments))],
   ['track posts', trackPosts],
   ['t-o cleanup', trackCleanup],
+  ['t-o calls', callsTiming],
   ['t-o role add', toAdd],
   ['t-o role set', toSet],
   ['t-o role remove', toRemove],

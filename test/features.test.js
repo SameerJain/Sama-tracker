@@ -627,7 +627,10 @@ test('recap includes spanning-week finishes, excludes inactive players, and pers
     if (query.includes('nodes { id }')) return playedThisWeek(query, [10, 30]);
     if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [{ ...event, startAt: until - 8 * 86400, state: 'COMPLETED', userEntrant: { initialSeedNum: 9, standing: { placement: 5 } } }] } } };
     histories.push(variables.id);
-    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [node('weekly', until - 10, variables.id, variables.id === 30)] } } };
+    const set = node('weekly', until - 10, variables.id, variables.id === 30);
+    // seed 17 over seed 2 is a major upset, the kind the recap calls notable
+    set.slots[0].entrant.initialSeedNum = 17;
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [set] } } };
   });
   const sent = [];
   const channel = { send: async r => sent.push(r) };
@@ -638,7 +641,7 @@ test('recap includes spanning-week finishes, excludes inactive players, and pers
   assert.match(text, /Active/);
   assert.match(text, /Next local/);
   assert.match(text, /Late Sunday/);
-  assert.match(text, /Biggest upset/);
+  assert.match(text, /Notable upset/);
   assert.match(text, /Best finish/);
   assert.doesNotMatch(text, /Inactive|DQ-only|Following week/);
   assert.deepEqual(histories.sort(), [10, 30]);
@@ -646,6 +649,35 @@ test('recap includes spanning-week finishes, excludes inactive players, and pers
   mockApi(() => assert.fail('A completed recap must not be fetched again'));
   await postWeeklyRecap(channel, until + 60);
   assert.equal(sent.length, 1);
+});
+
+test('recap only calls major upset wins notable, and leaves out small ones and losses', async () => {
+  const until = Date.parse('2026-10-26T01:00:00Z') / 1000;
+  const weekly = (seed, won) => {
+    const set = node(`weekly-${seed}-${won}`, until - 10, 10);
+    set.slots[0].entrant.initialSeedNum = seed;
+    set.slots[1].entrant.initialSeedNum = 2;
+    // won means slot 0 takes it, otherwise slot 1 does
+    set.winnerId = won ? 10 : 99;
+    return set;
+  };
+  const textFor = async (sets) => {
+    state.weeklyRecap = undefined;
+    state.players = { 1: crewPlayer };
+    state.tournaments = {};
+    mockApi(({ query }) => {
+      if (query.includes('nodes { id }')) return playedThisWeek(query, [10]);
+      if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+      return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: sets } } };
+    });
+    const sent = [];
+    await postWeeklyRecap({ send: async (r) => sent.push(r) }, until);
+    return sent.flatMap((r) => r.embeds.map((e) => (e.data ?? e).description)).join('\n');
+  };
+  // seed 17 over seed 2 is major, seed 9 over seed 2 is short of it
+  assert.match(await textFor([weekly(17, true)]), /Notable upset/);
+  assert.doesNotMatch(await textFor([weekly(9, true)]), /Notable upset/);
+  assert.doesNotMatch(await textFor([weekly(17, false)]), /Notable upset/);
 });
 
 test('recap retries unfinished message batches without reposting successful batches', async () => {
@@ -705,6 +737,69 @@ test('tournament roll calls and placements disable mentions', async () => {
   assert.deepEqual(sent.map(({ allowedMentions }) => allowedMentions), [{ parse: [] }, { parse: [] }]);
   assert.equal(sent[0].embeds[0].data.title, 'Tournament roll call · Local');
   assert.equal(sent[1].embeds[0].data.title, "Tracked players' results from Local");
+});
+
+test('results list notable upset wins, including tracked vs tracked, and skip losses and small ones', () => {
+  const players = {
+    1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active' },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival' },
+  };
+  const entries = [
+    { userId: 1, event: 'Singles', eventSlug: event.slug, entrants: 32, started: true, placement: 5, final: true },
+    { userId: 2, event: 'Singles', eventSlug: event.slug, entrants: 32, started: true, placement: 9, final: true },
+  ];
+  const upset = (setId, winnerUserId, loserUserId, winnerSeed, loserSeed) => ({
+    setId, winnerUserId, winnerName: players[winnerUserId].tag, winnerSeed,
+    loserUserId, loserName: players[loserUserId].tag, loserSeed,
+    winnerScore: 3, loserScore: 1, eventSlug: event.slug, round: 'Winners round 1', factor: 7,
+  });
+  // tracked vs tracked still shows as the winner's upset
+  const [card] = embeds.results({ name: 'Local', slug: 'tournament/local', entries, notableUpsets: [upset('s1', 1, 2, 17, 2)] }, players);
+  assert.match(card.data.description, /\*\*Notable upset:\*\*.*Active.*Rival.*seed 2.*3-1.*seed 17/);
+  // nothing saved means no upset line at all
+  const [plain] = embeds.results({ name: 'Local', slug: 'tournament/local', entries }, players);
+  assert.doesNotMatch(plain.data.description, /Notable upset/);
+});
+
+test('the set check saves notable upset wins per tournament, and skips losses, small ones, doubles and DQs', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = {
+    1: { ...crewPlayer, lastCheck: now - 120 },
+    2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastCheck: now - 120 },
+  };
+  state.tournaments = { 5: { id: 5, name: 'Local', slug: 'tournament/local', startAt: now - 3600, endAt: now + 3600, entries: [] } };
+  state.messages = {};
+  state.posted = [];
+  state.dqs = [];
+  const major = { ...node('major-win', now - 60), state: 3 };
+  major.slots[0].entrant.initialSeedNum = 17;
+  major.slots[1].entrant.initialSeedNum = 2;
+  // slot 0 (Active) beats slot 1, factor 7
+  const small = { ...node('small-win', now - 60), state: 3 };
+  // Active seeded 2 loses to seed 17: major the other way, but a loss so it stays out
+  const lost = { ...node('major-loss', now - 60), state: 3, winnerId: 99 };
+  lost.slots[0].entrant.initialSeedNum = 2;
+  lost.slots[1].entrant.initialSeedNum = 17;
+  const doubles = { ...node('doubles-win', now - 60), state: 3 };
+  doubles.slots[0].entrant.initialSeedNum = 17;
+  doubles.slots[0].entrant.participants.push({ player: { id: 20 } });
+  doubles.slots[0].playerIds = [10, 20];
+  const dq = { ...node('dq-win', now - 60), state: 3 };
+  dq.slots[0].entrant.initialSeedNum = 17;
+  dq.slots[0].standing.stats.score.value = -1;
+  for (const set of [major, small, lost, doubles, dq]) {
+    set.event = { ...event, tournament: { name: 'Local', slug: 'tournament/local' } };
+  }
+  mockApi(() => ({ p10: { sets: { nodes: [major, small, lost, doubles, dq] } }, p20: { sets: { nodes: [] } } }));
+  await tracker.postNewSets({ send: async () => ({}) });
+  const saved = state.tournaments[5].notableUpsets ?? [];
+  assert.deepEqual(saved.map((upset) => upset.setId), ['major-win']);
+  assert.equal(saved[0].winnerUserId, 1);
+  const [card] = embeds.results(
+    { name: 'Local', slug: 'tournament/local', entries: [{ userId: 1, event: 'Singles', eventSlug: event.slug, placement: 1, final: true }], notableUpsets: saved },
+    state.players,
+  );
+  assert.match(card.data.description, /Notable upset/);
 });
 
 test('roll calls link the streams on the tournament page, and post without them if that fails', async () => {

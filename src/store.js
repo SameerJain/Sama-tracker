@@ -6,14 +6,14 @@ export const stateDir = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUN
 const FILE = `${stateDir}/state.json`;
 
 // players are keyed by start.gg user id. posted/streamed/called/dqs are ids already announced.
-// regPings, streamPings and callPings are discord ids that turned on /notify registration, streams or calls. regDmPings and startDmPings are the 1-hour
+// regPings, streamPings, callPings and dqWarnPings are discord ids that turned on /notify registration, streams, calls or DQ warnings. regDmPings and startDmPings are the 1-hour
 // DM versions for registration and the start.
 // toRole is the TO role: { id, members, seeded }, id being the discord role, members the discord ids the bot has seen with it, for /t-o role list,
 // and seeded whether the first TO got it.
 // tournaments are keyed by id: the ones tracked players are in, and tracked ones. tracked: { by, at, sets, stream, top8, reminders } says it's tracked,
 // by being 'manual', or 'admin' from before the TO role, and the rest its /t-o tournament posts switches. schedule is the TO's custom
 // reminder times in hours before registration closes, most first, when it's not the default. reminder: { deadline, next } is its reg reminder progress, next being the
-// index into that schedule. dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for. events are all its events from start.gg. crew is the registered server members who aren't tracked,
+// index into that schedule. dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for. events are all its events from start.gg. notableUpsets are tracked players' major upset wins saved while sets posted, for the results card. crew is the registered server members who aren't tracked,
 // keyed by user id as { userId, slug, tag }, so cards can name them. lastCheck is when its sets were last checked, the way it is on a player.
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
 // accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.
@@ -49,7 +49,7 @@ const FILE = `${stateDir}/state.json`;
 // its image bytes, which get downloaded again on restore. billsMeta is the bills rotation across restarts:
 // { lastImage, kinds }, so the no-repeat and even photo/gif rotation survive one too
 const empty = {
-  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
+  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], dqWarnPings: [], regDmPings: [], startDmPings: [],
   toRole: { id: null, members: [], seeded: false },
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
    resultPosts: [], callPosts: [], streamPinged: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},

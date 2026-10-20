@@ -389,7 +389,7 @@ test('/t-o tournament posts sets, shows and clears a custom reminder schedule', 
 
 test('reminder schedules read hours and days, most first, and reject nonsense', async () => {
   const { parseSchedule } = await import('../src/commands/tournaments.js');
-  const { shortSchedule } = await import('../src/tracker.js');
+  const { shortSchedule } = await import('../src/embeds/shared.js');
   assert.deepEqual(parseSchedule('7d,3d,1d,6h'), [168, 72, 24, 6]);
   assert.deepEqual(parseSchedule('6h, 7d'), [168, 6]);
   assert.deepEqual(parseSchedule('48'), [48]);

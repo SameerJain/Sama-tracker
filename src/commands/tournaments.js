@@ -4,8 +4,9 @@ import { state, save } from '../store.js';
 import { ensureDiscordEvent } from '../discord-events.js';
 import {
   MAX_REMINDER_HOURS, MAX_REMINDERS, REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, missingThreadPermissions, nextRegReminder, regDeadline,
-  reminderSchedule, secondsNow, shortSchedule, trackTournament,
+  reminderSchedule, secondsNow, trackTournament,
 } from '../tracker.js';
+import { shortSchedule } from '../embeds/shared.js';
 import { lookup, replyEphemeral } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
 import { isTO, notTO } from './to.js';

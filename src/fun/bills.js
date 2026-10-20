@@ -14,6 +14,16 @@ const CATEGORIES = [
   'Jim Kelly', 'Thurman Thomas', 'Andre Reed', 'Bruce Smith (defensive end)',
   'Marv Levy', 'Sean McDermott', 'Damar Hamlin', 'Tyler Bass',
 ];
+// files in the categories that aren't Bills photos. the Damar Hamlin category holds a
+// Miss Black Michigan pageant photo from a charity event he attended, so it gets blocked
+const BLOCKED_FILES = new Set([`miss black michigan usa 2024 and chasing m's.jpg`]);
+
+// a commons File: title, description url or saved file name, to the blocked file name when it matches
+function blockedFile(title) {
+  const file = String(title).split('/').pop().replaceAll('_', ' ').toLowerCase().replaceAll('’', "'");
+  return BLOCKED_FILES.has(file.startsWith('file:') ? file.slice(5) : file);
+}
+
 // a small fallback if the official Bills channel is down
 const FALLBACK_GIFS = [
   ['zw3lIgxdVc0I6JMJ1x', 'Josh Allen hello'],
@@ -95,6 +105,7 @@ export async function billsImagePool() {
 
   const images = pages.flatMap((page) => {
     const info = page.imageinfo?.[0];
+    if (blockedFile(page.title)) return [];
     if (!info?.mime?.startsWith('image/') || info.mime === 'image/svg+xml' || !info.thumburl) return [];
     return [{
       name: page.title.replace(/^File:/, '').replace(/\.[^.]+$/, '').replaceAll('_', ' '),
@@ -251,6 +262,7 @@ function restore() {
   for (const entry of saved.slice(-QUEUE_SIZE)) {
     const { id, title, name, image, page, source } = entry ?? {};
     if (typeof id !== 'number' || typeof title !== 'string' || typeof image !== 'string') continue;
+    if (blockedFile(page ?? image)) continue;
     kept.push({ id, title, name, image, page, source });
     nextId = Math.max(nextId, id + 1);
     const pending = download(image).then(
