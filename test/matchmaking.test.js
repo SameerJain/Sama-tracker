@@ -15,6 +15,7 @@ after(() => rmSync(directory, { recursive: true, force: true }));
 
 beforeEach(() => {
   state.matchmaking = {};
+  state.matchmakingThreads = [];
 });
 
 // a server with these roles. made is what the bot asked discord to create
@@ -67,7 +68,7 @@ async function run(commandName, { guild = server(), member = person(), values = 
       startThread: async (options) => {
         if (threadFail) throw threadFail;
         threads.push(options);
-        return {};
+        return { id: `match-thread-${threads.length}` };
       },
     }),
     followUp: async (result) => {
@@ -231,10 +232,15 @@ test('thread:True starts a thread on the ping, left out it sends none', async ()
   const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }]);
   const member = { ...person(['melee-role']), displayName: 'Sam' };
 
+  const before = Math.floor(Date.now() / 1000);
   const withThread = await run('matchmaking_search', { guild, member, values: { game: 'melee', thread: true }, user: { id: 'me-discord', username: 'Sam' } });
   assert.equal(withThread[0][1].content, '<@&melee-role>');
   assert.equal(withThread.threads.length, 1);
   assert.equal(withThread.threads[0].name, 'Melee games with Sam');
+  assert.equal(state.matchmakingThreads.length, 1);
+  assert.equal(state.matchmakingThreads[0].id, 'match-thread-1');
+  assert.ok(state.matchmakingThreads[0].at >= before);
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmakingThreads, state.matchmakingThreads);
 
   const withoutThread = await run('matchmaking_search', { guild, member, values: { game: 'melee' } });
   assert.equal(withoutThread[0][1].content, '<@&melee-role>');

@@ -803,7 +803,7 @@ async function unpinThreadRef(postChannel, ref) {
 // the first post for a tournament, or for an event when byEvent, puts a card with its name in the channel and
 // starts the thread on it. saved by slug, since sets don't come with the tournament id, so a restart keeps using
 // the same one. event slugs start with their tournament's, so both kinds share state.threads without clashing.
-// a tournament thread pins its card so the thread stays easy to find, and unpinFinishedThreads takes it off once over
+// each thread pins its card so it stays easy to find, and unpinFinishedThreads takes it off once over
 async function tournamentThread(event, byEvent, postChannel) {
   const { tournament } = event;
   const slug = byEvent ? event.slug : tournament.slug;
@@ -839,7 +839,7 @@ async function tournamentThread(event, byEvent, postChannel) {
   }
   state.threads = Object.fromEntries(Object.entries(state.threads).filter(([, each]) => each.at > now - THREAD_KEPT_DAYS * DAY));
   const entry = { id: thread.id, at: now };
-  if (!byEvent && card?.id) {
+  if (card?.id) {
     entry.channelId = card.channelId ?? postChannel.id;
     entry.messageId = card.id;
     entry.pinned = await pinThreadCard(card, tournament);
@@ -868,10 +868,11 @@ export async function unpinFinishedThreads(postChannel = channel) {
       changed = true;
       continue;
     }
-    const tournament = Object.values(state.tournaments).find((each) => each.slug === slug);
+    const tournament = Object.values(state.tournaments).find((each) => each.slug === slug || slug.startsWith(`${each.slug}/event/`));
     // not tracked yet, or already pruned. deletions unpin on the way out, so this waits
     if (!tournament) continue;
-    if (!tournament.resultsPosted && now <= endTime(tournament) + RUNS_LATE_HOURS * HOUR) continue;
+    const event = tournament.events?.find((each) => each.slug === slug);
+    if (event ? event.state !== 'COMPLETED' : !tournament.resultsPosted && now <= endTime(tournament) + RUNS_LATE_HOURS * HOUR) continue;
     try {
       await unpinThreadRef(postChannel, entry);
     } catch (err) {

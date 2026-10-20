@@ -249,7 +249,7 @@ test('stream alerts and their pings go in the tournament thread', async () => {
   assert.deepEqual(thread.sent[0].allowedMentions, { users: ['fan'] });
 });
 
-test('tournament threads pin their channel card, event threads do not', async () => {
+test('tournament and event threads pin their channel cards', async () => {
   const channel = fakeChannel();
   sets = [node('a1', now() - 30, tournament('Local'))];
   await tracker.postNewSets(channel);
@@ -264,8 +264,11 @@ test('tournament threads pin their channel card, event threads do not', async ()
   const eventChannel = fakeChannel();
   sets = [node('s1', now(), tournament('Local'))];
   await tracker.postNewSets(eventChannel);
-  assert.deepEqual(eventChannel.pinned, []);
-  assert.equal(state.threads['tournament/local/event/singles'].pinned, undefined);
+  assert.deepEqual(eventChannel.pinned, ['card-1']);
+  const eventEntry = state.threads['tournament/local/event/singles'];
+  assert.equal(eventEntry.messageId, 'card-1');
+  assert.equal(eventEntry.channelId, 'posts');
+  assert.equal(eventEntry.pinned, true);
 });
 
 test('a thread still posts when pinning fails', async () => {
@@ -297,6 +300,24 @@ test('a pinned starter is unpinned once its tournament is over', async () => {
 
   // already off, so nothing more to unpin
   await tracker.unpinFinishedThreads(channel);
+  assert.deepEqual(channel.unpinned, ['card-1']);
+});
+
+test('a pinned event starter is unpinned once its event is over', async () => {
+  state.messages = { threads: 'event' };
+  const channel = fakeChannel();
+  sets = [node('a1', now() - 30, tournament('Local'))];
+  await tracker.postNewSets(channel);
+  const entry = state.threads['tournament/local/event/singles'];
+  assert.equal(entry.pinned, true);
+
+  state.tournaments = { 5: trackedLocal() };
+  await tracker.unpinFinishedThreads(channel);
+  assert.equal(entry.pinned, true);
+
+  state.tournaments[5].events[0].state = 'COMPLETED';
+  await tracker.unpinFinishedThreads(channel);
+  assert.equal(entry.pinned, false);
   assert.deepEqual(channel.unpinned, ['card-1']);
 });
 

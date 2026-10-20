@@ -31,7 +31,8 @@ const FILE = `${stateDir}/state.json`;
 // an empty top8 list with top8Posted unset means nothing was reported yet, and the final goes out as a new message once every event is finished.
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
-// matchmaking is the discord role id of each game's matchmaking role, keyed ult and melee, so a role renamed in server settings still counts
+// matchmaking is the discord role id of each game's matchmaking role, keyed ult and melee, so a role renamed in server settings still counts.
+// matchmakingThreads are { id, at } for threads the bot deletes 24 hours after /matchmaking_search made them.
 // discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, from /t-o tournament event, /t-o tournament add
 // with add_event or /messages events, so every path lands on the same one: { eventId, slug, startAt, synced, gone }. synced is start.gg's side
 // as of the last sync, null until one ran, and gone means a mod deleted it, it started or start.gg deleted the tournament, so it's left alone
@@ -40,7 +41,7 @@ const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
   toRole: { id: null, members: [], seeded: false },
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
-  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {}, discordEvents: {},
+  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingThreads: [], discordEvents: {},
 };
 
 function load() {

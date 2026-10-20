@@ -86,7 +86,11 @@ async function matchmakingSearch(interaction) {
   try {
     const message = await interaction.fetchReply();
     const name = interaction.member?.displayName ?? interaction.user?.username ?? 'someone';
-    await message.startThread({ name: `${label} games with ${name}`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
+    const thread = await message.startThread({ name: `${label} games with ${name}`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
+    if (thread?.id) {
+      state.matchmakingThreads.push({ id: thread.id, at: Math.floor(Date.now() / 1000) });
+      save();
+    }
   } catch (err) {
     console.error('starting a matchmaking thread failed:', err.message);
     await interaction.followUp({ content: 'Posted your search, but I couldn\'t start a thread here. A server admin can turn on **Create Public Threads** and **Send Messages in Threads** for this channel.', flags: MessageFlags.Ephemeral }).catch(() => {});
