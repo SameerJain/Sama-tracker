@@ -17,11 +17,12 @@ const FILE = `${stateDir}/state.json`;
 // links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
 // accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.
 // messages holds the /messages switches and recap schedule. weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
-// deploy is the railway deployment that last started: { id, at }, with at the first time it started.
+// deploy is the railway deployment that last started: { id, at, message? }, with at the first time it started
+// and message the first line of RAILWAY_GIT_COMMIT_MESSAGE, for the bot update post. no commit id
 // slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from the last check and
 // userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back.
 // threads are the threads from /messages threads, keyed by tournament slug, or event slug for one per event: { id, at }, with at when it was started.
-// a tournament thread also saves its channel card as { channelId, messageId, pinned }, pinned saying if the pin worked, so it comes off once the tournament is over.
+// each thread also saves its channel card as { channelId, messageId, pinned }, pinned saying if the pin worked, so it comes off once the tournament or event is over.
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
 // buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }, with at when it was sent
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
@@ -32,6 +33,8 @@ const FILE = `${stateDir}/state.json`;
 // a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
 // regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
 // matchmaking is the discord role id of each game's matchmaking role, keyed ult and melee, so a role renamed in server settings still counts.
+// matchmakingExpiry are timed roles from /matchmaking_role duration, keyed by discord id and game as
+// `discordId:game` to unix seconds when the role comes off, so a restart doesn't cancel them.
 // matchmakingThreads are { id, at } for threads the bot deletes 24 hours after /matchmaking_search made them.
 // discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, from /t-o tournament event, /t-o tournament add
 // with add_event or /messages events, so every path lands on the same one: { eventId, slug, startAt, synced, gone }. synced is start.gg's side
@@ -41,7 +44,7 @@ const empty = {
   players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
   toRole: { id: null, members: [], seeded: false },
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
-  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingThreads: [], discordEvents: {},
+  resultPosts: [], callPosts: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
 };
 
 function load() {

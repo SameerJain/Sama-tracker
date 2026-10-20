@@ -10,6 +10,7 @@ import { messageEnabled, messageSettings, setResultColors } from './message-sett
 import { rememberAccounts, serverMembers } from './accounts.js';
 import { cantMakeEvents, ensureDiscordEvent, syncDiscordEvents } from './discord-events.js';
 import { buttonRow, h2hButton, linkedPlayer } from './commands/shared.js';
+import { checkMatchmakingExpiry } from './commands/matchmaking.js';
 
 const SET_CHECK_MINUTES = 2;
 const TOURNAMENT_CHECK_MINUTES = 15;
@@ -91,12 +92,15 @@ export const health = {
 let channel;
 
 // railway gives each deploy an id but no time, so the first start under a new id is when it went live.
-// railway restarting the same deploy keeps that time
+// railway restarting the same deploy keeps that time. the commit message goes with it for the bot
+// update post. no commit id anywhere, the date and message are enough
 export function recordDeploy(env = process.env) {
   const id = env.RAILWAY_DEPLOYMENT_ID;
-  if (!id || state.deploy?.id === id) return;
-  state.deploy = { id, at: secondsNow() };
+  if (!id || state.deploy?.id === id) return null;
+  const message = String(env.RAILWAY_GIT_COMMIT_MESSAGE ?? '').split('\n')[0].trim().slice(0, 200);
+  state.deploy = message ? { id, at: secondsNow(), message } : { id, at: secondsNow() };
   save();
+  return state.deploy;
 }
 
 // when the running version went live. a local run has none, so it never shows railway's
@@ -104,9 +108,19 @@ export function deployedAt(env = process.env) {
   return env.RAILWAY_DEPLOYMENT_ID && state.deploy?.id === env.RAILWAY_DEPLOYMENT_ID ? state.deploy.at : null;
 }
 
+// a new railway deployment going live, once. the id is already saved, so a restart won't repeat it
+export async function postDeployUpdate(postChannel = channel, deploy = state.deploy) {
+  if (!deploy) return;
+  try {
+    await postChannel.send({ embeds: embeds.withImage([embeds.deployUpdate(deploy)]), allowedMentions: { parse: [] } });
+  } catch (err) {
+    console.error('posting the bot update failed:', err.message);
+  }
+}
+
 export function startTracking(postChannel) {
   channel = postChannel;
-  recordDeploy();
+  const deployed = recordDeploy();
 
   // lastCheck only moves while it's running, so the oldest one is when it went down.
   // Infinity with nobody tracked
@@ -127,6 +141,8 @@ export function startTracking(postChannel) {
   }
   migrateTracking();
   save();
+  // a new railway deployment posts once, before the checks start their own posts
+  if (deployed) postDeployUpdate(postChannel, deployed).catch(console.error);
 
   checkTournaments();
   checkSets();
@@ -139,6 +155,7 @@ export function startTracking(postChannel) {
   loopBills();
   checkPrune();
   checkDiscordEvents();
+  checkMatchmaking();
   setInterval(checkDiscordEvents, EVENT_SYNC_MINUTES * 60 * 1000);
   setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
   setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
@@ -149,6 +166,7 @@ export function startTracking(postChannel) {
   setInterval(checkSlippiRanks, SLIPPI_CHECK_MINUTES * 60 * 1000);
   setInterval(checkPrune, PRUNE_CHECK_DAYS * DAY * 1000);
   setInterval(checkWeeklyRecap, 60 * 1000);
+  setInterval(checkMatchmaking, 60 * 1000);
 }
 
 // saved from before tournaments could be tracked. a reg reminder becomes a tracked tournament with reminders
@@ -287,6 +305,8 @@ const checkSlippiCodes = queued(findSlippiCodes);
 const checkSlippiRanks = queued(postRankChanges);
 const checkPrune = queued(pruneInactive);
 const checkDiscordEvents = queued(() => syncDiscordEvents(channel?.guild));
+// discord only, no start.gg, but queued keeps one run at a time like the rest
+const checkMatchmaking = queued(() => checkMatchmakingExpiry(channel?.guild));
 
 // Bills runs on its own loop below since game day polls tighter than the baseline
 let billsRunning = false;
@@ -849,7 +869,7 @@ async function tournamentThread(event, byEvent, postChannel) {
   return thread;
 }
 
-// pinned tournament starters whose tournament is over get unpinned. over means past the end plus time
+// pinned tournament and event starters whose tournament or event is over get unpinned. over means past the end plus time
 // for locals running late, or placements already posted for a TO with a far-out end date
 export async function unpinFinishedThreads(postChannel = channel) {
   if (!postChannel?.client) return;
@@ -885,17 +905,22 @@ export async function unpinFinishedThreads(postChannel = channel) {
   if (changed) save();
 }
 
-// a tournament going away takes its pin off first, so deleted and unpublished ones don't stay pinned
-async function unpinTournamentThread(postChannel, tournament) {
-  const entry = state.threads[tournament.slug];
-  if (!entry?.pinned || !entry.messageId || !(postChannel ?? channel)?.client) return;
-  try {
-    await unpinThreadRef(postChannel ?? channel, entry);
-  } catch (err) {
-    console.error(`unpinning the thread starter for ${tournament.name} failed:`, err.message);
-    return;
+// a tournament going away takes its pins off first, so deleted and unpublished ones don't stay pinned.
+// that covers its event threads too, since unpinFinishedThreads skips tournaments that are gone
+export async function unpinTournamentThread(postChannel, tournament) {
+  if (!(postChannel ?? channel)?.client) return;
+  const prefix = `${tournament.slug}/event/`;
+  for (const [slug, entry] of Object.entries(state.threads)) {
+    if (slug !== tournament.slug && !slug.startsWith(prefix)) continue;
+    if (!entry?.pinned || !entry.messageId) continue;
+    try {
+      await unpinThreadRef(postChannel ?? channel, entry);
+    } catch (err) {
+      console.error(`unpinning the thread starter for ${tournament.name} failed:`, err.message);
+      continue;
+    }
+    entry.pinned = false;
   }
-  entry.pinned = false;
 }
 
 // discord caps thread names at 100. a long tournament name gets cut before the event's, which tells the threads apart

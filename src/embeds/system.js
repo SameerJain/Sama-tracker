@@ -95,6 +95,13 @@ export function status(info) {
   return baseEmbed(colors.brand).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
 
+// a new railway deployment going live, with when it deployed and the commit message. no commit id
+export function deployUpdate(deploy) {
+  const lines = [`**Latest version deployed:** <t:${deploy.at}:R>`];
+  if (deploy.message) lines.push(escapeMarkdown(deploy.message));
+  return baseEmbed(colors.brand).setTitle('Bot updated').setDescription(lines.join('\n'));
+}
+
 // a /matchmaking_search ping. a mention in a card never pings, so this one is just a name to click
 export function matchmaking({ label, color, discordId, avatar, message }) {
   const lines = [`<@${discordId}> is looking for ${label} games.`];
@@ -190,7 +197,7 @@ export function help(verbose = false) {
     ],
     [
       '**Matchmaking**',
-      '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it',
+      '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many minutes, then it comes off on its own',
       '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them. Only people with the role can',
       '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it',
     ],
@@ -263,6 +270,7 @@ export function help(verbose = false) {
       '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg',
       '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',
       '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
+      '**Bot updates.** A new version going live on Railway, with when it deployed and the commit message',
       '-# Tracked tournaments post their set results and stream alerts in a thread. `/messages threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here',
     ],
   ];

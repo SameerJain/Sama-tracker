@@ -1295,22 +1295,45 @@ test('the set check sends nothing to start.gg when nobody has set results on', a
 test('a new deploy saves when it first started, and a restart of the same one keeps that time', (t) => {
   state.deploy = null;
   t.mock.timers.enable({ apis: ['Date'], now: 1_000_000_000 });
-  tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd1' });
+  assert.deepEqual(tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd1' }), { id: 'd1', at: 1_000_000 });
   assert.deepEqual(state.deploy, { id: 'd1', at: 1_000_000 });
   assert.equal(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).deploy.id, 'd1');
 
   t.mock.timers.tick(60_000);
-  tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd1' });
+  assert.equal(tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd1' }), null);
   assert.equal(state.deploy.at, 1_000_000);
-  tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd2' });
-  assert.deepEqual(state.deploy, { id: 'd2', at: 1_000_060 });
+  assert.deepEqual(tracker.recordDeploy({ RAILWAY_DEPLOYMENT_ID: 'd2', RAILWAY_GIT_COMMIT_MESSAGE: 'Fixed a few bugs\nmore detail' }), { id: 'd2', at: 1_000_060, message: 'Fixed a few bugs' });
+  assert.deepEqual(state.deploy, { id: 'd2', at: 1_000_060, message: 'Fixed a few bugs' });
 
   // a local run has no deploy id, so it leaves the server's alone and doesn't show it
-  tracker.recordDeploy({});
+  assert.equal(tracker.recordDeploy({}), null);
   assert.equal(state.deploy.id, 'd2');
   assert.equal(tracker.deployedAt({}), null);
   assert.equal(tracker.deployedAt({ RAILWAY_DEPLOYMENT_ID: 'd1' }), null);
   assert.equal(tracker.deployedAt({ RAILWAY_DEPLOYMENT_ID: 'd2' }), 1_000_060);
+});
+
+test('a bot update posts the date and commit message, never the commit id', async () => {
+  const card = embeds.deployUpdate({ id: 'd2', at: 90, message: 'Fixed a few bugs' });
+  assert.equal(card.data.title, 'Bot updated');
+  assert.match(card.data.description, /\*\*Latest version deployed:\*\* <t:90:R>/);
+  assert.match(card.data.description, /Fixed a few bugs/);
+  assert.doesNotMatch(card.data.description, /d0beb8f5/);
+
+  const plain = embeds.deployUpdate({ id: 'd3', at: 91 });
+  assert.match(plain.data.description, /<t:91:R>/);
+  assert.doesNotMatch(plain.data.description, /\n/);
+
+  const sent = [];
+  const channel = { send: async (payload) => { sent.push(payload); return { id: 'm1', channelId: 'c1' }; } };
+  await tracker.postDeployUpdate(channel, { id: 'd2', at: 90, message: 'Fixed a few bugs' });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].allowedMentions, { parse: [] });
+  assert.equal(sent[0].embeds[0].data.title, 'Bot updated');
+  assert.match(sent[0].embeds[0].data.description, /Fixed a few bugs/);
+
+  // a failed send logs instead of throwing, and the deploy id stays saved so it won't repeat
+  await tracker.postDeployUpdate({ send: async () => { throw new Error('down'); } }, { id: 'd2', at: 90 });
 });
 
 test('/status shows when the latest version was deployed, and a local run shows its computer instead', () => {
@@ -1520,7 +1543,7 @@ test('/help is one short card by default, and verbose lists every command', () =
     assert.ok(card.data.description.endsWith(`\n${page}`));
   }
   const text = cards.map(card => card.data.description).join('\n');
-  for (const title of ['Set results', 'Stream alerts', 'Match call pings', 'Tournament roll calls', 'Tournament placements', 'Top 8s', 'Registration reminders', 'Slippi rank changes', 'Bills final results', 'Weekly crew recap']) {
+  for (const title of ['Set results', 'Stream alerts', 'Match call pings', 'Tournament roll calls', 'Tournament placements', 'Top 8s', 'Registration reminders', 'Slippi rank changes', 'Bills final results', 'Weekly crew recap', 'Bot updates']) {
     assert.match(text, new RegExp(`\\*\\*${title}\\.\\*\\*`));
   }
   for (const { name, type } of commands) {

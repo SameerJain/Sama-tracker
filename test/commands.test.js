@@ -272,6 +272,7 @@ const runs = [
   ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your set is on stream.*pinged for reg reminders.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['notify', { values: { dm_registration: 'on', dm_start: 'on' } }, /DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['matchmaking_role', { values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
+  ['matchmaking_role', { values: { game: 'melee', duration: 30 } }, /for 30 minutes.*comes off on its own/],
   ['matchmaking_search', { values: { game: 'ult' } }, /You need the \*\*Ultimate Matchmaking\*\* role to ping it\. `\/matchmaking_role game:Ultimate`/],
   ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1","thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}/],
   // left out, it's the code on crew's start.gg netplay registrations

@@ -321,6 +321,30 @@ test('a pinned event starter is unpinned once its event is over', async () => {
   assert.deepEqual(channel.unpinned, ['card-1']);
 });
 
+test('deleting a tournament unpins its event starters too', async () => {
+  state.messages = { threads: 'event' };
+  const channel = fakeChannel();
+  sets = [
+    node('s1', now() - 30, tournament('Local')),
+    node('d1', now() - 20, tournament('Local'), 3, 'Doubles'),
+    node('w1', now() - 10, tournament('Weekly')),
+  ];
+  await tracker.postNewSets(channel);
+  const singles = state.threads['tournament/local/event/singles'];
+  const doubles = state.threads['tournament/local/event/doubles'];
+  const weekly = state.threads['tournament/weekly/event/singles'];
+  assert.equal(singles.pinned, true);
+  assert.equal(doubles.pinned, true);
+  assert.equal(weekly.pinned, true);
+
+  // deleted from start.gg, so its event cards come off but the other tournament stays pinned
+  await tracker.unpinTournamentThread(channel, { slug: 'tournament/local', name: 'Local' });
+  assert.equal(singles.pinned, false);
+  assert.equal(doubles.pinned, false);
+  assert.equal(weekly.pinned, true);
+  assert.deepEqual(channel.unpinned.toSorted(), [singles.messageId, doubles.messageId].toSorted());
+});
+
 test('placements posted unpin even with a far-out end date, unknown tournaments wait', async () => {
   const channel = fakeChannel();
   sets = [node('a1', now() - 30, tournament('Local'))];

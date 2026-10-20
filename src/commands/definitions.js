@@ -225,8 +225,11 @@ export const commands = [
   // not under /notify: these are roles people ping each other with, not posts the bot sends
   {
     name: 'matchmaking_role',
-    description: 'Get the Ultimate or Melee Matchmaking role, or take it off if you have it',
-    options: [matchmakingGame('Which role')],
+    description: 'Get the Ultimate or Melee role for a while, or take it off if you have it',
+    options: [
+      matchmakingGame('Which role'),
+      { type: Option.Integer, name: 'duration', description: 'Minutes to keep it, 1-1440. Leave out to keep it until you take it off', min_value: 1, max_value: 1440 },
+    ],
   },
   {
     name: 'matchmaking_search',

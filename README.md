@@ -91,10 +91,10 @@ The bot makes the TO role the first time it's needed. A role named `TO` made by 
 
 | Command | What it does |
 | --- | --- |
-| `/matchmaking_role game:<Ultimate or Melee>` | Give yourself the **Ultimate Matchmaking** or **Melee Matchmaking** role, or take it off if you have it. Only you see the reply. |
+| `/matchmaking_role game:<Ultimate or Melee> duration:<minutes>` | Give yourself the **Ultimate Matchmaking** or **Melee Matchmaking** role, or take it off if you have it. `duration` keeps it 1-1440 minutes, then it comes off on its own. Running it again without `duration` takes it off right away. Only you see the reply. |
 | `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role here, with a card naming you and your message, like a netplay connect code or where you're playing. `message` is optional. `thread:True` starts a thread on your search to arrange games. Only people with the role can use it. |
 
-The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets. Threads need **Create Public Threads** and **Send Messages in Threads** in the channel, and the search still posts when they are missing.
+The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. Timed roles are saved, so a restart doesn't cancel them. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets. Threads need **Create Public Threads** and **Send Messages in Threads** in the channel, and the search still posts when they are missing.
 
 ### Stats and matchups
 
@@ -225,6 +225,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank. A new season reset is not posted. | `/slippi add` and `/slippi remove` control the watchlist. Tracked players can be discovered from connect codes entered on start.gg. Linked-only players cannot. |
 | Bills final results | Off by default. After each Bills game, with quarters and yards. | No player appears. |
 | Weekly crew recap | Sunday at 9 pm New York time by default. | Tracked players with a non-DQ singles set that week appear. There is no separate player switch. |
+| Bot updates | When Railway starts a new deployment. | No player appears. Always posts, with when it deployed and the commit message. |
 
 Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. `/messages set_colors` colors them green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played, so a small crew sees each member at a glance. Off, every card stays green. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. A top 8 lookup that fails at placements time holds them back 12 hours, then they go without it. A top 8 that fails to send retries for up to 3 days.
 
@@ -317,7 +318,7 @@ docker build -t sama-tracker .
 docker run -d --name sama-tracker --restart unless-stopped --env-file .env -v sama-data:/app/data sama-tracker
 ```
 
-**Railway.** Deploy this repository and Railway builds the included Dockerfile. Add the required `.env.example` values under the service's Variables, plus any optional keys. Attach a persistent volume, and the bot uses its path unless `STATE_DIR` says otherwise. Every push to master redeploys it.
+**Railway.** Deploy this repository and Railway builds the included Dockerfile. Add the required `.env.example` values under the service's Variables, plus any optional keys. Attach a persistent volume, and the bot uses its path unless `STATE_DIR` says otherwise. Every push to master redeploys it, and each new deployment posts a bot update here.
 
 ### Development
 

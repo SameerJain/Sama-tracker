@@ -1,12 +1,29 @@
 import { MessageFlags, PermissionFlagsBits, ThreadAutoArchiveDuration } from 'discord.js';
 import * as embeds from '../embeds/index.js';
-import { colors } from '../embeds/shared.js';
+import { colors, count } from '../embeds/shared.js';
 import { state, save } from '../store.js';
+import { serverMembers } from '../accounts.js';
 import { MATCHMAKING } from './definitions.js';
 import { replyEphemeral } from './shared.js';
 
 // discord's code for missing permissions, which includes a role sitting above the bot's
 const MISSING_PERMISSIONS = 50013;
+
+// minutes a timed role can last, 1 minute to a day
+export const MATCHMAKING_DURATION_MIN = 1;
+export const MATCHMAKING_DURATION_MAX = 1440;
+
+// a timed role, so a restart doesn't cancel it
+export const expiryKey = (discordId, game) => `${discordId}:${game}`;
+
+// 30 -> 30 minutes, 60 -> 1 hour, 90 -> 1 hour 30 minutes
+function formatDuration(minutes) {
+  if (minutes < 60) return count(minutes, 'minute');
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!rest) return count(hours, 'hour');
+  return `${count(hours, 'hour')} ${count(rest, 'minute')}`;
+}
 
 // the saved id first, so a role renamed in server settings still counts, then the name, for one made by
 // hand or lost with the state file. whichever turns up gets saved
@@ -30,22 +47,51 @@ async function makeRole(guild, game) {
 }
 
 // /matchmaking_role: hands whoever ran it the role, or takes it back if they have it. the role gets made the
-// first time. making and handing out roles can take discord past the 3 seconds a command gets, so it defers first
+// first time. duration keeps it for that many minutes, then the background check takes it off.
+// making and handing out roles can take discord past the 3 seconds a command gets, so it defers first
 async function matchmakingRole(interaction) {
   const game = interaction.options.getString('game', true);
+  const duration = interaction.options.getInteger?.('duration');
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  if (duration != null && (!Number.isInteger(duration) || duration < MATCHMAKING_DURATION_MIN || duration > MATCHMAKING_DURATION_MAX)) {
+    return interaction.editReply(`Duration is minutes to keep the role, ${MATCHMAKING_DURATION_MIN}-${MATCHMAKING_DURATION_MAX}. Leave it out to keep it until you take it off.`);
+  }
   const { guild, member } = interaction;
+  const key = expiryKey(interaction.user.id, game);
   let role = findRole(guild, game);
   const name = role?.name ?? MATCHMAKING[game].role;
   let reply;
   try {
     if (role && member.roles.cache.has(role.id)) {
-      await member.roles.remove(role);
-      reply = `Took off your **${name}** role, so it won't ping you anymore.`;
+      if (duration == null) {
+        await member.roles.remove(role);
+        if (state.matchmakingExpiry?.[key]) {
+          delete state.matchmakingExpiry[key];
+          save();
+        }
+        reply = `Took off your **${name}** role, so it won't ping you anymore.`;
+      } else {
+        state.matchmakingExpiry ??= {};
+        state.matchmakingExpiry[key] = Math.floor(Date.now() / 1000) + duration * 60;
+        save();
+        reply = `Keeping your **${name}** role for ${formatDuration(duration)}, then it comes off on its own.`;
+      }
     } else {
       role ??= await makeRole(guild, game);
       await member.roles.add(role);
-      reply = `You have the **${name}** role now, so you'll get pinged when someone wants games. \`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
+      if (duration == null) {
+        // a stale timer from a role taken off by hand
+        if (state.matchmakingExpiry?.[key]) {
+          delete state.matchmakingExpiry[key];
+          save();
+        }
+        reply = `You have the **${name}** role now, so you'll get pinged when someone wants games. \`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
+      } else {
+        state.matchmakingExpiry ??= {};
+        state.matchmakingExpiry[key] = Math.floor(Date.now() / 1000) + duration * 60;
+        save();
+        reply = `You have the **${name}** role now for ${formatDuration(duration)}, so you'll get pinged when someone wants games. It comes off on its own after that. \`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
+      }
     }
   } catch (err) {
     if (err.code === MISSING_PERMISSIONS) {
@@ -57,6 +103,66 @@ async function matchmakingRole(interaction) {
     }
   }
   return interaction.editReply(reply);
+}
+
+// timed roles whose time is up. a restart doesn't cancel them since the times are saved.
+// returns who lost the role, so tests can see it
+export async function checkMatchmakingExpiry(guild, now = Math.floor(Date.now() / 1000)) {
+  const expiries = state.matchmakingExpiry ??= {};
+  const due = Object.entries(expiries).filter(([, at]) => at <= now);
+  if (!due.length || !guild) return [];
+  const byGame = new Map();
+  let changed = false;
+  const drop = (key) => {
+    if (key in expiries) {
+      delete expiries[key];
+      changed = true;
+    }
+  };
+  for (const [key] of due) {
+    const sep = key.lastIndexOf(':');
+    const discordId = key.slice(0, sep);
+    const game = key.slice(sep + 1);
+    if (!discordId || !MATCHMAKING[game]) {
+      drop(key);
+      continue;
+    }
+    if (!byGame.has(game)) byGame.set(game, []);
+    byGame.get(game).push({ key, discordId });
+  }
+  const removed = [];
+  for (const [game, entries] of byGame) {
+    const role = findRole(guild, game);
+    if (!role) {
+      for (const { key } of entries) drop(key);
+      continue;
+    }
+    let members;
+    try {
+      members = await serverMembers(guild, entries.map((entry) => entry.discordId));
+    } catch (err) {
+      console.error('checking matchmaking expiry failed:', err.message);
+      continue;
+    }
+    for (const { key, discordId } of entries) {
+      const member = members.get(discordId);
+      // left the server, or took it off by hand
+      if (!member || !member.roles?.cache?.has?.(role.id)) {
+        drop(key);
+        continue;
+      }
+      try {
+        await member.roles.remove(role);
+        drop(key);
+        removed.push({ discordId, game, roleId: role.id });
+      } catch (err) {
+        console.error(`taking the matchmaking role off ${discordId} failed:`, err.message);
+        // kept, so the next check tries again
+      }
+    }
+  }
+  if (changed) save();
+  return removed;
 }
 
 // /matchmaking_search: pings the role with a card saying who's looking. only people with the role can, so it can't
