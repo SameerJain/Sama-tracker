@@ -263,8 +263,8 @@ function notifyText(discordId, me, name = null) {
   return lines.join('\n');
 }
 
-// /notify: your pings, or anyone's for a TO with user:. anyone can look at anyone's, only
-// TOs can change someone else's. match calls and stream alerts go by start.gg, so those need
+// /notify: your pings, or anyone's for a TO with user:. someone else's is TOs only, look
+// or change. match calls and stream alerts go by start.gg, so those need
 // whoever it's for linked or tracked with their discord on start.gg. registration hands out the
 // Reg Reminders role too, which can take discord past the 3 seconds a command gets, so that one
 // defers first
@@ -285,8 +285,8 @@ async function notify(interaction) {
     if (value) changes[ping] = value === 'on';
   }
   const me = linkedPlayer(id);
+  if (!self && !isTO(interaction)) return notTO(interaction, 'see or change someone else\'s pings. Leave out `user` for yours');
   if (!Object.keys(changes).length) return replyEphemeral(interaction, notifyText(id, me, name));
-  if (!self && !isTO(interaction)) return notTO(interaction, 'change someone else\'s pings. Leave out `user` to change yours');
 
   const lines = [];
   // the same words for someone else, with their pronouns

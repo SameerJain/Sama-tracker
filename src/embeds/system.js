@@ -152,7 +152,7 @@ export function help() {
     [
       '**Your pings**',
       '`/notify` your pings, or anyone\'s for a TO with `user:`. `calls` when your match is called, `streams` when your set is on stream, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for all five. Leave them out to see yours',
-      '-# Anyone can look at anyone\'s. Changing someone else\'s needs a TO. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
+      '-# Only TOs can see or change someone else\'s with `user:`. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. Reg reminders and registration DMs skip you once you\'re registered, if start.gg has your Discord',
     ],
     [
       '**Matchmaking**',

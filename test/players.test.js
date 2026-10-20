@@ -447,12 +447,12 @@ test('/notify lets TOs look at and change anyone\'s pings', async () => {
     return { displayName, changed, roles: { add: async (role) => changed.push(['add', role.name]), remove: async (role) => changed.push(['remove', role.name]) } };
   };
 
-  // someone who isn't a TO changes nothing about someone else, but can still look
+  // someone who isn't a TO gets nothing about someone else, look or change
   const refused = await run('notify', 'someone', { user: as('me-discord'), member: membership('Me'), calls: 'on' });
   assert.ok(refused.flags);
-  assert.equal(refused.content, 'Only TOs can change someone else\'s pings. Leave out `user` to change yours. `/t-o role list` shows who they are.');
+  assert.equal(refused.content, 'Only TOs can see or change someone else\'s pings. Leave out `user` for yours. `/t-o role list` shows who they are.');
   assert.deepEqual(state.callPings, []);
-  assert.match((await run('notify', 'someone', { user: as('me-discord'), member: membership('Me') })).content, /^\*\*Me's pings\*\*\n\*\*Match calls:\*\* off/);
+  assert.equal((await run('notify', 'someone', { user: as('me-discord'), member: membership('Me') })).content, refused.content);
 
   // picking yourself in user: is the same as leaving it out
   assert.match((await run('notify', 'me-discord', { user: as('me-discord'), member: membership('Me'), calls: 'on' })).content, /^You'll get pinged when your match is called\.$/);

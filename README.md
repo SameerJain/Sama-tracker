@@ -82,7 +82,7 @@ The bot makes the TO role the first time it's needed. A role named `TO` made by 
 | `/notify registration:<on or off>` | Get pinged for registration reminders, and get the **Reg Reminders** role. Skipped for tournaments you're already registered for, if start.gg has your Discord. |
 | `/notify dm_registration:<on or off>` | Get a DM 1 hour before registration closes, with the tournament link, location and image. Skipped once you're registered, if start.gg has your Discord. |
 | `/notify dm_start:<on or off>` | Get a DM 1 hour before the tournament starts, with the tournament link, location and image. |
-| `/notify user:<@someone>` | Someone else's pings instead of yours. Anyone can look, changing them needs a TO. |
+| `/notify user:<@someone>` | Someone else's pings instead of yours. TOs only. |
 | `/notify all:<on or off>` | All five at once. |
 
 `/notify` changes you unless a TO picks someone in `user:`, and registration and DM pings need no tracking or linking. Calls and streams need whoever it's for linked, or tracked with Discord connected on start.gg.
