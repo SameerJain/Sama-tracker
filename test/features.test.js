@@ -1514,8 +1514,10 @@ test('/help is one short card by default, and verbose lists every command', () =
   assert.equal(cards[0].data.title, 'Sama-tracker');
   assert.ok(cards.length > 1);
   for (const [i, card] of cards.entries()) {
+    const page = `-# Page ${i + 1}/${cards.length}`;
     assert.ok(card.data.description.length <= 4096);
-    assert.match(card.data.description, new RegExp(`^-# Page ${i + 1}/${cards.length}\\n\\*\\*`));
+    assert.ok(card.data.description.startsWith(`${page}\n**`));
+    assert.ok(card.data.description.endsWith(`\n${page}`));
   }
   const text = cards.map(card => card.data.description).join('\n');
   for (const title of ['Set results', 'Stream alerts', 'Match call pings', 'Tournament roll calls', 'Tournament placements', 'Top 8s', 'Registration reminders', 'Slippi rank changes', 'Bills final results', 'Weekly crew recap']) {

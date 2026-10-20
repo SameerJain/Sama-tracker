@@ -148,8 +148,8 @@ function shortHelp() {
   return [baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'))];
 }
 
-// '-# Page 99/99\n' is 15, so a card packed to this still fits its page line
-const PAGE_RESERVED = 16;
+// two of these, top and bottom: '-# Page 99/99\n' is 15, so a card packed to this still fits both
+const PAGE_RESERVED = 32;
 
 export function help(verbose = false) {
   if (!verbose) return shortHelp();
@@ -266,7 +266,10 @@ export function help(verbose = false) {
       '-# Tracked tournaments post their set results and stream alerts in a thread. `/messages threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. One per tournament pins its channel card until the tournament ends. If a thread can\'t be used, they post here',
     ],
   ];
-  // the page number goes on top of every card, with room left so none passes 4096
+  // the same page number goes on top and bottom of every card, with room left so none passes 4096
   const cards = withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections, 4096 - PAGE_RESERVED);
-  return cards.map((card, i) => card.setDescription(`-# Page ${i + 1}/${cards.length}\n${card.data.description}`));
+  return cards.map((card, i) => {
+    const page = `-# Page ${i + 1}/${cards.length}`;
+    return card.setDescription(`${page}\n${card.data.description}\n${page}`);
+  });
 }
