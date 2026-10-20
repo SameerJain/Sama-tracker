@@ -118,7 +118,38 @@ export function funImage(title, image, page, name, source = 'Wikimedia Commons')
     .setImage(image);
 }
 
-export function help() {
+// the short card /help sends by default. one card, since it fits, with verbose:True for the full list
+function shortHelp() {
+  const lines = [
+    '**Start here**',
+    '`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up',
+    '`/track add` post your placements here. TOs can add anyone',
+    '`/notify` pings for match calls, streams, reg reminders and 1-hour DMs',
+    '`/help verbose:True` the full list with the details',
+    '',
+    '**Look up stats**',
+    '`/stats` record and placements · `/recent` latest sets · `/run` current run and next opponent',
+    '`/h2h opponent:` record and one-line odds · `/predict opponent:` odds and why',
+    '`/scout profile:` form and habits · `/progress` last 30 days vs the 30 before',
+    '`/characters` reported characters · `/doubles` 2v2 record · `/upcoming` tournaments',
+    '',
+    '**TOs**',
+    '`/t-o role add user:` hand out the TO role · `/t-o tournament add tournament:` track one',
+    '`/t-o tournament event tournament:` make a Discord event · `/track posts` results and alerts on or off',
+    '-# TOs can track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one',
+    '',
+    '**Tournaments**',
+    '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered',
+    '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks',
+    '`/messages` automatic posts and threads, needs Manage Server · `/status` uptime and last checks',
+    '`/matchmaking_role game:` get game pings · `/matchmaking_search game:` find games',
+    '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun',
+  ];
+  return [baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'))];
+}
+
+export function help(verbose = false) {
+  if (!verbose) return shortHelp();
   const sections = [
     [
       '**General**',

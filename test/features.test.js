@@ -1501,8 +1501,14 @@ test('stream alerts ping only whoever is playing with /notify streams on', async
   state.streamPings = [];
 });
 
-test('/help lists every command, and each card starts at a section', () => {
-  const cards = embeds.help();
+test('/help is one short card by default, and verbose lists every command', () => {
+  const [short] = embeds.help();
+  assert.equal(short.data.title, 'Sama-tracker');
+  assert.ok(short.data.description.length < 4096);
+  assert.match(short.data.description, /`\/help verbose:True`/);
+  assert.match(short.data.description, /`\/track add`/);
+
+  const cards = embeds.help(true);
   assert.equal(cards[0].data.title, 'Sama-tracker');
   for (const card of cards) {
     assert.ok(card.data.description.length <= 4096);

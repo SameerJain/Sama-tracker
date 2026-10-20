@@ -188,7 +188,8 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
 
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
-  ['help', {}, /Linking yourself/], ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/],
+  ['help', {}, /\/help verbose:True/], ['help', { values: { verbose: true } }, /Linking yourself/],
+  ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/],
   ['messages', { values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
   ['messages', { values: { events: false } }, /Discord events for tracked tournaments:\*\* off/], ['socials', {}, /Nothing yet/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],

@@ -14,7 +14,7 @@ import { toAdd, toRemove, toList } from './to.js';
 import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch } from './matchmaking.js';
-import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage } from './shared.js';
+import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
@@ -36,7 +36,7 @@ function commandName(interaction) {
 }
 
 const handlers = new Map([
-  ['help', (interaction) => sendEmbeds(interaction, embeds.help())],
+  ['help', (interaction) => sendEmbeds(interaction, embeds.help(flag(interaction, 'verbose')))],
   ['messages', configureMessages],
   ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],
   ['socials_edit add', socialsAdd],

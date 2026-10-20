@@ -64,7 +64,10 @@ function venueOption() {
 }
 
 export const commands = [
-  { name: 'help', description: 'Show commands' },
+  {
+    name: 'help', description: 'Short command list, verbose:True for the full one with details',
+    options: [verboseOption('Every command with the details, instead of the short list')],
+  },
   {
     name: 'messages', description: 'Show or change automatic posts, threads, set result colors and the weekly recap schedule',
     default_member_permissions: PermissionFlagsBits.ManageGuild.toString(),

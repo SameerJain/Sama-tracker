@@ -21,7 +21,7 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 5. **Pick your pings.** `/notify` pings you when your match is called, when your set is on stream, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
 6. **Follow Slippi ranked.** `/slippi add` puts your connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
 
-`/help` in Discord lists every command in short form.
+`/help` in Discord lists the commands in short form, on one card. `/help verbose:True` is the full list with the details.
 
 ## Commands
 
@@ -184,7 +184,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 
 | Command | What it does |
 | --- | --- |
-| `/help` | List the commands. |
+| `/help` | Short command list. `verbose:True` lists every command with the details. |
 | `/status` | Uptime, when the latest version was deployed, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, the state file size and saves since start, any downtime before the last start, and why a post last missed its thread. A copy run on another computer also shows that computer's name. |
 | `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
 | `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event), set result colors and the recap schedule. Needs **Manage Server**. |
