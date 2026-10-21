@@ -1,0 +1,4240 @@
+[
+  {
+    "tournamentId": 583090,
+    "tournamentName": "Smash Royale #1 - UB Smash Club",
+    "slug": "tournament/smash-royale-1-ub-smash-club",
+    "startAt": 1694041200,
+    "numAttendees": 65,
+    "eventId": 971486,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 65,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-1-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Free Agent | MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | Kabayeezy",
+        "players": [
+          {
+            "id": 1256099,
+            "tag": "Kabayeezy"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "iModerz",
+        "players": [
+          {
+            "id": 172486,
+            "tag": "iModerz"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 593936,
+    "tournamentName": "Smash Royale #2 - UB Smash Club",
+    "slug": "tournament/smash-royale-2-ub-smash-club",
+    "startAt": 1695855600,
+    "numAttendees": 35,
+    "eventId": 992288,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 35,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-2-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Free Agent | MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | AnneHathawayFan100",
+        "players": [
+          {
+            "id": 2982999,
+            "tag": "GetPlucked"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 593936,
+    "tournamentName": "Smash Royale #2 - UB Smash Club",
+    "slug": "tournament/smash-royale-2-ub-smash-club",
+    "startAt": 1695855600,
+    "numAttendees": 35,
+    "eventId": 992289,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 10,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-2-ub-smash-club/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Crisis",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 597983,
+    "tournamentName": "Smash Royale #3 - UB Smash Club",
+    "slug": "tournament/smash-royale-3-ub-smash-club",
+    "startAt": 1697065200,
+    "numAttendees": 32,
+    "eventId": 999900,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 30,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-3-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Free Agent | MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "MBS | Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 597983,
+    "tournamentName": "Smash Royale #3 - UB Smash Club",
+    "slug": "tournament/smash-royale-3-ub-smash-club",
+    "startAt": 1697065200,
+    "numAttendees": 32,
+    "eventId": 999901,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 12,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-3-ub-smash-club/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Crisis",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "playBlast",
+        "players": [
+          {
+            "id": 1387749,
+            "tag": "playBlast"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 603433,
+    "tournamentName": "Smash Royale #4 - Pajama Day",
+    "slug": "tournament/smash-royale-4-pajama-day",
+    "startAt": 1698274800,
+    "numAttendees": 35,
+    "eventId": 1009967,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 35,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-4-pajama-day/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "KingP",
+        "players": [
+          {
+            "id": 1370191,
+            "tag": "KingP"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | AnneHathawayFan100",
+        "players": [
+          {
+            "id": 3703656,
+            "tag": "AnneHathawayFan100"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 603433,
+    "tournamentName": "Smash Royale #4 - Pajama Day",
+    "slug": "tournament/smash-royale-4-pajama-day",
+    "startAt": 1698274800,
+    "numAttendees": 35,
+    "eventId": 1009968,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 9,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-4-pajama-day/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "DNY | Scrimblo",
+        "players": [
+          {
+            "id": 2348185,
+            "tag": "Drew"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 608579,
+    "tournamentName": "Smash Royale #5",
+    "slug": "tournament/smash-royale-5",
+    "startAt": 1699488000,
+    "numAttendees": 23,
+    "eventId": 1020046,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 23,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-5/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "716 | AnneHathawayFan",
+        "players": [
+          {
+            "id": 2982999,
+            "tag": "GetPlucked"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TF | 3H | Explodypan",
+        "players": [
+          {
+            "id": 1545250,
+            "tag": "Explodypan"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Captinricard",
+        "players": [
+          {
+            "id": 2191110,
+            "tag": "captinricard"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 614761,
+    "tournamentName": "Smash Royale #6",
+    "slug": "tournament/smash-royale-6",
+    "startAt": 1701302400,
+    "numAttendees": 30,
+    "eventId": 1031542,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 30,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-6/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Free Agent | MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "EMW ESPORTS | Earths Mightiest Warrior",
+        "players": [
+          {
+            "id": 1466524,
+            "tag": "EMW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 614761,
+    "tournamentName": "Smash Royale #6",
+    "slug": "tournament/smash-royale-6",
+    "startAt": 1701302400,
+    "numAttendees": 30,
+    "eventId": 1031543,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 12,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-6/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "crosstheblock",
+        "players": [
+          {
+            "id": 3019507,
+            "tag": "crosstheblock"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Captinricard",
+        "players": [
+          {
+            "id": 2191110,
+            "tag": "captinricard"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 630749,
+    "tournamentName": "Smash Royale #7 - Spring Semester Opener",
+    "slug": "tournament/smash-royale-7-spring-semester-opener",
+    "startAt": 1707350400,
+    "numAttendees": 43,
+    "eventId": 1062983,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 41,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-7-spring-semester-opener/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MBS | Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Free Agent | MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 630749,
+    "tournamentName": "Smash Royale #7 - Spring Semester Opener",
+    "slug": "tournament/smash-royale-7-spring-semester-opener",
+    "startAt": 1707350400,
+    "numAttendees": 43,
+    "eventId": 1062984,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 21,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-7-spring-semester-opener/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Captinricard",
+        "players": [
+          {
+            "id": 2191110,
+            "tag": "captinricard"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "RenzZlax",
+        "players": [
+          {
+            "id": 2431415,
+            "tag": "RenzZlax"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 639502,
+    "tournamentName": "Smash Royale #8 - UB Smash Club",
+    "slug": "tournament/smash-royale-8-ub-smash-club",
+    "startAt": 1708560000,
+    "numAttendees": 37,
+    "eventId": 1080435,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 37,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-8-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Liyrex",
+        "players": [
+          {
+            "id": 67389,
+            "tag": "Liyrex"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "716 | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 644673,
+    "tournamentName": "Smash Royale #9 - UB Smash Club",
+    "slug": "tournament/smash-royale-9-ub-smash-club",
+    "startAt": 1709769600,
+    "numAttendees": 26,
+    "eventId": 1090608,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 26,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-9-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "MBS | Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 652491,
+    "tournamentName": "Smash Royale #10 - UB Smash Club",
+    "slug": "tournament/smash-royale-10-ub-smash-club",
+    "startAt": 1711581060,
+    "numAttendees": 30,
+    "eventId": 1106078,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 13,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-10-ub-smash-club/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 2,
+        "name": "MBS | Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "PPB | Tone",
+        "players": [
+          {
+            "id": 1285997,
+            "tag": "Tone"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 652491,
+    "tournamentName": "Smash Royale #10 - UB Smash Club",
+    "slug": "tournament/smash-royale-10-ub-smash-club",
+    "startAt": 1711581060,
+    "numAttendees": 30,
+    "eventId": 1106077,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 30,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-10-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "716 | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | AnneHathawayFan",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 656868,
+    "tournamentName": "Smash Royale #11 - UB Smash Club",
+    "slug": "tournament/smash-royale-11-ub-smash-club",
+    "startAt": 1712790000,
+    "numAttendees": 35,
+    "eventId": 1114662,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 34,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-11-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "716 | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "716 | AnneHathawayFan",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 656868,
+    "tournamentName": "Smash Royale #11 - UB Smash Club",
+    "slug": "tournament/smash-royale-11-ub-smash-club",
+    "startAt": 1712790000,
+    "numAttendees": 35,
+    "eventId": 1114663,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 14,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-11-ub-smash-club/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Barça | Pau Cubarsí fan club",
+        "players": [
+          {
+            "id": 2191110,
+            "tag": "captinricard"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 661512,
+    "tournamentName": "Smash Royale #12 - UB Smash Club",
+    "slug": "tournament/smash-royale-12-ub-smash-club",
+    "startAt": 1713999600,
+    "numAttendees": 62,
+    "eventId": 1123687,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 62,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-12-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "716 | Kabayeezy",
+        "players": [
+          {
+            "id": 1256099,
+            "tag": "Kabayeezy"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 661512,
+    "tournamentName": "Smash Royale #12 - UB Smash Club",
+    "slug": "tournament/smash-royale-12-ub-smash-club",
+    "startAt": 1713999600,
+    "numAttendees": 62,
+    "eventId": 1123688,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 18,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-12-ub-smash-club/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "BlxckGnarly",
+        "players": [
+          {
+            "id": 1803603,
+            "tag": "BlxckGnarly"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "RenzZlax",
+        "players": [
+          {
+            "id": 2431415,
+            "tag": "RenzZlax"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 712269,
+    "tournamentName": "Smash Royale #14 - UB Smash Club",
+    "slug": "tournament/smash-royale-14-ub-smash-club",
+    "startAt": 1727236800,
+    "numAttendees": 42,
+    "eventId": 1221553,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 14,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-14-ub-smash-club/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "PPB | Tone",
+        "players": [
+          {
+            "id": 1285997,
+            "tag": "Tone"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TTD | UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 712269,
+    "tournamentName": "Smash Royale #14 - UB Smash Club",
+    "slug": "tournament/smash-royale-14-ub-smash-club",
+    "startAt": 1727236800,
+    "numAttendees": 42,
+    "eventId": 1221552,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 42,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-14-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 717422,
+    "tournamentName": "Smash Royale #15 - UB Smash Club",
+    "slug": "tournament/smash-royale-15-ub-smash-club",
+    "startAt": 1728514800,
+    "numAttendees": 30,
+    "eventId": 1231909,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 30,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-15-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 717422,
+    "tournamentName": "Smash Royale #15 - UB Smash Club",
+    "slug": "tournament/smash-royale-15-ub-smash-club",
+    "startAt": 1728514800,
+    "numAttendees": 30,
+    "eventId": 1231910,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 8,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-15-ub-smash-club/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "CZn | Double_AA",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 723086,
+    "tournamentName": "Smash Royale #16 - UB Smash Club",
+    "slug": "tournament/smash-royale-16-ub-smash-club",
+    "startAt": 1729724400,
+    "numAttendees": 19,
+    "eventId": 1243238,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 19,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-16-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 727776,
+    "tournamentName": "Smash Royale #17 - UB Smash Club",
+    "slug": "tournament/smash-royale-17-ub-smash-club",
+    "startAt": 1730937600,
+    "numAttendees": 26,
+    "eventId": 1252848,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 26,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-17-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TTD | SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 732406,
+    "tournamentName": "Smash Royale #18 - UB Smash Club",
+    "slug": "tournament/smash-royale-18-ub-smash-club",
+    "startAt": 1732147200,
+    "numAttendees": 21,
+    "eventId": 1262139,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 21,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-18-ub-smash-club/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | Tony Soprano",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 749058,
+    "tournamentName": "Smash Royale #19 - SPRING 2025 OPENER",
+    "slug": "tournament/smash-royale-19-spring-2025-opener",
+    "startAt": 1737590400,
+    "numAttendees": 30,
+    "eventId": 1295891,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 30,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-19-spring-2025-opener/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "KingP",
+        "players": [
+          {
+            "id": 1370191,
+            "tag": "KingP"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Liyrex",
+        "players": [
+          {
+            "id": 67389,
+            "tag": "Liyrex"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 749058,
+    "tournamentName": "Smash Royale #19 - SPRING 2025 OPENER",
+    "slug": "tournament/smash-royale-19-spring-2025-opener",
+    "startAt": 1737590400,
+    "numAttendees": 30,
+    "eventId": 1295892,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 14,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-19-spring-2025-opener/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "716 | winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "reverse",
+        "players": [
+          {
+            "id": 3563797,
+            "tag": "reverse"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 753024,
+    "tournamentName": "Smash Royale #20",
+    "slug": "tournament/smash-royale-20",
+    "startAt": 1738195200,
+    "numAttendees": 32,
+    "eventId": 1303842,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 32,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-20/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 753024,
+    "tournamentName": "Smash Royale #20",
+    "slug": "tournament/smash-royale-20",
+    "startAt": 1738195200,
+    "numAttendees": 32,
+    "eventId": 1303843,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 15,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-20/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "PPB | Tone",
+        "players": [
+          {
+            "id": 1285997,
+            "tag": "Tone"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Fal | Eliminate",
+        "players": [
+          {
+            "id": 2676871,
+            "tag": "Eliminate"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 756685,
+    "tournamentName": "Smash Royale #21",
+    "slug": "tournament/smash-royale-21",
+    "startAt": 1739404800,
+    "numAttendees": 22,
+    "eventId": 1311313,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 21,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-21/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 756685,
+    "tournamentName": "Smash Royale #21",
+    "slug": "tournament/smash-royale-21",
+    "startAt": 1739404800,
+    "numAttendees": 22,
+    "eventId": 1311314,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 8,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-21/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Speedy",
+        "players": [
+          {
+            "id": 1452225,
+            "tag": "Speedy"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 758920,
+    "tournamentName": "Smash Royale #22: THE RETURN OF DRIP",
+    "slug": "tournament/smash-royale-22-the-return-of-drip",
+    "startAt": 1740009600,
+    "numAttendees": 42,
+    "eventId": 1315856,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 42,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-22-the-return-of-drip/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "KingP",
+        "players": [
+          {
+            "id": 1370191,
+            "tag": "KingP"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "NS | Phaethon",
+        "players": [
+          {
+            "id": 404287,
+            "tag": "Phaethon"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 762131,
+    "tournamentName": "Smash Royale #23",
+    "slug": "tournament/smash-royale-23",
+    "startAt": 1740614400,
+    "numAttendees": 20,
+    "eventId": 1322362,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 20,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-23/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TTD | SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 767094,
+    "tournamentName": "Smash Royale #24",
+    "slug": "tournament/smash-royale-24",
+    "startAt": 1741820400,
+    "numAttendees": 22,
+    "eventId": 1332885,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 21,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-24/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 767094,
+    "tournamentName": "Smash Royale #24",
+    "slug": "tournament/smash-royale-24",
+    "startAt": 1741820400,
+    "numAttendees": 22,
+    "eventId": 1332886,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 11,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-24/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 774300,
+    "tournamentName": "Smash Royale #25",
+    "slug": "tournament/smash-royale-25",
+    "startAt": 1743634800,
+    "numAttendees": 23,
+    "eventId": 1347666,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 21,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-25/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Next | Woozie",
+        "players": [
+          {
+            "id": 172316,
+            "tag": "Woozie"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 774300,
+    "tournamentName": "Smash Royale #25",
+    "slug": "tournament/smash-royale-25",
+    "startAt": 1743634800,
+    "numAttendees": 23,
+    "eventId": 1347667,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 12,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-25/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 779370,
+    "tournamentName": "Smash Royale #26",
+    "slug": "tournament/smash-royale-26",
+    "startAt": 1744844400,
+    "numAttendees": 22,
+    "eventId": 1357930,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 22,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-26/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Next | Woozie",
+        "players": [
+          {
+            "id": 172316,
+            "tag": "Woozie"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 779370,
+    "tournamentName": "Smash Royale #26",
+    "slug": "tournament/smash-royale-26",
+    "startAt": 1744844400,
+    "numAttendees": 22,
+    "eventId": 1357931,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 10,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-26/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 784549,
+    "tournamentName": "Smash Royale #27",
+    "slug": "tournament/smash-royale-27",
+    "startAt": 1746054000,
+    "numAttendees": 35,
+    "eventId": 1368499,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 13,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-27/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Akbros | SEXman",
+        "players": [
+          {
+            "id": 2564413,
+            "tag": "S&Xman"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "DNY | Mr. BIG BU$INES$",
+        "players": [
+          {
+            "id": 1082864,
+            "tag": "Mr. BIG BU$INES$"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 784549,
+    "tournamentName": "Smash Royale #27",
+    "slug": "tournament/smash-royale-27",
+    "startAt": 1746054000,
+    "numAttendees": 35,
+    "eventId": 1368498,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 35,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-27/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Akbros | Bing Bong",
+        "players": [
+          {
+            "id": 2867178,
+            "tag": "Bing Bong"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | Kabayeezy",
+        "players": [
+          {
+            "id": 1256099,
+            "tag": "Kabayeezy"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 821026,
+    "tournamentName": "Smash Royale #28",
+    "slug": "tournament/smash-royale-28",
+    "startAt": 1756942200,
+    "numAttendees": 40,
+    "eventId": 1443115,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 40,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-28/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | TTD | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 821026,
+    "tournamentName": "Smash Royale #28",
+    "slug": "tournament/smash-royale-28",
+    "startAt": 1756942200,
+    "numAttendees": 40,
+    "eventId": 1443116,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 10,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-28/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Antslayer01",
+        "players": [
+          {
+            "id": 3686579,
+            "tag": "Antslayer01"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "BM | Jermlol1",
+        "players": [
+          {
+            "id": 2157306,
+            "tag": "Jermlol1"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 827005,
+    "tournamentName": "Smash Royale #29",
+    "slug": "tournament/smash-royale-29",
+    "startAt": 1757545200,
+    "numAttendees": 24,
+    "eventId": 1454921,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 9,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-29/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "BlubBlub",
+        "players": [
+          {
+            "id": 4940646,
+            "tag": "BlubBlub"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 827005,
+    "tournamentName": "Smash Royale #29",
+    "slug": "tournament/smash-royale-29",
+    "startAt": 1757545200,
+    "numAttendees": 24,
+    "eventId": 1454920,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 24,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-29/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "716 | TTD | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 831940,
+    "tournamentName": "Smash Royale #30",
+    "slug": "tournament/smash-royale-30",
+    "startAt": 1758756600,
+    "numAttendees": 27,
+    "eventId": 1465036,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 12,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-30/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Fal | Eliminate",
+        "players": [
+          {
+            "id": 2676871,
+            "tag": "Eliminate"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Fal | DragonEmperorLuke",
+        "players": [
+          {
+            "id": 3512075,
+            "tag": "DragonEmperorLuke"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 831940,
+    "tournamentName": "Smash Royale #30",
+    "slug": "tournament/smash-royale-30",
+    "startAt": 1758756600,
+    "numAttendees": 27,
+    "eventId": 1465035,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 27,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-30/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "716 | TTD | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 837414,
+    "tournamentName": "Smash Royale #31",
+    "slug": "tournament/smash-royale-31",
+    "startAt": 1759966200,
+    "numAttendees": 24,
+    "eventId": 1475828,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 24,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-31/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 843223,
+    "tournamentName": "Smash Royale #32",
+    "slug": "tournament/smash-royale-32",
+    "startAt": 1761174000,
+    "numAttendees": 26,
+    "eventId": 1487326,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 9,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-32/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Grilled Cheese",
+        "players": [
+          {
+            "id": 4114317,
+            "tag": "Grilled Cheese"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Fal | Eliminate",
+        "players": [
+          {
+            "id": 2676871,
+            "tag": "Eliminate"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 843223,
+    "tournamentName": "Smash Royale #32",
+    "slug": "tournament/smash-royale-32",
+    "startAt": 1761174000,
+    "numAttendees": 26,
+    "eventId": 1487325,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 26,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-32/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Next | Woozie",
+        "players": [
+          {
+            "id": 172316,
+            "tag": "Woozie"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 848391,
+    "tournamentName": "Smash Royale #33",
+    "slug": "tournament/smash-royale-33",
+    "startAt": 1762387200,
+    "numAttendees": 20,
+    "eventId": 1497666,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 20,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-33/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "716 | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TTD | SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 851149,
+    "tournamentName": "Smash Royale #34",
+    "slug": "tournament/smash-royale-34",
+    "startAt": 1762993800,
+    "numAttendees": 28,
+    "eventId": 1502864,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 28,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-34/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 852991,
+    "tournamentName": "Smash Royale #35",
+    "slug": "tournament/smash-royale-35",
+    "startAt": 1763596800,
+    "numAttendees": 26,
+    "eventId": 1506337,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 26,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-35/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Oasis | Luigikid64",
+        "players": [
+          {
+            "id": 1605499,
+            "tag": "Luigikid64"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Akbros | Bing Bong",
+        "players": [
+          {
+            "id": 2867178,
+            "tag": "Bing Bong"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 857645,
+    "tournamentName": "Smash Royale #36 - Semester Finale",
+    "slug": "tournament/smash-royale-36-semester-finale",
+    "startAt": 1764806400,
+    "numAttendees": 24,
+    "eventId": 1515235,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 23,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-36-semester-finale/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 874244,
+    "tournamentName": "Smash Royale #37",
+    "slug": "tournament/smash-royale-37",
+    "startAt": 1769644800,
+    "numAttendees": 24,
+    "eventId": 1547061,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 12,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-37/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Fal | DragonEmperorLuke",
+        "players": [
+          {
+            "id": 3512075,
+            "tag": "DragonEmperorLuke"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Zilkon",
+        "players": [
+          {
+            "id": 1864833,
+            "tag": "Zilkon"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Humza",
+        "players": [
+          {
+            "id": 1493023,
+            "tag": "Humza"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Fal | ShockFire101",
+        "players": [
+          {
+            "id": 1997837,
+            "tag": "ShockFire101"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 874244,
+    "tournamentName": "Smash Royale #37",
+    "slug": "tournament/smash-royale-37",
+    "startAt": 1769644800,
+    "numAttendees": 24,
+    "eventId": 1547060,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 24,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-37/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 879402,
+    "tournamentName": "Smash Royale #38",
+    "slug": "tournament/smash-royale-38",
+    "startAt": 1770854400,
+    "numAttendees": 31,
+    "eventId": 1557310,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 31,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-38/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "EMW Esports 2 | KingP",
+        "players": [
+          {
+            "id": 1370191,
+            "tag": "KingP"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "DNY | Inigo",
+        "players": [
+          {
+            "id": 3353422,
+            "tag": "Tomodachi Wife"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 879402,
+    "tournamentName": "Smash Royale #38",
+    "slug": "tournament/smash-royale-38",
+    "startAt": 1770854400,
+    "numAttendees": 31,
+    "eventId": 1557311,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 16,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-38/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Lozman",
+        "players": [
+          {
+            "id": 2086155,
+            "tag": "Lozman"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Humza",
+        "players": [
+          {
+            "id": 1493023,
+            "tag": "Humza"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Fal | DragonEmperorLuke",
+        "players": [
+          {
+            "id": 3512075,
+            "tag": "DragonEmperorLuke"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 884089,
+    "tournamentName": "Smash Royale #39",
+    "slug": "tournament/smash-royale-39",
+    "startAt": 1772065800,
+    "numAttendees": 21,
+    "eventId": 1566914,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 18,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-39/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "716 | KingCoreyFTW",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 884089,
+    "tournamentName": "Smash Royale #39",
+    "slug": "tournament/smash-royale-39",
+    "startAt": 1772065800,
+    "numAttendees": 21,
+    "eventId": 1566915,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 11,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-39/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Antslayer01",
+        "players": [
+          {
+            "id": 3686579,
+            "tag": "Antslayer01"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 889388,
+    "tournamentName": "Smash Royale #40",
+    "slug": "tournament/smash-royale-40",
+    "startAt": 1773270000,
+    "numAttendees": 18,
+    "eventId": 1577905,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 18,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-40/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 894029,
+    "tournamentName": "Smash Royale #41",
+    "slug": "tournament/smash-royale-41",
+    "startAt": 1774481400,
+    "numAttendees": 22,
+    "eventId": 1587870,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 22,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-41/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 897626,
+    "tournamentName": "Smash Royale #42",
+    "slug": "tournament/smash-royale-42",
+    "startAt": 1775086200,
+    "numAttendees": 10,
+    "eventId": 1596199,
+    "eventName": "Round Robin",
+    "numEntrants": 10,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-42/event/round-robin",
+    "standings": []
+  },
+  {
+    "tournamentId": 897626,
+    "tournamentName": "Smash Royale #42",
+    "slug": "tournament/smash-royale-42",
+    "startAt": 1775086200,
+    "numAttendees": 10,
+    "eventId": 1595375,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 10,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-42/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 899435,
+    "tournamentName": "Smash Royale #43",
+    "slug": "tournament/smash-royale-43",
+    "startAt": 1775691000,
+    "numAttendees": 23,
+    "eventId": 1599504,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 22,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-43/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 899435,
+    "tournamentName": "Smash Royale #43",
+    "slug": "tournament/smash-royale-43",
+    "startAt": 1775691000,
+    "numAttendees": 23,
+    "eventId": 1599505,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 12,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-43/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Fal | DragonEmperorLuke",
+        "players": [
+          {
+            "id": 3512075,
+            "tag": "DragonEmperorLuke"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Fal | Eliminate",
+        "players": [
+          {
+            "id": 2676871,
+            "tag": "Eliminate"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 904396,
+    "tournamentName": "Smash Royale #44",
+    "slug": "tournament/smash-royale-44",
+    "startAt": 1776900600,
+    "numAttendees": 16,
+    "eventId": 1609796,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 16,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-44/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 906564,
+    "tournamentName": "FAREWELL MEGA CHAD - SMASH ROYALE #45",
+    "slug": "tournament/farewell-mega-chad-smash-royale-45",
+    "startAt": 1777505400,
+    "numAttendees": 30,
+    "eventId": 1614301,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 11,
+    "game": "Ultimate",
+    "eventSlug": "tournament/farewell-mega-chad-smash-royale-45/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Fal | ShockFire101",
+        "players": [
+          {
+            "id": 1997837,
+            "tag": "ShockFire101"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "DREAM BIG | luci",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Fal | DragonEmperorLuke",
+        "players": [
+          {
+            "id": 3512075,
+            "tag": "DragonEmperorLuke"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 906564,
+    "tournamentName": "FAREWELL MEGA CHAD - SMASH ROYALE #45",
+    "slug": "tournament/farewell-mega-chad-smash-royale-45",
+    "startAt": 1777505400,
+    "numAttendees": 30,
+    "eventId": 1614300,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 30,
+    "game": "Ultimate",
+    "eventSlug": "tournament/farewell-mega-chad-smash-royale-45/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "EMW Esports 2 | KingP",
+        "players": [
+          {
+            "id": 1370191,
+            "tag": "KingP"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "716 | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 954039,
+    "tournamentName": "FALL SEMESTER OPENER -  SMASH ROYALE #46",
+    "slug": "tournament/fall-semester-opener-smash-royale-46",
+    "startAt": 1789774200,
+    "numAttendees": 45,
+    "eventId": 1711519,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 13,
+    "game": "Ultimate",
+    "eventSlug": "tournament/fall-semester-opener-smash-royale-46/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 954039,
+    "tournamentName": "FALL SEMESTER OPENER -  SMASH ROYALE #46",
+    "slug": "tournament/fall-semester-opener-smash-royale-46",
+    "startAt": 1789774200,
+    "numAttendees": 45,
+    "eventId": 1711518,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 45,
+    "game": "Ultimate",
+    "eventSlug": "tournament/fall-semester-opener-smash-royale-46/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "DanyPB",
+        "players": [
+          {
+            "id": 1697114,
+            "tag": "DanyPB"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "Next | Woozie",
+        "players": [
+          {
+            "id": 172316,
+            "tag": "Woozie"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 956218,
+    "tournamentName": "SMASH ROYALE #47",
+    "slug": "tournament/smash-royale-47",
+    "startAt": 1790379000,
+    "numAttendees": 47,
+    "eventId": 1716018,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 40,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-47/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 956218,
+    "tournamentName": "SMASH ROYALE #47",
+    "slug": "tournament/smash-royale-47",
+    "startAt": 1790379000,
+    "numAttendees": 47,
+    "eventId": 1716019,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 16,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-47/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Mistyc",
+        "players": [
+          {
+            "id": 5553682,
+            "tag": "Mistyc"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "adrian",
+        "players": [
+          {
+            "id": 2393166,
+            "tag": "adrian"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Rockstar",
+        "players": [
+          {
+            "id": 2042112,
+            "tag": "Rockstar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 956218,
+    "tournamentName": "SMASH ROYALE #47",
+    "slug": "tournament/smash-royale-47",
+    "startAt": 1790379000,
+    "numAttendees": 47,
+    "eventId": 1716690,
+    "eventName": "Melee Stampede",
+    "numEntrants": 11,
+    "game": "Melee",
+    "eventSlug": "tournament/smash-royale-47/event/melee-stampede",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Squeegee",
+        "players": [
+          {
+            "id": 2454881,
+            "tag": "Squeegee"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "FlaggarsMiddleNut2",
+        "players": [
+          {
+            "id": 5597541,
+            "tag": "FlaagrasMiddleNut2"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "SecretSauce69",
+        "players": [
+          {
+            "id": 5597506,
+            "tag": "SecretSauce69"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 961896,
+    "tournamentName": "SMASH ROYALE #48",
+    "slug": "tournament/smash-royale-48",
+    "startAt": 1791588600,
+    "numAttendees": 34,
+    "eventId": 1728250,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 25,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-48/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 961896,
+    "tournamentName": "SMASH ROYALE #48",
+    "slug": "tournament/smash-royale-48",
+    "startAt": 1791588600,
+    "numAttendees": 34,
+    "eventId": 1728251,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 14,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-48/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Rockstar",
+        "players": [
+          {
+            "id": 2042112,
+            "tag": "Rockstar"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Humza",
+        "players": [
+          {
+            "id": 1493023,
+            "tag": "Humza"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 961896,
+    "tournamentName": "SMASH ROYALE #48",
+    "slug": "tournament/smash-royale-48",
+    "startAt": 1791588600,
+    "numAttendees": 34,
+    "eventId": 1728272,
+    "eventName": "Melee Singles",
+    "numEntrants": 13,
+    "game": "Melee",
+    "eventSlug": "tournament/smash-royale-48/event/melee-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "fLc | Jank",
+        "players": [
+          {
+            "id": 14579,
+            "tag": "Jank"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Squeegee",
+        "players": [
+          {
+            "id": 2454881,
+            "tag": "Squeegee"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "FlaagrasMiddleNut2",
+        "players": [
+          {
+            "id": 5597541,
+            "tag": "FlaagrasMiddleNut2"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "yungrick",
+        "players": [
+          {
+            "id": 1997639,
+            "tag": "yungrick"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 966964,
+    "tournamentName": "SMASH ROYALE #49",
+    "slug": "tournament/smash-royale-49",
+    "startAt": 1792798200,
+    "numAttendees": 20,
+    "eventId": 1738930,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 17,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-49/event/ultimate-singles",
+    "standings": []
+  }
+]

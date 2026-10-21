@@ -8,7 +8,12 @@ import { ApiError } from './errors.js';
 const API_URL = 'https://internal.slippi.gg/graphql';
 
 // nobody publishes a limit. community leaderboards keep to one a second, so this does too
-const REQUEST_GAP_MS = 1000;
+let REQUEST_GAP_MS = 1000;
+
+// tests that mock slippi.gg set this to 0. the real gap is covered by keeping it 1000 everywhere else
+export function setRequestGap(ms) {
+  REQUEST_GAP_MS = ms;
+}
 // players per request, as aliases
 const PER_REQUEST = 20;
 

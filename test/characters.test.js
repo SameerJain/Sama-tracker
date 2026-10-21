@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
 import { characterUsage, leans } from '../src/characters.js';
-import { getCharacterSets } from '../src/startgg.js';
+import { getCharacterSets, setRequestGap } from '../src/startgg.js';
+
+setRequestGap(0);
 
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; });

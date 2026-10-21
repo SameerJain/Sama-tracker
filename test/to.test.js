@@ -15,6 +15,8 @@ const { handleCommand } = await import('../src/commands/index.js');
 const { seedFirstTO, FIRST_TO } = await import('../src/commands/to.js');
 const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
+const slippi = await import('../src/slippi.js');
+slippi.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 

@@ -1,0 +1,40 @@
+{
+  "monday-night-smashball": {
+    "name": "Monday Night SmashBall",
+    "researchDir": "research_notes/monday-night-smashball",
+    "outDir": "monday-night-smashball",
+    "build": "monday-night-smashball/build.mjs",
+    "schedule": { "day": 2, "hour": 0, "tz": "America/New_York" },
+    "discover": {
+      "states": ["NY"],
+      "venues": ["Rossler"],
+      "nameRe": "monday.*smash"
+    },
+    "mainEventRe": "ultimate singles",
+    "sideEventRes": ["random", "rival", "amature", "doubles|dubs", "smash 4"],
+    "standingsMinEntrants": 0,
+    "skipGames": ["Street Fighter 6"],
+    "charEventsRes": ["ultimate singles", "melee singles", "^melee$"],
+    "entrantsEventsRes": ["ultimate singles"],
+    "recheckDays": 45
+  },
+  "ub-smash-royale": {
+    "name": "UB Smash Royale",
+    "researchDir": "research_notes/ub-smash-royale",
+    "outDir": "ub-smash-royale",
+    "build": "ub-smash-royale/build.mjs",
+    "schedule": { "day": 6, "hour": 0, "tz": "America/New_York" },
+    "discover": {
+      "states": ["NY"],
+      "venues": ["Student Union", "45 Lee Rd", "Founders Prom", "Clemens Hall", "O'Brian Hall"],
+      "nameRe": "smash royale #\\d+"
+    },
+    "mainEventRe": "ultimate singles",
+    "sideEventRes": ["redemption", "melee"],
+    "standingsMinEntrants": 8,
+    "skipGames": [],
+    "charEventsRes": ["ultimate singles", "melee singles", "^melee$"],
+    "entrantsEventsRes": ["ultimate singles"],
+    "recheckDays": 45
+  }
+}

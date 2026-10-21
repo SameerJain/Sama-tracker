@@ -330,7 +330,7 @@ docker run -d --name sama-tracker --restart unless-stopped --env-file .env -v sa
 
 ### Development
 
-`npm run dev` restarts on file changes. `npm test` runs against fake Discord and start.gg responses and posts nothing. Both `npm start` and `npm run dev` join the real server with the tokens in `.env`, so don't run them next to a deployed copy.
+`npm run dev` restarts on file changes. `npm run check` syntax-checks every file with node's own parser. `npm test` runs against fake Discord and start.gg responses and posts nothing. Both `npm start` and `npm run dev` join the real server with the tokens in `.env`, so don't run them next to a deployed copy.
 
 ## Data and limits
 

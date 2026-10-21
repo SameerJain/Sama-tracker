@@ -1,0 +1,2582 @@
+[
+  {
+    "id": 515103,
+    "name": "Monday Night Smashball @ Heart of The Game #1",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 38,
+    "startAt": 1675119600
+  },
+  {
+    "id": 518691,
+    "name": "Monday Night Smashball @ Heart of The Game #2",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-2",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1675724400
+  },
+  {
+    "id": 520988,
+    "name": "Monday Night Smashball @ Heart of the Game 3",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-3",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 38,
+    "startAt": 1676329200
+  },
+  {
+    "id": 523112,
+    "name": "Monday Night Smashball @ Heart of the Game #4",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-4",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1676934000
+  },
+  {
+    "id": 525306,
+    "name": "Monday Night Smashball @ Heart of the Game #5",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-5",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1677538800
+  },
+  {
+    "id": 527714,
+    "name": "Monday Night Smashball @ heart of the Game #6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 15,
+    "startAt": 1678143600
+  },
+  {
+    "id": 529971,
+    "name": "Monday Night SmashBall @ Heart of The Game #7",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-7",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 42,
+    "startAt": 1678744800
+  },
+  {
+    "id": 531996,
+    "name": "Monday Night SmashBall @ Heart of The Game #8",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-8",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1679349600
+  },
+  {
+    "id": 534246,
+    "name": "Monday Night SmashBall @ Heart of The Game #9",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-9",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 33,
+    "startAt": 1679932800
+  },
+  {
+    "id": 536542,
+    "name": "Monday Night Smashball @ Heart of The Game #10",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-10",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1680559200
+  },
+  {
+    "id": 538899,
+    "name": "Monday Night SmashBall @ Heart of The Game #11",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-11",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 39,
+    "startAt": 1681164000
+  },
+  {
+    "id": 541387,
+    "name": "Monday Night SmashBall @ Heart of The Game #12",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-12",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1681768800
+  },
+  {
+    "id": 543534,
+    "name": "Monday Night Smash Ball @ Heart of The Game #13",
+    "slug": "tournament/monday-night-smash-ball-heart-of-the-game-13",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 28,
+    "startAt": 1682373660
+  },
+  {
+    "id": 545702,
+    "name": "716 Esports Presents: The Playoffs",
+    "slug": "tournament/716-esports-presents-the-playoffs",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 14,
+    "startAt": 1682870400
+  },
+  {
+    "id": 546232,
+    "name": "Monday Night Smashball @ Heart of the Game 14",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-14",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1682978400
+  },
+  {
+    "id": 547689,
+    "name": "Monday Night Smash Ball @ heart of The Game #15",
+    "slug": "tournament/monday-night-smash-ball-heart-of-the-game-15",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 44,
+    "startAt": 1683583260
+  },
+  {
+    "id": 550320,
+    "name": "Monday Night smashball @ Heart of The Game #16",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-16",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1684188000
+  },
+  {
+    "id": 551789,
+    "name": "Monday Night Smashball @ Heart of the Game #17: Me When It's Corey's Birthday",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-17-me-when",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 57,
+    "startAt": 1684792800
+  },
+  {
+    "id": 556166,
+    "name": "Monday Night Smashball @ Heart of The Game 18",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-18",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 39,
+    "startAt": 1686002400
+  },
+  {
+    "id": 548561,
+    "name": "The Street Fighter Launch Tournament",
+    "slug": "tournament/the-street-fighter-launch-tournament",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 33,
+    "startAt": 1686499200
+  },
+  {
+    "id": 558729,
+    "name": "Monday Night Smashball @ Heart of The Game 19",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-19",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1686607200
+  },
+  {
+    "id": 560617,
+    "name": "Monday Night Smashball @ Heart of The Game #20",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-20",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 43,
+    "startAt": 1687212000
+  },
+  {
+    "id": 562878,
+    "name": "Monday Night Smashball @ Heart of The Game #21",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-21",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1687816800
+  },
+  {
+    "id": 566812,
+    "name": "Monday Night Smashball @ Heart of The Game #22",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-22",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 41,
+    "startAt": 1689026400
+  },
+  {
+    "id": 569098,
+    "name": "Monday Night Smashball @ Heart of The Game 23",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-23",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1689631200
+  },
+  {
+    "id": 571740,
+    "name": "Monday Night Smashball @ Heart of the Game 24",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1690236000
+  },
+  {
+    "id": 573548,
+    "name": "Monday Night Smashball @ Heart of the Game 25",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-25",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 40,
+    "startAt": 1690840800
+  },
+  {
+    "id": 575456,
+    "name": "Monday Night Smashball @ Heart of The Game 26",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-26",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 38,
+    "startAt": 1691459940
+  },
+  {
+    "id": 577865,
+    "name": "Monday Night Smashball @ Heart of The Game 27",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-27",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1692050400
+  },
+  {
+    "id": 580776,
+    "name": "Monday Night Smashball @ Heart of The Game 28",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-28",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1692655200
+  },
+  {
+    "id": 583421,
+    "name": "BFGC Weeklies 8/26/23",
+    "slug": "tournament/bfgc-weeklies-8-26-23",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1693090800
+  },
+  {
+    "id": 583599,
+    "name": "Monday Night SmashBall @ Heart of The Game 29",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-29",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 28,
+    "startAt": 1693260000
+  },
+  {
+    "id": 585865,
+    "name": "Monday Night Smashball @ Heart of The Game 30",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-30",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 38,
+    "startAt": 1693864800
+  },
+  {
+    "id": 590505,
+    "name": "Monday Night Smashball at Heart of the Game #31",
+    "slug": "tournament/monday-night-smashball-at-heart-of-the-game-31",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1695074400
+  },
+  {
+    "id": 593017,
+    "name": "Monday Night Smashball @ Heart of The Game #32",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-32",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1695679200
+  },
+  {
+    "id": 595725,
+    "name": "Monday Night SmashBall @ Heart of The Game #33",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-33",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 32,
+    "startAt": 1696284000
+  },
+  {
+    "id": 598503,
+    "name": "Monday Night Smashball @Heart of the Game #34",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-34",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1696888800
+  },
+  {
+    "id": 598070,
+    "name": "BFGC Weeklies 10/7/23",
+    "slug": "tournament/bfgc-weeklies-10-7-23",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 15,
+    "startAt": 1697313600
+  },
+  {
+    "id": 600854,
+    "name": "Monday Night SmashBall @ Heart of The Game 35",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-35",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1697493600
+  },
+  {
+    "id": 602810,
+    "name": "Monday Night SmashBall @ Heart of The Game 36",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-36",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1698098400
+  },
+  {
+    "id": 605108,
+    "name": "Monday Night Smashball @ Heart of The Game 37 HALLOWEEKLY EDITION",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-37-halloweekly-edition",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1698703200
+  },
+  {
+    "id": 605436,
+    "name": "BFGC Weeklies 11/4/23",
+    "slug": "tournament/bfgc-weeklies-11-4-23",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 35,
+    "startAt": 1699120800
+  },
+  {
+    "id": 608253,
+    "name": "Monday Night Smashball @ Heart of The Game 38",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-38",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1699311600
+  },
+  {
+    "id": 607974,
+    "name": "BFGC Weeklies 11/11/23",
+    "slug": "tournament/bfgc-weeklies-11-11-23",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1699729200
+  },
+  {
+    "id": 611181,
+    "name": "BFGC Weeklies 11/18/2023",
+    "slug": "tournament/bfgc-weeklies-11-18-2023",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1700334000
+  },
+  {
+    "id": 612573,
+    "name": "Monday Night Smashball @ Heart of The Game 39",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-39",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 30,
+    "startAt": 1700521200
+  },
+  {
+    "id": 614399,
+    "name": "Monday Night Smashball @ Heart of The Game 40",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-40",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1701126000
+  },
+  {
+    "id": 616240,
+    "name": "BFGC Weeklies 12/02/23",
+    "slug": "tournament/bfgc-weeklies-12-02-23",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 14,
+    "startAt": 1701543600
+  },
+  {
+    "id": 616608,
+    "name": "Monday Night Smashball @ Heart of The Game 41",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-41",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 18,
+    "startAt": 1701730800
+  },
+  {
+    "id": 617857,
+    "name": "BFGC Weeklies 12/09/23",
+    "slug": "tournament/bfgc-weeklies-12-09-23",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1702148400
+  },
+  {
+    "id": 618129,
+    "name": "Monday Night Smashball @ Heart of The Game 42",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-42",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 28,
+    "startAt": 1702335600
+  },
+  {
+    "id": 620327,
+    "name": "Monday Night Smashball @ Heart of The Game 43 Christmas Game Night Edition",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-43-christmas-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 41,
+    "startAt": 1702940400
+  },
+  {
+    "id": 622836,
+    "name": "BFGC Weeklies 12/30/2023",
+    "slug": "tournament/bfgc-weeklies-12-30-2023",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1703962800
+  },
+  {
+    "id": 623201,
+    "name": "BFGC Weeklies 01/06/2024",
+    "slug": "tournament/bfgc-weeklies-01-06-2024",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 15,
+    "startAt": 1704567600
+  },
+  {
+    "id": 624434,
+    "name": "Monday Night Smashball @ Heart of The Game 44",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-44",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 14,
+    "startAt": 1704754800
+  },
+  {
+    "id": 628959,
+    "name": "The Trillion Dollar Playoffs",
+    "slug": "tournament/the-trillion-dollar-playoffs",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1705770000
+  },
+  {
+    "id": 629556,
+    "name": "Monday Night Smashball @ Heart of The Game 45",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-45",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1705964400
+  },
+  {
+    "id": 631730,
+    "name": "Monday Night Smashball @ Heart of The Game 46",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-46",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1706569200
+  },
+  {
+    "id": 634077,
+    "name": "BFGC Weeklies 02/03/24",
+    "slug": "tournament/bfgc-weeklies-02-03-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1706986800
+  },
+  {
+    "id": 633784,
+    "name": "Monday Night Smashball @ Heart of The Game 47",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-47",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 30,
+    "startAt": 1707174000
+  },
+  {
+    "id": 635037,
+    "name": "BFGC Weeklies 02/10/24",
+    "slug": "tournament/bfgc-weeklies-02-10-24-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1707591600
+  },
+  {
+    "id": 637263,
+    "name": "Monday Night Smashball @ Heart of The Game 48",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-48",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1707778800
+  },
+  {
+    "id": 638873,
+    "name": "Buffalo FGC Weeklies 02/17/24",
+    "slug": "tournament/buffalo-fgc-weeklies-02-17-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1708196400
+  },
+  {
+    "id": 638617,
+    "name": "Monday Night Smashball @ Heart of The Game 49",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-49",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 28,
+    "startAt": 1708383600
+  },
+  {
+    "id": 641115,
+    "name": "Monday Night Smashball @ Heart of The Game 50 ft. Street Fighter 6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-50-ft-street",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1708988400
+  },
+  {
+    "id": 642667,
+    "name": "BFGC Weeklies 3/2/24",
+    "slug": "tournament/bfgc-weeklies-3-2-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 34,
+    "startAt": 1709406000
+  },
+  {
+    "id": 644265,
+    "name": "Monday Night Smashball @ Heart of the Game 51 ft. All of them",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-51-ft-all",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1709593200
+  },
+  {
+    "id": 646443,
+    "name": "BFGC Weeklies 3/9/24",
+    "slug": "tournament/bfgc-weeklies-3-9-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 37,
+    "startAt": 1710010800
+  },
+  {
+    "id": 646029,
+    "name": "Monday Night SmashBall @ Heart of The Game 52 ft. Ultimate & Street fighter 6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-52-ft-ultimate",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 33,
+    "startAt": 1710194400
+  },
+  {
+    "id": 648688,
+    "name": "Monday Night Smashball @ Heart of The Game 53",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-53",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1710799200
+  },
+  {
+    "id": 651297,
+    "name": "BFGC Weeklies 3/23/24",
+    "slug": "tournament/bfgc-weeklies-3-23-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1711216800
+  },
+  {
+    "id": 651199,
+    "name": "Monday Night Smashball @ Heart of The Game 54 ft Ult,Melee,SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-54-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 33,
+    "startAt": 1711404000
+  },
+  {
+    "id": 654080,
+    "name": "Monday Night SmashBall @ Heart of The Game 55",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-55",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1712008800
+  },
+  {
+    "id": 655928,
+    "name": "BFGC Weeklies 4/6/24",
+    "slug": "tournament/bfgc-weeklies-4-6-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 18,
+    "startAt": 1712426400
+  },
+  {
+    "id": 657258,
+    "name": "Monday Night Smashball: Lights Out",
+    "slug": "tournament/monday-night-smashball-lights-out",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 14,
+    "startAt": 1712613600
+  },
+  {
+    "id": 658968,
+    "name": "BFGC Weeklies 4/13/24",
+    "slug": "tournament/bfgc-weeklies-4-13-24-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1713031200
+  },
+  {
+    "id": 659555,
+    "name": "Monday Night Smashball @ Heart of The Game 57",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-57",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1713218400
+  },
+  {
+    "id": 662099,
+    "name": "Monday Night Smashball @ Heart of The Game 58",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-58",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1713823200
+  },
+  {
+    "id": 663722,
+    "name": "Monday Night Smashball @ Heart of The Game 60",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-60",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1714428000
+  },
+  {
+    "id": 655935,
+    "name": "BFGC Weeklies 5/4/24",
+    "slug": "tournament/bfgc-weeklies-5-4-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1714845600
+  },
+  {
+    "id": 666260,
+    "name": "Monday Night Smashball @ Heart of The Game 61",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-61",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1715032800
+  },
+  {
+    "id": 669553,
+    "name": "Monday Night Smashball 62 @ Heart of The Game ft. Ultimate&SF6",
+    "slug": "tournament/monday-night-smashball-62-heart-of-the-game-ft-ultimate",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1715637600
+  },
+  {
+    "id": 670359,
+    "name": "Monday Night Smashball 63 @ Heart of The Game ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-63-heart-of-the-game-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1716242400
+  },
+  {
+    "id": 672954,
+    "name": "Monday Night Smashball 64 ft. Ultimate, Melee, Akuma",
+    "slug": "tournament/monday-night-smashball-64-ft-ultimate-melee-akuma",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1716847200
+  },
+  {
+    "id": 674553,
+    "name": "BFGC Weeklies 6/1/24",
+    "slug": "tournament/bfgc-weeklies-6-1-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1717264800
+  },
+  {
+    "id": 676326,
+    "name": "Monday Night Smashball 65 ft Ult&SF6",
+    "slug": "tournament/monday-night-smashball-65-ft-ult-sf6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1717452000
+  },
+  {
+    "id": 678150,
+    "name": "Monday Night Smashball 66 ft. Ult, Melee,SF6",
+    "slug": "tournament/monday-night-smashball-66-ft-ult-melee-sf6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1718056800
+  },
+  {
+    "id": 680352,
+    "name": "BFGC Weeklies 06/15/2024",
+    "slug": "tournament/bfgc-weeklies-06-15-2024",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1718474400
+  },
+  {
+    "id": 680355,
+    "name": "Monday Night Smashball @ Heart of The Game ft. Ult, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-ft-ult-sf6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1718661600
+  },
+  {
+    "id": 681306,
+    "name": "BFGC Weeklies 06/22/2024",
+    "slug": "tournament/bfgc-weeklies-06-22-2024",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1719079200
+  },
+  {
+    "id": 682418,
+    "name": "Monday Night Smashball @Heart of The Game 68 ft. Ult,Melee,SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-68-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1719266400
+  },
+  {
+    "id": 682019,
+    "name": "BFGC Weeklies 6/29/24",
+    "slug": "tournament/bfgc-weeklies-6-29-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1719684000
+  },
+  {
+    "id": 686463,
+    "name": "Monday Night smashBall 69.0+1.0 You Will (Not) Enter Street Fighter",
+    "slug": "tournament/monday-night-smashball-69-0-1-0-you-will-not",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1720476000
+  },
+  {
+    "id": 688492,
+    "name": "BFGC Weeklies 7/13/24",
+    "slug": "tournament/bfgc-weeklies-7-13-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1720893600
+  },
+  {
+    "id": 688774,
+    "name": "Monday Night SmashBall @ Heart of The Game 71 ft Ult&SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-71-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1721080800
+  },
+  {
+    "id": 690294,
+    "name": "Monday Night SmashBall @ Heart of The Game 72 ft Ult&Melee",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-72-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 35,
+    "startAt": 1721642400
+  },
+  {
+    "id": 692434,
+    "name": "BFGC Weekly 7/27/24",
+    "slug": "tournament/bfgc-weekly-7-27-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1722103200
+  },
+  {
+    "id": 693115,
+    "name": "Monday Night SmashBall @ Heart of The Game 73 ft. Ult&SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-73-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1722290400
+  },
+  {
+    "id": 694403,
+    "name": "Monday Night SmashBall @ Heart of The Game 74 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-74-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1722895200
+  },
+  {
+    "id": 697258,
+    "name": "Monday Night SmashBall @ Heart of The Game 75 ft. Ultimate& SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-75-ft-ultimate",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1723500000
+  },
+  {
+    "id": 698277,
+    "name": "BFGC Weeklies 08/17/24",
+    "slug": "tournament/bfgc-weeklies-08-17-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1723917600
+  },
+  {
+    "id": 699282,
+    "name": "Monday Night SmashBall @ Heart of The Game 76 ft. Ult Melee and SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-76-ft-ult-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1724104800
+  },
+  {
+    "id": 701428,
+    "name": "BFGC Weekly 8/24/24",
+    "slug": "tournament/bfgc-weekly-8-24-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1724522400
+  },
+  {
+    "id": 701752,
+    "name": "Monday Night SmashBall 77 ft. Ult and SF6",
+    "slug": "tournament/monday-night-smashball-77-ft-ult-and-sf6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1724709600
+  },
+  {
+    "id": 703599,
+    "name": "BFGC Weekly 8/31/24",
+    "slug": "tournament/bfgc-weekly-8-31-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1725127200
+  },
+  {
+    "id": 704021,
+    "name": "Monday Night SmashBall @ Heart of The Game 78 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-78-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 45,
+    "startAt": 1725314400
+  },
+  {
+    "id": 706504,
+    "name": "BFGC Weekly 9/7/24",
+    "slug": "tournament/bfgc-weekly-9-7-24-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1725732000
+  },
+  {
+    "id": 706795,
+    "name": "Monday Night Smashball at Heart of The Game 79 ft. Ult & SF6",
+    "slug": "tournament/monday-night-smashball-at-heart-of-the-game-79-ft",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 34,
+    "startAt": 1725919200
+  },
+  {
+    "id": 685697,
+    "name": "Shut Up And PLAY!",
+    "slug": "tournament/shut-up-and-play",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 170,
+    "startAt": 1726322400
+  },
+  {
+    "id": 708761,
+    "name": "Monday Night SmashBall @ Heart of The Game 80 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-80-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1726524000
+  },
+  {
+    "id": 711657,
+    "name": "BFGC Weekly 9/21/24",
+    "slug": "tournament/bfgc-weekly-9-21-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1726941600
+  },
+  {
+    "id": 711979,
+    "name": "Monday Night Smashball @ Heart of The Game 81",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-81",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 18,
+    "startAt": 1727128800
+  },
+  {
+    "id": 714125,
+    "name": "BFGC Weekly 9/28/24",
+    "slug": "tournament/bfgc-weekly-9-28-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 14,
+    "startAt": 1727546400
+  },
+  {
+    "id": 714644,
+    "name": "Monday Night SmashBall @ Heart of The Game 82 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-82-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1727733600
+  },
+  {
+    "id": 715792,
+    "name": "BFGC Weekly 10/5/24",
+    "slug": "tournament/bfgc-weekly-10-5-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1728151200
+  },
+  {
+    "id": 717433,
+    "name": "Monday Night Smashball 83 @ Heart of The Game ft. Ult, SF6",
+    "slug": "tournament/monday-night-smashball-83-heart-of-the-game-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1728338400
+  },
+  {
+    "id": 718379,
+    "name": "Monday Night SmashBall @ Heart of The Game 84 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-84-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1728943200
+  },
+  {
+    "id": 721994,
+    "name": "BFGC Weekly 10/19/24",
+    "slug": "tournament/bfgc-weekly-10-19-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 12,
+    "startAt": 1729360800
+  },
+  {
+    "id": 722419,
+    "name": "Monday Night Smashball @HOTG #85 ft. Ult&SF6",
+    "slug": "tournament/monday-night-smashball-hotg-85-ft-ult-sf6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1729548000
+  },
+  {
+    "id": 723835,
+    "name": "Monday Night Smashball @ Heart of The Game 86 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-86-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1730152800
+  },
+  {
+    "id": 726947,
+    "name": "BFGC Weekly 11/2/24",
+    "slug": "tournament/bfgc-weekly-11-2-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1730570400
+  },
+  {
+    "id": 727327,
+    "name": "Monday Night Smashball at Heart of The Game 87 ft. Ult, SF6",
+    "slug": "tournament/monday-night-smashball-at-heart-of-the-game-87-ft",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 10,
+    "startAt": 1730761200
+  },
+  {
+    "id": 728980,
+    "name": "Monday Night Smashball 88 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-88-ft-ult-melee-sf6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1731366000
+  },
+  {
+    "id": 731693,
+    "name": "Monday Night SmashBall @ Heart of The Game 89 ft Ult, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-89-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1731970800
+  },
+  {
+    "id": 733452,
+    "name": "BFGC Weekly 11/23/24",
+    "slug": "tournament/bfgc-weekly-11-23-24",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 14,
+    "startAt": 1732399200
+  },
+  {
+    "id": 733653,
+    "name": "Monday Night SmashBall @ Heart of The Game 90 ft. Ult, Melee,SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-90-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 32,
+    "startAt": 1732575600
+  },
+  {
+    "id": 736655,
+    "name": "Monday Night SmashBall @Heart of The Game 91 ft. Ult,SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-91-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 28,
+    "startAt": 1733180400
+  },
+  {
+    "id": 738520,
+    "name": "Monday Night SmashBall @ Heart of The Game 92 ft. Ult, Melee, SF6",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-92-ft-ult",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1733785200
+  },
+  {
+    "id": 731699,
+    "name": "MNSB Holiday Party",
+    "slug": "tournament/mnsb-holiday-party",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 54,
+    "startAt": 1734300000
+  },
+  {
+    "id": 741092,
+    "name": "Monday Night SmashBall @ Heart Of The Game 93",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-93",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1734390000
+  },
+  {
+    "id": 742143,
+    "name": "Monday Night SmashBall @ Heart Of The Game 94",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-94",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1734994800
+  },
+  {
+    "id": 743291,
+    "name": "Monday Night SmashBall 95 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-95-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1735599600
+  },
+  {
+    "id": 745124,
+    "name": "BFGC 1/4/25",
+    "slug": "tournament/bfgc-1-4-25",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 13,
+    "startAt": 1736031600
+  },
+  {
+    "id": 745812,
+    "name": "Monday night Smash Ball 96/2",
+    "slug": "tournament/monday-night-smash-ball-96-2",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 2,
+    "startAt": 1736163600
+  },
+  {
+    "id": 744603,
+    "name": "Monday Night SmashBall @ Heart Of The Game 96",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-96",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1736204400
+  },
+  {
+    "id": 747056,
+    "name": "Monday Night SmashBall @ Heart Of The Game 97",
+    "slug": "tournament/monday-night-smashball-heart-of-the-game-97",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1736811000
+  },
+  {
+    "id": 748850,
+    "name": "Monday Night SmashBall 98 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-98-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1737414000
+  },
+  {
+    "id": 748546,
+    "name": "BFGC 2025 Ranbats Season 1 Week 1",
+    "slug": "tournament/bfgc-2025-ranbats-season-1-week-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1737842400
+  },
+  {
+    "id": 750833,
+    "name": "Monday Night SmashBall 99 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-99-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1738020600
+  },
+  {
+    "id": 751177,
+    "name": "Monday Night SmashBall 100 $100 POT BONUS @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-100-100-pot-bonus-heart-of-the",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 58,
+    "startAt": 1738623600
+  },
+  {
+    "id": 748554,
+    "name": "BFGC 2025 Ranbats Season 1 Week 2",
+    "slug": "tournament/bfgc-2025-ranbats-season-1-week-2",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1739052000
+  },
+  {
+    "id": 756667,
+    "name": "Monday Night SmashBall 101 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-101-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1739228400
+  },
+  {
+    "id": 758895,
+    "name": "Monday Night SmashBall 102 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-102-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 34,
+    "startAt": 1739833200
+  },
+  {
+    "id": 748560,
+    "name": "BFGC 2025 Ranbats Season 1 Week 3",
+    "slug": "tournament/bfgc-2025-ranbats-season-1-week-3",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1740261600
+  },
+  {
+    "id": 761480,
+    "name": "Monday Night SmashBall 103 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-103-heart-of-the-game-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1740438000
+  },
+  {
+    "id": 763174,
+    "name": "Monday Night SmashBall 104 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-104-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1741044600
+  },
+  {
+    "id": 748563,
+    "name": "BFGC 2025 Ranbats Season 1 Week 4",
+    "slug": "tournament/bfgc-2025-ranbats-season-1-week-4",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1741471200
+  },
+  {
+    "id": 766779,
+    "name": "Monday Night SmashBall 105 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-105-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1741645800
+  },
+  {
+    "id": 768609,
+    "name": "Monday Night SmashBall 106 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-106-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1742248800
+  },
+  {
+    "id": 746183,
+    "name": "Shut Up And Play! 2",
+    "slug": "tournament/shut-up-and-play-2",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 143,
+    "startAt": 1742616000
+  },
+  {
+    "id": 771528,
+    "name": "Monday Night SmashBall 107 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-107-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 28,
+    "startAt": 1742855400
+  },
+  {
+    "id": 772391,
+    "name": "Monday Night SmashBall 108 + Melee Monthly @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-108-melee-monthly-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 34,
+    "startAt": 1743460200
+  },
+  {
+    "id": 776303,
+    "name": "Monday Night SmashBall 109 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-109-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1744065000
+  },
+  {
+    "id": 779179,
+    "name": "Monday Night SmashBall 110 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-110-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1744669800
+  },
+  {
+    "id": 779960,
+    "name": "Monday Night SmashBall 111@ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-111-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1745274600
+  },
+  {
+    "id": 783178,
+    "name": "Monday Night SmashBall 112 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-112-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1745879400
+  },
+  {
+    "id": 785058,
+    "name": "Monday Night SmashBall 113 + Melee Monthly @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-113-melee-monthly-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 32,
+    "startAt": 1746484200
+  },
+  {
+    "id": 788633,
+    "name": "Monday Night SmashBall 114 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-114-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1747089000
+  },
+  {
+    "id": 780864,
+    "name": "BuffaLOVE Melee @ Heart of the Game",
+    "slug": "tournament/buffalove-melee-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1747576800
+  },
+  {
+    "id": 790402,
+    "name": "Monday Night SmashBall 115 (Corey’s Birthday Celebration) @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-115-corey-s-birthday-celebration-heart-of",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1747693800
+  },
+  {
+    "id": 792523,
+    "name": "Monday Night SmashBall 116 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-116-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1748298600
+  },
+  {
+    "id": 795632,
+    "name": "Monday Night SmashBall 117 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-117-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1748903400
+  },
+  {
+    "id": 795919,
+    "name": "BFGC Mini-Monthly 6/7/25 ft. COTW, SF6, and MK1",
+    "slug": "tournament/bfgc-mini-monthly-6-7-25-ft-cotw-sf6-and",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1749333600
+  },
+  {
+    "id": 797345,
+    "name": "Monday Night SmashBall 118 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-118-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1749508200
+  },
+  {
+    "id": 799223,
+    "name": "Monday Night SmashBall 119 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-119-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1750113000
+  },
+  {
+    "id": 802047,
+    "name": "Monday Night SmashBall 120 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-120-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1750717800
+  },
+  {
+    "id": 803029,
+    "name": "BuffaLOVE Melee #2 @ Heart of the Game",
+    "slug": "tournament/buffalove-melee-2-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 9,
+    "startAt": 1751207400
+  },
+  {
+    "id": 805877,
+    "name": "Monday Night SmashBall 122 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-122-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1751927400
+  },
+  {
+    "id": 803247,
+    "name": "Denny's Cup 2",
+    "slug": "tournament/denny-s-cup-2",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1752422400
+  },
+  {
+    "id": 808008,
+    "name": "Monday Night SmashBall 123 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-123-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1752532200
+  },
+  {
+    "id": 809307,
+    "name": "BFGC Weeklies 7/19/25",
+    "slug": "tournament/bfgc-weeklies-7-19-25-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1752948000
+  },
+  {
+    "id": 809844,
+    "name": "Monday Night SmashBall 124 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-124-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1753137000
+  },
+  {
+    "id": 812412,
+    "name": "Monday Night SmashBall 125 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-125-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1753741800
+  },
+  {
+    "id": 814004,
+    "name": "Monday Night SmashBall 126 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-126-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1754346600
+  },
+  {
+    "id": 816908,
+    "name": "Monday Night SmashBall 127 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-127-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1754951400
+  },
+  {
+    "id": 818227,
+    "name": "Monday Night SmashBall 128 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-128-heart-of-the-game-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 24,
+    "startAt": 1755556200
+  },
+  {
+    "id": 820517,
+    "name": "Monday Night SmashBall 129 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-129-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 38,
+    "startAt": 1756161000
+  },
+  {
+    "id": 823064,
+    "name": "Monday Night SmashBall 130 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-130-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1756765800
+  },
+  {
+    "id": 825344,
+    "name": "Monday Night SmashBall 131 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-131-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1757370600
+  },
+  {
+    "id": 795167,
+    "name": "Shut Up And Play! 3",
+    "slug": "tournament/shut-up-and-play-3",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 127,
+    "startAt": 1757775600
+  },
+  {
+    "id": 828358,
+    "name": "Monday Night SmashBall 132 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-132-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1757975400
+  },
+  {
+    "id": 831237,
+    "name": "BFGC Weekly Tournament 9/20/25",
+    "slug": "tournament/bfgc-weekly-tournament-9-20-25-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 7,
+    "startAt": 1758391200
+  },
+  {
+    "id": 830877,
+    "name": "Monday Night SmashBall 133 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-133-heart-of-the-game-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1758580200
+  },
+  {
+    "id": 833939,
+    "name": "BFGC Weekly Tournament 9/27/25",
+    "slug": "tournament/bfgc-weekly-tournament-9-27-25",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 8,
+    "startAt": 1759006800
+  },
+  {
+    "id": 833295,
+    "name": "Monday Night SmashBall 134 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-134-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 30,
+    "startAt": 1759185000
+  },
+  {
+    "id": 836948,
+    "name": "BFGC Weekly 10/4/25",
+    "slug": "tournament/bfgc-weekly-10-4-25",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 2,
+    "startAt": 1759613400
+  },
+  {
+    "id": 836196,
+    "name": "Monday Night SmashBall 135 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-135-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 18,
+    "startAt": 1759789800
+  },
+  {
+    "id": 838919,
+    "name": "Monday Night SmashBall 136 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-136-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1760394600
+  },
+  {
+    "id": 841503,
+    "name": "Monday Night SmashBall 137 ($50 pot bonus) @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-137-50-pot-bonus-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1760999400
+  },
+  {
+    "id": 844140,
+    "name": "Monday Night SmashBall 138 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-138-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 27,
+    "startAt": 1761604200
+  },
+  {
+    "id": 846873,
+    "name": "BFGC's Nightmare After Halloween Tournament 11/1/25",
+    "slug": "tournament/bfgc-s-nightmare-after-halloween-tournament-11-1-25",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 13,
+    "startAt": 1762020000
+  },
+  {
+    "id": 847134,
+    "name": "Monday Night SmashBall 139 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-139-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1762212600
+  },
+  {
+    "id": 848400,
+    "name": "BFGC Weekly 11/8/25",
+    "slug": "tournament/bfgc-weekly-11-8-25",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 8,
+    "startAt": 1762628400
+  },
+  {
+    "id": 848989,
+    "name": "Monday Night SmashBall 140 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-140-heart-of-the-game-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1762817400
+  },
+  {
+    "id": 851391,
+    "name": "Monday Night SmashBall 141 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-141-heart-of-the-game-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1763422200
+  },
+  {
+    "id": 854355,
+    "name": "Monday Night SmashBall 142 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-142-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1764027000
+  },
+  {
+    "id": 856280,
+    "name": "Monday Night SmashBall 143 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-143-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1764631800
+  },
+  {
+    "id": 858873,
+    "name": "Monday Night SmashBall 144 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-144-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 26,
+    "startAt": 1765236600
+  },
+  {
+    "id": 861030,
+    "name": "Monday Night SmashBall 145 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-145-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 7,
+    "startAt": 1765841400
+  },
+  {
+    "id": 863369,
+    "name": "BFGC Weekly 12/20/25",
+    "slug": "tournament/bfgc-weekly-12-20-25",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 15,
+    "startAt": 1766268000
+  },
+  {
+    "id": 862334,
+    "name": "SmashBall 146 Holiday Party $250 pot bonus!!!! @ Heart Of The Game",
+    "slug": "tournament/smashball-146-holiday-party-250-pot-bonus-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 38,
+    "startAt": 1766446200
+  },
+  {
+    "id": 861881,
+    "name": "BFGC January MONTHLY Tournament - 1/3/26",
+    "slug": "tournament/bfgc-january-monthly-tournament-1-3-26",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1767477600
+  },
+  {
+    "id": 865660,
+    "name": "Monday Night SmashBall 147 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-147-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1767655800
+  },
+  {
+    "id": 867922,
+    "name": "Monday Night SmashBall 148 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-148-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1768260600
+  },
+  {
+    "id": 870459,
+    "name": "Monday Night SmashBall 149 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-149-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1768865400
+  },
+  {
+    "id": 875400,
+    "name": "Monday Night SmashBall 150 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-150-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1770075000
+  },
+  {
+    "id": 878485,
+    "name": "Monday Night SmashBall 151 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-151-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1770679800
+  },
+  {
+    "id": 879893,
+    "name": "Monday Night SmashBall 152 @ Heart Of The Game ($100 pot bonus)",
+    "slug": "tournament/monday-night-smashball-152-heart-of-the-game-100-pot-bonus",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1771284600
+  },
+  {
+    "id": 882975,
+    "name": "Monday Night SmashBall 153 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-153-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1771889400
+  },
+  {
+    "id": 847922,
+    "name": "SmashCade 2026",
+    "slug": "tournament/smashcade-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 60,
+    "startAt": 1772298000
+  },
+  {
+    "id": 886422,
+    "name": "Monday Night SmashBall 154 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-154-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1772494200
+  },
+  {
+    "id": 887455,
+    "name": "BFGC March Monthly Tournament - 3/7/26",
+    "slug": "tournament/bfgc-march-monthly-tournament-3-7-26",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 6,
+    "startAt": 1772920800
+  },
+  {
+    "id": 888305,
+    "name": "Monday Night SmashBall 155 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-155-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1773095400
+  },
+  {
+    "id": 890805,
+    "name": "Monday Night SmashBall 156 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-156-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1773700080
+  },
+  {
+    "id": 893039,
+    "name": "Monday Night SmashBall 157 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-157-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1774305000
+  },
+  {
+    "id": 895876,
+    "name": "Monday Night SmashBall 158 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-158-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1774909800
+  },
+  {
+    "id": 898083,
+    "name": "Monday Night SmashBall 159 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-159-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 30,
+    "startAt": 1775514600
+  },
+  {
+    "id": 900652,
+    "name": "Monday Night SmashBall 160 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-160-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 19,
+    "startAt": 1776119400
+  },
+  {
+    "id": 903292,
+    "name": "Monday Night SmashBall 161 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-161-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1776724200
+  },
+  {
+    "id": 905624,
+    "name": "Monday Night SmashBall 162 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-162-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 10,
+    "startAt": 1777285800
+  },
+  {
+    "id": 908019,
+    "name": "Monday Night SmashBall 163 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-163-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1777933800
+  },
+  {
+    "id": 910292,
+    "name": "Monday Night SmashBall 164 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-164-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1778538600
+  },
+  {
+    "id": 914852,
+    "name": "Monday Night SmashBall 165 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-165-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 18,
+    "startAt": 1779748200
+  },
+  {
+    "id": 917372,
+    "name": "Monday Night SmashBall 166 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-166-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1780353000
+  },
+  {
+    "id": 916877,
+    "name": "BFGC Heart of the Game 10th Anniversary Celebration Tournament | 6/6/26",
+    "slug": "tournament/bfgc-heart-of-the-game-10th-anniversary-celebration-tournament-6-6-26",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 13,
+    "startAt": 1780765200
+  },
+  {
+    "id": 916093,
+    "name": "Heart Of The Game 10th Anniversary Tournament",
+    "slug": "tournament/heart-of-the-game-10th-anniversary-tournament",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1780851600
+  },
+  {
+    "id": 919823,
+    "name": "Monday Night SmashBall 167 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-167-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 12,
+    "startAt": 1781562600
+  },
+  {
+    "id": 924289,
+    "name": "Monday Night SmashBall 168 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-168-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 31,
+    "startAt": 1782167400
+  },
+  {
+    "id": 927277,
+    "name": "Monday Night SmashBall 169 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-169-heart-of-the-game-1",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1782772200
+  },
+  {
+    "id": 929181,
+    "name": "Monday Night SmashBall 170 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-170-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1783377000
+  },
+  {
+    "id": 931330,
+    "name": "BFGC Weekly 7/11/26",
+    "slug": "tournament/bfgc-weekly-7-11-26",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 8,
+    "startAt": 1783792800
+  },
+  {
+    "id": 931923,
+    "name": "Monday Night SmashBall 171 @ Heart Of The Gane",
+    "slug": "tournament/monday-night-smashball-171-heart-of-the-gane",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 29,
+    "startAt": 1783981800
+  },
+  {
+    "id": 931210,
+    "name": "BFGC MONTHLY 7/18/26",
+    "slug": "tournament/bfgc-monthly-7-18-26",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 9,
+    "startAt": 1784397600
+  },
+  {
+    "id": 933478,
+    "name": "Monday Night SmashBall 172 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-172-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 37,
+    "startAt": 1784584800
+  },
+  {
+    "id": 936262,
+    "name": "Monday Night SmashBall 173 @ heart of the game",
+    "slug": "tournament/monday-night-smashball-173-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 23,
+    "startAt": 1785191400
+  },
+  {
+    "id": 938143,
+    "name": "Buffalo Weekly 08/01/2026",
+    "slug": "tournament/buffalo-weekly-08-01-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 9,
+    "startAt": 1785618000
+  },
+  {
+    "id": 940065,
+    "name": "Buffalo Weekly 8/8/2026",
+    "slug": "tournament/buffalo-weekly-8-8-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 10,
+    "startAt": 1786212000
+  },
+  {
+    "id": 937810,
+    "name": "Farewell Corey Monday Night SmashBall 174 @ Heart Of The Game",
+    "slug": "tournament/farewell-corey-monday-night-smashball-174-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 47,
+    "startAt": 1786401000
+  },
+  {
+    "id": 941455,
+    "name": "Buffalo Monthly 08/15/2026",
+    "slug": "tournament/buffalo-monthly-08-15-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 12,
+    "startAt": 1786827600
+  },
+  {
+    "id": 942805,
+    "name": "Monday Night SmashBall 175 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-175-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1787005800
+  },
+  {
+    "id": 944015,
+    "name": "Buffalo Weekly 08/22/2026",
+    "slug": "tournament/buffalo-weekly-08-22-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 10,
+    "startAt": 1787432400
+  },
+  {
+    "id": 945074,
+    "name": "Monday Night SmashBall 176 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-176-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 32,
+    "startAt": 1787610600
+  },
+  {
+    "id": 947261,
+    "name": "Monday Night SmashBall 177 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-177-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 42,
+    "startAt": 1788215400
+  },
+  {
+    "id": 949941,
+    "name": "Buffalo Weekly 09/05/2026",
+    "slug": "tournament/buffalo-weekly-09-05-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 12,
+    "startAt": 1788642000
+  },
+  {
+    "id": 947428,
+    "name": "Buffalo Monthly 09/12/26",
+    "slug": "tournament/buffalo-monthly-09-12-26",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 14,
+    "startAt": 1789246800
+  },
+  {
+    "id": 951469,
+    "name": "Monday Night SmashBall 178 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-178-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1789425000
+  },
+  {
+    "id": 953683,
+    "name": "Buffalo Weekly 09/19/2026",
+    "slug": "tournament/buffalo-weekly-09-19-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 9,
+    "startAt": 1789851600
+  },
+  {
+    "id": 954660,
+    "name": "Monday Night SmashBall 179 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-179-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1790029800
+  },
+  {
+    "id": 956251,
+    "name": "Buffalo Weekly 09/26/2026",
+    "slug": "tournament/buffalo-weekly-09-26-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 11,
+    "startAt": 1790445600
+  },
+  {
+    "id": 957585,
+    "name": "Monday Night SmashBall 180 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-180-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 20,
+    "startAt": 1790634600
+  },
+  {
+    "id": 926809,
+    "name": "Shut Up And Play! 4",
+    "slug": "tournament/shut-up-and-play-4",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 101,
+    "startAt": 1791039600
+  },
+  {
+    "id": 960298,
+    "name": "Monday Night SmashBall 181 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-181-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 25,
+    "startAt": 1791239400
+  },
+  {
+    "id": 962390,
+    "name": "Buffalo Weekly 10/10/2026",
+    "slug": "tournament/buffalo-weekly-10-10-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 12,
+    "startAt": 1791667800
+  },
+  {
+    "id": 962193,
+    "name": "Monday Night SmashBall 182 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-182-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 22,
+    "startAt": 1791844200
+  },
+  {
+    "id": 964058,
+    "name": "Buffalo Weekly 10/17/2026",
+    "slug": "tournament/buffalo-weekly-10-17-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 16,
+    "startAt": 1792270800
+  },
+  {
+    "id": 940145,
+    "name": "SmashCade 2",
+    "slug": "tournament/smashcade-2-4",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 73,
+    "startAt": 1792335600
+  },
+  {
+    "id": 966135,
+    "name": "Monday Night SmashBall 183 @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-183-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 21,
+    "startAt": 1792449000
+  },
+  {
+    "id": 966148,
+    "name": "Buffalo Weekly 10/24/2026",
+    "slug": "tournament/buffalo-weekly-10-24-2026",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 0,
+    "startAt": 1792875600
+  }
+]

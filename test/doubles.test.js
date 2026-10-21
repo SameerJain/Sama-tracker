@@ -9,6 +9,7 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { doubles, doublesReport } = await import('../src/embeds/doubles.js');
 const startgg = await import('../src/startgg.js');
+startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 

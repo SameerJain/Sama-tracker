@@ -11,7 +11,9 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleAutocomplete, handleCommand } = await import('../src/commands/index.js');
-const { queueLength } = await import('../src/startgg.js');
+const startgg = await import('../src/startgg.js');
+startgg.setRequestGap(0);
+const { queueLength } = startgg;
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 

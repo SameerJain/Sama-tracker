@@ -1,0 +1,1866 @@
+[
+  {
+    "id": 583090,
+    "name": "Smash Royale #1 - UB Smash Club",
+    "slug": "tournament/smash-royale-1-ub-smash-club",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 65,
+    "startAt": 1694041200,
+    "endAt": 1694055600,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 971487,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-1-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 971486,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-1-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 65,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 593936,
+    "name": "Smash Royale #2 - UB Smash Club",
+    "slug": "tournament/smash-royale-2-ub-smash-club",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1695855600,
+    "endAt": 1695870000,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 992288,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-2-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 35,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 992289,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-2-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 10,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 597983,
+    "name": "Smash Royale #3 - UB Smash Club",
+    "slug": "tournament/smash-royale-3-ub-smash-club",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 32,
+    "startAt": 1697065200,
+    "endAt": 1697079660,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 999900,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-3-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 30,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 999901,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-3-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 12,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 603433,
+    "name": "Smash Royale #4 - Pajama Day",
+    "slug": "tournament/smash-royale-4-pajama-day",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1698274800,
+    "endAt": 1698289200,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1009967,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-4-pajama-day/event/ultimate-singles",
+        "numEntrants": 35,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1009968,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-4-pajama-day/event/redemption-bracket",
+        "numEntrants": 9,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 608579,
+    "name": "Smash Royale #5",
+    "slug": "tournament/smash-royale-5",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 23,
+    "startAt": 1699488000,
+    "endAt": 1699502400,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1020047,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-5/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1020046,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-5/event/ultimate-singles",
+        "numEntrants": 23,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 614761,
+    "name": "Smash Royale #6",
+    "slug": "tournament/smash-royale-6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1701302400,
+    "endAt": 1701316800,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1031542,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-6/event/ultimate-singles",
+        "numEntrants": 30,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1031543,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-6/event/redemption-bracket",
+        "numEntrants": 12,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 630749,
+    "name": "Smash Royale #7 - Spring Semester Opener",
+    "slug": "tournament/smash-royale-7-spring-semester-opener",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 43,
+    "startAt": 1707350400,
+    "endAt": 1707364800,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1062983,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-7-spring-semester-opener/event/ultimate-singles",
+        "numEntrants": 41,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1062984,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-7-spring-semester-opener/event/redemption-bracket",
+        "numEntrants": 21,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 639502,
+    "name": "Smash Royale #8 - UB Smash Club",
+    "slug": "tournament/smash-royale-8-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 37,
+    "startAt": 1708560000,
+    "endAt": 1708574400,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1080436,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-8-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1080435,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-8-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 37,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 644673,
+    "name": "Smash Royale #9 - UB Smash Club",
+    "slug": "tournament/smash-royale-9-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1709769600,
+    "endAt": 1709784000,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1090609,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-9-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1090608,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-9-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 26,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 652491,
+    "name": "Smash Royale #10 - UB Smash Club",
+    "slug": "tournament/smash-royale-10-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1711581060,
+    "endAt": 1711595460,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1106078,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-10-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 13,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1106077,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-10-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 30,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 656868,
+    "name": "Smash Royale #11 - UB Smash Club",
+    "slug": "tournament/smash-royale-11-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1712790000,
+    "endAt": 1712804400,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1114662,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-11-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 34,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1114663,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-11-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 14,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 661512,
+    "name": "Smash Royale #12 - UB Smash Club",
+    "slug": "tournament/smash-royale-12-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 62,
+    "startAt": 1713999600,
+    "endAt": 1714014000,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    },
+    "events": [
+      {
+        "id": 1123687,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-12-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 62,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1123688,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-12-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 18,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 712269,
+    "name": "Smash Royale #14 - UB Smash Club",
+    "slug": "tournament/smash-royale-14-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 42,
+    "startAt": 1727236800,
+    "endAt": 1727323140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1221553,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-14-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 14,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1221552,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-14-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 42,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 717422,
+    "name": "Smash Royale #15 - UB Smash Club",
+    "slug": "tournament/smash-royale-15-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1728514800,
+    "endAt": 1728532740,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1231909,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-15-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 30,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1231910,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-15-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 8,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 723086,
+    "name": "Smash Royale #16 - UB Smash Club",
+    "slug": "tournament/smash-royale-16-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 19,
+    "startAt": 1729724400,
+    "endAt": 1729742340,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1243239,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-16-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1243238,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-16-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 19,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 727776,
+    "name": "Smash Royale #17 - UB Smash Club",
+    "slug": "tournament/smash-royale-17-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1730937600,
+    "endAt": 1730955540,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1252849,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-17-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1252848,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-17-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 26,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 732406,
+    "name": "Smash Royale #18 - UB Smash Club",
+    "slug": "tournament/smash-royale-18-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 21,
+    "startAt": 1732147200,
+    "endAt": 1732165140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1262140,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-18-ub-smash-club/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1262139,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-18-ub-smash-club/event/ultimate-singles",
+        "numEntrants": 21,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 749058,
+    "name": "Smash Royale #19 - SPRING 2025 OPENER",
+    "slug": "tournament/smash-royale-19-spring-2025-opener",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1737590400,
+    "endAt": 1737608340,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1295891,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-19-spring-2025-opener/event/ultimate-singles",
+        "numEntrants": 30,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1295892,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-19-spring-2025-opener/event/redemption-bracket",
+        "numEntrants": 14,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 753024,
+    "name": "Smash Royale #20",
+    "slug": "tournament/smash-royale-20",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 32,
+    "startAt": 1738195200,
+    "endAt": 1738213140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1303842,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-20/event/ultimate-singles",
+        "numEntrants": 32,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1303843,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-20/event/redemption-bracket",
+        "numEntrants": 15,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 756685,
+    "name": "Smash Royale #21",
+    "slug": "tournament/smash-royale-21",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1739404800,
+    "endAt": 1739419200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1311313,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-21/event/ultimate-singles",
+        "numEntrants": 21,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1311314,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-21/event/redemption-bracket",
+        "numEntrants": 8,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 758920,
+    "name": "Smash Royale #22: THE RETURN OF DRIP",
+    "slug": "tournament/smash-royale-22-the-return-of-drip",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 42,
+    "startAt": 1740009600,
+    "endAt": 1740024000,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1315857,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-22-the-return-of-drip/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1315856,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-22-the-return-of-drip/event/ultimate-singles",
+        "numEntrants": 42,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 762131,
+    "name": "Smash Royale #23",
+    "slug": "tournament/smash-royale-23",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 20,
+    "startAt": 1740614400,
+    "endAt": 1740628860,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1322363,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-23/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1322362,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-23/event/ultimate-singles",
+        "numEntrants": 20,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 767094,
+    "name": "Smash Royale #24",
+    "slug": "tournament/smash-royale-24",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1741820400,
+    "endAt": 1741838340,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1332885,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-24/event/ultimate-singles",
+        "numEntrants": 21,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1332886,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-24/event/redemption-bracket",
+        "numEntrants": 11,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 774300,
+    "name": "Smash Royale #25",
+    "slug": "tournament/smash-royale-25",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 23,
+    "startAt": 1743634800,
+    "endAt": 1743649200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1347666,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-25/event/ultimate-singles",
+        "numEntrants": 21,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1347667,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-25/event/redemption-bracket",
+        "numEntrants": 12,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 779370,
+    "name": "Smash Royale #26",
+    "slug": "tournament/smash-royale-26",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1744844400,
+    "endAt": 1744858800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1357930,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-26/event/ultimate-singles",
+        "numEntrants": 22,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1357931,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-26/event/redemption-bracket",
+        "numEntrants": 10,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 784549,
+    "name": "Smash Royale #27",
+    "slug": "tournament/smash-royale-27",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1746054000,
+    "endAt": 1746068400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1368499,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-27/event/redemption-bracket",
+        "numEntrants": 13,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1368498,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-27/event/ultimate-singles",
+        "numEntrants": 35,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 821026,
+    "name": "Smash Royale #28",
+    "slug": "tournament/smash-royale-28",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "O'Brian Hall, 211 Mary Talbert Way, Buffalo, NY 14260, USA",
+    "numAttendees": 40,
+    "startAt": 1756942200,
+    "endAt": 1756954800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1443115,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-28/event/ultimate-singles",
+        "numEntrants": 40,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1443116,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-28/event/redemption-bracket",
+        "numEntrants": 10,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 827005,
+    "name": "Smash Royale #29",
+    "slug": "tournament/smash-royale-29",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1757545200,
+    "endAt": 1757559600,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1454921,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-29/event/redemption-bracket",
+        "numEntrants": 9,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1454920,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-29/event/ultimate-singles",
+        "numEntrants": 24,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 831940,
+    "name": "Smash Royale #30",
+    "slug": "tournament/smash-royale-30",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 27,
+    "startAt": 1758756600,
+    "endAt": 1758769200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1465036,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-30/event/redemption-bracket",
+        "numEntrants": 12,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1465035,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-30/event/ultimate-singles",
+        "numEntrants": 27,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 837414,
+    "name": "Smash Royale #31",
+    "slug": "tournament/smash-royale-31",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1759966200,
+    "endAt": 1759978800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1475829,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-31/event/redemption-bracket",
+        "numEntrants": 6,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1475828,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-31/event/ultimate-singles",
+        "numEntrants": 24,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 843223,
+    "name": "Smash Royale #32",
+    "slug": "tournament/smash-royale-32",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1761174000,
+    "endAt": 1761188400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1487326,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-32/event/redemption-bracket",
+        "numEntrants": 9,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1487325,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-32/event/ultimate-singles",
+        "numEntrants": 26,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 848391,
+    "name": "Smash Royale #33",
+    "slug": "tournament/smash-royale-33",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 20,
+    "startAt": 1762387200,
+    "endAt": 1762405140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1497667,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-33/event/redemption-bracket",
+        "numEntrants": 7,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1497666,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-33/event/ultimate-singles",
+        "numEntrants": 20,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 851149,
+    "name": "Smash Royale #34",
+    "slug": "tournament/smash-royale-34",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 28,
+    "startAt": 1762993800,
+    "endAt": 1763006400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1502865,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-34/event/redemption-bracket",
+        "numEntrants": 7,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1502864,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-34/event/ultimate-singles",
+        "numEntrants": 28,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 852991,
+    "name": "Smash Royale #35",
+    "slug": "tournament/smash-royale-35",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1763596800,
+    "endAt": 1763611200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1506338,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-35/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1506337,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-35/event/ultimate-singles",
+        "numEntrants": 26,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 857645,
+    "name": "Smash Royale #36 - Semester Finale",
+    "slug": "tournament/smash-royale-36-semester-finale",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1764806400,
+    "endAt": 1764820800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1515236,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-36-semester-finale/event/redemption-bracket",
+        "numEntrants": 7,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1515235,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-36-semester-finale/event/ultimate-singles",
+        "numEntrants": 23,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 874244,
+    "name": "Smash Royale #37",
+    "slug": "tournament/smash-royale-37",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1769644800,
+    "endAt": 1769659200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1547061,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-37/event/redemption-bracket",
+        "numEntrants": 12,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1547060,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-37/event/ultimate-singles",
+        "numEntrants": 24,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 879402,
+    "name": "Smash Royale #38",
+    "slug": "tournament/smash-royale-38",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 31,
+    "startAt": 1770854400,
+    "endAt": 1770868800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1557310,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-38/event/ultimate-singles",
+        "numEntrants": 31,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1557311,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-38/event/redemption-bracket",
+        "numEntrants": 16,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 884089,
+    "name": "Smash Royale #39",
+    "slug": "tournament/smash-royale-39",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 21,
+    "startAt": 1772065800,
+    "endAt": 1772078400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1566914,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-39/event/ultimate-singles",
+        "numEntrants": 18,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1566915,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-39/event/redemption-bracket",
+        "numEntrants": 11,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 889388,
+    "name": "Smash Royale #40",
+    "slug": "tournament/smash-royale-40",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 18,
+    "startAt": 1773270000,
+    "endAt": 1773284400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1577906,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-40/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1577905,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-40/event/ultimate-singles",
+        "numEntrants": 18,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 894029,
+    "name": "Smash Royale #41",
+    "slug": "tournament/smash-royale-41",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1774481400,
+    "endAt": 1774494000,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1587871,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-41/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1587870,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-41/event/ultimate-singles",
+        "numEntrants": 22,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 897626,
+    "name": "Smash Royale #42",
+    "slug": "tournament/smash-royale-42",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 10,
+    "startAt": 1775086200,
+    "endAt": 1775098800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1596199,
+        "name": "Round Robin",
+        "slug": "tournament/smash-royale-42/event/round-robin",
+        "numEntrants": 10,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1595376,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-42/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1595375,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-42/event/ultimate-singles",
+        "numEntrants": 10,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 899435,
+    "name": "Smash Royale #43",
+    "slug": "tournament/smash-royale-43",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 23,
+    "startAt": 1775691000,
+    "endAt": 1775703600,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1599504,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-43/event/ultimate-singles",
+        "numEntrants": 22,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1599505,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-43/event/redemption-bracket",
+        "numEntrants": 12,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 904396,
+    "name": "Smash Royale #44",
+    "slug": "tournament/smash-royale-44",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 16,
+    "startAt": 1776900600,
+    "endAt": 1776913200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1609797,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-44/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1609796,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-44/event/ultimate-singles",
+        "numEntrants": 16,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 906564,
+    "name": "FAREWELL MEGA CHAD - SMASH ROYALE #45",
+    "slug": "tournament/farewell-mega-chad-smash-royale-45",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1777505400,
+    "endAt": 1777518000,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    },
+    "events": [
+      {
+        "id": 1614301,
+        "name": "Redemption Bracket",
+        "slug": "tournament/farewell-mega-chad-smash-royale-45/event/redemption-bracket",
+        "numEntrants": 11,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1614300,
+        "name": "Ultimate Singles",
+        "slug": "tournament/farewell-mega-chad-smash-royale-45/event/ultimate-singles",
+        "numEntrants": 30,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 954039,
+    "name": "FALL SEMESTER OPENER -  SMASH ROYALE #46",
+    "slug": "tournament/fall-semester-opener-smash-royale-46",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 45,
+    "startAt": 1789774200,
+    "endAt": 1789873200,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    },
+    "events": [
+      {
+        "id": 1711519,
+        "name": "Redemption Bracket",
+        "slug": "tournament/fall-semester-opener-smash-royale-46/event/redemption-bracket",
+        "numEntrants": 13,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1711518,
+        "name": "Ultimate Singles",
+        "slug": "tournament/fall-semester-opener-smash-royale-46/event/ultimate-singles",
+        "numEntrants": 45,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  },
+  {
+    "id": 956218,
+    "name": "SMASH ROYALE #47",
+    "slug": "tournament/smash-royale-47",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 47,
+    "startAt": 1790379000,
+    "endAt": 1790481540,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    },
+    "events": [
+      {
+        "id": 1716018,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-47/event/ultimate-singles",
+        "numEntrants": 40,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1716019,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-47/event/redemption-bracket",
+        "numEntrants": 16,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1716690,
+        "name": "Melee Stampede",
+        "slug": "tournament/smash-royale-47/event/melee-stampede",
+        "numEntrants": 11,
+        "videogame": {
+          "id": 1,
+          "displayName": "Melee"
+        }
+      }
+    ]
+  },
+  {
+    "id": 961896,
+    "name": "SMASH ROYALE #48",
+    "slug": "tournament/smash-royale-48",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 34,
+    "startAt": 1791588600,
+    "endAt": 1791691140,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    },
+    "events": [
+      {
+        "id": 1728250,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-48/event/ultimate-singles",
+        "numEntrants": 25,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1728251,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-48/event/redemption-bracket",
+        "numEntrants": 14,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1728272,
+        "name": "Melee Singles",
+        "slug": "tournament/smash-royale-48/event/melee-singles",
+        "numEntrants": 13,
+        "videogame": {
+          "id": 1,
+          "displayName": "Melee"
+        }
+      }
+    ]
+  },
+  {
+    "id": 966964,
+    "name": "SMASH ROYALE #49",
+    "slug": "tournament/smash-royale-49",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 20,
+    "startAt": 1792798200,
+    "endAt": 1792900740,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    },
+    "events": [
+      {
+        "id": 1738930,
+        "name": "Ultimate Singles",
+        "slug": "tournament/smash-royale-49/event/ultimate-singles",
+        "numEntrants": 17,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      },
+      {
+        "id": 1738932,
+        "name": "Melee Singles",
+        "slug": "tournament/smash-royale-49/event/melee-singles",
+        "numEntrants": 7,
+        "videogame": {
+          "id": 1,
+          "displayName": "Melee"
+        }
+      },
+      {
+        "id": 1738931,
+        "name": "Redemption Bracket",
+        "slug": "tournament/smash-royale-49/event/redemption-bracket",
+        "numEntrants": 0,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
+  }
+]

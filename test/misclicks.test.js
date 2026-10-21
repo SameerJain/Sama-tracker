@@ -13,6 +13,7 @@ delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleButton, handleCommand } = await import('../src/commands/index.js');
 const startgg = await import('../src/startgg.js');
+startgg.setRequestGap(0);
 const tracker = await import('../src/tracker.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });

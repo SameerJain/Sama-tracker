@@ -56,16 +56,45 @@ const empty = {
    funQueue: {}, billsMeta: {},
 };
 
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// a valid file with the wrong shape shouldn't stick: one bad key falls back
+// to its default instead of crashing whoever reads it later
+export function cleanState(parsed) {
+  if (!isPlainObject(parsed)) return structuredClone(empty);
+  const out = { ...structuredClone(empty), ...parsed };
+  for (const [key, fallback] of Object.entries(empty)) {
+    const value = out[key];
+    if (value === undefined) {
+      out[key] = structuredClone(fallback);
+      continue;
+    }
+    if (Array.isArray(fallback)) {
+      if (!Array.isArray(value)) out[key] = structuredClone(fallback);
+      continue;
+    }
+    if (isPlainObject(fallback)) {
+      if (!isPlainObject(value)) out[key] = structuredClone(fallback);
+      continue;
+    }
+    // null defaults like weeklyRecap and deploy are null or an object
+    if (fallback === null && value !== null && !isPlainObject(value)) out[key] = null;
+  }
+  return out;
+}
+
 function load() {
-  if (!fs.existsSync(FILE)) return { ...empty };
+  if (!fs.existsSync(FILE)) return structuredClone(empty);
   try {
-    return { ...empty, ...JSON.parse(fs.readFileSync(FILE, 'utf8')) };
+    return cleanState(JSON.parse(fs.readFileSync(FILE, 'utf8')));
   } catch (err) {
     // a half-written main file shouldn't wipe the track list: fall back to the
     // backup from the last good save, and only quit when both are unreadable
     try {
       console.error(`couldn't read ${FILE} (${err.message}), trying ${FILE}.bak`);
-      return { ...empty, ...JSON.parse(fs.readFileSync(`${FILE}.bak`, 'utf8')) };
+      return cleanState(JSON.parse(fs.readFileSync(`${FILE}.bak`, 'utf8')));
     } catch {
       console.error(`couldn't read ${FILE} (${err.message}), fix or delete it`);
       process.exit(1);

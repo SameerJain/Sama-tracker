@@ -12,7 +12,9 @@ const { state } = await import('../src/store.js');
 const { commands, handleAutocomplete, handleCommand } = await import('../src/commands/index.js');
 const embeds = await import('../src/embeds/index.js');
 const { predict } = await import('../src/predict.js');
-const { queueLength, forgetMisses } = await import('../src/startgg.js');
+const startgg = await import('../src/startgg.js');
+startgg.setRequestGap(0);
+const { queueLength, forgetMisses } = startgg;
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 

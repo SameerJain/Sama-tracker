@@ -13,6 +13,8 @@ const { state } = await import('../src/store.js');
 const { handleButton, buttonFailed } = await import('../src/commands/index.js');
 const { reportButton, readButton, parseSince, buttonRow, sendEmbeds, h2hButton } = await import('../src/commands/shared.js');
 const { setFallbackImage } = await import('../src/embeds/index.js');
+const startgg = await import('../src/startgg.js');
+startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 

@@ -1,0 +1,898 @@
+[
+  {
+    "id": 583090,
+    "name": "Smash Royale #1 - UB Smash Club",
+    "slug": "tournament/smash-royale-1-ub-smash-club",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 65,
+    "startAt": 1694041200,
+    "endAt": 1694055600,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 593936,
+    "name": "Smash Royale #2 - UB Smash Club",
+    "slug": "tournament/smash-royale-2-ub-smash-club",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1695855600,
+    "endAt": 1695870000,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 597983,
+    "name": "Smash Royale #3 - UB Smash Club",
+    "slug": "tournament/smash-royale-3-ub-smash-club",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 32,
+    "startAt": 1697065200,
+    "endAt": 1697079660,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 603433,
+    "name": "Smash Royale #4 - Pajama Day",
+    "slug": "tournament/smash-royale-4-pajama-day",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1698274800,
+    "endAt": 1698289200,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 608579,
+    "name": "Smash Royale #5",
+    "slug": "tournament/smash-royale-5",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 23,
+    "startAt": 1699488000,
+    "endAt": 1699502400,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 614761,
+    "name": "Smash Royale #6",
+    "slug": "tournament/smash-royale-6",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Student Union, Buffalo, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1701302400,
+    "endAt": 1701316800,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 614732,
+    "name": "Scarlet Tempest Presents: The Winter Royale",
+    "slug": "tournament/scarlet-tempest-presents-the-winter-royale",
+    "city": "Queens",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "8000 Utopia Pkwy, Jamaica, NY 11439, USA",
+    "numAttendees": 21,
+    "startAt": 1701468000,
+    "endAt": 1701492900,
+    "isOnline": false,
+    "owner": {
+      "id": 107649
+    }
+  },
+  {
+    "id": 619326,
+    "name": "NYCMelee Arcadian: Battlefield Royale",
+    "slug": "tournament/nycmelee-arcadian-battlefield-royale",
+    "city": "New York",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "50 Bowery, New York, NY 10013, USA",
+    "numAttendees": 162,
+    "startAt": 1704556800,
+    "endAt": 1704603540,
+    "isOnline": false,
+    "owner": {
+      "id": 531324
+    }
+  },
+  {
+    "id": 630749,
+    "name": "Smash Royale #7 - Spring Semester Opener",
+    "slug": "tournament/smash-royale-7-spring-semester-opener",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 43,
+    "startAt": 1707350400,
+    "endAt": 1707364800,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 639502,
+    "name": "Smash Royale #8 - UB Smash Club",
+    "slug": "tournament/smash-royale-8-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 37,
+    "startAt": 1708560000,
+    "endAt": 1708574400,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 644673,
+    "name": "Smash Royale #9 - UB Smash Club",
+    "slug": "tournament/smash-royale-9-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1709769600,
+    "endAt": 1709784000,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 652491,
+    "name": "Smash Royale #10 - UB Smash Club",
+    "slug": "tournament/smash-royale-10-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1711581060,
+    "endAt": 1711595460,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 656868,
+    "name": "Smash Royale #11 - UB Smash Club",
+    "slug": "tournament/smash-royale-11-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1712790000,
+    "endAt": 1712804400,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 661512,
+    "name": "Smash Royale #12 - UB Smash Club",
+    "slug": "tournament/smash-royale-12-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 62,
+    "startAt": 1713999600,
+    "endAt": 1714014000,
+    "isOnline": false,
+    "owner": {
+      "id": 625623
+    }
+  },
+  {
+    "id": 712269,
+    "name": "Smash Royale #14 - UB Smash Club",
+    "slug": "tournament/smash-royale-14-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 42,
+    "startAt": 1727236800,
+    "endAt": 1727323140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 717422,
+    "name": "Smash Royale #15 - UB Smash Club",
+    "slug": "tournament/smash-royale-15-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1728514800,
+    "endAt": 1728532740,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 723086,
+    "name": "Smash Royale #16 - UB Smash Club",
+    "slug": "tournament/smash-royale-16-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 19,
+    "startAt": 1729724400,
+    "endAt": 1729742340,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 727776,
+    "name": "Smash Royale #17 - UB Smash Club",
+    "slug": "tournament/smash-royale-17-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1730937600,
+    "endAt": 1730955540,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 732406,
+    "name": "Smash Royale #18 - UB Smash Club",
+    "slug": "tournament/smash-royale-18-ub-smash-club",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 21,
+    "startAt": 1732147200,
+    "endAt": 1732165140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 735135,
+    "name": "Scarlet Tempest Smash Presents: The Winter Royale 2024",
+    "slug": "tournament/scarlet-tempest-smash-presents-the-winter-royale-2024",
+    "city": "Queens",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "8000 Utopia Pkwy, Jamaica, NY 11439, USA",
+    "numAttendees": 25,
+    "startAt": 1733524200,
+    "endAt": 1733544000,
+    "isOnline": false,
+    "owner": {
+      "id": 107649
+    }
+  },
+  {
+    "id": 749058,
+    "name": "Smash Royale #19 - SPRING 2025 OPENER",
+    "slug": "tournament/smash-royale-19-spring-2025-opener",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1737590400,
+    "endAt": 1737608340,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 753024,
+    "name": "Smash Royale #20",
+    "slug": "tournament/smash-royale-20",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 32,
+    "startAt": 1738195200,
+    "endAt": 1738213140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 756685,
+    "name": "Smash Royale #21",
+    "slug": "tournament/smash-royale-21",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1739404800,
+    "endAt": 1739419200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 758920,
+    "name": "Smash Royale #22: THE RETURN OF DRIP",
+    "slug": "tournament/smash-royale-22-the-return-of-drip",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 42,
+    "startAt": 1740009600,
+    "endAt": 1740024000,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 762131,
+    "name": "Smash Royale #23",
+    "slug": "tournament/smash-royale-23",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 20,
+    "startAt": 1740614400,
+    "endAt": 1740628860,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 767094,
+    "name": "Smash Royale #24",
+    "slug": "tournament/smash-royale-24",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1741820400,
+    "endAt": 1741838340,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 774300,
+    "name": "Smash Royale #25",
+    "slug": "tournament/smash-royale-25",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 23,
+    "startAt": 1743634800,
+    "endAt": 1743649200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 779370,
+    "name": "Smash Royale #26",
+    "slug": "tournament/smash-royale-26",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1744844400,
+    "endAt": 1744858800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 784549,
+    "name": "Smash Royale #27",
+    "slug": "tournament/smash-royale-27",
+    "city": "Amherst",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "45 Lee Rd, Amherst, NY 14228, USA",
+    "numAttendees": 35,
+    "startAt": 1746054000,
+    "endAt": 1746068400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 821026,
+    "name": "Smash Royale #28",
+    "slug": "tournament/smash-royale-28",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "O'Brian Hall, 211 Mary Talbert Way, Buffalo, NY 14260, USA",
+    "numAttendees": 40,
+    "startAt": 1756942200,
+    "endAt": 1756954800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 827005,
+    "name": "Smash Royale #29",
+    "slug": "tournament/smash-royale-29",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1757545200,
+    "endAt": 1757559600,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 819789,
+    "name": "ROC Royale 2",
+    "slug": "tournament/roc-royale-2",
+    "city": "Rochester",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "115 South Ave, Rochester, NY 14604, USA",
+    "numAttendees": 14,
+    "startAt": 1758380400,
+    "endAt": 1758398400,
+    "isOnline": false,
+    "owner": {
+      "id": 1084311
+    }
+  },
+  {
+    "id": 831940,
+    "name": "Smash Royale #30",
+    "slug": "tournament/smash-royale-30",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 27,
+    "startAt": 1758756600,
+    "endAt": 1758769200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 837414,
+    "name": "Smash Royale #31",
+    "slug": "tournament/smash-royale-31",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1759966200,
+    "endAt": 1759978800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 843223,
+    "name": "Smash Royale #32",
+    "slug": "tournament/smash-royale-32",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1761174000,
+    "endAt": 1761188400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 845602,
+    "name": "NXT Legaci Pokémon Legends ZA Battle Royale Tournament",
+    "slug": "tournament/nxt-legaci-pok-mon-legends-za-battle-royale-tournament-1",
+    "city": "New York",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "200 W 41st St 2nd floor, New York, NY 10036, USA",
+    "numAttendees": 0,
+    "startAt": 1761969600,
+    "endAt": 1762056000,
+    "isOnline": false,
+    "owner": {
+      "id": 3179043
+    }
+  },
+  {
+    "id": 848391,
+    "name": "Smash Royale #33",
+    "slug": "tournament/smash-royale-33",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 20,
+    "startAt": 1762387200,
+    "endAt": 1762405140,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 851149,
+    "name": "Smash Royale #34",
+    "slug": "tournament/smash-royale-34",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 28,
+    "startAt": 1762993800,
+    "endAt": 1763006400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 852991,
+    "name": "Smash Royale #35",
+    "slug": "tournament/smash-royale-35",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 26,
+    "startAt": 1763596800,
+    "endAt": 1763611200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 857645,
+    "name": "Smash Royale #36 - Semester Finale",
+    "slug": "tournament/smash-royale-36-semester-finale",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1764806400,
+    "endAt": 1764820800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 874244,
+    "name": "Smash Royale #37",
+    "slug": "tournament/smash-royale-37",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 24,
+    "startAt": 1769644800,
+    "endAt": 1769659200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 877376,
+    "name": "Rivals Royale 1",
+    "slug": "tournament/rivals-royale-1-1",
+    "city": "Canton",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "34 Cornell Dr, Canton, NY 13617, USA",
+    "numAttendees": 4,
+    "startAt": 1770418800,
+    "endAt": 1770426000,
+    "isOnline": false,
+    "owner": {
+      "id": 2213599
+    }
+  },
+  {
+    "id": 879402,
+    "name": "Smash Royale #38",
+    "slug": "tournament/smash-royale-38",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 31,
+    "startAt": 1770854400,
+    "endAt": 1770868800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 884089,
+    "name": "Smash Royale #39",
+    "slug": "tournament/smash-royale-39",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 21,
+    "startAt": 1772065800,
+    "endAt": 1772078400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 889388,
+    "name": "Smash Royale #40",
+    "slug": "tournament/smash-royale-40",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 18,
+    "startAt": 1773270000,
+    "endAt": 1773284400,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 882652,
+    "name": "Rivals Royale 2",
+    "slug": "tournament/rivals-royale-2",
+    "city": "Canton",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "34 Cornell Dr, Canton, NY 13617, USA",
+    "numAttendees": 0,
+    "startAt": 1774044000,
+    "endAt": 1774051200,
+    "isOnline": false,
+    "owner": {
+      "id": 2213599
+    }
+  },
+  {
+    "id": 894029,
+    "name": "Smash Royale #41",
+    "slug": "tournament/smash-royale-41",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 22,
+    "startAt": 1774481400,
+    "endAt": 1774494000,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 897626,
+    "name": "Smash Royale #42",
+    "slug": "tournament/smash-royale-42",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 10,
+    "startAt": 1775086200,
+    "endAt": 1775098800,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 899435,
+    "name": "Smash Royale #43",
+    "slug": "tournament/smash-royale-43",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 23,
+    "startAt": 1775691000,
+    "endAt": 1775703600,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 904396,
+    "name": "Smash Royale #44",
+    "slug": "tournament/smash-royale-44",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 16,
+    "startAt": 1776900600,
+    "endAt": 1776913200,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 905354,
+    "name": "RPI Smash Royale",
+    "slug": "tournament/rpi-smash-royale-1",
+    "city": "Troy",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "1761 15th St, Troy, NY 12180, USA",
+    "numAttendees": 8,
+    "startAt": 1777150800,
+    "endAt": 1777172400,
+    "isOnline": false,
+    "owner": {
+      "id": 1064839
+    }
+  },
+  {
+    "id": 906564,
+    "name": "FAREWELL MEGA CHAD - SMASH ROYALE #45",
+    "slug": "tournament/farewell-mega-chad-smash-royale-45",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "170 Founders Prom, Buffalo, NY 14228, USA",
+    "numAttendees": 30,
+    "startAt": 1777505400,
+    "endAt": 1777518000,
+    "isOnline": false,
+    "owner": {
+      "id": 629921
+    }
+  },
+  {
+    "id": 954039,
+    "name": "FALL SEMESTER OPENER -  SMASH ROYALE #46",
+    "slug": "tournament/fall-semester-opener-smash-royale-46",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 45,
+    "startAt": 1789774200,
+    "endAt": 1789873200,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    }
+  },
+  {
+    "id": 956218,
+    "name": "SMASH ROYALE #47",
+    "slug": "tournament/smash-royale-47",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 47,
+    "startAt": 1790379000,
+    "endAt": 1790481540,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    }
+  },
+  {
+    "id": 961896,
+    "name": "SMASH ROYALE #48",
+    "slug": "tournament/smash-royale-48",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 34,
+    "startAt": 1791588600,
+    "endAt": 1791691140,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    }
+  },
+  {
+    "id": 966964,
+    "name": "SMASH ROYALE #49",
+    "slug": "tournament/smash-royale-49",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
+    "numAttendees": 20,
+    "startAt": 1792798200,
+    "endAt": 1792900740,
+    "isOnline": false,
+    "owner": {
+      "id": 792375
+    }
+  }
+]

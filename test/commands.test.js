@@ -16,6 +16,8 @@ const { commands, handleButton, handleCommand } = await import('../src/commands/
 const { buttonRow, fullReport } = await import('../src/commands/shared.js');
 const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
+const slippi = await import('../src/slippi.js');
+slippi.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
