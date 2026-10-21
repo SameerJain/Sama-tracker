@@ -75,8 +75,8 @@ export function attendanceRanking(rows, winsById = {}) {
     }
   }
   return Object.entries(entered)
-    .map(([id, v]) => ({ id, tag: [...v.names].sort((a, b) => b.length - a.length)[0], events: v.events, wins: winsById[id] ?? 0 }))
-    .sort((a, b) => b.events - a.events);
+    .map(([id, v]) => { const names = [...v.names].sort((a, b) => b.length - a.length); return { id, tag: names[0], names, events: v.events, wins: winsById[id] ?? 0 }; })
+    .sort((a, b) => b.events - a.events || a.tag.localeCompare(b.tag));
 }
 
 // newcomers per edition + first/last dates per player. needs startAt per row

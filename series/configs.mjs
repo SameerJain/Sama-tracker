@@ -58,6 +58,7 @@ events, standings, character games).
   },
   'ub-smash-royale': {
     title: 'UB Smash Royale',
+    academic: true,
     extras: ['redemption'],
     allWinners: ['ultimate', 'redemption', 'melee'],
     allNote: 'Every tournament analyzed, with a link to its start.gg page. Click any header to sort. Melee ran only at #47–#49 (Stampede, Singles, Singles).',

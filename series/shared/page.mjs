@@ -6,7 +6,7 @@ export const trunc = (s, n) => { s = String(s ?? ''); return s.length > n ? s.sl
 export const csv = (rows) => rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
 export const pill = (cls, text) => `<span class="pill ${cls}">${esc(text)}</span>`;
 
-export const CSS = `:root{--bg:#fff;--fg:#222;--line:#ddd;--head:#f2f2f2;--headhov:#e2e2e2;--card:#fff}body.dark{--bg:#16181d;--fg:#e6e6e8;--line:#3a3f47;--head:#22262e;--headhov:#2c313a;--card:#1b1f26}body{font-family:system-ui,sans-serif;max-width:1100px;margin:0 auto;padding:16px;color:var(--fg);background:var(--bg)}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}th{background:var(--head)}th:hover{background:var(--headhov)}img{max-width:none;display:block}body.dark .scroll svg,body.dark .scroll img{filter:invert(0.88) hue-rotate(180deg)}.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:16px 0;overflow:hidden}small{color:#888}.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.toggles{font-size:13px;margin:6px 0}.toggles label{margin-right:12px;white-space:nowrap}nav{font-size:14px;margin:8px 0;display:flex;flex-wrap:wrap;column-gap:12px}nav a{margin-right:12px}.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;color:#fff;white-space:nowrap}.pill.u{background:#4c78a8}.pill.m{background:#2ca02a}.pill.r{background:#8c564b}.pill.s{background:#9467bd}#toolbar{position:fixed;top:10px;left:10px;z-index:70;display:flex;gap:6px}#toolbar button{font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);cursor:pointer}body.nav-hidden nav{display:none}rect.clickable:hover{opacity:.7}@media(min-width:1000px){nav.side{flex-direction:column;position:fixed;left:max(8px,calc(50% - 660px));top:110px;width:150px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}nav.side a{display:block;margin:0 0 8px}}@media(max-width:640px){body{padding:44px 8px 8px}h1{font-size:22px}table{font-size:12px}th,td{padding:3px 6px}.card{padding:8px;margin:12px 0}}`;
+export const CSS = `:root{--bg:#fff;--fg:#222;--line:#ddd;--head:#f2f2f2;--headhov:#e2e2e2;--card:#fff}body.dark{--bg:#16181d;--fg:#e6e6e8;--line:#3a3f47;--head:#22262e;--headhov:#2c313a;--card:#1b1f26}body{font-family:system-ui,sans-serif;max-width:1100px;margin:0 auto;padding:16px;color:var(--fg);background:var(--bg)}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}th{background:var(--head)}th:hover{background:var(--headhov)}img{max-width:none;display:block}body.dark .scroll svg,body.dark .scroll img{filter:invert(0.88) hue-rotate(180deg)}.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:16px 0;overflow:hidden}small{color:#888}.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.toggles{font-size:13px;margin:6px 0}.toggles label{margin-right:12px;white-space:nowrap}nav{font-size:14px;margin:8px 0;display:flex;flex-wrap:wrap;column-gap:12px}nav a{margin-right:12px}.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;color:#fff;white-space:nowrap}.pill.u{background:#4c78a8}.pill.m{background:#2ca02a}.pill.r{background:#8c564b}.pill.s{background:#9467bd}#toolbar{position:fixed;top:10px;left:10px;z-index:70;display:flex;gap:6px}#toolbar button{font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);cursor:pointer}body.nav-hidden nav{display:none}rect.clickable:hover{opacity:.7}circle.dot:hover{r:6;fill:#e45756}#attended.hide-few tr[data-events="1"],#attended.hide-few tr[data-events="2"]{display:none!important}@media(min-width:1000px){nav.side{flex-direction:column;position:fixed;left:max(8px,calc(50% - 660px));top:110px;width:150px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}nav.side a{display:block;margin:0 0 8px}}@media(max-width:640px){body{padding:44px 8px 8px}h1{font-size:22px}table{font-size:12px}th,td{padding:3px 6px}.card{padding:8px;margin:12px 0}}`;
 
 export function card(id, title, bodyHtml, accent) {
   return `<div class="card"${id ? ` id="${id}"` : ''}${accent ? ` style="border-top:4px solid ${accent}"` : ''}>${title ? `<h2>${title}</h2>` : ''}${bodyHtml}</div>`;
@@ -52,7 +52,7 @@ document.querySelectorAll('table').forEach((t) => {
 export const CLIENT_JS_UI = `
 // chart layer toggles
 document.querySelectorAll('.toggles input').forEach((cb) => {
-  cb.onchange = () => document.querySelectorAll('#attchart .' + cb.dataset.t).forEach((el) => { el.style.display = cb.checked ? '' : 'none'; });
+  cb.onchange = () => document.querySelectorAll('.attchart .' + cb.dataset.t).forEach((el) => { el.style.display = cb.checked ? '' : 'none'; });
 });
 // dark mode
 const darkBtn = document.getElementById('darkbtn');
@@ -64,6 +64,23 @@ const navToggle = document.getElementById('navtoggle');
 const setNav = (hidden) => { document.body.classList.toggle('nav-hidden', hidden); navToggle.textContent = hidden ? '☰ menu' : '✕ menu'; try { localStorage.setItem('navhidden', hidden ? '1' : '0'); } catch (e) {} };
 try { if (localStorage.getItem('navhidden') === '1') setNav(true); } catch (e) {}
 navToggle.onclick = () => setNav(!document.body.classList.contains('nav-hidden'));
+// calendar vs academic year view (only on pages with the yearview radios)
+document.querySelectorAll('input[name="yearview"]').forEach((r) => {
+  r.onchange = () => {
+    document.querySelectorAll('[data-yearview]').forEach((el) => { el.style.display = el.dataset.yearview === r.value ? '' : 'none'; });
+  };
+});
+// attended card: hide players with only 1-2 events (swap to the shorter 3+ chart, hide table rows)
+const fewToggle = document.getElementById('fewtoggle');
+if (fewToggle) {
+  fewToggle.onchange = () => {
+    document.getElementById('attended').classList.toggle('hide-few', fewToggle.checked);
+    const all = document.getElementById('attp-all');
+    const reg = document.getElementById('attp-regular');
+    if (all) all.style.display = fewToggle.checked ? 'none' : '';
+    if (reg) reg.style.display = fewToggle.checked ? '' : 'none';
+  };
+}
 // table tools: show all/less toggle on long tables (click any header to sort)
 document.querySelectorAll('.scroll > table').forEach((t) => {
   const n = t.rows.length - 1, LIMIT = 15;

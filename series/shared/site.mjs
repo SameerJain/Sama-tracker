@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hbars, line } from './charts.mjs';
+import { hbars, line, academicStartYear } from './charts.mjs';
 import { winnersFromStandings, streaksFromStandings, attendanceRanking, charStats, mostUsedChars, validateSeries } from './compute.mjs';
 import { CSS, esc, dstr, trunc, csv, pill, card, scrollTable, CLIENT_JS_SORT, CLIENT_JS_UI, MODAL_HTML, clientModal } from './page.mjs';
 import { VIEWER } from '../configs.mjs';
@@ -65,21 +65,24 @@ export function buildSite(slug) {
   };
   const byDate = [...tournaments].sort((a, b) => a.startAt - b.startAt);
   const latest10 = [...byDate].reverse().slice(0, 10).map((t) => ({ ...t, winner: ultWinnerOf[t.id], entrants: entrantsOf.get(t.id) ?? winnerTag(t.id, MAIN_RE).entrants }));
-  const yearRows = (() => {
+  // per-period rollup; keyOf(startAt) -> period key, labelOf(key) -> display label
+  const rowsForPeriod = (keyOf, labelOf) => {
     const years = {};
     for (const t of tournaments) {
-      const y = new Date(t.startAt * 1000).getUTCFullYear();
+      const y = keyOf(t.startAt);
       years[y] ??= { editions: 0, att: 0, champWins: {}, champTags: {}, champs: new Set() };
       years[y].editions++;
       years[y].att += t.numAttendees;
       const w = ultWinnerOf[t.id];
       if (w) { const k = w.id != null ? String(w.id) : w.tag; years[y].champs.add(k); years[y].champWins[k] = (years[y].champWins[k] || 0) + 1; years[y].champTags[k] = w.tag; }
     }
-    return Object.entries(years).sort((a, b) => a[0] - b[0]).map(([y, v]) => {
+    return Object.entries(years).sort((a, b) => Number(a[0]) - Number(b[0])).map(([y, v]) => {
       const topChamp = Object.entries(v.champWins).sort((a, b) => b[1] - a[1])[0];
-      return { year: y, editions: v.editions, avgAtt: Math.round((v.att / v.editions) * 10) / 10, distinctChamps: v.champs.size, topChamp: topChamp ? `${v.champTags[topChamp[0]]} (${topChamp[1]})` : '' };
+      return { key: y, year: labelOf(y), editions: v.editions, avgAtt: Math.round((v.att / v.editions) * 10) / 10, distinctChamps: v.champs.size, topChamp: topChamp ? `${v.champTags[topChamp[0]]} (${topChamp[1]})` : '' };
     });
-  })();
+  };
+  const yearRows = rowsForPeriod((ts) => new Date(ts * 1000).getUTCFullYear(), (y) => String(y));
+  const acadRows = cfg.academic ? rowsForPeriod((ts) => academicStartYear(ts), (y) => `${y}–${String(Number(y) + 1).slice(2)}`) : null;
   const streaks = streaksFromStandings(ultStandings);
   const enteredList = attendanceRanking(attendanceRows, winById).map((p) => ({ ...p, ultWins: p.wins }));
 
@@ -153,6 +156,15 @@ export function buildSite(slug) {
     }
     winInfo['s:' + i] = { title: `${r.tag} — streak of ${r.n} (${dstr(r.from)} → ${dstr(r.to)})`, links };
   });
+  // year bars: every tournament in that period
+  for (const r of yearRows) {
+    const links = byDate.filter((t) => new Date(t.startAt * 1000).getUTCFullYear() === Number(r.key)).map((t) => tLink(t));
+    if (links.length) winInfo['y:' + r.key] = { title: `${r.year} — ${links.length} tournament${links.length === 1 ? '' : 's'}`, links };
+  }
+  if (acadRows) for (const r of acadRows) {
+    const links = byDate.filter((t) => academicStartYear(t.startAt) === Number(r.key)).map((t) => tLink(t));
+    if (links.length) winInfo['ya:' + r.key] = { title: `${r.year} academic year — ${links.length} tournament${links.length === 1 ? '' : 's'}`, links };
+  }
 
   // ---- charts + image files ----
   const attChart = line(att);
@@ -165,9 +177,18 @@ export function buildSite(slug) {
   const attPItems = enteredList.map((p) => ({ label: p.tag, value: p.events, color: '#e377c2', pid: p.id }));
   writeFileSync(`${OUT}/images/attendance-players.svg`, hbars(attPItems, { labelW: 190 }));
   const attPChart = hbars(attPItems, { labelW: 190, keyFn: (it) => 'e:' + it.pid });
+  const attPChartRegular = hbars(attPItems.filter((it) => it.value >= 3), { labelW: 190, keyFn: (it) => 'e:' + it.pid });
   writeFileSync(`${OUT}/images/editions-per-year.svg`, hbars(yearRows.map((r) => ({ label: String(r.year), value: r.editions, color: '#72b7b2' })), { labelW: 80 }));
+  const editionsChart = hbars(yearRows.map((r) => ({ label: String(r.year), value: r.editions, color: '#72b7b2', key: r.key })), { labelW: 80, keyFn: (it) => 'y:' + it.key });
+  let attChartAcad = null, editionsAcadChart = '';
+  if (cfg.academic) {
+    attChartAcad = line(att, { period: 'academic' });
+    writeFileSync(`${OUT}/images/attendance-academic.svg`, attChartAcad.svg);
+    writeFileSync(`${OUT}/images/editions-academic.svg`, hbars(acadRows.map((r) => ({ label: r.year, value: r.editions, color: '#72b7b2' })), { labelW: 80 }));
+    editionsAcadChart = hbars(acadRows.map((r) => ({ label: r.year, value: r.editions, color: '#72b7b2', key: r.key })), { labelW: 80, keyFn: (it) => 'ya:' + it.key });
+  }
   const charGamesItems = charList.map((c) => ({ label: c.name, value: c.games, color: '#4c78a8' }));
-  const charWinItems = [...charList].sort((a, b) => b.winrate - a.winrate || b.games - a.games).map((c) => ({ label: c.name, value: Math.round(c.winrate * 1000) / 10, color: '#eeca3b' }));
+  const charWinItems = [...charList].sort((a, b) => b.winrate - a.winrate || b.games - a.games).map((c) => ({ label: `${c.name} (${c.games})`, value: Math.round(c.winrate * 1000) / 10, color: '#eeca3b' }));
   writeFileSync(`${OUT}/images/characters-games.svg`, hbars(charGamesItems, { labelW: 150 }));
   writeFileSync(`${OUT}/images/characters-winrate.svg`, hbars(charWinItems, { labelW: 150, valueFn: (it) => it.value + '%' }));
   const charGamesChart = hbars(charGamesItems, { labelW: 150 });
@@ -206,8 +227,17 @@ export function buildSite(slug) {
   const cards = [];
   const add = (id, label, html) => cards.push({ id, label, html });
   const yearTbl = yearRows.map((r) => `<tr><td>${r.year}</td><td>${r.editions}</td><td>${r.avgAtt}</td><td>${r.distinctChamps}</td><td>${esc(r.topChamp)}</td></tr>`).join('\n');
-  add('att', 'Attendance', card('att', `Attendance over time (${n} tournaments, avg ${avg.toFixed(1)})`,
-    `<div class="toggles">Show: <label><input type="checkbox" data-t="s-raw" checked> attendance</label> <label><input type="checkbox" data-t="s-avg" checked> average</label> <label><input type="checkbox" data-t="s-whole" checked> whole trend</label> <label><input type="checkbox" data-t="s-year" checked> yearly trends</label></div><div class="scroll" id="attchart">${attChart.svg}</div><h3>Tournaments run per year</h3><div class="scroll"><img src="images/editions-per-year.svg" alt="tournaments run per year"></div>${scrollTable('<th>Year</th><th>Tournaments</th><th>Avg att.</th><th>Distinct champs</th><th>Most titles</th>', yearTbl)}`));
+  const togglesHtml = `<div class="toggles">Show: <label><input type="checkbox" data-t="s-raw" checked> attendance</label> <label><input type="checkbox" data-t="s-avg" checked> average</label> <label><input type="checkbox" data-t="s-whole" checked> whole trend</label> <label><input type="checkbox" data-t="s-year" checked> yearly trends</label></div>`;
+  let attBody;
+  if (cfg.academic) {
+    const acadTbl = acadRows.map((r) => `<tr><td>${r.year}</td><td>${r.editions}</td><td>${r.avgAtt}</td><td>${r.distinctChamps}</td><td>${esc(r.topChamp)}</td></tr>`).join('\n');
+    attBody = `${togglesHtml}<p>Year view: <label><input type="radio" name="yearview" value="cal" checked> calendar</label> <label><input type="radio" name="yearview" value="acad"> academic (Aug–Jun)</label></p>`
+      + `<div data-yearview="cal"><div class="scroll attchart" id="attchart">${attChart.svg}</div><h3>Tournaments run per year</h3><p><small>Click a bar to see that year's tournaments.</small></p><div class="scroll">${editionsChart}</div>${scrollTable('<th>Year</th><th>Tournaments</th><th>Avg att.</th><th>Distinct champs</th><th>Most titles</th>', yearTbl)}</div>`
+      + `<div data-yearview="acad" style="display:none"><div class="scroll attchart" id="attchart-acad">${attChartAcad.svg}</div><h3>Tournaments run per academic year</h3><p><small>Click a bar to see that academic year's tournaments.</small></p><div class="scroll">${editionsAcadChart}</div>${scrollTable('<th>Academic year</th><th>Tournaments</th><th>Avg att.</th><th>Distinct champs</th><th>Most titles</th>', acadTbl)}</div>`;
+  } else {
+    attBody = `${togglesHtml}<div class="scroll attchart" id="attchart">${attChart.svg}</div><h3>Tournaments run per year</h3><p><small>Click a bar to see that year's tournaments.</small></p><div class="scroll">${editionsChart}</div>${scrollTable('<th>Year</th><th>Tournaments</th><th>Avg att.</th><th>Distinct champs</th><th>Most titles</th>', yearTbl)}`;
+  }
+  add('att', 'Attendance', card('att', `Attendance over time (${n} tournaments, avg ${avg.toFixed(1)})`, attBody));
   const crowTop = top10.map((t, i) => `<tr><td>${i + 1}</td><td>${t.date}</td><td><a href="https://www.start.gg/${esc(t.slug)}">${esc(trunc(t.name, 55))}</a></td><td>${t.attendees}</td></tr>`).join('\n');
   add('crowds', 'Crowds', card('crowds', `Largest tournament: ${top.attendees} attendees`,
     `<p><a href="https://www.start.gg/${esc(top.slug)}">${esc(top.name)}</a> — ${top.date}</p><h3>Top 10 crowds</h3>${scrollTable('<th>#</th><th>Date</th><th>Tournament</th><th>Att.</th>', crowTop)}`));
@@ -217,12 +247,12 @@ export function buildSite(slug) {
   const streakTbl = streaks.map((r) => `<tr><td>${esc(r.tag)}</td><td>${r.n}</td><td>${dstr(r.from)} → ${dstr(r.to)}</td></tr>`).join('\n');
   add('winners', 'Winners', card('winners', 'Most Ultimate wins (by start.gg player id, all aliases merged)',
     `<p><small>Click a bar to see every tournament in that run.</small></p><div class="scroll">${winChart}</div><h3>Longest win streaks (consecutive tournaments)</h3><div class="scroll">${streakChart}</div>${scrollTable('<th>Player</th><th>Streak</th><th>Span</th>', streakTbl)}${scrollTable('<th>#</th><th>Player</th><th>1st</th><th>2nd</th><th>3rd</th><th>4th</th><th>Most used character</th><th>Aliases</th>', wrows)}`, '#4c78a8'));
-  const enteredTbl = enteredList.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.tag)}</td><td>${p.events}</td><td>${p.ultWins}</td></tr>`).join('\n');
+  const enteredTbl = enteredList.map((p, i) => `<tr data-events="${p.events}"><td>${i + 1}</td><td>${esc(p.tag)}</td><td>${p.events}</td><td>${p.ultWins}</td><td>${esc((p.names ?? [p.tag]).slice(0, 3).join(' / '))}${(p.names ?? []).length > 3 ? '…' : ''}</td></tr>`).join('\n');
   add('attended', 'Attendance', card('attended', `Most events entered (Ultimate Singles, ${attendanceRows.length} events with entrant lists)`,
-    `<p><small>Click a bar to see every tournament they entered.</small></p><div class="scroll">${attPChart}</div>${scrollTable('<th>#</th><th>Player</th><th>Events entered</th><th>Ult wins</th>', enteredTbl)}`));
+    `<p><small>Click a bar to see every tournament they entered.</small></p><p><label><input type="checkbox" id="fewtoggle"> hide players with 1–2 events</label></p><div class="scroll" id="attp-all">${attPChart}</div><div class="scroll" id="attp-regular" style="display:none">${attPChartRegular}</div>${scrollTable('<th>#</th><th>Player</th><th>Events entered</th><th>Ult wins</th><th>Aliases</th>', enteredTbl)}`));
   if (charList.length) {
     const crows = charList.map((c, i) => `<tr><td>${i + 1}</td><td>${esc(c.name)}</td><td>${c.games}</td><td>${c.wins}</td><td>${(Math.round(c.winrate * 1000) / 10).toFixed(1)}%</td></tr>`).join('\n');
-    add('characters', 'Characters', card('characters', `Characters — most games played (Ultimate, ${totalGames.toLocaleString('en-US')} games with reported characters out of ${totalSets.toLocaleString('en-US')} sets)`,
+    add('characters', 'Characters', card('characters', `Characters — most games played (Ultimate, ${totalGames.toLocaleString('en-US')} games with both characters reported, from ${totalSets.toLocaleString('en-US')} sets checked)`,
       `<div class="scroll">${charGamesChart}</div><h3>Winrate (all characters)</h3><div class="scroll">${charWinChart}</div>${scrollTable('<th>#</th><th>Character</th><th>Games</th><th>Game wins</th><th>Winrate</th>', crows)}`));
   }
   if (has('melee')) {

@@ -12,16 +12,24 @@ export function hbars(items, { width = 640, barH = 20, gap = 7, labelW = 170, va
     const y = 8 + i * (barH + gap);
     const w = Math.max(2, (it.value / max) * bw);
     const key = keyFn ? keyFn(it) : null;
-    s += `<text x="0" y="${y + barH - 5}">${esc(it.label)}</text>`;
+    s += `<g class="hbar" data-v="${it.value}"><text x="0" y="${y + barH - 5}">${esc(it.label)}</text>`;
     s += `<rect x="${labelW}" y="${y}" width="${w}" height="${barH}" rx="3" fill="${it.color || '#4c78a8'}"${key ? ` data-k="${esc(key)}" class="clickable" style="cursor:pointer"` : ''}/>`;
-    s += `<text x="${labelW + w + 6}" y="${y + barH - 5}" fill="#222">${esc(valueFn ? valueFn(it) : String(it.value))}</text>`;
+    s += `<text x="${labelW + w + 6}" y="${y + barH - 5}" fill="#222">${esc(valueFn ? valueFn(it) : String(it.value))}</text></g>`;
   });
   return s + '</svg>';
 }
 
+// academic year (Aug 1 to Jun 1) starting year for a timestamp; Jun/Jul counts as the year just ended
+export function academicStartYear(ts) {
+  const d = new Date(ts * 1000);
+  const y = d.getUTCFullYear(), m = d.getUTCMonth();
+  return m >= 7 ? y : y - 1;
+}
+
 // attendance over time. data = [{ startAt, attendees, name, date }] sorted by startAt.
 // layers carry s-raw / s-avg / s-whole / s-year classes for the page toggles.
-export function line(data, { width = 900, height = 260 } = {}) {
+// period 'academic': yearly segments fit Aug 1 to Jun 1 windows instead of calendar years.
+export function line(data, { width = 900, height = 260, period = 'calendar' } = {}) {
   const padL = 44, padB = 26, padT = 56, padR = 10;
   const xs = data.map((d) => d.startAt), ys = data.map((d) => d.attendees);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y1 = Math.max(...ys);
@@ -50,6 +58,7 @@ export function line(data, { width = 900, height = 260 } = {}) {
   const label = `max ${m.attendees} — ${trunc(m.name, 40)} (${m.date})`;
   const anchorRight = mx > width - 320;
   s += `<g class="s-raw"><polyline fill="none" stroke="#4c78a8" stroke-width="1.6" points="${rawPts}"/>`;
+  for (const d of data) s += `<circle class="dot" cx="${X(d.startAt).toFixed(1)}" cy="${Y(d.attendees).toFixed(1)}" r="3" fill="#4c78a8"><title>${esc(`${d.attendees} attendees — ${d.name} (${d.date})`)}</title></circle>`;
   s += `<circle cx="${mx}" cy="${my}" r="4" fill="#e45756"/>`;
   s += `<text x="${anchorRight ? mx - 8 : mx + 8}" y="${Math.max(12, my - 8)}" fill="#e45756" text-anchor="${anchorRight ? 'end' : 'start'}">${esc(label)}</text></g>`;
   // rolling-average trend over the whole series
@@ -68,10 +77,10 @@ export function line(data, { width = 900, height = 260 } = {}) {
   const clampY = (v) => Math.max(0, Math.min(y1, v));
   s += `<line class="s-whole" x1="${X(x0)}" y1="${Y(clampY(rA))}" x2="${X(x1)}" y2="${Y(clampY(rA + rB * (x1 - x0)))}" stroke="#9467bd" stroke-width="2"/>`;
   // per-year straight segments: same least-squares fit as the whole line, one per
-  // calendar year, drawn across Jan 1 to Dec 31 with a triangle at each end
+  // year, drawn across the year's span with a triangle at each end
   s += '<g class="s-year">';
   const byYear = {};
-  for (const d of data) { const y = new Date(d.startAt * 1000).getUTCFullYear(); (byYear[y] ??= []).push(d); }
+  for (const d of data) { const y = period === 'academic' ? academicStartYear(d.startAt) : new Date(d.startAt * 1000).getUTCFullYear(); (byYear[y] ??= []).push(d); }
   for (const [yr, pts] of Object.entries(byYear)) {
     pts.sort((a, b) => a.startAt - b.startAt);
     if (pts.length < 2) continue;
@@ -82,17 +91,18 @@ export function line(data, { width = 900, height = 260 } = {}) {
     if (!denom) continue;
     const qB = (pts.length * qSxy - qSx * qSy) / denom;
     const qA = (qSy - qB * qSx) / pts.length;
-    const jan1 = Date.UTC(Number(yr), 0, 1) / 1000, dec31 = Date.UTC(Number(yr), 11, 31) / 1000;
-    const sx = Math.max(x0, jan1), ex = Math.min(x1, dec31);
+    const spanStart = period === 'academic' ? Date.UTC(Number(yr), 7, 1) / 1000 : Date.UTC(Number(yr), 0, 1) / 1000;
+    const spanEnd = period === 'academic' ? Date.UTC(Number(yr) + 1, 5, 1) / 1000 : Date.UTC(Number(yr), 11, 31) / 1000;
+    const sx = Math.max(x0, spanStart), ex = Math.min(x1, spanEnd);
     if (ex <= sx) continue;
     const ya = Y(clampY(qA + qB * (sx - xa))), yb = Y(clampY(qA + qB * (ex - xa)));
     const X1 = X(sx).toFixed(1), X2 = X(ex).toFixed(1), Y1 = ya.toFixed(1), Y2 = yb.toFixed(1);
-    s += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#9467bd" stroke-width="2"/>`;
-    s += `<polygon points="${X1},${(ya - 6).toFixed(1)} ${(X(sx) - 5).toFixed(1)},${(ya + 4).toFixed(1)} ${(X(sx) + 5).toFixed(1)},${(ya + 4).toFixed(1)}" fill="#9467bd"/>`;
-    s += `<polygon points="${X2},${(yb - 6).toFixed(1)} ${(X(ex) - 5).toFixed(1)},${(yb + 4).toFixed(1)} ${(X(ex) + 5).toFixed(1)},${(yb + 4).toFixed(1)}" fill="#9467bd"/>`;
+    s += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2ca02a" stroke-width="2"/>`;
+    s += `<polygon points="${X1},${(ya - 6).toFixed(1)} ${(X(sx) - 5).toFixed(1)},${(ya + 4).toFixed(1)} ${(X(sx) + 5).toFixed(1)},${(ya + 4).toFixed(1)}" fill="#2ca02a"/>`;
+    s += `<polygon points="${X2},${(yb - 6).toFixed(1)} ${(X(ex) - 5).toFixed(1)},${(yb + 4).toFixed(1)} ${(X(ex) + 5).toFixed(1)},${(yb + 4).toFixed(1)}" fill="#2ca02a"/>`;
   }
   s += '</g>';
   s += `<text x="${padL}" y="14" fill="#4c78a8">— attendance</text><text x="${padL + 105}" y="14" fill="#f28e2b">- - ${W}-tournament average</text>`;
-  s += `<text x="${padL}" y="32" fill="#9467bd">— straight-line trend (whole)</text><text x="${padL + 200}" y="32" fill="#9467bd">▲ straight-line trend (each year) ▲</text>`;
+  s += `<text x="${padL}" y="32" fill="#9467bd">— straight-line trend (whole)</text><text x="${padL + 200}" y="32" fill="#2ca02a">▲ straight-line trend (each year) ▲</text>`;
   return { svg: s + '</svg>', slopePerYear: (rB * 365.25 * 24 * 3600) || 0 };
 }
