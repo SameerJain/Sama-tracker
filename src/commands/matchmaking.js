@@ -225,7 +225,9 @@ async function matchmakingSearch(interaction) {
 async function startSearchThread(interaction, posted, label) {
   try {
     const name = interaction.member?.displayName ?? interaction.user?.username ?? 'someone';
-    const thread = await posted.startThread({ name: `${label} games with ${name}`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
+    const today = new Date();
+    const dated = `${today.getUTCMonth() + 1}/${today.getUTCDate()}`;
+    const thread = await posted.startThread({ name: `${label}:${name} (${dated})`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
     if (thread?.id) {
       state.matchmakingThreads.push({ id: thread.id, at: Math.floor(Date.now() / 1000) });
       save();

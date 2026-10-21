@@ -20,7 +20,7 @@ export const colors = {
   reg: 0xdc2626,
   regEarly: 0xf59e0b,
   reset: 0x6b7280, // a result the TO took back
-  update: 0xec4899, // bot updates, nothing else
+  system: 0xec4899, // status and bot updates, never feature cards
 };
 
 // double elim placements: 1, 2, 3, 4, 5, 7, 9, 13, 17, 25...

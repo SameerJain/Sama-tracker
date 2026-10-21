@@ -284,7 +284,8 @@ test('thread:True starts a thread on the ping, left out it sends none', async ()
   const withThread = await run('matchmaking_search', { guild, member, values: { game: 'melee', thread: true }, user: { id: 'me-discord', username: 'Sam' } });
   assert.equal(withThread[0][1].content, '<@&melee-role>');
   assert.equal(withThread.threads.length, 1);
-  assert.equal(withThread.threads[0].name, 'Melee games with Sam');
+  const today = new Date();
+  assert.equal(withThread.threads[0].name, `Melee:Sam (${today.getUTCMonth() + 1}/${today.getUTCDate()})`);
   assert.equal(state.matchmakingThreads.length, 1);
   assert.equal(state.matchmakingThreads[0].id, 'match-thread-1');
   assert.ok(state.matchmakingThreads[0].at >= before);
@@ -549,7 +550,8 @@ test('a redirected search still starts its thread', async () => {
 
   assert.equal(lfg.sent.length, 1);
   assert.equal(lfg.threads.length, 1);
-  assert.equal(lfg.threads[0].name, 'Melee games with Sam');
+  const today = new Date();
+  assert.equal(lfg.threads[0].name, `Melee:Sam (${today.getUTCMonth() + 1}/${today.getUTCDate()})`);
   assert.equal(state.matchmakingThreads.length, 1);
   assert.equal(state.matchmakingThreads[0].id, 'channel-thread-1');
   assert.match(calls[0][1].content, /Posted your Melee search in <#lfg-melee>\./);

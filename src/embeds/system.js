@@ -80,6 +80,7 @@ export function status(info) {
 
   const lines = [`**Started:** ${ago(info.startedAt)}${info.host ? ` on ${escapeMarkdown(info.host)}` : ''}`];
   if (info.deployedAt) lines.push(`**Latest version deployed:** <t:${info.deployedAt}:R>`);
+  if (info.deployMessage) lines.push(escapeMarkdown(info.deployMessage));
   lines.push(
     `**Last set check:** ${setCheck}`,
     `**Signups and placements updated:** ${ago(info.tournamentCheck)}`,
@@ -92,19 +93,18 @@ export function status(info) {
   }
   if (info.threadError) lines.push(`**Threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
   if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
-  if (info.stateSize) lines.push(`**State:** ${(info.stateSize / 1024).toFixed(0)} KB · ${count(info.saves ?? 0, 'save')} since start`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
   lines.push('-# [GitHub](https://github.com/SameerJain/Sama-tracker)');
 
-  return baseEmbed(colors.brand).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
+  return baseEmbed(colors.system).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
 
 // a new railway deployment going live, with when it deployed and the commit message. no commit id
 export function deployUpdate(deploy) {
   const lines = [`**Latest version deployed:** <t:${deploy.at}:R>`];
   if (deploy.message) lines.push(escapeMarkdown(deploy.message));
-  return baseEmbed(colors.update).setTitle('Bot updated').setDescription(lines.join('\n'));
+  return baseEmbed(colors.system).setTitle('Bot updated').setDescription(lines.join('\n'));
 }
 
 // a /matchmaking_search ping. a mention in a card never pings, so this one is just a name to click
@@ -204,7 +204,7 @@ export function help(verbose = false) {
     [
       '**Matchmaking**',
       '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many hours, like 2 or 0.5 for 30 minutes, then it comes off on its own',
-      '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them. Only people with the role can',
+      '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them, named like `Melee:Sam (10/21)`. Only people with the role can',
       '`/matchmaking_channel` where a game\'s searches post with `game:` and `channel:`. TOs only to change it, anyone can look. Left out means wherever the command runs. `clear:True` goes back to that',
       '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it',
     ],

@@ -2,7 +2,7 @@ import { hostname } from 'node:os';
 import { HTTPError, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
-import { state, saveCount } from '../store.js';
+import { state } from '../store.js';
 import { deployedAt, health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
@@ -359,13 +359,12 @@ function status(interaction) {
     // only off the server, to spot a copy running somewhere it shouldn't. the server's is a random container id
     host: process.env.RAILWAY_ENVIRONMENT_NAME ? null : hostname(),
     deployedAt: deployedAt(),
+    deployMessage: state.deploy?.message,
     avatar: interaction.client.user.displayAvatarURL(),
     players: Object.keys(state.players).length,
     slippi: Object.keys(state.slippi).length,
     tournaments: tournaments.length,
     queued: startgg.queueLength(),
-    stateSize: Buffer.byteLength(JSON.stringify(state)),
-    saves: saveCount,
   };
   return interaction.reply({ embeds: [embeds.status(info)], allowedMentions: { parse: [] } });
 }

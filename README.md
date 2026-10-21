@@ -95,7 +95,7 @@ The bot makes the TO role when first needed. A role named `TO` also counts, and 
 | Command | What it does |
 | --- | --- |
 | `/matchmaking_role game:<Ultimate or Melee> duration:<hours>` | Give yourself the **Ultimate Matchmaking** or **Melee Matchmaking** role, or take it off if you have it. `duration` keeps it 0.5-24 hours, like 2 or 0.5 for 30 minutes, then it comes off on its own. Running it again without `duration` takes it off right away. Only you see the reply. |
-| `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role with a card naming you and your message, like a netplay connect code or where you're playing. Posts where the command runs, or in that game's channel from `/matchmaking_channel`. `message` is optional. `thread:True` starts a thread on your search to arrange games. Only people with the role can use it. |
+| `/matchmaking_search game:<Ultimate or Melee> message:<text>` | Ping that role with a card naming you and your message, like a netplay connect code or where you're playing. Posts where the command runs, or in that game's channel from `/matchmaking_channel`. `message` is optional. `thread:True` starts a thread on your search to arrange games, named like `Melee:Sam (10/21)`. Only people with the role can use it. |
 | `/matchmaking_channel game:<Ultimate or Melee> channel:<#channel>` | Set which channel that game's searches post in. Leave out `channel` to see where they go. `clear:True` goes back to posting where the command runs. Anyone can look, only TOs can change it. |
 
 The bot makes each role the first time someone asks for it, with no permissions and set so anyone can @mention it, so typing `@Melee Matchmaking` works without the commands. A role renamed in server settings keeps working. Timed roles are saved, so a restart doesn't cancel them. A saved search channel that gets deleted posts where the command runs instead, until a TO sets a new one. If an admin turns off mentions for a role, `/matchmaking_search` says so instead of sending a ping nobody gets. Threads need **Create Public Threads** and **Send Messages in Threads** in the channel, and the search still posts when they are missing.
@@ -191,7 +191,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Command | What it does |
 | --- | --- |
 | `/help` | Short command list. `verbose:True` lists every command with the details. |
-| `/status` | Uptime, when the latest version was deployed, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, the state file size and saves since start, any downtime before the last start, why a post last missed its thread, and a link to the GitHub repo. A copy run on another computer also shows that computer's name. |
+| `/status` | Uptime, when the latest version was deployed plus its message, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, any downtime before the last start, why a post last missed its thread, and a link to the GitHub repo. A copy run on another computer also shows that computer's name. |
 | `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
 | `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event), set result colors and the recap schedule. Needs the TO role or **Manage Server**. |
 | `/socials` | Saved streams and social links. |

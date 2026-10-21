@@ -79,9 +79,13 @@ test('untracked tournaments a month past their end are forgotten, tracked ones s
   assert.equal(tracker.shouldForgetTournament({ ...old, startAt: now - 10 * 86400, endAt: now - 86400 }, now), false);
 });
 
-test('/status shows the state size and saves since start', async () => {
+test('/status names the deployed version like the bot update post, never the state size', async () => {
   state.players = {};
   state.tournaments = {};
+  const kept = state.deploy;
+  const keptEnv = process.env.RAILWAY_DEPLOYMENT_ID;
+  state.deploy = { id: 'd9', at: 92, message: 'Fixed a few bugs' };
+  process.env.RAILWAY_DEPLOYMENT_ID = 'd9';
   let reply;
   await handleCommand({
     commandName: 'status',
@@ -89,6 +93,11 @@ test('/status shows the state size and saves since start', async () => {
     client: { user: { displayAvatarURL: () => 'https://example.com/a.png' } },
     reply: async (result) => { reply = result; },
   });
+  state.deploy = kept;
+  if (keptEnv === undefined) delete process.env.RAILWAY_DEPLOYMENT_ID;
+  else process.env.RAILWAY_DEPLOYMENT_ID = keptEnv;
   const text = reply.embeds[0].data.description;
-  assert.match(text, /\*\*State:\*\* \d+ KB · \d+ saves? since start/);
+  assert.doesNotMatch(text, /\*\*State:\*\*/);
+  assert.match(text, /\*\*Latest version deployed:\*\* <t:92:R>\nFixed a few bugs/);
+  assert.equal(reply.embeds[0].data.color, 0xec4899);
 });
