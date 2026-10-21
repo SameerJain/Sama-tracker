@@ -2,7 +2,8 @@
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const trunc = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
-// horizontal bars. keyFn(item) -> WININFO key makes the bar clickable.
+// horizontal bars. every bar is clickable: data-x is its label, data-y its shown
+// value, so a click can read both out. keyFn(item) -> WININFO key adds the list under it.
 export function hbars(items, { width = 640, barH = 20, gap = 7, labelW = 170, valueFn, keyFn } = {}) {
   const H = items.length * (barH + gap) + 14;
   const max = Math.max(...items.map((it) => it.value));
@@ -12,9 +13,10 @@ export function hbars(items, { width = 640, barH = 20, gap = 7, labelW = 170, va
     const y = 8 + i * (barH + gap);
     const w = Math.max(2, (it.value / max) * bw);
     const key = keyFn ? keyFn(it) : null;
+    const shown = valueFn ? valueFn(it) : String(it.value);
     s += `<g class="hbar" data-v="${it.value}"><text x="0" y="${y + barH - 5}">${esc(it.label)}</text>`;
-    s += `<rect x="${labelW}" y="${y}" width="${w}" height="${barH}" rx="3" fill="${it.color || '#4c78a8'}"${key ? ` data-k="${esc(key)}" class="clickable" style="cursor:pointer"` : ''}/>`;
-    s += `<text x="${labelW + w + 6}" y="${y + barH - 5}" fill="#222">${esc(valueFn ? valueFn(it) : String(it.value))}</text></g>`;
+    s += `<rect x="${labelW}" y="${y}" width="${w}" height="${barH}" rx="3" fill="${it.color || '#4c78a8'}" data-x="${esc(it.label)}" data-y="${esc(shown)}"${key ? ` data-k="${esc(key)}"` : ''} class="clickable" style="cursor:pointer"><title>${esc(it.label)} — ${esc(shown)}</title></rect>`;
+    s += `<text x="${labelW + w + 6}" y="${y + barH - 5}" fill="#222">${esc(shown)}</text></g>`;
   });
   return s + '</svg>';
 }
@@ -58,7 +60,7 @@ export function line(data, { width = 900, height = 260, period = 'calendar' } = 
   const label = `max ${m.attendees} — ${trunc(m.name, 40)} (${m.date})`;
   const anchorRight = mx > width - 320;
   s += `<g class="s-raw"><polyline fill="none" stroke="#4c78a8" stroke-width="1.6" points="${rawPts}"/>`;
-  for (const d of data) s += `<circle class="dot" cx="${X(d.startAt).toFixed(1)}" cy="${Y(d.attendees).toFixed(1)}" r="3" fill="#4c78a8"><title>${esc(`${d.attendees} attendees — ${d.name} (${d.date})`)}</title></circle>`;
+  for (const d of data) s += `<circle class="dot" cx="${X(d.startAt).toFixed(1)}" cy="${Y(d.attendees).toFixed(1)}" r="3" fill="#4c78a8" data-x="${esc(d.date)}" data-y="${esc(d.attendees)}" data-name="${esc(d.name)}" style="cursor:pointer"><title>${esc(`${d.attendees} attendees — ${d.name} (${d.date})`)}</title></circle>`;
   s += `<circle cx="${mx}" cy="${my}" r="4" fill="#e45756"/>`;
   s += `<text x="${anchorRight ? mx - 8 : mx + 8}" y="${Math.max(12, my - 8)}" fill="#e45756" text-anchor="${anchorRight ? 'end' : 'start'}">${esc(label)}</text></g>`;
   // rolling-average trend over the whole series

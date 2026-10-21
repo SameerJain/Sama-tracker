@@ -17,10 +17,12 @@ export function scrollTable(headersHtml, rowsHtml, full) {
 
 export const MODAL_HTML = `<div id="winmodal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50"><div style="background:var(--card);color:var(--fg);width:min(520px,92vw);margin:8vh auto;padding:16px;border-radius:10px;max-height:76vh;overflow:auto"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="winmodal-title" style="margin:0"></h3><button id="winmodal-x" aria-label="close" style="font-size:16px;padding:2px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);cursor:pointer">✕</button></div><div id="winmodal-list" style="margin-top:8px"></div></div></div>`;
 
-// winner-popup script for one page's WININFO map. Modal div must stay outside any script block.
+// click-popup script for one page's WININFO map. clicking a bar or dot reads out
+// its X and Y values first, then the WININFO tournament list when the point has one.
+// Modal div must stay outside any script block.
 export function clientModal(winInfo) {
   return `<script>const WININFO = ${JSON.stringify(winInfo).replace(/<\//g, '<\\/')};
-document.querySelectorAll('rect.clickable').forEach((r) => { r.onclick = () => { const info = WININFO[r.dataset.k]; if (!info) return; document.getElementById('winmodal-title').textContent = info.title; document.getElementById('winmodal-list').innerHTML = info.links.map((l) => '<div style="padding:3px 0"><a href="' + l.u + '">' + l.n + '</a> <small>' + l.d + '</small></div>').join(''); document.getElementById('winmodal').style.display = 'block'; }; });
+document.querySelectorAll('rect.clickable, circle.dot').forEach((r) => { r.onclick = () => { const info = WININFO[r.dataset.k]; const x = r.dataset.x, y = r.dataset.y; if (!info && x === undefined && y === undefined) return; document.getElementById('winmodal-title').textContent = info ? info.title : (r.dataset.name || x || ''); const list = document.getElementById('winmodal-list'); list.innerHTML = ''; if (x !== undefined || y !== undefined) { const xy = document.createElement('div'); xy.style.padding = '3px 0'; xy.textContent = 'X: ' + (x ?? '') + ' \\u00b7 Y: ' + (y ?? ''); list.appendChild(xy); } if (r.dataset.name && (x !== undefined || y !== undefined) && !info) { const nm = document.createElement('div'); nm.style.padding = '3px 0'; nm.textContent = r.dataset.name; list.appendChild(nm); } if (info) list.insertAdjacentHTML('beforeend', info.links.map((l) => '<div style="padding:3px 0"><a href="' + l.u + '">' + l.n + '</a> <small>' + l.d + '</small></div>').join('')); document.getElementById('winmodal').style.display = 'block'; }; });
 document.getElementById('winmodal-x').onclick = () => { document.getElementById('winmodal').style.display = 'none'; };
 document.getElementById('winmodal').onclick = (e) => { if (e.target.id === 'winmodal') e.target.style.display = 'none'; };</script>`;
 }

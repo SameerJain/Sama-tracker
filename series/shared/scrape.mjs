@@ -122,12 +122,15 @@ export async function getCharGames(eventId, perPage = 10) {
     if (id && !emap.has(String(id))) emap.set(String(id), (s.entrant.participants ?? []).map((p) => ({ id: p?.player?.id, tag: p?.player?.gamerTag })));
   }
   const games = [];
+  let gamesTotal = 0;
   for (const n of nodes) for (const g of n.games ?? []) {
+    gamesTotal++;
     const sel = g?.selections ?? [];
     const w = sel.find((s) => String(s?.entrant?.id) === String(g?.winnerId));
     const l = sel.find((s) => String(s?.entrant?.id) !== String(g?.winnerId));
     if (!w?.character?.name || !l?.character?.name) continue;
     games.push({ wChar: w.character.name, lChar: l.character.name, wEntrant: String(g.winnerId), lEntrant: String(l.entrant.id), wPlayers: emap.get(String(g.winnerId)) ?? [], lPlayers: emap.get(String(l.entrant.id)) ?? [], setId: String(n.id) });
   }
-  return { totalSets: nodes.length, games };
+  const setsWithChars = new Set(games.map((g) => g.setId)).size;
+  return { totalSets: nodes.length, games, gamesTotal, setsWithChars };
 }

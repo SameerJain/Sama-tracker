@@ -87,8 +87,8 @@ async function runSeries(slug, cfg, { dryRun, noDeploy }) {
     }
     for (const e of events) {
       if (!cfg.charEventsRes.some((re) => new RegExp(re, 'i').test(e.name))) continue;
-      const { totalSets, games } = await getCharGames(e.id);
-      newChars.push({ eventId: e.id, tournamentId: t.id, tournamentName: t.name, startAt: t.startAt, game: e.videogame?.id === 1 ? 'Melee' : 'Ultimate', eventName: e.name, numEntrants: e.numEntrants, totalSets, gamesReported: games.length, games });
+      const { totalSets, games, gamesTotal, setsWithChars } = await getCharGames(e.id);
+      newChars.push({ eventId: e.id, tournamentId: t.id, tournamentName: t.name, startAt: t.startAt, game: e.videogame?.id === 1 ? 'Melee' : 'Ultimate', eventName: e.name, numEntrants: e.numEntrants, totalSets, gamesReported: games.length, gamesTotal, setsWithChars, games });
     }
   }
 
