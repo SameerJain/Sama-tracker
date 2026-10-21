@@ -63,13 +63,8 @@ const THREAD_KEPT_DAYS = 14;
 const BUTTON_KEPT_HOURS = 12;
 // TOs report the wrong winner or score and fix it, or reset the set, so set results get looked at again this long
 const RESULT_WATCH_MINUTES = 60;
-// and calls get looked at this long for going back to waiting, or to the DQ time when that's later
+// calls get looked at this long for going back to waiting
 const CALL_WATCH_MINUTES = 15;
-// a called set still not started this long after gets one warning naming the expected DQ minute.
-// both from /t-o calls, 5 and 10 unless a TO changes them
-const callWarnMinutes = () => state.messages.callsWarn ?? 5;
-const callDqMinutes = () => state.messages.callsDq ?? 10;
-const callWatchMinutes = () => Math.max(CALL_WATCH_MINUTES, callDqMinutes());
 // a set back to waiting, ready or queued isn't called anymore
 const UNCALLED_STATES = [1, 4, 7];
 // placements that went out projected get edited once they're final, for this long after
@@ -183,6 +178,9 @@ export function startTracking(postChannel) {
 export function migrateTracking(now = secondsNow()) {
   delete state.regAdmins;
   delete state.regSkipped;
+  delete state.dqWarnPings;
+  delete state.messages.callsWarn;
+  delete state.messages.callsDq;
   for (const tournament of Object.values(state.tournaments)) {
     if (!tournament.discordEventId) continue;
     state.discordEvents[tournament.id] ??= { eventId: tournament.discordEventId, slug: tournament.slug, startAt: tournament.startAt, synced: null };
@@ -1054,7 +1052,7 @@ async function sendMatchCall(set, inSet, discordIds, postChannel) {
 function watchCall(message, set, discordIds, text) {
   if (!message?.id || !/^\d+$/.test(set.id)) return;
   const [ref] = postRefs([message]);
-  state.callPosts.push({ setId: set.id, ...ref, calledAt: Math.min(set.updatedAt ?? Infinity, secondsNow()), discordIds, warned: false, text });
+  state.callPosts.push({ setId: set.id, ...ref, calledAt: Math.min(set.updatedAt ?? Infinity, secondsNow()), discordIds, text });
   state.callPosts = state.callPosts.slice(-200);
   save();
 }
@@ -1062,12 +1060,11 @@ function watchCall(message, set, discordIds, text) {
 // recent match calls in one request. a call usually means go now, so there's no wait
 // before it goes out like stream alerts have. instead one whose set goes back to waiting gets edited to say
 // it was uncalled, and the next call pings again. one still called when the warning comes due pings the
-// warn-me players once more, naming the DQ time from /t-o calls
+// it was uncalled. started, finished and deleted sets stop being watched
 export async function followCalls(postChannel = channel) {
   const now = secondsNow();
-  const warnAt = callWarnMinutes();
   const before = state.callPosts.length;
-  state.callPosts = state.callPosts.filter((each) => each.calledAt > now - callWatchMinutes() * 60);
+  state.callPosts = state.callPosts.filter((each) => each.calledAt > now - CALL_WATCH_MINUTES * 60);
   const watching = state.callPosts;
   if (!watching.length) {
     if (state.callPosts.length !== before) save();
@@ -1077,25 +1074,7 @@ export async function followCalls(postChannel = channel) {
     const states = await startgg.getSetStates([...new Set(watching.map((each) => each.setId))]);
     for (const each of watching) {
       const setState = states.get(each.setId);
-      if (setState === 6) {
-        const minutes = Math.floor((now - each.calledAt) / 60);
-        if (each.warned || !each.discordIds.length || minutes < warnAt) continue;
-        // marked first, two of these would be worse than none
-        each.warned = true;
-        save();
-        if (messageEnabled('calls', each.calledAt + warnAt * 60)) {
-          // only whoever asked for the warning too, and turning either ping off stops it
-          const users = each.discordIds.filter((id) => (state.callPings ?? []).includes(id) && (state.dqWarnPings ?? []).includes(id) && mentionable(id));
-          if (!users.length) continue;
-          const still = (each.text ?? `You're up`).replace(`You're up`, `You're still up`);
-          await postChannel.send({
-            content: `${mentions(users)} ${still}, ${minutes} min in. TOs usually DQ at ${callDqMinutes()}`,
-            reply: { messageReference: each.messageId, failIfNotExists: false },
-            allowedMentions: { users },
-          });
-        }
-        continue;
-      }
+      if (setState === 6) continue;
       // started, finished or deleted, so there's nothing more to watch for
       if (!UNCALLED_STATES.includes(setState)) {
         state.callPosts = state.callPosts.filter((other) => other !== each);

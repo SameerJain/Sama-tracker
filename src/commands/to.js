@@ -16,7 +16,7 @@ const MISSING_PERMISSIONS = 50013;
 const KNOWN_KEPT = 100;
 
 // what the role lets someone do, for the replies that hand it out
-const TO_POWERS = 'TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament`, `/t-o calls` and `/t-o cleanup`.';
+const TO_POWERS = 'TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`.';
 
 // the saved id first, so renaming it in server settings keeps it, then the name. whichever turns up gets saved
 function findRole(guild) {

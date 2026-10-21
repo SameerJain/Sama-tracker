@@ -42,7 +42,7 @@ export function toList(tos, role) {
   const lines = role
     ? (tos.length ? tos.map((id) => `<@${id}>`) : ['Nobody the bot has seen yet.'])
     : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role, or `/t-o role set` uses one already in the server.'];
-    lines.push('', '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament`, `/t-o calls` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
+    lines.push('', '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
   if (role) lines.push(`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
   return embed.setDescription(lines.join('\n'));
 }
@@ -104,7 +104,7 @@ export function status(info) {
 export function deployUpdate(deploy) {
   const lines = [`**Latest version deployed:** <t:${deploy.at}:R>`];
   if (deploy.message) lines.push(escapeMarkdown(deploy.message));
-  return baseEmbed(colors.brand).setTitle('Bot updated').setDescription(lines.join('\n'));
+  return baseEmbed(colors.update).setTitle('Bot updated').setDescription(lines.join('\n'));
 }
 
 // a /matchmaking_search ping. a mention in a card never pings, so this one is just a name to click
@@ -194,13 +194,12 @@ export function help(verbose = false) {
       '`/t-o role set` use an existing server role for TO privileges. Needs Manage Server',
       '`/t-o role remove` take the TO role off someone. Refuses to remove the last known T.O. T.O.s only',
       '`/t-o role list` who the TOs are',
-      '`/t-o calls` when the DQ warning fires and what DQ time it names. Leave both out to see them. T.O.s only',
-      '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament`, `/t-o calls` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
+      '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
     ],
     [
       '**Your pings**',
-      '`/notify` your pings, or anyone\'s for a TO with `user:` or `player:`. `calls` when your match is called, `streams` when your set is on stream, `dq_warnings` to be warned again if a called set still hasn\'t started, `registration` for reg reminders, `dm_registration` and `dm_start` for 1-hour DMs, `all` for the five besides DQ warnings. `player:all` changes everyone tracked and asks first. Changes apply during a tournament. Leave them out to see yours',
-      '-# Only TOs can see or change someone else\'s with `user:` or `player:`, and only `user:` or `player:`, not both. `calls`, `streams` and `dq_warnings` need whoever it\'s for linked, or tracked with Discord on start.gg, and the warning only goes to people with both `calls` and `dq_warnings` on. `/t-o calls` sets when it fires and what DQ time it names. `registration` pings the Reg Reminders role for everyone with it. Registration DMs skip you once you\'re registered, if start.gg has your Discord. DMs only go to current server members',
+      '`/notify` your pings, or anyone\'s for a TO with `user:` or `player:`. `calls` covers match calls, `streams` covers stream sets, `registration` covers reg reminders, and `dm_registration` and `dm_start` cover 1-hour DMs. `all` changes all five. `player:all` changes everyone tracked and asks first. Leave them out to see yours',
+      '-# Only TOs can see or change someone else\'s with `user:` or `player:`, and only `user:` or `player:`, not both. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. `registration` pings the Reg Reminders role. Registration DMs skip registered players when start.gg has their Discord. DMs only go to current server members',
     ],
     [
       '**Matchmaking**',

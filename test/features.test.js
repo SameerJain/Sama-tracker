@@ -1413,6 +1413,7 @@ test('a new deploy saves when it first started, and a restart of the same one ke
 test('a bot update posts the date and commit message, never the commit id', async () => {
   const card = embeds.deployUpdate({ id: 'd2', at: 90, message: 'Fixed a few bugs' });
   assert.equal(card.data.title, 'Bot updated');
+  assert.equal(card.data.color, 0xec4899);
   assert.match(card.data.description, /\*\*Latest version deployed:\*\* <t:90:R>/);
   assert.match(card.data.description, /Fixed a few bugs/);
   assert.doesNotMatch(card.data.description, /d0beb8f5/);
@@ -1992,7 +1993,8 @@ test('saved reg reminders become tracked tournaments, and match call pings move 
     3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', callPings: true },
   };
   state.callPings = [];
-  state.messages = { calls: true };
+  state.dqWarnPings = ['crew-discord'];
+  state.messages = { calls: true, callsWarn: 5, callsDq: 10 };
   tracker.migrateTracking(now);
 
   assert.equal(state.regReminders, undefined);
@@ -2008,6 +2010,9 @@ test('saved reg reminders become tracked tournaments, and match call pings move 
   // no discord on start.gg has nobody to ping
   assert.deepEqual(state.callPings, ['crew-discord']);
   assert.ok(Object.values(state.players).every((player) => !Object.hasOwn(player, 'callPings')));
+  assert.equal(state.dqWarnPings, undefined);
+  assert.equal(state.messages.callsWarn, undefined);
+  assert.equal(state.messages.callsDq, undefined);
 
   // with the server switch off nobody was getting pinged, so nothing carries over
   state.players = { 1: { ...crewPlayer, discordId: 'crew-discord', callPings: true } };

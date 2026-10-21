@@ -138,10 +138,10 @@ test('a set result the TO corrects gets edited, a reset one gets marked, and an 
   assert.deepEqual(state.resultPosts, []);
 });
 
-test('a match call that goes back to waiting is taken back, and one not started after 5 minutes pings once more', async () => {
+test('a match call that stays called does not ping again, and one that goes back to waiting is taken back', async () => {
   state.players = { 1: crew };
   state.callPings = ['crew-discord'];
-  state.dqWarnPings = ['crew-discord'];
+  state.dqWarnPings = ['crew-discord']; // old saved opt-ins must not cause a second ping
   state.messages = { calls: true };
   state.called = [];
   state.callPosts = [];
@@ -154,21 +154,15 @@ test('a match call that goes back to waiting is taken back, and one not started 
   await tracker.postMatchCalls(channel);
   assert.equal(channel.sent.length, 1);
   assert.equal(channel.sent[0].content, `<@crew-discord> You're up`);
-  assert.deepEqual(state.callPosts.map(({ setId, messageId, discordIds, warned, text }) => [setId, messageId, discordIds, warned, text]), [['801', 'm1', ['crew-discord'], false, `You're up`]]);
+  assert.deepEqual(state.callPosts.map(({ setId, messageId, discordIds, text }) => [setId, messageId, discordIds, text]), [['801', 'm1', ['crew-discord'], `You're up`]]);
 
-  // a minute in, still called, so nothing yet
+  // start.gg can leave a set called after play starts, so a called set never gets another ping
   await tracker.followCalls(channel);
   assert.equal(channel.sent.length, 1);
 
   state.callPosts[0].calledAt = now - 6 * 60;
   await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 2);
-  const warning = channel.sent[1];
-  assert.equal(warning.content, `<@crew-discord> You're still up, 6 min in. TOs usually DQ at 10`);
-  assert.deepEqual(warning.allowedMentions, { users: ['crew-discord'] });
-  assert.equal(warning.reply.messageReference, 'm1');
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 2, 'warned twice');
+  assert.equal(channel.sent.length, 1);
 
   // uncalled: the ping gets crossed out, and calling it again pings again
   setState = 1;
@@ -178,52 +172,21 @@ test('a match call that goes back to waiting is taken back, and one not started 
   assert.ok(!state.called.includes('801'));
   setState = 6;
   await tracker.postMatchCalls(channel);
-  assert.equal(channel.sent.length, 3);
-  assert.match(channel.sent[2].content, /You're up/);
+  assert.equal(channel.sent.length, 2);
+  assert.match(channel.sent[1].content, /You're up/);
 
   // started, so there's nothing left to say
   setState = 2;
   await tracker.followCalls(channel);
   assert.equal(channel.edits.length, 1);
-  assert.equal(channel.sent.length, 3);
+  assert.equal(channel.sent.length, 2);
   assert.deepEqual(state.callPosts, []);
 
   // a 15 minute old call isn't asked about
-  state.callPosts = [{ setId: '801', channelId: 'c1', messageId: 'm3', calledAt: now - 16 * 60, discordIds: [], warned: false }];
+  state.callPosts = [{ setId: '801', channelId: 'c1', messageId: 'm3', calledAt: now - 16 * 60, discordIds: [] }];
   mockStartgg(() => assert.fail('nothing to check'));
   await tracker.followCalls(channel);
   assert.deepEqual(state.callPosts, []);
-});
-
-test('the DQ warning stays quiet with match call pings switched off, without the DQ opt-in, or nobody to ping', async () => {
-  const channel = fakeChannel();
-  state.messages = { calls: false };
-  state.callPings = ['crew-discord'];
-  state.dqWarnPings = ['crew-discord'];
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: ['crew-discord'], warned: false }];
-  mockStartgg(() => ({ s802: { state: 6 } }));
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 0);
-  assert.equal(state.callPosts[0].warned, true);
-
-  state.messages = { calls: true };
-  state.callPings = [];
-  state.dqWarnPings = ['crew-discord'];
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: ['crew-discord'], warned: false }];
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 0);
-
-  // calls on but the DQ warning off stays quiet too
-  state.callPings = ['crew-discord'];
-  state.dqWarnPings = [];
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: ['crew-discord'], warned: false }];
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 0);
-  assert.equal(state.callPosts[0].warned, true);
-
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: [], warned: false }];
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 0);
 });
 
 test('placements that went out projected get edited once start.gg has them final', async () => {
@@ -496,54 +459,6 @@ test('/notify player:all all:on fits discord\'s button limit and changes all fiv
   assert.deepEqual(state.regPings.toSorted(), ['crew-discord', 'rival-discord']);
   assert.deepEqual(state.regDmPings.toSorted(), ['crew-discord', 'rival-discord']);
   assert.deepEqual(state.startDmPings.toSorted(), ['crew-discord', 'rival-discord']);
-});
-
-test('/t-o calls shows, changes and validates the DQ warning timing, TOs only', async () => {
-  state.messages = {};
-  const shown = command('t-o', { subcommand: 'calls' });
-  await handleCommand(shown);
-  assert.equal(shown.calls[0][1].content, '**Match call warnings**\n**Warn after:** 5 min · **DQ at:** 10 min\n-# One warning per called set while it\'s still called, for people with both `/notify calls` and `/notify dq_warnings` on');
-
-  const set = command('t-o', { subcommand: 'calls', values: { warn: 3, dq: 8 } });
-  await handleCommand(set);
-  assert.match(set.calls[0][1].content, /\*\*Warn after:\*\* 3 min · \*\*DQ at:\*\* 8 min/);
-  assert.equal(state.messages.callsWarn, 3);
-  assert.equal(state.messages.callsDq, 8);
-
-  // one at a time works, warn at or past dq is refused and changes nothing
-  const warnOnly = command('t-o', { subcommand: 'calls', values: { warn: 4 } });
-  await handleCommand(warnOnly);
-  assert.match(warnOnly.calls[0][1].content, /\*\*Warn after:\*\* 4 min/);
-  const bad = command('t-o', { subcommand: 'calls', values: { warn: 8, dq: 8 } });
-  await handleCommand(bad);
-  assert.match(bad.calls[0][1].content, /Pick `warn` before `dq`/);
-  assert.equal(state.messages.callsWarn, 4);
-  assert.equal(state.messages.callsDq, 8);
-
-  // someone who isn't a TO is turned away before anything changes
-  const refused = command('t-o', { subcommand: 'calls', values: { warn: 3 } });
-  refused.memberPermissions = { has: () => false };
-  await handleCommand(refused);
-  assert.equal(refused.calls[0][1].content, 'Only TOs can change match call warnings. `/t-o role list` shows who they are.');
-  assert.equal(state.messages.callsWarn, 4);
-});
-
-test('the DQ warning uses the /t-o calls timing and watches to the DQ time', async () => {
-  const channel = fakeChannel();
-  state.messages = { calls: true, callsWarn: 3, callsDq: 8 };
-  state.callPings = ['crew-discord'];
-  state.dqWarnPings = ['crew-discord'];
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 4 * 60, discordIds: ['crew-discord'], warned: false }];
-  mockStartgg(() => ({ s802: { state: 6 } }));
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 1);
-  assert.equal(channel.sent[0].content, `<@crew-discord> You're still up, 4 min in. TOs usually DQ at 8`);
-
-  // default timing would have stayed quiet at 4 minutes
-  state.messages = { calls: true };
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 4 * 60, discordIds: ['crew-discord'], warned: false }];
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 1, 'warned early');
 });
 
 test('/t-o cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {

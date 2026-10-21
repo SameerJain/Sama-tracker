@@ -6,7 +6,7 @@ export const stateDir = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUN
 const FILE = `${stateDir}/state.json`;
 
 // players are keyed by start.gg user id. posted/streamed/called/dqs are ids already announced.
-// regPings, streamPings, callPings and dqWarnPings are discord ids that turned on /notify registration, streams, calls or DQ warnings. regDmPings and startDmPings are the 1-hour
+// regPings, streamPings and callPings are discord ids that turned on /notify registration, streams or calls. regDmPings and startDmPings are the 1-hour
 // DM versions for registration and the start.
 // toRole is the TO role: { id, members, seeded }, id being the discord role, members the discord ids the bot has seen with it, for /t-o role list,
 // and seeded whether the first TO got it.
@@ -27,8 +27,8 @@ const FILE = `${stateDir}/state.json`;
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
 // buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }, with at when it was sent
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
-// callPosts are match calls still watched for the set going back to waiting or not starting: { setId, channelId, messageId, calledAt, discordIds, warned, text }.
-// text is the You're up ping as it went out, so the follow-ups match it
+// callPosts are match calls still watched for the set going back to waiting: { setId, channelId, messageId, calledAt, discordIds, text }.
+// text is the You're up ping as it went out, so an uncalled edit matches it
 // streamPinged is who already got pinged for a live streamed set: { setId, discordIds }.
 // a tournament with projected: { at, checkedAt, results, top8 } had placements go out projected, each list being the { channelId, messageId } posts to edit once they're final.
 // an empty top8 list with top8Posted unset means nothing was reported yet, and the final goes out as a new message once every event is finished.
@@ -49,7 +49,7 @@ const FILE = `${stateDir}/state.json`;
 // its image bytes, which get downloaded again on restore. billsMeta is the bills rotation across restarts:
 // { lastImage, kinds }, so the no-repeat and even photo/gif rotation survive one too
 const empty = {
-  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], dqWarnPings: [], regDmPings: [], startDmPings: [],
+  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
   toRole: { id: null, members: [], seeded: false },
   links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
    resultPosts: [], callPosts: [], streamPinged: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},

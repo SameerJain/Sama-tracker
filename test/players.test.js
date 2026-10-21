@@ -390,20 +390,18 @@ test('/notify changes your own pings, and match calls need their start.gg', asyn
   state.links = { 'me-discord': me };
   state.callPings = [];
   state.streamPings = [];
-  state.dqWarnPings = [];
   state.regPings = [];
   state.regDmPings = [];
   state.startDmPings = [];
   state.messages = {};
   globalThis.fetch = async () => assert.fail('no start.gg lookup');
 
-  // nobody to look up, so calls, streams and DQ warnings stay off and the rest still go through
-  const stranger = await run('notify', 'stranger', { calls: 'on', streams: 'on', dq_warnings: 'on' });
+  // nobody to look up, so calls and streams stay off
+  const stranger = await run('notify', 'stranger', { calls: 'on', streams: 'on' });
   assert.ok(stranger.flags);
-  assert.match(stranger.content, /^Match call pings need your start\.gg, so `\/link` first\..*\nStream alert pings need your start\.gg, so `\/link` first\..*\nDQ warning pings need your start\.gg, so `\/link` first\..*$/);
+  assert.match(stranger.content, /^Match call pings need your start\.gg, so `\/link` first\..*\nStream alert pings need your start\.gg, so `\/link` first\..*$/);
   assert.deepEqual(state.callPings, []);
   assert.deepEqual(state.streamPings, []);
-  assert.deepEqual(state.dqWarnPings, []);
 
   // linked, or tracked with this discord on start.gg
   assert.match((await run('notify', 'me-discord', { calls: 'on' })).content, /^You'll get pinged when your match is called\.$/);
@@ -412,16 +410,10 @@ test('/notify changes your own pings, and match calls need their start.gg', asyn
   assert.match((await run('notify', 'me-discord', { streams: 'on' })).content, /^You'll get pinged when your set is on stream\.$/);
   assert.deepEqual(state.streamPings, ['me-discord']);
 
-  // DQ warnings opt in on their own, off by default
-  assert.match((await run('notify', 'me-discord', { dq_warnings: 'on' })).content, /^You'll get warned again if your called set still hasn't started\. Needs match calls on too\.$/);
-  assert.deepEqual(state.dqWarnPings, ['me-discord']);
-  assert.match((await run('notify', 'me-discord', { dq_warnings: 'off' })).content, /^No more DQ warning pings\.$/);
-  assert.deepEqual(state.dqWarnPings, []);
-
   // nothing given shows where theirs are at, and a tracked player's own posts
   const mine = await run('notify', 'crew-discord');
   assert.ok(mine.flags);
-  assert.match(mine.content, /\*\*Match calls:\*\* on\n\*\*Stream alerts:\*\* off\n\*\*DQ warnings:\*\* off\n\*\*Reg reminders:\*\* off\n\*\*Registration DMs:\*\* off\n\*\*Start DMs:\*\* off\n-# You're tracked as Crew, with set results on and stream alerts on/);
+  assert.match(mine.content, /\*\*Match calls:\*\* on\n\*\*Stream alerts:\*\* off\n\*\*Reg reminders:\*\* off\n\*\*Registration DMs:\*\* off\n\*\*Start DMs:\*\* off\n-# You're tracked as Crew, with set results on and stream alerts on/);
   assert.doesNotMatch((await run('notify', 'me-discord')).content, /You're tracked/);
 
   // DMs opt in and out per person
@@ -436,7 +428,6 @@ test('/notify changes your own pings, and match calls need their start.gg', asyn
   assert.deepEqual(state.callPings, ['crew-discord']);
   state.callPings = [];
   state.streamPings = [];
-  state.dqWarnPings = [];
   state.regDmPings = [];
   state.startDmPings = [];
 });
@@ -446,7 +437,6 @@ test('/notify lets TOs look at and change anyone\'s pings', async () => {
   state.links = { 'me-discord': me };
   state.callPings = [];
   state.streamPings = [];
-  state.dqWarnPings = [];
   state.regPings = [];
   state.regDmPings = [];
   state.startDmPings = [];
@@ -506,35 +496,9 @@ test('/notify lets TOs look at and change anyone\'s pings', async () => {
   assert.equal((await run('notify', 'to-discord', { user: as('ghost') })).content, 'Pick someone in this server.');
   state.callPings = [];
   state.streamPings = [];
-  state.dqWarnPings = [];
   state.regPings = [];
   state.regDmPings = [];
   state.startDmPings = [];
-});
-
-test('/notify dq_warnings needs match calls and start.gg like the call ping does', async () => {
-  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
-  state.links = {};
-  state.callPings = [];
-  state.dqWarnPings = [];
-  state.messages = {};
-
-  // nobody to look up, so it stays off with a nudge to link
-  assert.match((await run('notify', 'stranger', { dq_warnings: 'on' })).content, /^DQ warning pings need your start\.gg, so `\/link` first\./);
-  assert.deepEqual(state.dqWarnPings, []);
-
-  // a TO can set it for a tracked player, and bulk all turns calls on but leaves it alone
-  assert.match((await run('notify', 'to-discord', { player: '1', dq_warnings: 'on' })).content, /^They'll get warned again if their called set still hasn't started\. Needs match calls on too\.$/);
-  assert.deepEqual(state.dqWarnPings, ['crew-discord']);
-  state.callPings = [];
-  state.streamPings = ['old-discord'];
-  state.regPings = [];
-  state.regDmPings = [];
-  state.startDmPings = [];
-  const ask = await run('notify', 'to-discord', { player: 'all', all: 'on' });
-  assert.match(ask.content, /^Change \/notify for 1 tracked player\? Match calls on, stream alerts on/);
-  assert.doesNotMatch(ask.content, /DQ warnings/);
-  assert.deepEqual(state.callPings, []);
 });
 
 test('/notify registration makes its role mentionable so the role ping notifies', async () => {
@@ -580,7 +544,6 @@ test('/notify lets TOs pick a tracked player without a member mention', async ()
   state.links = {};
   state.callPings = [];
   state.streamPings = [];
-  state.dqWarnPings = [];
 
   const refused = await run('notify', 'someone', { player: '1', calls: 'on' });
   assert.equal(refused.content, 'Only TOs can see or change a tracked player\'s pings. Leave out `player` for yours. `/t-o role list` shows who they are.');

@@ -62,24 +62,6 @@ test('a start.gg id with graphql in it never reaches the query', async () => {
   assert.equal(asked.length, 0);
 });
 
-test('a bad discord id from start.gg never becomes a mention or a ping', async () => {
-  // a warned call with one good id and two bad values: only the good one pings
-  state.messages = { calls: true };
-  state.callPings = ['@everyone', '123', 'bad id'];
-  state.dqWarnPings = ['@everyone', '123', 'bad id'];
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 6 * 60, discordIds: ['@everyone', '123', 'bad id'], warned: false }];
-  mockStartgg(() => ({ s802: { state: 6 } }));
-  const channel = fakeChannel();
-  // the warning reply needs its original message to exist
-  await channel.send({ content: 'original call' });
-  channel.sent.length = 0;
-  state.callPosts[0].messageId = 'm1';
-  await tracker.followCalls(channel);
-  assert.equal(channel.sent.length, 1);
-  assert.equal(channel.sent[0].content, `<@123> You're still up, 6 min in. TOs usually DQ at 10`);
-  assert.deepEqual(channel.sent[0].allowedMentions, { users: ['123'] });
-});
-
 test('expired result posts are saved away, not left to come back on restart', async () => {
   state.resultPosts = [{ setId: '701', channelId: 'c1', messageId: 'm1', at: now - 61 * 60, outcome: '1:2:1', reset: false }];
   mockStartgg(() => assert.fail('expired posts are never asked about'));
@@ -88,7 +70,7 @@ test('expired result posts are saved away, not left to come back on restart', as
 });
 
 test('an uncalled edit that fails stays watched for the next check', async () => {
-  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 60, discordIds: ['123'], warned: false }];
+  state.callPosts = [{ setId: '802', channelId: 'c1', messageId: 'm1', calledAt: now - 60, discordIds: ['123'] }];
   state.called = ['802'];
   mockStartgg(() => ({ s802: { state: 1 } }));
   const channel = fakeChannel({ editThrows: Object.assign(new Error('discord is down'), { code: 500 }) });
