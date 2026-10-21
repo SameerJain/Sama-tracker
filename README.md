@@ -194,6 +194,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | `/status` | Uptime, when the latest version was deployed plus its message, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, any downtime before the last start, why a post last missed its thread, and a link to the GitHub repo. A copy run on another computer also shows that computer's name. |
 | `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
 | `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event), set result colors and the recap schedule. Needs the TO role or **Manage Server**. |
+| `/data` | Links to the [Monday Night SmashBall data page](https://monday-night-smashball.vercel.app) and the [UB Smash Royale data page](https://ub-smash-royale.vercel.app): every tournament's attendance, winners, most events entered and characters. |
 | `/socials` | Saved streams and social links. |
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional, and links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |

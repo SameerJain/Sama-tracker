@@ -37,7 +37,9 @@ export function line(data, { width = 900, height = 260, period = 'calendar' } = 
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y1 = Math.max(...ys);
   const X = (x) => padL + ((x - x0) / Math.max(1, x1 - x0)) * (width - padL - padR);
   const Y = (y) => padT + (1 - y / y1) * (height - padT - padB);
-  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" font-family="system-ui,sans-serif" font-size="11">`;
+  // the axis scale rides on the svg so the page can turn a hover position
+  // back into an X (date) and Y (value) for its line tooltip
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" font-family="system-ui,sans-serif" font-size="11" data-x0="${x0}" data-x1="${x1}" data-ymax="${y1}" data-padl="${padL}" data-padr="${padR}" data-padt="${padT}" data-padb="${padB}">`;
   for (let g = 0; g <= 4; g++) {
     const v = Math.round((y1 * g) / 4);
     s += `<line x1="${padL}" y1="${Y(v)}" x2="${width - padR}" y2="${Y(v)}" stroke="#ddd"/><text x="4" y="${Y(v) + 4}" fill="#666">${v}</text>`;
@@ -59,7 +61,7 @@ export function line(data, { width = 900, height = 260, period = 'calendar' } = 
   const mx = X(m.startAt), my = Y(m.attendees);
   const label = `max ${m.attendees} — ${trunc(m.name, 40)} (${m.date})`;
   const anchorRight = mx > width - 320;
-  s += `<g class="s-raw"><polyline fill="none" stroke="#4c78a8" stroke-width="1.6" points="${rawPts}"/>`;
+  s += `<g class="s-raw"><polyline fill="none" stroke="#4c78a8" stroke-width="1.6" points="${rawPts}"/><polyline class="hit" data-series="attendance" fill="none" stroke="rgba(0,0,0,0)" stroke-width="12" style="pointer-events:stroke;cursor:crosshair" points="${rawPts}"/>`;
   for (const d of data) s += `<circle class="dot" cx="${X(d.startAt).toFixed(1)}" cy="${Y(d.attendees).toFixed(1)}" r="3" fill="#4c78a8" data-x="${esc(d.date)}" data-y="${esc(d.attendees)}" data-name="${esc(d.name)}" style="cursor:pointer"><title>${esc(`${d.attendees} attendees — ${d.name} (${d.date})`)}</title></circle>`;
   s += `<circle cx="${mx}" cy="${my}" r="4" fill="#e45756"/>`;
   s += `<text x="${anchorRight ? mx - 8 : mx + 8}" y="${Math.max(12, my - 8)}" fill="#e45756" text-anchor="${anchorRight ? 'end' : 'start'}">${esc(label)}</text></g>`;
@@ -69,7 +71,7 @@ export function line(data, { width = 900, height = 260, period = 'calendar' } = 
     const win = data.slice(Math.max(0, i - W + 1), i + 1);
     return `${X(d.startAt).toFixed(1)},${Y(win.reduce((a, t) => a + t.attendees, 0) / win.length).toFixed(1)}`;
   }).join(' ');
-  s += `<polyline class="s-avg" fill="none" stroke="#f28e2b" stroke-width="2" stroke-dasharray="6,3" points="${tpts}"/>`;
+  s += `<polyline class="s-avg" fill="none" stroke="#f28e2b" stroke-width="2" stroke-dasharray="6,3" points="${tpts}"/><polyline class="hit s-avg" data-series="${W}-tournament average" fill="none" stroke="rgba(0,0,0,0)" stroke-width="12" style="pointer-events:stroke;cursor:crosshair" points="${tpts}"/>`;
   // straight least-squares line over the whole period
   const rN = data.length;
   let rSx = 0, rSy = 0, rSxx = 0, rSxy = 0;
@@ -77,7 +79,7 @@ export function line(data, { width = 900, height = 260, period = 'calendar' } = 
   const rB = (rN * rSxy - rSx * rSy) / (rN * rSxx - rSx * rSx);
   const rA = (rSy - rB * rSx) / rN;
   const clampY = (v) => Math.max(0, Math.min(y1, v));
-  s += `<line class="s-whole" x1="${X(x0)}" y1="${Y(clampY(rA))}" x2="${X(x1)}" y2="${Y(clampY(rA + rB * (x1 - x0)))}" stroke="#9467bd" stroke-width="2"/>`;
+  s += `<line class="s-whole" x1="${X(x0)}" y1="${Y(clampY(rA))}" x2="${X(x1)}" y2="${Y(clampY(rA + rB * (x1 - x0)))}" stroke="#9467bd" stroke-width="2"/><line class="hit s-whole" data-series="straight-line trend (whole)" x1="${X(x0)}" y1="${Y(clampY(rA))}" x2="${X(x1)}" y2="${Y(clampY(rA + rB * (x1 - x0)))}" stroke="rgba(0,0,0,0)" stroke-width="12" style="pointer-events:stroke;cursor:crosshair"/>`;
   // per-year straight segments: same least-squares fit as the whole line, one per
   // year, drawn across the year's span with a triangle at each end
   s += '<g class="s-year">';
@@ -99,7 +101,7 @@ export function line(data, { width = 900, height = 260, period = 'calendar' } = 
     if (ex <= sx) continue;
     const ya = Y(clampY(qA + qB * (sx - xa))), yb = Y(clampY(qA + qB * (ex - xa)));
     const X1 = X(sx).toFixed(1), X2 = X(ex).toFixed(1), Y1 = ya.toFixed(1), Y2 = yb.toFixed(1);
-    s += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2ca02a" stroke-width="2"/>`;
+    s += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2ca02a" stroke-width="2"/><line class="hit" data-series="straight-line trend (${period === 'academic' ? `${yr}–${String(Number(yr) + 1).slice(2)}` : yr})" x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="rgba(0,0,0,0)" stroke-width="12" style="pointer-events:stroke;cursor:crosshair"/>`;
     s += `<polygon points="${X1},${(ya - 6).toFixed(1)} ${(X(sx) - 5).toFixed(1)},${(ya + 4).toFixed(1)} ${(X(sx) + 5).toFixed(1)},${(ya + 4).toFixed(1)}" fill="#2ca02a"/>`;
     s += `<polygon points="${X2},${(yb - 6).toFixed(1)} ${(X(ex) - 5).toFixed(1)},${(yb + 4).toFixed(1)} ${(X(ex) + 5).toFixed(1)},${(yb + 4).toFixed(1)}" fill="#2ca02a"/>`;
   }
@@ -107,4 +109,35 @@ export function line(data, { width = 900, height = 260, period = 'calendar' } = 
   s += `<text x="${padL}" y="14" fill="#4c78a8">— attendance</text><text x="${padL + 105}" y="14" fill="#f28e2b">- - ${W}-tournament average</text>`;
   s += `<text x="${padL}" y="32" fill="#9467bd">— straight-line trend (whole)</text><text x="${padL + 200}" y="32" fill="#2ca02a">▲ straight-line trend (each year) ▲</text>`;
   return { svg: s + '</svg>', slopePerYear: (rB * 365.25 * 24 * 3600) || 0 };
+}
+
+// cumulative distinct players over time. points: [{ startAt, total, newPlayers,
+// date, name }] in date order. a step line, since the total only ever goes up
+// in jumps at each edition. dots read out date (X) and distinct ever (Y)
+export function growthLine(points, { width = 900, height = 240 } = {}) {
+  if (!points.length) return '';
+  const padL = 44, padB = 26, padT = 30, padR = 10;
+  const x0 = points[0].startAt, x1 = points[points.length - 1].startAt, y1 = Math.max(...points.map((p) => p.total));
+  const X = (x) => padL + ((x - x0) / Math.max(1, x1 - x0)) * (width - padL - padR);
+  const Y = (y) => padT + (1 - y / y1) * (height - padT - padB);
+  // the axis scale rides on the svg so the page can turn a hover position
+  // back into an X (date) and Y (value) for its line tooltip
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" font-family="system-ui,sans-serif" font-size="11" data-x0="${x0}" data-x1="${x1}" data-ymax="${y1}" data-padl="${padL}" data-padr="${padR}" data-padt="${padT}" data-padb="${padB}">`;
+  for (let g = 0; g <= 4; g++) {
+    const v = Math.round((y1 * g) / 4);
+    s += `<line x1="${padL}" y1="${Y(v)}" x2="${width - padR}" y2="${Y(v)}" stroke="#ddd"/><text x="4" y="${Y(v) + 4}" fill="#666">${v}</text>`;
+  }
+  const y0 = new Date(x0 * 1000).getUTCFullYear(), y1y = new Date(x1 * 1000).getUTCFullYear();
+  for (let y = y0; y <= y1y; y++) {
+    const ts = Date.UTC(y, 0, 1) / 1000;
+    if (ts < x0 || ts > x1) continue;
+    s += `<line x1="${X(ts)}" y1="${padT}" x2="${X(ts)}" y2="${height - padB}" stroke="#bbb" stroke-dasharray="3,3"/><text x="${X(ts) + 3}" y="${height - 10}" fill="#666">${y}</text>`;
+  }
+  let d = `M ${X(x0).toFixed(1)},${Y(points[0].total).toFixed(1)}`;
+  for (let i = 1; i < points.length; i++) d += ` H ${X(points[i].startAt).toFixed(1)} V ${Y(points[i].total).toFixed(1)}`;
+  s += `<path d="${d}" fill="none" stroke="#9467bd" stroke-width="2"/><path class="hit" data-series="distinct players ever" d="${d}" fill="none" stroke="rgba(0,0,0,0)" stroke-width="12" style="pointer-events:stroke;cursor:crosshair"/>`;
+  for (const p of points) s += `<circle class="dot" cx="${X(p.startAt).toFixed(1)}" cy="${Y(p.total).toFixed(1)}" r="3" fill="#9467bd" data-x="${esc(p.date ?? '')}" data-y="${esc(p.total)}" data-name="${esc(p.name ?? '')}" style="cursor:pointer"><title>${esc(`${p.total} distinct players ever (+${p.newPlayers} new) — ${p.name ?? ''} (${p.date ?? ''})`)}</title></circle>`;
+  const last = points[points.length - 1];
+  s += `<text x="${padL}" y="14" fill="#9467bd">— distinct players ever (${last.total})</text>`;
+  return s + '</svg>';
 }

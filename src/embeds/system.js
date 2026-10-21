@@ -64,6 +64,17 @@ function socialLink(url) {
   return site ? `[${site}](${url})` : url;
 }
 
+// /data: the two series data pages, hosted on Vercel
+export function dataPages() {
+  const lines = [
+    '**Monday Night SmashBall** · [Data analysis](https://monday-night-smashball.vercel.app)',
+    '**UB Smash Royale** · [Data analysis](https://ub-smash-royale.vercel.app)',
+    '',
+    '-# Every tournament in each series: attendance over time, biggest crowds, winners, most events entered and characters reported on start.gg',
+  ];
+  return [baseEmbed(colors.brand).setTitle('Data pages').setDescription(lines.join('\n'))];
+}
+
 export function socials(links) {
   const embed = baseEmbed(colors.brand).setTitle('Socials');
   if (!links.length) return [embed.setDescription('Nothing yet. Add a link with `/socials_edit add`.')];
@@ -153,6 +164,7 @@ function shortHelp() {
     '**Tournaments**',
     '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered',
     '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks',
+    '`/data` Monday Night SmashBall and UB Smash Royale data pages',
     '`/messages` automatic posts and threads, for TOs or Manage Server · `/status` uptime and last checks',
     '`/matchmaking_role game:` get game pings · `/matchmaking_search game:` find games · `/matchmaking_channel` where searches go',
     '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun',
@@ -171,6 +183,7 @@ export function help(verbose = false) {
       '`/help` this list',
       '`/status` uptime, when the latest version was deployed, and the last start.gg and Slippi checks',
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
+      '`/data` links to the Monday Night SmashBall and UB Smash Royale data pages: every tournament\'s attendance, winners, most events entered and characters',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
       '`/messages` automatic posts on or off, threads, set result colors and the recap schedule. T.O.s or Manage Server',

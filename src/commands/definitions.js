@@ -82,6 +82,7 @@ export const commands = [
       { type: Option.String, name: 'timezone', description: 'Recap timezone, like America/New_York or Europe/London' },
     ],
   },
+  { name: 'data', description: 'Links to the Monday Night SmashBall and UB Smash Royale data pages' },
   // two commands since one with subcommands can't be run on its own, and permissions are per command
   { name: 'socials', description: 'Streams and social links saved for this server' },
   {

@@ -39,6 +39,7 @@ function commandName(interaction) {
 const handlers = new Map([
   ['help', (interaction) => sendEmbeds(interaction, embeds.help(flag(interaction, 'verbose')))],
   ['messages', configureMessages],
+  ['data', (interaction) => sendEmbeds(interaction, embeds.dataPages())],
   ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],
   ['socials_edit add', socialsAdd],
   ['socials_edit remove', socialsRemove],

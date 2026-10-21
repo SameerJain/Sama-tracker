@@ -66,6 +66,7 @@
       "nameRe": "smash royale #\\d+"
     },
     "mainEventRe": "ultimate singles",
+    "offWeekNameRe": "ub smash|smash club|randittos|the arcadian",
     "sideEventRes": [
       "redemption",
       "melee"

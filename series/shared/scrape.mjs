@@ -97,13 +97,26 @@ const SETS_Q = `query ($id: ID!, $page: Int!, $perPage: Int!) { event(id: $id) {
     pageInfo { totalPages }
     nodes {
       id
-      slots { entrant { id participants { player { id gamerTag } } } }
+      slots { entrant { id participants { player { id gamerTag } } } standing { stats { score { value } } } }
       games { winnerId selections { entrant { id } character { name } } } } } } }`;
 async function getSetsPage(eventId, page, perPage) {
   try {
     return await gql(SETS_Q, { id: eventId, page, perPage });
   } catch (err) {
-    if (err.complexity && perPage > 2) return getSetsPage(eventId, page, 2);
+    if (err.complexity && perPage > 1) {
+      // split the failed page into smaller pages covering the same sets
+      const half = Math.max(1, Math.floor(perPage / 2));
+      const count = Math.ceil(perPage / half);
+      const firstSub = Math.floor(((page - 1) * perPage) / half) + 1;
+      const nodes = [];
+      let subTotalPages = 0;
+      for (let k = 0; k < count; k++) {
+        const sub = await getSetsPage(eventId, firstSub + k, half);
+        nodes.push(...(sub?.event?.sets?.nodes ?? []));
+        subTotalPages = sub?.event?.sets?.pageInfo?.totalPages ?? subTotalPages;
+      }
+      return { event: { sets: { nodes, pageInfo: { totalPages: Math.ceil((subTotalPages * half) / perPage) } } } };
+    }
     throw err;
   }
 }
@@ -132,5 +145,11 @@ export async function getCharGames(eventId, perPage = 10) {
     games.push({ wChar: w.character.name, lChar: l.character.name, wEntrant: String(g.winnerId), lEntrant: String(l.entrant.id), wPlayers: emap.get(String(g.winnerId)) ?? [], lPlayers: emap.get(String(l.entrant.id)) ?? [], setId: String(n.id) });
   }
   const setsWithChars = new Set(games.map((g) => g.setId)).size;
-  return { totalSets: nodes.length, games, gamesTotal, setsWithChars };
+  // games actually played, from set scores. a DQ (-1) or a missing score played none that count
+  let gamesPlayed = 0;
+  for (const n of nodes) {
+    const scores = (n.slots ?? []).map((s) => s?.standing?.stats?.score?.value);
+    if (scores.length >= 2 && scores.every((v) => typeof v === 'number' && v >= 0)) gamesPlayed += scores.reduce((a, b) => a + b, 0);
+  }
+  return { totalSets: nodes.length, games, gamesTotal, setsWithChars, gamesPlayed };
 }

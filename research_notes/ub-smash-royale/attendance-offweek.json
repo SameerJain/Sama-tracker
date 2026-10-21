@@ -1,0 +1,6303 @@
+[
+  {
+    "tournamentId": 590929,
+    "eventIds": [
+      986398
+    ],
+    "events": [
+      "Ultimate Singles"
+    ],
+    "entrants": [
+      {
+        "name": "Fuzzi",
+        "players": [
+          {
+            "id": 1482148,
+            "tag": "Fuzzi"
+          }
+        ]
+      },
+      {
+        "name": "716 | Interstellar",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "juan22",
+        "players": [
+          {
+            "id": 2088640,
+            "tag": "juan22"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "Im_to_lazy_to_change_it",
+        "players": [
+          {
+            "id": 3560696,
+            "tag": "Im_to_lazy_to_change_it"
+          }
+        ]
+      },
+      {
+        "name": "Spellbound",
+        "players": [
+          {
+            "id": 371042,
+            "tag": "Spellbound"
+          }
+        ]
+      },
+      {
+        "name": "ICYoyo",
+        "players": [
+          {
+            "id": 177352,
+            "tag": "ICYoyo"
+          }
+        ]
+      },
+      {
+        "name": "Broot",
+        "players": [
+          {
+            "id": 2621867,
+            "tag": "Broot"
+          }
+        ]
+      },
+      {
+        "name": "atrocity980",
+        "players": [
+          {
+            "id": 3641457,
+            "tag": "atrocity980"
+          }
+        ]
+      },
+      {
+        "name": "TheMixedMamba",
+        "players": [
+          {
+            "id": 3618715,
+            "tag": "TheMixedMamba"
+          }
+        ]
+      },
+      {
+        "name": "reverse",
+        "players": [
+          {
+            "id": 3563797,
+            "tag": "reverse"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "MoonCake",
+        "players": [
+          {
+            "id": 1062062,
+            "tag": "MoonCake"
+          }
+        ]
+      },
+      {
+        "name": "TTD | SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Crisis",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "Kurlz",
+        "players": [
+          {
+            "id": 1206137,
+            "tag": "Kurlz"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "BRB | MM | PEACEPRIZE",
+        "players": [
+          {
+            "id": 1385888,
+            "tag": "PEACEPRIZE"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "LeMickey",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "Free Agent | Firework",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "HAZE | Brenderman",
+        "players": [
+          {
+            "id": 3636147,
+            "tag": "Brenderman"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 594975,
+    "eventIds": [
+      994344
+    ],
+    "events": [
+      "Ultimate Doubles"
+    ],
+    "entrants": [
+      {
+        "name": "SWISH / PolarChan",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          },
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "name": "Redsaw / Crisis",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          },
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "Sauce / UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          },
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Interstellar / astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          },
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "Zanya / King David",
+        "players": [
+          {
+            "id": 266892,
+            "tag": "Zanya"
+          },
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "9th Life / Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          },
+          {
+            "id": 3666243,
+            "tag": "9th Life"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin / MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          },
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "BNSO / Bruno",
+        "players": [
+          {
+            "id": 3321069,
+            "tag": "Bruno"
+          },
+          {
+            "id": 3666768,
+            "tag": "BNSO"
+          }
+        ]
+      },
+      {
+        "name": "atrocity980 / TheHomieNoelle",
+        "players": [
+          {
+            "id": 3641457,
+            "tag": "atrocity980"
+          },
+          {
+            "id": 3666729,
+            "tag": "TheHomieNoelle"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker / DG",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          },
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "Samatron / MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          },
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 601358,
+    "eventIds": [
+      1006150
+    ],
+    "events": [
+      "Ultimate Randoms"
+    ],
+    "entrants": [
+      {
+        "name": "PPB | Szadubiii",
+        "players": [
+          {
+            "id": 3233312,
+            "tag": "Szadubiii"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 234080,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "Francesco",
+        "players": [
+          {
+            "id": 1643987,
+            "tag": "Francesco"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "Victor Wembanyama",
+        "players": [
+          {
+            "id": 3692132,
+            "tag": "Victor Wembanyama"
+          }
+        ]
+      },
+      {
+        "name": "A Fly",
+        "players": [
+          {
+            "id": 1831044,
+            "tag": "A Fly"
+          }
+        ]
+      },
+      {
+        "name": "JoshAllenFan17",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "VD | coolBeans21",
+        "players": [
+          {
+            "id": 3691990,
+            "tag": "coolBeans21"
+          }
+        ]
+      },
+      {
+        "name": "Broot",
+        "players": [
+          {
+            "id": 2621867,
+            "tag": "Broot"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Comet",
+        "players": [
+          {
+            "id": 2309784,
+            "tag": "Comet"
+          }
+        ]
+      },
+      {
+        "name": "Ren",
+        "players": [
+          {
+            "id": 3690759,
+            "tag": "Ren"
+          }
+        ]
+      },
+      {
+        "name": "Number-Vulture",
+        "players": [
+          {
+            "id": 3690717,
+            "tag": "Number-Vulture"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "716 | Interstellar",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "Firework",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 606044,
+    "eventIds": [
+      1014971
+    ],
+    "events": [
+      "Heroes vs Villains"
+    ],
+    "entrants": [
+      {
+        "name": "crosstheblock",
+        "players": [
+          {
+            "id": 3019507,
+            "tag": "crosstheblock"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "BigMessiFan",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Eclipse",
+        "players": [
+          {
+            "id": 3661659,
+            "tag": "Eclipse"
+          }
+        ]
+      },
+      {
+        "name": "Crisis",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "TTD | WoJo",
+        "players": [
+          {
+            "id": 2976929,
+            "tag": "WoJo"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "MoonCake",
+        "players": [
+          {
+            "id": 1062062,
+            "tag": "MoonCake"
+          }
+        ]
+      },
+      {
+        "name": "Victor Wembanyama",
+        "players": [
+          {
+            "id": 3692132,
+            "tag": "Victor Wembanyama"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "Vergil",
+        "players": [
+          {
+            "id": 3716271,
+            "tag": "Kyouki"
+          }
+        ]
+      },
+      {
+        "name": "716 | AnneHathawayFan100",
+        "players": [
+          {
+            "id": 2982999,
+            "tag": "GetPlucked"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 610862,
+    "eventIds": [
+      1024356
+    ],
+    "events": [
+      "Ultimate Singles"
+    ],
+    "entrants": [
+      {
+        "name": "Ken",
+        "players": [
+          {
+            "id": 3742107,
+            "tag": "Ken"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "Crisis",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "BigMessiFan",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "MoonCake",
+        "players": [
+          {
+            "id": 1062062,
+            "tag": "MoonCake"
+          }
+        ]
+      },
+      {
+        "name": "TTD | UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "RenzZlax",
+        "players": [
+          {
+            "id": 2431415,
+            "tag": "RenzZlax"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Broot",
+        "players": [
+          {
+            "id": 2621867,
+            "tag": "Broot"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "716 | AnneHathawayFan",
+        "players": [
+          {
+            "id": 2982999,
+            "tag": "GetPlucked"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "MBS | Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Kyouki",
+        "players": [
+          {
+            "id": 3716271,
+            "tag": "Kyouki"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 617045,
+    "eventIds": [
+      1035934
+    ],
+    "events": [
+      "Anything Goes"
+    ],
+    "entrants": [
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "TTD | UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "BigMessiFan",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "DNY | Scrimblo",
+        "players": [
+          {
+            "id": 2348185,
+            "tag": "Drew"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "MoonCake",
+        "players": [
+          {
+            "id": 1062062,
+            "tag": "MoonCake"
+          }
+        ]
+      },
+      {
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "Broot",
+        "players": [
+          {
+            "id": 2621867,
+            "tag": "Broot"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "716 | Interstellar",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 637043,
+    "eventIds": [
+      1075352
+    ],
+    "events": [
+      "Ultimate Singles"
+    ],
+    "entrants": [
+      {
+        "name": "Lunrein ROA",
+        "players": [
+          {
+            "id": 1673881,
+            "tag": "Lunrein"
+          }
+        ]
+      },
+      {
+        "name": "TTD | UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "MoonCake",
+        "players": [
+          {
+            "id": 1062062,
+            "tag": "MoonCake"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "DJOheb",
+        "players": [
+          {
+            "id": 2266420,
+            "tag": "DJOheb"
+          }
+        ]
+      },
+      {
+        "name": "716 | AnneHathawayFan",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "Fuzzi",
+        "players": [
+          {
+            "id": 1482148,
+            "tag": "Fuzzi"
+          }
+        ]
+      },
+      {
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Firework",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "Goofy Goober",
+        "players": [
+          {
+            "id": 3887989,
+            "tag": "I Am Kenough"
+          }
+        ]
+      },
+      {
+        "name": "BlxckGnarly",
+        "players": [
+          {
+            "id": 1803603,
+            "tag": "BlxckGnarly"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "MBS | Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 655549,
+    "eventIds": [
+      1112073
+    ],
+    "events": [
+      "Ultimate Singles"
+    ],
+    "entrants": [
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "PPB | Tone",
+        "players": [
+          {
+            "id": 1285997,
+            "tag": "Tone"
+          }
+        ]
+      },
+      {
+        "name": "DJSean",
+        "players": [
+          {
+            "id": 1543196,
+            "tag": "DJSean"
+          }
+        ]
+      },
+      {
+        "name": "MBS | Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Jwasder",
+        "players": [
+          {
+            "id": 3971874,
+            "tag": "Jwasder"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Jummy",
+        "players": [
+          {
+            "id": 2463256,
+            "tag": "StummyTroubles"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "Rinn",
+        "players": [
+          {
+            "id": 1640882,
+            "tag": "Rinn"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "Sol | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "716 | AnneHathawayFan",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 658679,
+    "eventIds": [
+      1118333
+    ],
+    "events": [
+      "Ultimate Singles"
+    ],
+    "entrants": [
+      {
+        "name": "BlxckGnarly",
+        "players": [
+          {
+            "id": 1803603,
+            "tag": "BlxckGnarly"
+          }
+        ]
+      },
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "DJOheb",
+        "players": [
+          {
+            "id": 2266420,
+            "tag": "DJOheb"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "TTD | WoJo",
+        "players": [
+          {
+            "id": 2976929,
+            "tag": "WoJo"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "Barça | Pau Cubarsí fan club",
+        "players": [
+          {
+            "id": 2191110,
+            "tag": "captinricard"
+          }
+        ]
+      },
+      {
+        "name": "BBW | Broot",
+        "players": [
+          {
+            "id": 2621867,
+            "tag": "Broot"
+          }
+        ]
+      },
+      {
+        "name": "AfroNinja",
+        "players": [
+          {
+            "id": 1158116,
+            "tag": "AfroNinja"
+          }
+        ]
+      },
+      {
+        "name": "UU | Mizu",
+        "players": [
+          {
+            "id": 569195,
+            "tag": "Mizu"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Fuzzi",
+        "players": [
+          {
+            "id": 1482148,
+            "tag": "Fuzzi"
+          }
+        ]
+      },
+      {
+        "name": "DNY/Akbros | Genghis John",
+        "players": [
+          {
+            "id": 3353422,
+            "tag": "Tomodachi Wife"
+          }
+        ]
+      },
+      {
+        "name": "DNY | Scrimblo",
+        "players": [
+          {
+            "id": 2348185,
+            "tag": "Drew"
+          }
+        ]
+      },
+      {
+        "name": "Sol | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "Ranger",
+        "players": [
+          {
+            "id": 861161,
+            "tag": "Ranger"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "CSS",
+        "players": [
+          {
+            "id": 2874224,
+            "tag": "CSS"
+          }
+        ]
+      },
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Jummy",
+        "players": [
+          {
+            "id": 2463256,
+            "tag": "StummyTroubles"
+          }
+        ]
+      },
+      {
+        "name": "Avonnyeeeeee",
+        "players": [
+          {
+            "id": 4011657,
+            "tag": "Avonnyeeeeee"
+          }
+        ]
+      },
+      {
+        "name": "winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "name": "PPB | Tone",
+        "players": [
+          {
+            "id": 1285997,
+            "tag": "Tone"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "716 | Zambo",
+        "players": [
+          {
+            "id": 181296,
+            "tag": "Zambo"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 661153,
+    "eventIds": [
+      1128619,
+      1123035,
+      1131542
+    ],
+    "events": [
+      "Ultimate Doubles",
+      "Ultimate Singles",
+      "Battle of the Departing TOs"
+    ],
+    "entrants": [
+      {
+        "name": "Metro Shroomin' / DG",
+        "players": [
+          {
+            "id": 614023,
+            "tag": "Metro Shroomin'"
+          },
+          {
+            "id": 3975956,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "RenzZlax / Vital",
+        "players": [
+          {
+            "id": 2431415,
+            "tag": "RenzZlax"
+          },
+          {
+            "id": 1693519,
+            "tag": "Vital"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts / King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          },
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Jummy / BlxckGnarly",
+        "players": [
+          {
+            "id": 1803603,
+            "tag": "BlxckGnarly"
+          },
+          {
+            "id": 2463256,
+            "tag": "StummyTroubles"
+          }
+        ]
+      },
+      {
+        "name": "Dagel / bad at tha game :3",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          },
+          {
+            "id": 3864386,
+            "tag": "MKUltra Instinct"
+          }
+        ]
+      },
+      {
+        "name": "Liyrex / CoreyIsHot",
+        "players": [
+          {
+            "id": 67389,
+            "tag": "Liyrex"
+          },
+          {
+            "id": 3907470,
+            "tag": "CoreyIsHot"
+          }
+        ]
+      },
+      {
+        "name": "astra / AnneHathawayFan",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          },
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "PolarChan / SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          },
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "name": "Sauce / ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          },
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Liam1283 / Vidiot",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          },
+          {
+            "id": 2724299,
+            "tag": "Vidiot"
+          }
+        ]
+      },
+      {
+        "name": "felix / Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          },
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "C / winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          },
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "Drip / MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          },
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      },
+      {
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "name": "TC | Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "716 | AnneHathawayFan",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "TTD | SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          }
+        ]
+      },
+      {
+        "name": "Metro Shroomin'",
+        "players": [
+          {
+            "id": 614023,
+            "tag": "Metro Shroomin'"
+          }
+        ]
+      },
+      {
+        "name": "Drip",
+        "players": [
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          }
+        ]
+      },
+      {
+        "name": "Gai | Steverson",
+        "players": [
+          {
+            "id": 3654552,
+            "tag": "Steverson"
+          }
+        ]
+      },
+      {
+        "name": "UU | Mizu",
+        "players": [
+          {
+            "id": 569195,
+            "tag": "Mizu"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Vidiot",
+        "players": [
+          {
+            "id": 2724299,
+            "tag": "Vidiot"
+          }
+        ]
+      },
+      {
+        "name": "BlxckGnarly",
+        "players": [
+          {
+            "id": 1803603,
+            "tag": "BlxckGnarly"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "716 | Fresh",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          }
+        ]
+      },
+      {
+        "name": "Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Sol | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "DNY | Scrimblo",
+        "players": [
+          {
+            "id": 2348185,
+            "tag": "Drew"
+          }
+        ]
+      },
+      {
+        "name": "Clibs",
+        "players": [
+          {
+            "id": 1055253,
+            "tag": "Clibs"
+          }
+        ]
+      },
+      {
+        "name": "CoreyIsHot",
+        "players": [
+          {
+            "id": 3907470,
+            "tag": "CoreyIsHot"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "DJOheb",
+        "players": [
+          {
+            "id": 2266420,
+            "tag": "DJOheb"
+          }
+        ]
+      },
+      {
+        "name": "AGN | Eclipse",
+        "players": [
+          {
+            "id": 1428028,
+            "tag": "Eclipse"
+          }
+        ]
+      },
+      {
+        "name": "VD | coolBeans21",
+        "players": [
+          {
+            "id": 3691990,
+            "tag": "coolBeans21"
+          }
+        ]
+      },
+      {
+        "name": "xau/usd",
+        "players": [
+          {
+            "id": 4046488,
+            "tag": "xau/usd"
+          }
+        ]
+      },
+      {
+        "name": "LookUp",
+        "players": [
+          {
+            "id": 3980868,
+            "tag": "LookUp"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "womp | Krimm",
+        "players": [
+          {
+            "id": 4046401,
+            "tag": "Krimm"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "MoonCake",
+        "players": [
+          {
+            "id": 1062062,
+            "tag": "MoonCake"
+          }
+        ]
+      },
+      {
+        "name": "reverse",
+        "players": [
+          {
+            "id": 3563797,
+            "tag": "reverse"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "BBW | Broot",
+        "players": [
+          {
+            "id": 2621867,
+            "tag": "Broot"
+          }
+        ]
+      },
+      {
+        "name": "bad at tha game :3",
+        "players": [
+          {
+            "id": 3864386,
+            "tag": "MKUltra Instinct"
+          }
+        ]
+      },
+      {
+        "name": "RenzZlax",
+        "players": [
+          {
+            "id": 2431415,
+            "tag": "RenzZlax"
+          }
+        ]
+      },
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "Jummy",
+        "players": [
+          {
+            "id": 2463256,
+            "tag": "StummyTroubles"
+          }
+        ]
+      },
+      {
+        "name": "GWOLF",
+        "players": [
+          {
+            "id": 1259881,
+            "tag": "phone wallet bees"
+          }
+        ]
+      },
+      {
+        "name": "ICYoyo",
+        "players": [
+          {
+            "id": 177352,
+            "tag": "ICYoyo"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "PPB | Tone",
+        "players": [
+          {
+            "id": 1285997,
+            "tag": "Tone"
+          }
+        ]
+      },
+      {
+        "name": "TTD | UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "name": "Yoyo | benny",
+        "players": [
+          {
+            "id": 1990254,
+            "tag": "benny"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "CF | MODCHAT | Connor",
+        "players": [
+          {
+            "id": 404287,
+            "tag": "Phaethon"
+          }
+        ]
+      },
+      {
+        "name": "Liyrex",
+        "players": [
+          {
+            "id": 67389,
+            "tag": "Liyrex"
+          }
+        ]
+      },
+      {
+        "name": "Team Drip",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          },
+          {
+            "id": 1210907,
+            "tag": "Drip"
+          },
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          },
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          },
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "Team Corey",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          },
+          {
+            "id": 404287,
+            "tag": "Phaethon"
+          },
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          },
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          },
+          {
+            "id": 3907470,
+            "tag": "CoreyIsHot"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 703221,
+    "eventIds": [
+      1203839
+    ],
+    "events": [
+      "Ultimate Singles"
+    ],
+    "entrants": [
+      {
+        "name": "TTD | WoJo",
+        "players": [
+          {
+            "id": 2976929,
+            "tag": "WoJo"
+          }
+        ]
+      },
+      {
+        "name": "Juanrix_23",
+        "players": [
+          {
+            "id": 4299391,
+            "tag": "Juanrix_23"
+          }
+        ]
+      },
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      },
+      {
+        "name": "Scup | Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "crosstheblock",
+        "players": [
+          {
+            "id": 3019507,
+            "tag": "crosstheblock"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "Xaneak",
+        "players": [
+          {
+            "id": 1924966,
+            "tag": "Xaneak"
+          }
+        ]
+      },
+      {
+        "name": "Ziax(Isiah)",
+        "players": [
+          {
+            "id": 2979661,
+            "tag": "TingTong"
+          }
+        ]
+      },
+      {
+        "name": "schrodonger",
+        "players": [
+          {
+            "id": 4298167,
+            "tag": "schrodonger"
+          }
+        ]
+      },
+      {
+        "name": "Schmooven",
+        "players": [
+          {
+            "id": 2434881,
+            "tag": "Schmooven"
+          }
+        ]
+      },
+      {
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "spacecowboy",
+        "players": [
+          {
+            "id": 4291756,
+            "tag": "Spike"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "mob100",
+        "players": [
+          {
+            "id": 4291866,
+            "tag": "mob100"
+          }
+        ]
+      },
+      {
+        "name": "kuruk",
+        "players": [
+          {
+            "id": 4291757,
+            "tag": "kuruk"
+          }
+        ]
+      },
+      {
+        "name": "PatoGrease",
+        "players": [
+          {
+            "id": 4291794,
+            "tag": "PatoGrease"
+          }
+        ]
+      },
+      {
+        "name": "Redsaw",
+        "players": [
+          {
+            "id": 2842804,
+            "tag": "Redsaw"
+          }
+        ]
+      },
+      {
+        "name": "Swiss",
+        "players": [
+          {
+            "id": 4291633,
+            "tag": "Swiss"
+          }
+        ]
+      },
+      {
+        "name": "Liyrex",
+        "players": [
+          {
+            "id": 67389,
+            "tag": "Liyrex"
+          }
+        ]
+      },
+      {
+        "name": "SPT | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "slip & fall | liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 709776,
+    "eventIds": [
+      1216665,
+      1216666
+    ],
+    "events": [
+      "Ultimate Singles",
+      "Redemption Bracket"
+    ],
+    "entrants": [
+      {
+        "name": "Fuzzi",
+        "players": [
+          {
+            "id": 1482148,
+            "tag": "Fuzzi"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "crosstheblock",
+        "players": [
+          {
+            "id": 3019507,
+            "tag": "crosstheblock"
+          }
+        ]
+      },
+      {
+        "name": "Spike",
+        "players": [
+          {
+            "id": 4291756,
+            "tag": "Spike"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      },
+      {
+        "name": "Blams",
+        "players": [
+          {
+            "id": 1374667,
+            "tag": "Blams"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Nette | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "Snek",
+        "players": [
+          {
+            "id": 4326074,
+            "tag": "Snek"
+          }
+        ]
+      },
+      {
+        "name": "PatoGrease",
+        "players": [
+          {
+            "id": 4291794,
+            "tag": "PatoGrease"
+          }
+        ]
+      },
+      {
+        "name": "CZn | Double_AA",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "Skybloom003",
+        "players": [
+          {
+            "id": 4324099,
+            "tag": "Skybloom003"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "Juanrix_23",
+        "players": [
+          {
+            "id": 4299391,
+            "tag": "Juanrix_23"
+          }
+        ]
+      },
+      {
+        "name": "kurukkz",
+        "players": [
+          {
+            "id": 4322995,
+            "tag": "kurukkz"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "astra",
+        "players": [
+          {
+            "id": 2994579,
+            "tag": "astra"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "cr1spy",
+        "players": [
+          {
+            "id": 4322558,
+            "tag": "cr1spy"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "mob100",
+        "players": [
+          {
+            "id": 4291866,
+            "tag": "mob100"
+          }
+        ]
+      },
+      {
+        "name": "Swiss",
+        "players": [
+          {
+            "id": 4291633,
+            "tag": "Swiss"
+          }
+        ]
+      },
+      {
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Smelvin",
+        "players": [
+          {
+            "id": 2994432,
+            "tag": "Smelvin"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "Nette | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "Blams",
+        "players": [
+          {
+            "id": 1374667,
+            "tag": "Blams"
+          }
+        ]
+      },
+      {
+        "name": "Swiss",
+        "players": [
+          {
+            "id": 4291633,
+            "tag": "Swiss"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Skybloom003",
+        "players": [
+          {
+            "id": 4324099,
+            "tag": "Skybloom003"
+          }
+        ]
+      },
+      {
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 715097,
+    "eventIds": [
+      1227107
+    ],
+    "events": [
+      "Squad Strike"
+    ],
+    "entrants": [
+      {
+        "name": "TTD | UpTilted",
+        "players": [
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "GrayGhost110",
+        "players": [
+          {
+            "id": 2427518,
+            "tag": "GrayGhost110"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Spark",
+        "players": [
+          {
+            "id": 1657490,
+            "tag": "Spark"
+          }
+        ]
+      },
+      {
+        "name": "Goober",
+        "players": [
+          {
+            "id": 4348150,
+            "tag": "Goober"
+          }
+        ]
+      },
+      {
+        "name": "Gal",
+        "players": [
+          {
+            "id": 4348149,
+            "tag": "Gal"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "PatoGrease",
+        "players": [
+          {
+            "id": 4291794,
+            "tag": "PatoGrease"
+          }
+        ]
+      },
+      {
+        "name": "Swiss",
+        "players": [
+          {
+            "id": 4291633,
+            "tag": "Swiss"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "CZn | Double_AA",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 720729,
+    "eventIds": [
+      1238400
+    ],
+    "events": [
+      "Juan's Stupid Rule"
+    ],
+    "entrants": [
+      {
+        "name": "Avon",
+        "players": [
+          {
+            "id": 4374729,
+            "tag": "Avon"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "Wormy",
+        "players": [
+          {
+            "id": 4359792,
+            "tag": "Jacy"
+          }
+        ]
+      },
+      {
+        "name": "Grilled Cheese",
+        "players": [
+          {
+            "id": 4114317,
+            "tag": "Grilled Cheese"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "onlinepetclub | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "ICYoyo",
+        "players": [
+          {
+            "id": 177352,
+            "tag": "ICYoyo"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "Crisis87",
+        "players": [
+          {
+            "id": 2208017,
+            "tag": "Crisis87"
+          }
+        ]
+      },
+      {
+        "name": "Hoopbug",
+        "players": [
+          {
+            "id": 4373949,
+            "tag": "Hoopbug"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "CZn | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "Swiss",
+        "players": [
+          {
+            "id": 4291633,
+            "tag": "Swiss"
+          }
+        ]
+      },
+      {
+        "name": "MyBallsStink | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 725026,
+    "eventIds": [
+      1247191
+    ],
+    "events": [
+      "Randittos"
+    ],
+    "entrants": [
+      {
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "PatoGrease",
+        "players": [
+          {
+            "id": 4291794,
+            "tag": "PatoGrease"
+          }
+        ]
+      },
+      {
+        "name": "Teku",
+        "players": [
+          {
+            "id": 2979661,
+            "tag": "TingTong"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "Vidiot",
+        "players": [
+          {
+            "id": 2724299,
+            "tag": "Vidiot"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "TheConflict",
+        "players": [
+          {
+            "id": 4379725,
+            "tag": "TheConflict"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "dumb bitch inc | robbie",
+        "players": [
+          {
+            "id": 768635,
+            "tag": "robbie"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "Mook",
+        "players": [
+          {
+            "id": 4382665,
+            "tag": "Mook"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "CZn | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Cranjis McBasketball",
+        "players": [
+          {
+            "id": 4392069,
+            "tag": "Vital"
+          }
+        ]
+      },
+      {
+        "name": "Vingus",
+        "players": [
+          {
+            "id": 4382005,
+            "tag": "Vingus"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 730026,
+    "eventIds": [
+      1257406
+    ],
+    "events": [
+      "Squad Strike"
+    ],
+    "entrants": [
+      {
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "dumb bitch inc | robbie",
+        "players": [
+          {
+            "id": 768635,
+            "tag": "robbie"
+          }
+        ]
+      },
+      {
+        "name": "Teku",
+        "players": [
+          {
+            "id": 2979661,
+            "tag": "TingTong"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Spike",
+        "players": [
+          {
+            "id": 4291756,
+            "tag": "Spike"
+          }
+        ]
+      },
+      {
+        "name": "PatoGrease",
+        "players": [
+          {
+            "id": 4291794,
+            "tag": "PatoGrease"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Goofball Zoner | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "MBS | Tony Soprano",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 737276,
+    "eventIds": [
+      1271843,
+      1271842,
+      1272649
+    ],
+    "events": [
+      "Redemption Bracket",
+      "Randittos",
+      "Ultimate Doubles"
+    ],
+    "entrants": [
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "dumb bitch inc | robbie",
+        "players": [
+          {
+            "id": 768635,
+            "tag": "robbie"
+          }
+        ]
+      },
+      {
+        "name": "Spike",
+        "players": [
+          {
+            "id": 4291756,
+            "tag": "Spike"
+          }
+        ]
+      },
+      {
+        "name": "DBQ | ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "PatoGrease",
+        "players": [
+          {
+            "id": 4291794,
+            "tag": "PatoGrease"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Goofball Zoner | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Vingus",
+        "players": [
+          {
+            "id": 4382005,
+            "tag": "Vingus"
+          }
+        ]
+      },
+      {
+        "name": "Cranjis McBasketball",
+        "players": [
+          {
+            "id": 4392069,
+            "tag": "Vital"
+          }
+        ]
+      },
+      {
+        "name": "Dip | M0N0chrome__tG",
+        "players": [
+          {
+            "id": 4432491,
+            "tag": "M0N0chrome__tG"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "MBS | Tony Soprano",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "Vingus / Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          },
+          {
+            "id": 4382005,
+            "tag": "Vingus"
+          }
+        ]
+      },
+      {
+        "name": "Spike / PatoGrease",
+        "players": [
+          {
+            "id": 4291756,
+            "tag": "Spike"
+          },
+          {
+            "id": 4291794,
+            "tag": "PatoGrease"
+          }
+        ]
+      },
+      {
+        "name": "Tony Soprano / felix",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          },
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Cranjis McBasketball / M0N0chrome__tG",
+        "players": [
+          {
+            "id": 4392069,
+            "tag": "Vital"
+          },
+          {
+            "id": 4432491,
+            "tag": "M0N0chrome__tG"
+          }
+        ]
+      },
+      {
+        "name": "Samatron / Orbular",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          },
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "yeehaw / ~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          },
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 753944,
+    "eventIds": [
+      1305735
+    ],
+    "events": [
+      "DOUBLES"
+    ],
+    "entrants": [
+      {
+        "name": "Bishop / THE HEAD RIPPEROFFER",
+        "players": [
+          {
+            "id": 496484,
+            "tag": "THE HEAD RIPPEROFFER"
+          },
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "felix / Liam1283",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          },
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Samatron / Orbular",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          },
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "Winds / Chari",
+        "players": [
+          {
+            "id": 134119,
+            "tag": "Winds"
+          },
+          {
+            "id": 3876951,
+            "tag": "Chari"
+          }
+        ]
+      },
+      {
+        "name": "Heavener / MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          },
+          {
+            "id": 4542574,
+            "tag": "Heavener"
+          }
+        ]
+      },
+      {
+        "name": "~NEOS~ / Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          },
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "Fresh / Dook",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          },
+          {
+            "id": 1652111,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "Sauce / yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          },
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "King David / UpTilted",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          },
+          {
+            "id": 1214510,
+            "tag": "UpTilted"
+          }
+        ]
+      },
+      {
+        "name": "SWISH / PolarChan",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          },
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "name": "MEGA CHAD / Corey",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          },
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 764670,
+    "eventIds": [
+      1327837
+    ],
+    "events": [
+      "SQUAD STRIKE"
+    ],
+    "entrants": [
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "Summers",
+        "players": [
+          {
+            "id": 3980290,
+            "tag": "Summers"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "Swoosh",
+        "players": [
+          {
+            "id": 4600773,
+            "tag": "Swoosh"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Lexiforreals",
+        "players": [
+          {
+            "id": 4599649,
+            "tag": "Lexiforreals"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "BigMOAB14",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "ORBUTRON | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "knockedloose | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "Dip | M0N0chrome__tG",
+        "players": [
+          {
+            "id": 4432491,
+            "tag": "M0N0chrome__tG"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 772119,
+    "eventIds": [
+      1343170
+    ],
+    "events": [
+      "Items 1v1"
+    ],
+    "entrants": [
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "knockedloose | Vital",
+        "players": [
+          {
+            "id": 3480773,
+            "tag": "vital"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "AFAS Comfy | Sovereign",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          }
+        ]
+      },
+      {
+        "name": "Fuzzi",
+        "players": [
+          {
+            "id": 1482148,
+            "tag": "Fuzzi"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "DJOheb",
+        "players": [
+          {
+            "id": 2266420,
+            "tag": "DJOheb"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Mattcraft",
+        "players": [
+          {
+            "id": 4645003,
+            "tag": "Mattcraft"
+          }
+        ]
+      },
+      {
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "BigMOAB14",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "ORBUTRON | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 776774,
+    "eventIds": [
+      1352753
+    ],
+    "events": [
+      "Home Stage Advantage"
+    ],
+    "entrants": [
+      {
+        "name": "yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "BigMOAB14",
+        "players": [
+          {
+            "id": 2272989,
+            "tag": "BigMOAB14"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Fuzzi",
+        "players": [
+          {
+            "id": 1482148,
+            "tag": "Fuzzi"
+          }
+        ]
+      },
+      {
+        "name": "Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Sauce",
+        "players": [
+          {
+            "id": 2276114,
+            "tag": "Sauce"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "716 | Corey",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "~NEOS~",
+        "players": [
+          {
+            "id": 1788561,
+            "tag": "~NEOS~"
+          }
+        ]
+      },
+      {
+        "name": "ORBUTRON | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 781167,
+    "eventIds": [
+      1361533
+    ],
+    "events": [
+      "Ultimate Singles"
+    ],
+    "entrants": [
+      {
+        "name": "liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "MillyC",
+        "players": [
+          {
+            "id": 4715211,
+            "tag": "MillyC"
+          }
+        ]
+      },
+      {
+        "name": "Sam",
+        "players": [
+          {
+            "id": 4715210,
+            "tag": "Sam"
+          }
+        ]
+      },
+      {
+        "name": "THE HEAD RIPPEROFFER",
+        "players": [
+          {
+            "id": 496484,
+            "tag": "THE HEAD RIPPEROFFER"
+          }
+        ]
+      },
+      {
+        "name": "CSS",
+        "players": [
+          {
+            "id": 2874224,
+            "tag": "CSS"
+          }
+        ]
+      },
+      {
+        "name": "reverse",
+        "players": [
+          {
+            "id": 3563797,
+            "tag": "reverse"
+          }
+        ]
+      },
+      {
+        "name": "DNY | Mr. BIG BU$INES$",
+        "players": [
+          {
+            "id": 1082864,
+            "tag": "Mr. BIG BU$INES$"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      },
+      {
+        "name": "716 | winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "name": "DJOheb",
+        "players": [
+          {
+            "id": 2266420,
+            "tag": "DJOheb"
+          }
+        ]
+      },
+      {
+        "name": "C",
+        "players": [
+          {
+            "id": 2649169,
+            "tag": "C"
+          }
+        ]
+      },
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "Fuzzi",
+        "players": [
+          {
+            "id": 1482148,
+            "tag": "Fuzzi"
+          }
+        ]
+      },
+      {
+        "name": "ORBUTRON | Orbular",
+        "players": [
+          {
+            "id": 3216222,
+            "tag": "Orbular"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 829863,
+    "eventIds": [
+      1460785
+    ],
+    "events": [
+      "SQUAD STRIKE"
+    ],
+    "entrants": [
+      {
+        "name": "liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      },
+      {
+        "name": "Fal | Eliminate",
+        "players": [
+          {
+            "id": 2676871,
+            "tag": "Eliminate"
+          }
+        ]
+      },
+      {
+        "name": "Dagel",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Fal | DragonEmperorLuke",
+        "players": [
+          {
+            "id": 3512075,
+            "tag": "DragonEmperorLuke"
+          }
+        ]
+      },
+      {
+        "name": "Fal | ShockFire101",
+        "players": [
+          {
+            "id": 1997837,
+            "tag": "ShockFire101"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "BM | Jermlol1",
+        "players": [
+          {
+            "id": 2157306,
+            "tag": "Jermlol1"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "Humza",
+        "players": [
+          {
+            "id": 1493023,
+            "tag": "Humza"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "Janken",
+        "players": [
+          {
+            "id": 4978820,
+            "tag": "Janken"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 834559,
+    "eventIds": [
+      1470276
+    ],
+    "events": [
+      "ITEMS ON"
+    ],
+    "entrants": [
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "yellohatparappa",
+        "players": [
+          {
+            "id": 5002083,
+            "tag": "yellohatparappa"
+          }
+        ]
+      },
+      {
+        "name": "Antslayer01",
+        "players": [
+          {
+            "id": 3686579,
+            "tag": "Antslayer01"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 840834,
+    "eventIds": [
+      1482627
+    ],
+    "events": [
+      "DOUBLES"
+    ],
+    "entrants": [
+      {
+        "name": "jack/felix",
+        "players": [
+          {
+            "id": 599043,
+            "tag": "Sovereign"
+          },
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Fresh / Dook",
+        "players": [
+          {
+            "id": 271875,
+            "tag": "Fresh"
+          },
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "dubs timeout",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          },
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "bishlinks",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          },
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "CAT / yeehaw",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          },
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "name": "self-frying chickens",
+        "players": [
+          {
+            "id": 179750,
+            "tag": "Dagel"
+          },
+          {
+            "id": 3864386,
+            "tag": "MKUltra Instinct"
+          }
+        ]
+      },
+      {
+        "name": "DIE MONSTER, YOU DONT BELONG IN THIS WORLD",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          },
+          {
+            "id": 3686579,
+            "tag": "Antslayer01"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 845443,
+    "eventIds": [
+      1491653
+    ],
+    "events": [
+      "Off Week Singles"
+    ],
+    "entrants": [
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "Samatron",
+        "players": [
+          {
+            "id": 1176894,
+            "tag": "Samatron"
+          }
+        ]
+      },
+      {
+        "name": "Neptun3",
+        "players": [
+          {
+            "id": 4955680,
+            "tag": "Neptun3"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Fal | ShockFire101",
+        "players": [
+          {
+            "id": 1997837,
+            "tag": "ShockFire101"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 877254,
+    "eventIds": [
+      1553004
+    ],
+    "events": [
+      "SQUAD STRIKE"
+    ],
+    "entrants": [
+      {
+        "name": "DREAM BIG | liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "Antslayer01",
+        "players": [
+          {
+            "id": 3686579,
+            "tag": "Antslayer01"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "Ban",
+        "players": [
+          {
+            "id": 4964740,
+            "tag": "Ban"
+          }
+        ]
+      },
+      {
+        "name": "Humza",
+        "players": [
+          {
+            "id": 1493023,
+            "tag": "Humza"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "Neptun3",
+        "players": [
+          {
+            "id": 4955680,
+            "tag": "Neptun3"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 882173,
+    "eventIds": [
+      1562904
+    ],
+    "events": [
+      "Juan's Stupid Rules"
+    ],
+    "entrants": [
+      {
+        "name": "DREAM BIG | liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "Gio",
+        "players": [
+          {
+            "id": 5222453,
+            "tag": "Gio"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "MikolRising",
+        "players": [
+          {
+            "id": 2173518,
+            "tag": "MikolRising"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "TowableLamp",
+        "players": [
+          {
+            "id": 4963734,
+            "tag": "TowableLamp"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "B.",
+        "players": [
+          {
+            "id": 5220551,
+            "tag": "B."
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 886698,
+    "eventIds": [
+      1572322,
+      1572323
+    ],
+    "events": [
+      "Ultimate Singles",
+      "Redemption Bracket"
+    ],
+    "entrants": [
+      {
+        "name": "Zilkon",
+        "players": [
+          {
+            "id": 1864833,
+            "tag": "Zilkon"
+          }
+        ]
+      },
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "RFAN | punkstar",
+        "players": [
+          {
+            "id": 609079,
+            "tag": "punkstar"
+          }
+        ]
+      },
+      {
+        "name": "Antslayer01",
+        "players": [
+          {
+            "id": 3686579,
+            "tag": "Antslayer01"
+          }
+        ]
+      },
+      {
+        "name": "716 | winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "name": "Humza",
+        "players": [
+          {
+            "id": 1493023,
+            "tag": "Humza"
+          }
+        ]
+      },
+      {
+        "name": "savasaps2004",
+        "players": [
+          {
+            "id": 5247042,
+            "tag": "savasaps2004"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Fal | ShockFire101",
+        "players": [
+          {
+            "id": 1997837,
+            "tag": "ShockFire101"
+          }
+        ]
+      },
+      {
+        "name": "Neptun3",
+        "players": [
+          {
+            "id": 4955680,
+            "tag": "Neptun3"
+          }
+        ]
+      },
+      {
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "name": "Bport Esports | A-Crack",
+        "players": [
+          {
+            "id": 4910697,
+            "tag": "A-Crack"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "DREAM BIG | liakk",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "Yoyo | SoP | benny",
+        "players": [
+          {
+            "id": 1990254,
+            "tag": "benny"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Yoyo | SoP | benny",
+        "players": [
+          {
+            "id": 1990254,
+            "tag": "benny"
+          }
+        ]
+      },
+      {
+        "name": "Fal | ShockFire101",
+        "players": [
+          {
+            "id": 1997837,
+            "tag": "ShockFire101"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "Zilkon",
+        "players": [
+          {
+            "id": 1864833,
+            "tag": "Zilkon"
+          }
+        ]
+      },
+      {
+        "name": "Antslayer01",
+        "players": [
+          {
+            "id": 3686579,
+            "tag": "Antslayer01"
+          }
+        ]
+      },
+      {
+        "name": "Bport Esports | A-Crack",
+        "players": [
+          {
+            "id": 4910697,
+            "tag": "A-Crack"
+          }
+        ]
+      },
+      {
+        "name": "RFAN | punkstar",
+        "players": [
+          {
+            "id": 609079,
+            "tag": "punkstar"
+          }
+        ]
+      },
+      {
+        "name": "Neptun3",
+        "players": [
+          {
+            "id": 4955680,
+            "tag": "Neptun3"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 901772,
+    "eventIds": [
+      1604311,
+      1604315
+    ],
+    "events": [
+      "Redemption Bracket",
+      "RANDITTOS"
+    ],
+    "entrants": [
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "Zilkon",
+        "players": [
+          {
+            "id": 1864833,
+            "tag": "Zilkon"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "SELLOUT | QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "Neptun3",
+        "players": [
+          {
+            "id": 4955680,
+            "tag": "Neptun3"
+          }
+        ]
+      },
+      {
+        "name": "Budokai",
+        "players": [
+          {
+            "id": 2343948,
+            "tag": "Budokai"
+          }
+        ]
+      },
+      {
+        "name": "Zilkon",
+        "players": [
+          {
+            "id": 1864833,
+            "tag": "Zilkon"
+          }
+        ]
+      },
+      {
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "name": "Mr. Matty O",
+        "players": [
+          {
+            "id": 3573687,
+            "tag": "Mr. Matty O"
+          }
+        ]
+      },
+      {
+        "name": "716 | KingCoreyFTW",
+        "players": [
+          {
+            "id": 989934,
+            "tag": "KingCoreyFTW"
+          }
+        ]
+      },
+      {
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "name": "felix",
+        "players": [
+          {
+            "id": 1256236,
+            "tag": "felix"
+          }
+        ]
+      },
+      {
+        "name": "SELLOUT | QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      },
+      {
+        "name": "DG",
+        "players": [
+          {
+            "id": 2450682,
+            "tag": "DG"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "Neptun3",
+        "players": [
+          {
+            "id": 4955680,
+            "tag": "Neptun3"
+          }
+        ]
+      },
+      {
+        "name": "MBS | MEGA CHAD",
+        "players": [
+          {
+            "id": 997249,
+            "tag": "MEGA CHAD"
+          }
+        ]
+      }
+    ]
+  }
+]

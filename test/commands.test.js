@@ -204,6 +204,7 @@ const runs = [
   ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/],
   ['messages', { values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
   ['messages', { values: { events: false } }, /Discord events for tracked tournaments:\*\* off/], ['socials', {}, /Nothing yet/],
+  ['data', {}, /Monday Night SmashBall.*monday-night-smashball\.vercel\.app.*UB Smash Royale.*ub-smash-royale\.vercel\.app/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
   ['track', { subcommand: 'add', values: { profile: 'start.gg/user/opponent' } }, /Now tracking \[Opponent\].*Set results and stream alerts start off/],

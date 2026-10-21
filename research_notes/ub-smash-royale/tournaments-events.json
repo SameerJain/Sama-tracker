@@ -1823,7 +1823,7 @@
     "addrState": "NY",
     "venueName": null,
     "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
-    "numAttendees": 20,
+    "numAttendees": 21,
     "startAt": 1792798200,
     "endAt": 1792900740,
     "isOnline": false,
@@ -1835,7 +1835,7 @@
         "id": 1738930,
         "name": "Ultimate Singles",
         "slug": "tournament/smash-royale-49/event/ultimate-singles",
-        "numEntrants": 17,
+        "numEntrants": 18,
         "videogame": {
           "id": 1386,
           "displayName": "Ultimate"

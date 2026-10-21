@@ -1080,6 +1080,60 @@
     ]
   },
   {
+    "tournamentId": 709776,
+    "tournamentName": "UB Smash Club Fall Opener (OFF WEEK)",
+    "slug": "tournament/ub-smash-club-fall-opener-off-week",
+    "startAt": 1726700400,
+    "numAttendees": 33,
+    "eventId": 1216666,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 10,
+    "game": "Ultimate",
+    "eventSlug": "tournament/ub-smash-club-fall-opener-off-week/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "QBrawl",
+        "players": [
+          {
+            "id": 2899697,
+            "tag": "QBrawl"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "tournamentId": 712269,
     "tournamentName": "Smash Royale #14 - UB Smash Club",
     "slug": "tournament/smash-royale-14-ub-smash-club",
@@ -3348,6 +3402,60 @@
     ]
   },
   {
+    "tournamentId": 886698,
+    "tournamentName": "UB Smash Club Spring 2026 Arcadian",
+    "slug": "tournament/ub-smash-club-spring-2026-arcadian",
+    "startAt": 1772670600,
+    "numAttendees": 18,
+    "eventId": 1572323,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 11,
+    "game": "Ultimate",
+    "eventSlug": "tournament/ub-smash-club-spring-2026-arcadian/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "RFAN | punkstar",
+        "players": [
+          {
+            "id": 609079,
+            "tag": "punkstar"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "MysticArts",
+        "players": [
+          {
+            "id": 2463667,
+            "tag": "MysticArts"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "tournamentId": 889388,
     "tournamentName": "Smash Royale #40",
     "slug": "tournament/smash-royale-40",
@@ -4229,10 +4337,10 @@
     "tournamentName": "SMASH ROYALE #49",
     "slug": "tournament/smash-royale-49",
     "startAt": 1792798200,
-    "numAttendees": 20,
+    "numAttendees": 21,
     "eventId": 1738930,
     "eventName": "Ultimate Singles",
-    "numEntrants": 17,
+    "numEntrants": 18,
     "game": "Ultimate",
     "eventSlug": "tournament/smash-royale-49/event/ultimate-singles",
     "standings": []
