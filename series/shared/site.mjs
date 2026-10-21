@@ -9,7 +9,7 @@ import { CSS, esc, dstr, trunc, csv, pill, card, scrollTable, CLIENT_JS_SORT, CL
 import { VIEWER } from '../configs.mjs';
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const MAIN_RE = /ultimate singles/i;
+const MAIN_RE = /ultimate singles|^smash ultimate$/i;
 
 export function buildSite(slug) {
   const reg = JSON.parse(readFileSync(path.join(ROOT, 'series', 'series.json'), 'utf8'))[slug];

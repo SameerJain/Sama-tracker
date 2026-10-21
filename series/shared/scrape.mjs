@@ -64,7 +64,7 @@ export async function getEvents(tournamentId) {
 }
 
 const STANDINGS_Q = `query ($id: ID!) { event(id: $id) {
-  standings(query: { perPage: 4, page: 1 }) { nodes { placement entrant { name participants { player { id gamerTag } } } } } } } }`;
+  standings(query: { perPage: 4, page: 1 }) { nodes { placement entrant { name participants { player { id gamerTag } } } } } } }`;
 export async function getTop4(eventId) {
   const data = await gql(STANDINGS_Q, { id: eventId });
   return (data?.event?.standings?.nodes ?? []).map((n) => ({
@@ -98,7 +98,7 @@ const SETS_Q = `query ($id: ID!, $page: Int!, $perPage: Int!) { event(id: $id) {
     nodes {
       id
       slots { entrant { id participants { player { id gamerTag } } } }
-      games { winnerId selections { entrant { id } character { name } } } } } } } }`;
+      games { winnerId selections { entrant { id } character { name } } } } } } }`;
 async function getSetsPage(eventId, page, perPage) {
   try {
     return await gql(SETS_Q, { id: eventId, page, perPage });

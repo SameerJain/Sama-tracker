@@ -11,10 +11,10 @@ Charts are static SVGs in `images/`, raw numbers in `data/` (JSON + CSV).
   #96 ran twice (96 and 96/2 on 2025-01-06), #146 ran as "SmashBall 146
   Holiday Party" (no "Monday" in the name). #72 came from a fourth TO.
 - Largest: Monday Night SmashBall 100 $100 POT BONUS @ Heart Of The Game, 58 attendees, 2025-02-03.
-- Ultimate only: 180 Ultimate Singles events, 8,206 sets, 4,333 games with
+- Ultimate only: 181 Ultimate Singles events, 8,242 sets, 4,364 games with
   reported characters, 85 distinct characters. Plus a Melee top-10 from 57 events.
 - Winners merged by start.gg player id across alias/sponsor changes.
-  Events-entered ranking from full entrant lists (434 distinct players).
+  Events-entered ranking from full entrant lists (436 distinct players).
 
 ## Data files
 
