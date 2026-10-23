@@ -16,7 +16,7 @@ import { slippiFor, slippiLookup } from './slippi.js';
 import { LOGO as slippiLogo } from '../slippi.js';
 import {
   fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, fullReport, buttonRow,
-  linkedPlayer, rememberPick, parseSince,
+  linkedPlayer, rememberPick, parseSince, t, language,
 } from './shared.js';
 
 // /characters verbose, so the cards fit in one message
@@ -105,7 +105,7 @@ async function pair(interaction) {
   const a = readPlayer(interaction);
   // left out with no start.gg linked, there's no player to look up
   if (!a && interaction.options.getString('player') === null) {
-    await replyEphemeral(interaction, 'Pick a player by name, a start.gg link or ID, or `/link` your start.gg so leaving it out looks you up.');
+    await replyEphemeral(interaction, t('Pick a player by name, a start.gg link or ID, or `/link` your start.gg so leaving it out looks you up.'));
     return null;
   }
   // a typed link or ID isn't on either list, so it gets looked up; that request waits for the defer
@@ -116,7 +116,7 @@ async function pair(interaction) {
   const second = b ?? await fetchPlayer(interaction, interaction.options.getString('opponent'));
   if (!second) return null;
   if (first.userId === second.userId) {
-    await replyEphemeralAfterDefer(interaction, 'Pick two different players.');
+    await replyEphemeralAfterDefer(interaction, t('Pick two different players.'));
     return null;
   }
   return [first, second];
@@ -151,7 +151,7 @@ async function progressReport(interaction, { player, verbose, melee }) {
   const ranked = slippiLookup([player], melee);
   // newest first, the first two get compared
   const periods = Array.from({ length: verbose ? TREND_PERIODS : 2 }, (_, i) => ({ since: now - (i + 1) * span, until: now - i * span }));
-  const [sets, events, characterSets] = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s sets`, Promise.all([
+  const [sets, events, characterSets] = await withCountdown(interaction, t`Going through ${escapeMarkdown(player.tag)}'s sets`, Promise.all([
     startgg.getPeriodHistory(player.playerId, periods.at(-1).since, now),
     eventHistory(player.userId),
     // the rest still says plenty without characters, so start.gg failing here doesn't sink it
@@ -168,13 +168,13 @@ async function progressReport(interaction, { player, verbose, melee }) {
 async function scout(interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const player = await verifiedCaller(interaction.user.id);
-  if (!player) return interaction.editReply(NOT_LINKED);
+  if (!player) return interaction.editReply(t(NOT_LINKED));
 
   const input = interaction.options.getString('opponent', true);
   // a tracked or linked pick from autocomplete, otherwise a start.gg link or ID
   const opponent = readPlayer(interaction, 'opponent') ?? await findPlayer(interaction, input);
   if (!opponent) return;
-  if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
+  if (player.playerId === opponent.playerId) return interaction.editReply(t('Use an opponent\'s profile, not your own.'));
   const filters = filterOptions(interaction);
   if (filters.error) return interaction.editReply(filters.error);
 
@@ -185,7 +185,7 @@ async function scout(interaction) {
 async function scoutReport(interaction, { player, opponent, verbose, melee, since, venue, sinceText }) {
   const scope = scoped({ melee, since, venue });
   const ranked = slippiLookup([player, opponent], melee);
-  const [mine, theirs, characters] = await withCountdown(interaction, `Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
+  const [mine, theirs, characters] = await withCountdown(interaction, t`Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
     setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
   ]));
   const mySets = scope.sets(mine);
@@ -196,7 +196,7 @@ async function scoutReport(interaction, { player, opponent, verbose, melee, sinc
 
   // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
   // meeting them and the odds, so the usual amount is plenty
-  const [deeper, characterSets, events, myEvents] = await withCountdown(interaction, 'Full report on its way', Promise.all([
+  const [deeper, characterSets, events, myEvents] = await withCountdown(interaction, t('Full report on its way'), Promise.all([
     setHistories(opponent.playerId, SCOUT_PAGES), characterHistories(opponent.playerId, SCOUT_CHARACTER_PAGES), eventHistory(opponent.userId),
     eventHistory(player.userId).catch(() => null),
   ]), quick);
@@ -225,7 +225,7 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
   const scope = scoped({ melee, since, venue });
   const ranked = slippiLookup([a, b], melee);
   // meetings for the record, histories and events for one line of /predict odds
-  const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
+  const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, t`Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
     Promise.all([
       h2hHistory(a.playerId, b.playerId),
       setHistory(a.playerId), setHistory(b.playerId),
@@ -268,7 +268,7 @@ async function statsReport(interaction, { player, verbose, melee, since, venue, 
     return sendEmbeds(interaction, [recent], more);
   }
   // show the recent card while the lifetime report loads
-  const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
+  const [events, history] = await withCountdown(interaction, t('Lifetime report on its way'),
     Promise.all([eventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
   const lifetime = embeds.lifetimeStats(player, scope.events(events), scope.sets(history), state.players, { melee, filters: scope.filters });
   return sendEmbeds(interaction, embeds.withSlippi(lifetime, [player], profiles));
@@ -293,7 +293,7 @@ async function doublesLookup(player, { verbose, melee }) {
 }
 
 async function doublesReport(interaction, { player, verbose, melee }) {
-  const doing = `Going through ${escapeMarkdown(player.tag)}'s doubles`;
+  const doing = t`Going through ${escapeMarkdown(player.tag)}'s doubles`;
   const recent = await withCountdown(interaction, doing, doublesLookup(player, { verbose: false, melee }));
   const quick = embeds.doubles(player, recent.sets, recent.events, { melee });
   if (!verbose) {
@@ -302,7 +302,7 @@ async function doublesReport(interaction, { player, verbose, melee }) {
     return sendEmbeds(interaction, [quick], more);
   }
   // the short card shows while the rest loads
-  const full = await withCountdown(interaction, 'Full doubles report on its way', doublesLookup(player, { verbose, melee }), [quick]);
+  const full = await withCountdown(interaction, t('Full doubles report on its way'), doublesLookup(player, { verbose, melee }), [quick]);
   return sendEmbeds(interaction, embeds.doublesReport(player, full.sets, full.events, { melee }));
 }
 
@@ -316,12 +316,12 @@ async function characters(interaction) {
 
 // game is the one picked, null for whichever has more reported
 async function charactersReport(interaction, { player, verbose, game: picked }) {
-  let sets = await withCountdown(interaction, `Going through ${escapeMarkdown(player.tag)}'s reported characters`, characterHistory(player.playerId));
+  let sets = await withCountdown(interaction, t`Going through ${escapeMarkdown(player.tag)}'s reported characters`, characterHistory(player.playerId));
   if (verbose) {
     // every game is the same pages and more, so the usual card shows while it loads
     const usual = characterCards(sets, false, picked).cards
       .map(({ game, usage }) => embeds.characters(player, usage, { game: game?.displayName, searched: sets.length }));
-    sets = await withCountdown(interaction, 'Every game on its way', lifetimeCharacterHistory(player.playerId), usual);
+    sets = await withCountdown(interaction, t('Every game on its way'), lifetimeCharacterHistory(player.playerId), usual);
   }
   const { cards, note } = characterCards(sets, verbose, picked);
 
@@ -359,8 +359,9 @@ function characterCards(sets, verbose, picked) {
   // so it's clear the rest got looked at too
   const unreported = games.filter(({ game, usage }) => !usage.reported && !cards.some((card) => card.game.id === game.id))
     .sort((a, b) => b.usage.scanned - a.usage.scanned).map(({ game }) => game.displayName);
-  const shown = unreported.length > 4 ? [...unreported.slice(0, 3), `${unreported.length - 3} other games`] : unreported;
-  return { cards, note: shown.length ? `No characters reported for ${new Intl.ListFormat('en').format(shown)}` : undefined };
+  const shown = unreported.length > 4 ? [...unreported.slice(0, 3), t`${unreported.length - 3} other games`] : unreported;
+  const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(shown);
+  return { cards, note: shown.length ? t`No characters reported for ${list}` : undefined };
 }
 
 // nothing to predict with: without melee that means no game in common. with it, name whoever is missing
@@ -368,15 +369,15 @@ function characterCards(sets, verbose, picked) {
 // the hint goes by the filters without the melee one, since melee-only histories never share another game
 function noOdds(a, b, historyA, historyB, melee, filters = {}, hintA = historyA, hintB = historyB) {
   const tags = [escapeMarkdown(a.tag), escapeMarkdown(b.tag)];
-  const scope = filters.since || filters.venue ? ' matching those filters' : '';
-  if (!melee) return `${tags[0]} and ${tags[1]} haven't played singles in the same game on start.gg${scope}.`;
+  const scope = filters.since || filters.venue ? t(' matching those filters') : '';
+  if (!melee) return t`${tags[0]} and ${tags[1]} haven't played singles in the same game on start.gg${scope}.`;
 
   const missing = [a, b].filter((player, i) => !gameSets(i ? historyB : historyA, player, 'Melee').length).map((player) => escapeMarkdown(player.tag));
-  const who = missing.length === 2 ? `Neither ${tags[0]} nor ${tags[1]} has` : `${missing[0]} hasn't`;
+  const who = missing.length === 2 ? t`Neither ${tags[0]} nor ${tags[1]} has` : t`${missing[0]} hasn't`;
   // the game predict would pick without melee, which leaves out DQs, so leaving melee out really gives odds there
   const shared = sharedGame(a, b, hintA, hintB);
-  const hint = shared ? `\n-# Leave out \`melee\` for ${escapeMarkdown(shared)} odds` : '';
-  return `${who} played Melee singles on start.gg${scope}.${hint}`;
+  const hint = shared ? t`\n-# Leave out \`melee\` for ${escapeMarkdown(shared)} odds` : '';
+  return t`${who} played Melee singles on start.gg${scope}.${hint}`;
 }
 
 // verbose explains the same odds instead of changing them
@@ -416,7 +417,8 @@ async function noPredictions(interaction, a, b, { melee, filters, profiles, scop
 
 // verbose is the full breakdown: how much each part counts, with bars, and how sure the odds are
 async function predictReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
-  const doing = `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets${verbose ? ' for the full breakdown' : ''}`;
+  const tags = [escapeMarkdown(a.tag), escapeMarkdown(b.tag)];
+  const doing = verbose ? t`Going through ${tags[0]} and ${tags[1]}'s sets for the full breakdown` : t`Going through ${tags[0]} and ${tags[1]}'s sets`;
   const { odds, profiles, filters, ...rest } = await oddsFor(interaction, a, b, { melee, since, venue, doing });
   // netplay players can have a rank without a melee set on start.gg, which is when it says the most
   if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
@@ -431,11 +433,11 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
 async function memberPlayer(interaction, { defer }) {
   const target = interaction.targetUser;
   if (target.bot) {
-    await replyEphemeral(interaction, 'Bots don\'t have start.gg accounts.');
+    await replyEphemeral(interaction, t('Bots don\'t have start.gg accounts.'));
     return null;
   }
   if (target.id === interaction.user.id) {
-    await replyEphemeral(interaction, 'Pick someone else. `/stats` is the one about you.');
+    await replyEphemeral(interaction, t('Pick someone else. `/stats` is the one about you.'));
     return null;
   }
   await defer();
@@ -450,7 +452,7 @@ async function memberPlayer(interaction, { defer }) {
   const name = escapeMarkdown(interaction.targetMember?.displayName ?? target.displayName);
   // a name can spell out a role mention, so mentions are off
   await interaction.editReply({
-    content: `Couldn't find a start.gg with ${name}'s Discord connected.\n-# Ask them to run \`/link\` with their start.gg link once, or to register for a tournament the bot checks. start.gg can't be searched by Discord`,
+    content: t`Couldn't find a start.gg with ${name}'s Discord connected.\n-# Ask them to run \`/link\` with their start.gg link once, or to register for a tournament the bot checks. start.gg can't be searched by Discord`,
     allowedMentions: { parse: [] },
   });
   return null;
@@ -459,10 +461,10 @@ async function memberPlayer(interaction, { defer }) {
 // Apps > H2H with me, the same as /h2h with them as the opponent
 async function memberHeadToHead(interaction) {
   const player = linkedPlayer(interaction.user.id);
-  if (!player) return replyEphemeral(interaction, 'Run `/link` with your start.gg first, so the bot knows which one is yours.');
+  if (!player) return replyEphemeral(interaction, t('Run `/link` with your start.gg first, so the bot knows which one is yours.'));
   const opponent = await memberPlayer(interaction, { defer: () => interaction.deferReply() });
   if (!opponent) return;
-  if (opponent.userId === player.userId) return interaction.editReply('That\'s your own start.gg.');
+  if (opponent.userId === player.userId) return interaction.editReply(t('That\'s your own start.gg.'));
   return headToHeadReport(interaction, { player, opponent, verbose: false, melee: false });
 }
 
@@ -471,8 +473,8 @@ async function memberScout(interaction) {
   const opponent = await memberPlayer(interaction, { defer: () => interaction.deferReply({ flags: MessageFlags.Ephemeral }) });
   if (!opponent) return;
   const player = await verifiedCaller(interaction.user.id);
-  if (!player) return interaction.editReply(NOT_LINKED);
-  if (player.playerId === opponent.playerId) return interaction.editReply('That\'s your own start.gg.');
+  if (!player) return interaction.editReply(t(NOT_LINKED));
+  if (player.playerId === opponent.playerId) return interaction.editReply(t('That\'s your own start.gg.'));
   return scoutReport(interaction, { player, opponent, verbose: false, melee: false });
 }
 

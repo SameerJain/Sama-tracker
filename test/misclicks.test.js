@@ -12,6 +12,7 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { handleButton, handleCommand } = await import('../src/commands/index.js');
+const { confirmable, handleChoice } = await import('../src/commands/confirm.js');
 const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
 const tracker = await import('../src/tracker.js');
@@ -250,10 +251,10 @@ test('an event named for Melee but tagged as Ultimate counts as Melee, and the o
 });
 
 // a slash command run by someone with Manage Server, recording what it answers
-function command(commandName, { group = null, subcommand = null, values = {}, user = 'runner' } = {}) {
+function command(commandName, { group = null, subcommand = null, values = {}, user = 'runner', guildId = null } = {}) {
   const calls = [];
   const run = {
-    calls, commandName, user: { id: user }, memberPermissions: { has: () => true },
+    calls, commandName, user: { id: user }, guildId, memberPermissions: { has: () => true },
     options: { getSubcommandGroup: () => group, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null, getInteger: (name) => values[name] ?? null, getUser: () => null, getMember: () => null },
     reply: async (result) => calls.push(['reply', result]),
     deferReply: async () => { run.deferred = true; },
@@ -263,12 +264,12 @@ function command(commandName, { group = null, subcommand = null, values = {}, us
 }
 
 // pressing a button on the message something answered with
-async function press(message, label, user = 'runner') {
+async function press(message, label, user = 'runner', guildId = null) {
   const button = message.components.flatMap((row) => row.toJSON().components).find((each) => each.label === label);
   assert.ok(button, `no ${label} button`);
   const calls = [];
   const click = {
-    calls, customId: button.custom_id, user: { id: user }, isButton: () => true,
+    calls, customId: button.custom_id, user: { id: user }, guildId, isButton: () => true,
     reply: async (result) => calls.push(['reply', result]),
     update: async (result) => calls.push(['update', result]),
     editReply: async (result) => calls.push(['edit', result]),
@@ -524,4 +525,93 @@ test('a name that matches nobody suggests the closest tracked, linked or watchli
   assert.equal(await answer('slippi', { subcommand: 'remove', values: { player: 'CREW#2' } }), 'They aren\'t on the Slippi watchlist. Did you mean **Crew (CREW#1)**?');
   assert.match(await answer('slippi', { subcommand: 'remove', values: { player: 'Falco' } }), /`\/slippi leaderboard` shows who is/);
   assert.equal(await answer('slippi', { subcommand: 'rank', values: { player: 'Crewe' } }), 'Nobody on the watchlist goes by that. Did you mean **Crew (CREW#1)**?');
+});
+
+test('an Undo pressed in another server finds nothing to put back', async () => {
+  state.players = { 2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', lastCheck: now } };
+  const run = command('track', { subcommand: 'remove', values: { player: '2' }, guildId: 'g1' });
+  await handleCommand(run);
+  const removed = (await press(run.calls[0][1], 'Stop tracking', 'runner', 'g1')).calls[0][1];
+  assert.equal(removed.content, 'Stopped tracking Rival.');
+  assert.equal(state.players[2], undefined);
+
+  // the same person pressing the same Undo in another server gets the too-late answer, and nothing comes back
+  const elsewhere = await press(removed, 'Undo', 'runner', 'g2');
+  assert.deepEqual(elsewhere.calls.map(([kind]) => kind), ['update', 'followUp']);
+  assert.match(elsewhere.calls[1][1].content, /^Too late to undo/);
+  assert.equal(elsewhere.calls[1][1].flags, MessageFlags.Ephemeral);
+  assert.equal(state.players[2], undefined);
+
+  // back in its own server the Undo still puts them back
+  const home = (await press(removed, 'Undo', 'runner', 'g1')).calls[0][1];
+  assert.equal(home.content, 'Tracking Rival again, with the same settings as before.');
+  assert.ok(state.players[2]);
+});
+
+test('a confirm pressed twice at once in two servers runs once per server', async () => {
+  let runs = 0;
+  confirmable('server-lock-kind', {
+    command: '/server-lock',
+    run: () => { runs++; return { content: 'ran' }; },
+    cancel: () => 'cancelled',
+  });
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const pressAs = (guildId) => handleChoice({
+    customId: 'confirm:server-lock-kind:target:runner', guildId, user: { id: 'runner' },
+    update: async () => { await gate; return 'updated'; },
+    reply: async (result) => result,
+  });
+  const first = pressAs('g1');
+  await new Promise(setImmediate);
+  // the same press in another server is a different lock, so it runs too instead of hearing one press is enough
+  const second = pressAs('g2');
+  await new Promise(setImmediate);
+  release();
+  assert.equal(await first, 'updated');
+  assert.equal(await second, 'updated');
+  assert.equal(runs, 2);
+
+  // in the same server the double still runs once
+  runs = 0;
+  let releaseSame;
+  const gateSame = new Promise((resolve) => { releaseSame = resolve; });
+  const one = handleChoice({
+    customId: 'confirm:server-lock-kind:target:runner', guildId: 'g1', user: { id: 'runner' },
+    update: async () => { await gateSame; return 'updated'; },
+    reply: async (result) => result,
+  });
+  await new Promise(setImmediate);
+  const two = await handleChoice({
+    customId: 'confirm:server-lock-kind:target:runner', guildId: 'g1', user: { id: 'runner' },
+    update: async () => 'updated',
+    reply: async (result) => result,
+  });
+  assert.match(two.content, /one press is enough/);
+  releaseSame();
+  assert.equal(await one, 'updated');
+  assert.equal(runs, 1);
+});
+
+test('a confirm pressed by the wrong user leaves the lock free for whoever ran it', async () => {
+  let runs = 0;
+  confirmable('lock-kind', {
+    command: '/lock',
+    run: () => { runs++; return { content: 'ran' }; },
+    cancel: () => 'cancelled',
+  });
+  const pressAs = (user) => handleChoice({
+    customId: 'confirm:lock-kind:target:runner', guildId: 'g1', user: { id: user },
+    update: async () => assert.fail('a wrong press never updates'),
+    reply: async (result) => result,
+  });
+  const refused = await pressAs('someone-else');
+  assert.equal(refused.content, 'Only whoever ran `/lock` can press this.');
+  const home = await handleChoice({
+    customId: 'confirm:lock-kind:target:runner', guildId: 'g1', user: { id: 'runner' },
+    update: async (result) => result,
+    reply: async (result) => result,
+  });
+  assert.equal(home.content, 'ran');
+  assert.equal(runs, 1);
 });

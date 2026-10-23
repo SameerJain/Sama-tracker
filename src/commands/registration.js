@@ -4,7 +4,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { RUNS_LATE_HOURS, endTime, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
-import { replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag } from './shared.js';
+import { replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag, t, listOf, language } from './shared.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
@@ -21,7 +21,7 @@ function tournamentSlug(input) {
 // mentions stay off so a typed link can't ping anyone. backticks stripped so it can't break the code span
 function tournamentNotFound(input) {
   const shown = String(input).replaceAll('`', '').slice(0, 100);
-  return { content: `Couldn't find a start.gg tournament for \`${shown}\`. Paste its link, like start.gg/tournament/genesis-x.`, allowedMentions: { parse: [] } };
+  return { content: t`Couldn't find a start.gg tournament for \`${shown}\`. Paste its link, like start.gg/tournament/genesis-x.`, allowedMentions: { parse: [] } };
 }
 
 // autocomplete, so nobody has to paste a link for a tournament the bot already knows: tracked ones and ones
@@ -50,7 +50,7 @@ function tournamentChoices(typed, { only = 'known' } = {}) {
   if (choices.length) return choices.slice(0, 25);
   // picking the empty one gets the not found reply
   if (!search) {
-    return [{ name: only === 'tracked' ? 'No tracked tournaments yet, /t-o tournament add one' : 'No tournaments to pick yet, paste a start.gg link', value: 'none' }];
+    return [{ name: only === 'tracked' ? t('No tracked tournaments yet, /t-o tournament add one') : t('No tournaments to pick yet, paste a start.gg link'), value: 'none' }];
   }
   return [{ name: typed.trim().slice(0, 100), value: typed.trim().slice(0, 100) }];
 }
@@ -69,7 +69,7 @@ function goingOn(tournaments) {
 function bracket(interaction) {
   const live = goingOn(Object.values(state.tournaments).filter((tournament) => tournament.tracked));
   if (!live.length) {
-    return interaction.reply('No tracked tournaments going on right now. Check the other channels if you\'re expecting one.');
+    return interaction.reply(t('No tracked tournaments going on right now. Check the other channels if you\'re expecting one.'));
   }
   return sendEmbeds(interaction, live.flatMap((tournament) => embeds.bracket(tournament)));
 }
@@ -80,7 +80,7 @@ const ASK_A_TO = 'If you were expecting a stream, ask a TO in another channel. `
 // tournament page, so a tournament with none is left out and named instead
 async function streamLink(interaction) {
   const live = goingOn(Object.values(state.tournaments).filter((tournament) => !tournament.resultsPosted));
-  if (!live.length) return interaction.reply(`No tracked tournaments are going on right now. ${ASK_A_TO}`);
+  if (!live.length) return interaction.reply(t`No tracked tournaments are going on right now. ${t(ASK_A_TO)}`);
 
   await interaction.deferReply();
   let streams;
@@ -88,13 +88,14 @@ async function streamLink(interaction) {
     streams = await startgg.getTournamentStreams(live.map((tournament) => tournament.id));
   } catch (err) {
     console.error('stream links failed:', err.message);
-    return interaction.editReply(`Couldn't get stream links from start.gg right now. ${ASK_A_TO}`);
+    return interaction.editReply(t`Couldn't get stream links from start.gg right now. ${t(ASK_A_TO)}`);
   }
   const shown = live.filter((tournament) => streams.get(String(tournament.id))?.length);
   if (!shown.length) {
     const names = live.slice(0, 5).map((tournament) => escapeMarkdown(tournament.name));
-    if (live.length > 5) names.push(`${live.length - 5} more`);
-    return interaction.editReply({ content: `No stream links on start.gg for ${new Intl.ListFormat('en').format(names)}. ${ASK_A_TO}`, allowedMentions: { parse: [] } });
+    if (live.length > 5) names.push(t`${live.length - 5} more`);
+    const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(names);
+    return interaction.editReply({ content: t`No stream links on start.gg for ${list}. ${t(ASK_A_TO)}`, allowedMentions: { parse: [] } });
   }
   return sendEmbeds(interaction, shown.flatMap((tournament) => embeds.streamLinks(tournament, streams.get(String(tournament.id)))));
 }
@@ -110,7 +111,7 @@ async function registered(interaction) {
   const participants = await startgg.getParticipants(found.id);
   rememberAccounts(participants);
   if (startgg.attendeesHidden(found, participants)) {
-    return interaction.editReply({ content: `start.gg hides who's registered for ${escapeMarkdown(found.name)}, so there's no list to show.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: t`start.gg hides who's registered for ${escapeMarkdown(found.name)}, so there's no list to show.`, allowedMentions: { parse: [] } });
   }
   const linked = participants.filter((participant) => participant.discordId);
   const members = await serverMembers(interaction.guild, [...new Set(linked.map((participant) => participant.discordId))]);
@@ -128,7 +129,7 @@ async function registered(interaction) {
 async function regWarn(interaction) {
   const input = interaction.options.getString('tournament', true).trim();
   const user = interaction.options.getUser('user', true);
-  if (user.bot) return replyEphemeral(interaction, 'Bots don\'t need to register.');
+  if (user.bot) return replyEphemeral(interaction, t('Bots don\'t need to register.'));
 
   await interaction.deferReply();
   const tournament = await startgg.getRegistration(tournamentSlug(input));
@@ -139,19 +140,20 @@ async function regWarn(interaction) {
   const name = escapeMarkdown(interaction.options.getMember('user')?.displayName ?? user.displayName);
   const title = escapeMarkdown(tournament.name);
   const say = (content) => interaction.editReply({ content, allowedMentions: { parse: [] } });
-  if (participants.some((participant) => participant.discordId === user.id)) return say(`Already registered.\n-# ${name} · ${title}`);
+  if (participants.some((participant) => participant.discordId === user.id)) return say(t`Already registered.\n-# ${name} · ${title}`);
   const deadline = regDeadline(tournament);
-  if (deadline <= secondsNow()) return say(`Registration for ${title} already closed.`);
-  if (!tournament.isRegistrationOpen) return say(`Registration for ${title} isn't open right now.`);
+  if (deadline <= secondsNow()) return say(t`Registration for ${title} already closed.`);
+  if (!tournament.isRegistrationOpen) return say(t`Registration for ${title} isn't open right now.`);
   // not on a hidden list means nothing, so no warning
-  if (startgg.attendeesHidden(tournament, participants)) return say(`start.gg hides who's registered for ${title}, so there's no telling if they are. No warning sent.`);
+  if (startgg.attendeesHidden(tournament, participants)) return say(t`start.gg hides who's registered for ${title}, so there's no telling if they are. No warning sent.`);
   // two people warning the same person about the same tournament is one too many. checked last, with nothing
   // awaited before it's saved, so two at once can't both get through
   const now = secondsNow();
   state.regWarned = state.regWarned.filter((each) => each.at > now - REG_WARN_COOLDOWN_HOURS * 60 * 60);
   const earlier = state.regWarned.find((each) => String(each.tournamentId) === String(tournament.id) && each.discordId === user.id);
   if (earlier) {
-    return replyEphemeralAfterDefer(interaction, `${name} was already warned about ${title} <t:${earlier.at}:R>. They can be warned again <t:${earlier.at + REG_WARN_COOLDOWN_HOURS * 60 * 60}:R>.`);
+    const again = earlier.at + REG_WARN_COOLDOWN_HOURS * 60 * 60;
+    return replyEphemeralAfterDefer(interaction, t`${name} was already warned about ${title} <t:${earlier.at}:R>. They can be warned again <t:${again}:R>.`);
   }
   state.regWarned = [...state.regWarned, { tournamentId: tournament.id, discordId: user.id, at: now }].slice(-200);
   save();

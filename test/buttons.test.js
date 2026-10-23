@@ -527,3 +527,26 @@ test('a reply that hasn\'t deferred does before downloading, and one without Att
   assert.deepEqual(blocked.calls[0][1].files, []);
   assert.equal(blocked.calls[0][1].embeds[0].data.thumbnail.url, good);
 });
+
+test('a start.gg picture bigger than discord takes comes off instead of filling memory', async () => {
+  const avatar = 'https://cdn.discordapp.com/avatars/1/bot.png';
+  setFallbackImage(avatar);
+  const realFetch = globalThis.fetch;
+  try {
+    // one honest about its size, one that lies and sends it anyway
+    const big = (length) => ({ ok: true, headers: new Headers({ 'content-type': 'image/jpeg' }), arrayBuffer: async () => new Uint8Array(length).buffer });
+    globalThis.fetch = async (url) => String(url).endsWith('huge.jpg')
+      ? { ok: true, headers: new Headers({ 'content-type': 'image/jpeg', 'content-length': '99999999' }), arrayBuffer: async () => new Uint8Array([1]).buffer }
+      : big(8 * 1024 * 1024 + 1);
+    for (const url of ['https://images.start.gg/huge.jpg', 'https://images.start.gg/liar.jpg']) {
+      const run = waited(5);
+      await sendEmbeds(run, pictured(1, url));
+      const [[, sent]] = run.calls;
+      assert.deepEqual(sent.files, []);
+      assert.equal(sent.embeds[0].data.thumbnail.url, avatar);
+    }
+  } finally {
+    setFallbackImage(null);
+    globalThis.fetch = realFetch;
+  }
+});

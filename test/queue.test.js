@@ -33,10 +33,10 @@ async function until(check) {
 }
 
 // a discord interaction with what the line touches
-function fake({ user = 'u1', commandName = 'stats', customId = null } = {}) {
+function fake({ user = 'u1', commandName = 'stats', customId = null, guildId = null } = {}) {
   const calls = [];
   const run = {
-    calls, user: { id: user }, commandName, customId, deferred: false, replied: false,
+    calls, user: { id: user }, commandName, customId, guildId, deferred: false, replied: false,
     isButton: () => Boolean(customId),
     deferReply: async (options) => { calls.push(['defer', options]); run.deferred = true; },
     editReply: async (content) => { calls.push(['edit', content]); },
@@ -131,6 +131,47 @@ test(`past ${QUEUED_PER_PERSON} waiting, the next is turned away and only they s
   await Promise.all(going);
   // the line is clear again
   assert.equal(await inTurn(fake(), () => {}), true);
+});
+
+test('a slow command in one server never holds up the same person in another', async () => {
+  let releaseFirst;
+  const holding = new Promise((resolve) => { releaseFirst = resolve; });
+  const firstDone = inTurn(fake({ guildId: 'g1' }), () => holding);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  // the same user in another server answers and asks start.gg without waiting
+  const other = fake({ guildId: 'g2' });
+  let asked = false;
+  const secondDone = inTurn(other, async () => {
+    await other.deferReply();
+    await startgg.checkToken();
+    asked = true;
+  });
+  await until(() => asked);
+  await secondDone;
+  assert.deepEqual(other.calls.map(([kind]) => kind), ['defer'], 'no queued line for another server');
+  releaseFirst();
+  await firstDone;
+});
+
+test('the waiting room is per server: a full line in one turns away nobody in another', async () => {
+  let release;
+  const holding = new Promise((resolve) => { release = resolve; });
+  const going = Array.from({ length: QUEUED_PER_PERSON + 1 }, () => inTurn(fake({ guildId: 'g1' }), () => holding));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const stranger = fake({ guildId: 'g2' });
+  let ran = false;
+  assert.equal(await inTurn(stranger, () => { ran = true; }), true);
+  assert.equal(ran, true);
+
+  const extra = fake({ commandName: 'h2h', guildId: 'g1' });
+  let extraRan = false;
+  assert.equal(await inTurn(extra, () => { extraRan = true; }), false);
+  assert.equal(extraRan, false);
+  assert.match(extra.calls[0][1].content, /You have 4 commands going already/);
+  release();
+  await Promise.all(going);
 });
 
 test('a command that throws still lets the next one go', async () => {

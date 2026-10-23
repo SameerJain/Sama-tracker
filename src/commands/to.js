@@ -3,7 +3,7 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { serverMembers } from '../accounts.js';
-import { replyEphemeral, sendEmbeds } from './shared.js';
+import { replyEphemeral, sendEmbeds, t } from './shared.js';
 
 // the role's name when the bot makes it. one made by hand with this name counts too
 const TO_ROLE = 'TO';
@@ -68,7 +68,7 @@ function isTO(interaction) {
 
 // the private no for someone who isn't a TO. doing finishes "Only TOs can", like "untrack someone else"
 function notTO(interaction, doing) {
-  return replyEphemeral(interaction, `Only TOs can ${doing}. \`/t-o role list\` shows who they are.`);
+  return replyEphemeral(interaction, t`Only TOs can ${doing}. \`/t-o role list\` shows who they are.`);
 }
 
 // the member picked in user:, or a reply saying why there's nobody to change. null when it replied
@@ -76,11 +76,11 @@ async function pickedMember(interaction) {
   const user = interaction.options.getUser('user', true);
   const member = interaction.options.getMember('user');
   if (user.bot) {
-    await replyEphemeral(interaction, 'Bots can\'t be TOs.');
+    await replyEphemeral(interaction, t('Bots can\'t be TOs.'));
     return null;
   }
   if (!member) {
-    await replyEphemeral(interaction, 'Pick someone in this server.');
+    await replyEphemeral(interaction, t('Pick someone in this server.'));
     return null;
   }
   return { user, member, name: escapeMarkdown(member.displayName ?? user.displayName) };
@@ -88,14 +88,14 @@ async function pickedMember(interaction) {
 
 // /t-o role add: TOs hand each other the role. it gets made the first time, which can take discord past the 3 seconds
 async function toAdd(interaction) {
-  if (!isTO(interaction)) return notTO(interaction, 'add TOs');
+  if (!isTO(interaction)) return notTO(interaction, t('add TOs'));
   const picked = await pickedMember(interaction);
   if (!picked) return;
   const { user, member, name } = picked;
   const role = findRole(interaction.guild);
   if (role && hasRole(member, role)) {
     remember(user.id);
-    return replyEphemeral(interaction, `${name} is already a TO.`);
+    return replyEphemeral(interaction, t`${name} is already a TO.`);
   }
 
   await interaction.deferReply();
@@ -103,51 +103,51 @@ async function toAdd(interaction) {
     await member.roles.add(role ?? await makeRole(interaction.guild), 'added with /t-o role add');
   } catch (err) {
     if (err.code !== MISSING_PERMISSIONS) throw err;
-    return interaction.editReply({ content: `I couldn't give ${name} the TO role. That needs Manage Roles, with my role above TO.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: t`I couldn't give ${name} the TO role. That needs Manage Roles, with my role above TO.`, allowedMentions: { parse: [] } });
   }
   remember(user.id);
-  return interaction.editReply({ content: `${name} is a TO now. ${TO_POWERS}`, allowedMentions: { parse: [] } });
+  return interaction.editReply({ content: t`${name} is a TO now. ${t(TO_POWERS)}`, allowedMentions: { parse: [] } });
 }
 
 // /t-o role set: a server manager can point the bot at a role that already exists
 async function toSet(interaction) {
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    return replyEphemeral(interaction, 'You need Manage Server permission to set the TO role.');
+    return replyEphemeral(interaction, t('You need Manage Server permission to set the TO role.'));
   }
   const role = interaction.options.getRole('role', true);
   state.toRole.id = role.id;
   state.toRole.members = [];
   if (hasRole(interaction.member, role)) state.toRole.members.push(interaction.user.id);
   save();
-  return interaction.reply({ content: `${escapeMarkdown(role.name)} is the TO role now.`, allowedMentions: { parse: [] } });
+  return interaction.reply({ content: t`${escapeMarkdown(role.name)} is the TO role now.`, allowedMentions: { parse: [] } });
 }
 
 // /t-o role remove: any TO can take it off another, or off themselves
 async function toRemove(interaction) {
-  if (!isTO(interaction)) return notTO(interaction, 'remove TOs');
+  if (!isTO(interaction)) return notTO(interaction, t('remove TOs'));
   const picked = await pickedMember(interaction);
   if (!picked) return;
   const { user, member, name } = picked;
   const role = findRole(interaction.guild);
   if (!role || !hasRole(member, role)) {
     forget(user.id);
-    return replyEphemeral(interaction, `${name} isn't a TO.`);
+    return replyEphemeral(interaction, t`${name} isn't a TO.`);
   }
 
   await interaction.deferReply();
   const known = await serverMembers(interaction.guild, state.toRole.members);
   const others = [...known].some(([id, knownMember]) => id !== user.id && hasRole(knownMember, role));
   if (!others) {
-    return interaction.editReply({ content: `${name} is the last known TO. Add another TO first, or have someone with Manage Server set the TO role.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: t`${name} is the last known TO. Add another TO first, or have someone with Manage Server set the TO role.`, allowedMentions: { parse: [] } });
   }
   try {
     await member.roles.remove(role, 'removed with /t-o role remove');
   } catch (err) {
     if (err.code !== MISSING_PERMISSIONS) throw err;
-    return interaction.editReply({ content: `I couldn't take the TO role off ${name}. That needs Manage Roles, with my role above TO.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: t`I couldn't take the TO role off ${name}. That needs Manage Roles, with my role above TO.`, allowedMentions: { parse: [] } });
   }
   forget(user.id);
-  return interaction.editReply({ content: `${name} isn't a TO anymore.`, allowedMentions: { parse: [] } });
+  return interaction.editReply({ content: t`${name} isn't a TO anymore.`, allowedMentions: { parse: [] } });
 }
 
 // /t-o role list: anyone can see who the TOs are. each one the bot has seen gets checked against the server, so

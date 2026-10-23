@@ -608,4 +608,7 @@ test('an event saved before the sync gets start.gg\'s details once', async () =>
 });
 
 // let the last ones finish while the fake is still in place
-test('background checks settle', settle);
+test('background checks settle with nothing left waiting on start.gg', async () => {
+  await settle();
+  assert.equal(startgg.queueLength(), 0);
+});

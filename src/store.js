@@ -142,16 +142,24 @@ export function forGuild(id) {
   return raw.guilds[id];
 }
 
+// what a read sees, without making an entry. writes still go through forGuild above,
+// so a check that only looks never dirties the file with an empty server
+function peekGuild(id) {
+  if (!id) return null;
+  return raw.guilds[id] ?? null;
+}
+
 export function guildIds() {
   return Object.keys(raw.guilds);
 }
 
 // where a server's automatic posts go. single-server builds always use CHANNEL_ID. multi-server builds use
-// /settings channel's pick, and the server migrated from GUILD_ID falls back to CHANNEL_ID until it runs /settings channel
+// /settings channel's pick, and the server migrated from GUILD_ID falls back to CHANNEL_ID until it runs /settings channel.
+// looking it up never makes the entry, so a stray id can't fill the file with empty servers
 export function postsChannelId(id = guildId()) {
   if (!isMultiGuild()) return process.env.CHANNEL_ID ?? null;
   if (!id) return null;
-  return forGuild(id).channelId ?? (id === process.env.GUILD_ID ? process.env.CHANNEL_ID ?? null : null);
+  return peekGuild(id)?.channelId ?? (id === process.env.GUILD_ID ? process.env.CHANNEL_ID ?? null : null);
 }
 
 // copy the old single-server root into that server's entry once, so nobody loses their
@@ -189,33 +197,34 @@ function load() {
 
 const raw = load();
 
-// the server's own copy when a per-server key gets read inside guildLocal.run(), otherwise null
-function guildFor(key) {
+// the server's own copy when a per-server key gets used inside guildLocal.run(), otherwise null.
+// reads peek so they never make an entry, writes go through forGuild so there's somewhere to put them
+function guildFor(key, ensure) {
   const id = guildLocal.getStore();
   if (!id || typeof key !== 'string' || GLOBAL_KEYS.has(key) || !Object.hasOwn(emptyGuild, key)) return null;
-  return forGuild(id);
+  return ensure ? forGuild(id) : peekGuild(id);
 }
 
 // live code reads state.players etc, which routes to the current guild's copy inside
 // guildLocal.run(), and to the root otherwise, which single-server builds, tests and DMs use
 export const state = new Proxy(raw, {
   get(target, key, receiver) {
-    const guild = guildFor(key);
+    const guild = guildFor(key, false);
     return guild ? guild[key] : Reflect.get(target, key, receiver);
   },
   set(target, key, value) {
-    (guildFor(key) ?? target)[key] = value;
+    (guildFor(key, true) ?? target)[key] = value;
     return true;
   },
   deleteProperty(target, key) {
-    delete (guildFor(key) ?? target)[key];
+    delete (guildFor(key, true) ?? target)[key];
     return true;
   },
   has(target, key) {
-    return key in (guildFor(key) ?? target);
+    return key in (guildFor(key, false) ?? target);
   },
   getOwnPropertyDescriptor(target, key) {
-    const guild = guildFor(key);
+    const guild = guildFor(key, false);
     if (!guild) return Object.getOwnPropertyDescriptor(target, key);
     return Object.getOwnPropertyDescriptor(guild, key) ?? { configurable: true, enumerable: true, value: undefined, writable: true };
   },

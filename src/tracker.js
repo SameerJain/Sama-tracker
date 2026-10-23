@@ -16,5 +16,5 @@ export { billsDelay, postBillsResults } from './tracker/bills.js';
 export {
   recordDeploy, deployedAt, startTracking, stopTracking, migrateTracking, newTracked,
   trackTournament, pruneInactive, checkTournaments, checkRegReminders, checkDmReminders,
-  guildChannel, setBotClient, eachGuild, lastOutage, postStartNotice, outagePresence, updatePresence,
+  guildChannel, dropGuildChannel, setBotClient, eachGuild, lastOutage, postStartNotice, outagePresence, updatePresence,
 } from './tracker/maintenance.js';

@@ -93,8 +93,14 @@ export async function postNewSets(postChannel = currentChannel()) {
       const resultsWereOn = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
       if ((covered.has(set.id) || resultsWereOn) && messageEnabled('sets', set.completedAt)) {
         // no head to head button, the set's over
-        const card = embeds.setResult(set, state.players, { setColors: setResultColors() });
-        watchResult(await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([card]) }), set);
+        try {
+          const card = embeds.setResult(set, state.players, { setColors: setResultColors() });
+          watchResult(await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([card]) }), set);
+        } catch (err) {
+          // one bad send skips this set for now but still posts the rest
+          console.error(`posting set ${set.id} failed:`, err.message);
+          continue;
+        }
       }
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);

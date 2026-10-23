@@ -428,6 +428,13 @@ function objectCount(value) {
 // other are alike, and a page asked for as halves costs 2 requests against 3 for one that goes over
 const denseCharacters = new Map();
 const OBJECT_LIMIT = 1000;
+// in-memory only, so just keep the recent ones
+const DENSE_KEPT = 500;
+function noteDense(playerId, dense) {
+  denseCharacters.delete(playerId);
+  denseCharacters.set(playerId, dense);
+  for (const old of [...denseCharacters.keys()].slice(0, -DENSE_KEPT)) denseCharacters.delete(old);
+}
 
 // for /characters and /scout. every game they reported a character for, newest set first, 40 sets a page.
 // the limit counts what comes back, and a bo5 with characters and stages is ~51 objects. most sets have
@@ -443,14 +450,14 @@ export async function getCharacterSets(playerId, page, perPage = 40) {
   if (halved) {
     const first = data ? characterPage(data, playerId) : await splitCharacterPage(playerId, page * 2 - 1, 20);
     const second = await getCharacterSets(playerId, page * 2, 20);
-    denseCharacters.set(playerId, first.objects + second.objects > OBJECT_LIMIT);
+    noteDense(playerId, first.objects + second.objects > OBJECT_LIMIT);
     return { totalPages: Math.ceil(first.totalPages / 2), sets: [...first.sets, ...second.sets] };
   }
   if (!data) {
-    if (perPage === 40) denseCharacters.set(playerId, true);
+    if (perPage === 40) noteDense(playerId, true);
     return splitCharacterPage(playerId, page, perPage);
   }
-  if (perPage === 40) denseCharacters.set(playerId, false);
+  if (perPage === 40) noteDense(playerId, false);
   return characterPage(data, playerId);
 }
 

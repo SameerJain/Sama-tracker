@@ -84,7 +84,7 @@ test('only TOs can change the server language', async () => {
   assert.equal(state.messages.language, undefined);
 
   const changed = await configure({ language: 'es' });
-  assert.match(changed.content, /Language:\*\* Español/);
+  assert.match(changed.content, /Idioma:\*\* Español/);
   assert.equal(state.messages.language, 'es');
 });
 

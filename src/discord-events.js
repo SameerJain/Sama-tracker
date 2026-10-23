@@ -1,5 +1,6 @@
 import { GuildScheduledEventEntityType, GuildScheduledEventPrivacyLevel, GuildScheduledEventStatus, PermissionFlagsBits } from 'discord.js';
 import { getRegistrationById, startggUrl } from './startgg.js';
+import { locale, t } from './i18n.js';
 import { state, save } from './store.js';
 import { BIG_EVENT_ATTENDEES, BIG_EVENT_BRACKETS, BIG_EVENT_HOURS, messageSettings } from './message-settings.js';
 import { venueText } from './embeds/shared.js';
@@ -30,16 +31,16 @@ const secondsNow = () => Math.floor(Date.now() / 1000);
 // discord external events need a location, 100 characters at most. the venue and its street address when
 // the TO put them on start.gg, the address alone when both don't fit
 function eventLocation(tournament) {
-  if (tournament.isOnline) return 'Online';
+  if (tournament.isOnline) return t('Online');
   for (const each of [venueText(tournament), tournament.venueAddress?.trim()]) {
     if (each && each.length <= 100) return each;
   }
-  return ([tournament.city, tournament.addrState].filter(Boolean).join(', ') || 'See the start.gg link').slice(0, 100);
+  return ([tournament.city, tournament.addrState].filter(Boolean).join(', ') || t('See the start.gg link')).slice(0, 100);
 }
 
 // written out in the server's timezone, since an event description may not show discord timestamps
 function timeText(seconds) {
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(locale(), {
     timeZone: messageSettings().timezone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
   }).format(new Date(seconds * 1000));
 }
@@ -53,14 +54,14 @@ function streamLink({ streamName, streamSource }) {
 
 // the start.gg link gets a line to itself, which is how an event made earlier gets found again
 function eventDescription(tournament) {
-  const lines = [`${tournament.name} on start.gg`, startggUrl(tournament.slug), eventLocation(tournament)];
+  const lines = [t`${tournament.name} on start.gg`, startggUrl(tournament.slug), eventLocation(tournament)];
   const streams = (tournament.streams ?? []).filter((stream) => stream?.streamName).map(streamLink);
-  if (streams.length) lines.push(`Streams: ${streams.join(', ')}`);
+  if (streams.length) lines.push(t`Streams: ${streams.join(', ')}`);
   if (tournament.registrationClosesAt && tournament.registrationClosesAt < tournament.startAt) {
-    lines.push(`Registration closes ${timeText(tournament.registrationClosesAt)}`);
+    lines.push(t`Registration closes ${timeText(tournament.registrationClosesAt)}`);
   }
   const names = (tournament.events ?? []).map((event) => event.name).filter(Boolean).slice(0, 10);
-  if (names.length) lines.push(`Events: ${names.join(', ')}`);
+  if (names.length) lines.push(t`Events: ${names.join(', ')}`);
   return lines.join('\n').slice(0, 1000);
 }
 
@@ -111,10 +112,10 @@ function remember(found, eventId, synced) {
 
 // why the bot can't make events in this server, or null when it can
 export function cantMakeEvents(guild) {
-  if (!guild?.scheduledEvents?.create) return 'Couldn\'t make a Discord event here.';
+  if (!guild?.scheduledEvents?.create) return t('Couldn\'t make a Discord event here.');
   // the bot's own member isn't always cached, and then discord says no on the create instead
   const permissions = guild.members?.me?.permissions;
-  if (permissions && !permissions.has(PermissionFlagsBits.ManageEvents) && !permissions.has(PermissionFlagsBits.CreateEvents)) return NO_PERMISSION;
+  if (permissions && !permissions.has(PermissionFlagsBits.ManageEvents) && !permissions.has(PermissionFlagsBits.CreateEvents)) return t(NO_PERMISSION);
   return null;
 }
 
@@ -171,7 +172,15 @@ export async function syncDiscordEvents(guild, now = secondsNow()) {
   }
   const due = Object.entries(state.discordEvents).filter(([, saved]) => !saved.gone && saved.startAt > now);
   if (due.length && !cantMakeEvents(guild)) {
-    const events = await guild.scheduledEvents.fetch();
+    // a failed list keeps the prunes above but leaves the syncs for next time
+    let events;
+    try {
+      events = await guild.scheduledEvents.fetch();
+    } catch (err) {
+      console.error('listing discord events failed:', err.message);
+      if (changed) save();
+      return;
+    }
     for (const [id, saved] of due) {
       try {
         const event = events.get(saved.eventId);

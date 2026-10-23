@@ -492,6 +492,7 @@ test('a picked tournament goes to start.gg by its slug, the same as a pasted lin
 // while the fake is still answering so nothing reaches the real start.gg
 test('background checks finish before the fake goes away', async () => {
   while (queueLength() || Date.now() - lastFetch < 2000) await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(queueLength(), 0);
 });
 
 // /stream_link with these tournaments going on and start.gg answering streams. records each answer

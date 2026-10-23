@@ -1,5 +1,6 @@
 import { ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
-import { buttonRow, replyEphemeral } from './shared.js';
+import { guildId } from '../store.js';
+import { buttonRow, replyEphemeral, t } from './shared.js';
 
 // a removal can be put back this long after
 const UNDO_SECONDS = 60;
@@ -15,10 +16,16 @@ const UNDO_SECONDS = 60;
 const kinds = new Map();
 const CHOICES = ['confirm', 'cancel', 'undo'];
 
-// what Undo would put back, in memory since it's only kept a minute. a restart in that minute loses it
+// what Undo would put back, in memory since it's only kept a minute. a restart in that minute loses it.
+// keyed by server too, so the same person pressing the same button in two servers doesn't share one
 const removed = new Map();
 // a double press before the first update lands runs twice without this
 const confirming = new Set();
+
+// the server this press is in, so undo records don't leak between servers. the button id itself
+// stays without it for discord's 100 characters, and old buttons still press
+const scopeOf = (interaction) => interaction.guildId ?? guildId() ?? '';
+const scopedKey = (interaction, ...parts) => [scopeOf(interaction), ...parts].join(':');
 
 function confirmable(kind, spec) {
   kinds.set(kind, spec);
@@ -36,7 +43,7 @@ function askFirst(interaction, kind, target, question, label) {
   const { id } = interaction.user;
   const asking = {
     content: question,
-    components: buttonRow(choiceButton('confirm', kind, target, id, label, ButtonStyle.Danger), choiceButton('cancel', kind, target, id, 'Cancel', ButtonStyle.Secondary)),
+    components: buttonRow(choiceButton('confirm', kind, target, id, label, ButtonStyle.Danger), choiceButton('cancel', kind, target, id, t('Cancel'), ButtonStyle.Secondary)),
     allowedMentions: { parse: [] },
   };
   return interaction.deferred ? interaction.editReply(asking) : interaction.reply(asking);
@@ -44,16 +51,16 @@ function askFirst(interaction, kind, target, question, label) {
 
 // an Undo button that puts record back, and comes off the message once the minute is up. reply is the
 // interaction whose reply has the button
-function undoRow(reply, kind, target, record) {
-  const { id } = reply.user;
-  const key = [kind, target, id].join(':');
-  const kept = { record, at: Date.now() };
+function undoRow(interaction, kind, target, record) {
+  const { id } = interaction.user;
+  const key = scopedKey(interaction, kind, target, id);
+  const kept = { record, at: Date.now(), scope: scopeOf(interaction) };
   removed.set(key, kept);
   setTimeout(() => {
     if (removed.get(key) === kept) removed.delete(key);
-    reply.editReply({ components: [] }).catch(() => {});
+    interaction.editReply({ components: [] }).catch(() => {});
   }, UNDO_SECONDS * 1000).unref?.();
-  return buttonRow(choiceButton('undo', kind, target, id, 'Undo', ButtonStyle.Secondary));
+  return buttonRow(choiceButton('undo', kind, target, id, t('Undo'), ButtonStyle.Secondary));
 }
 
 async function handleChoice(interaction) {
@@ -63,30 +70,30 @@ async function handleChoice(interaction) {
   const discordId = parts.at(-1);
   const target = parts.slice(2, -1).join(':');
   const spec = kinds.get(kind);
-  if (parts.length < 4 || !target || !spec) return replyEphemeral(interaction, 'That button doesn\'t work anymore.');
-  if (interaction.user.id !== discordId) return replyEphemeral(interaction, `Only whoever ran \`${spec.command}\` can press this.`);
+  if (parts.length < 4 || !target || !spec) return replyEphemeral(interaction, t('That button doesn\'t work anymore.'));
+  if (interaction.user.id !== discordId) return replyEphemeral(interaction, t`Only whoever ran \`${spec.command}\` can press this.`);
 
-  if (choice === 'cancel') return interaction.update({ content: spec.cancel(target), components: [], allowedMentions: { parse: [] } });
+  if (choice === 'cancel') return interaction.update({ content: t(spec.cancel(target)), components: [], allowedMentions: { parse: [] } });
   if (choice === 'confirm') {
-    const key = interaction.customId;
-    if (confirming.has(key)) return replyEphemeral(interaction, 'Already on it, one press is enough.');
+    const key = scopedKey(interaction, interaction.customId);
+    if (confirming.has(key)) return replyEphemeral(interaction, t('Already on it, one press is enough.'));
     confirming.add(key);
     try {
       const { content, undo } = spec.run(target);
-      return await interaction.update({ content, components: undo ? undoRow(interaction, kind, target, undo) : [], allowedMentions: { parse: [] } });
+      return await interaction.update({ content: t(content), components: undo ? undoRow(interaction, kind, target, undo) : [], allowedMentions: { parse: [] } });
     } finally {
       confirming.delete(key);
     }
   }
 
-  const key = [kind, target, discordId].join(':');
+  const key = scopedKey(interaction, kind, target, discordId);
   const kept = removed.get(key);
   removed.delete(key);
-  if (!kept || Date.now() - kept.at > UNDO_SECONDS * 1000) {
+  if (!kept || kept.scope !== scopeOf(interaction) || Date.now() - kept.at > UNDO_SECONDS * 1000) {
     await interaction.update({ components: [] });
-    return interaction.followUp({ content: spec.tooLate, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+    return interaction.followUp({ content: t(spec.tooLate), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
   }
-  return interaction.update({ content: spec.undo(kept.record, discordId), components: [], allowedMentions: { parse: [] } });
+  return interaction.update({ content: t(spec.undo(kept.record, discordId)), components: [], allowedMentions: { parse: [] } });
 }
 
 export { confirmable, isChoice, askFirst, undoRow, handleChoice, UNDO_SECONDS };

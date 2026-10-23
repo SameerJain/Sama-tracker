@@ -1,8 +1,9 @@
 import { ActivityType } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
+import { t } from '../i18n.js';
 import {
-  forGuild, guildIds, guildLocal, isMultiGuild, migrateLegacyToGuild, postsChannelId, readHeartbeat, writeHeartbeat, state, save,
+  forGuild, guildId, guildIds, guildLocal, isMultiGuild, migrateLegacyToGuild, postsChannelId, readHeartbeat, writeHeartbeat, state, save,
 } from '../store.js';
 import { syncDiscordEvents } from '../discord-events.js';
 import { checkMatchmakingExpiry } from '../commands/matchmaking.js';
@@ -69,7 +70,7 @@ let shownDown = false;
 
 export function outagePresence(downSince) {
   if (!downSince) return { status: 'online', activities: [] };
-  return { status: 'idle', activities: [{ type: ActivityType.Custom, name: 'start.gg is down', state: 'start.gg is down, lookups wait until it\'s back' }] };
+  return { status: 'idle', activities: [{ type: ActivityType.Custom, name: t('start.gg is down'), state: t('start.gg is down, lookups wait until it\'s back') }] };
 }
 
 export function updatePresence(client, downSince = startgg.startggDownSince()) {
@@ -109,18 +110,24 @@ let botClient = null;
 const channelCache = new Map();
 
 export async function guildChannel(guildId) {
-  const id = postsChannelId(guildId);
-  if (!id) return null;
+  const channelId = postsChannelId(guildId);
+  if (!channelId) return null;
   const cached = channelCache.get(guildId);
-  if (cached?.id === id) return cached;
+  if (cached?.id === channelId) return cached;
   try {
-    const found = await botClient?.channels.fetch(id);
+    const found = await botClient?.channels.fetch(channelId);
     if (!found?.isTextBased()) return null;
     channelCache.set(guildId, found);
     return found;
   } catch {
     return null;
   }
+}
+
+// drops one server's cached posts channel, so the next check fetches the new one.
+// used when the bot leaves a server and when a channel send says it's gone
+export function dropGuildChannel(guildId) {
+  channelCache.delete(guildId);
 }
 
 // for tests, which hand it a fake client instead of a logged in one
@@ -130,10 +137,14 @@ export function setBotClient(client) {
 
 // multi-server only: every server's checks run in one pass, in its own guild entry, with its
 // own channel. single-server builds run the same checks once on the root, with CHANNEL_ID.
-// one run at a time (see queued below) so nothing posts twice
+// one run at a time (see queued below) so nothing posts twice. servers the bot already left
+// are skipped once the guild cache is up, so their saved entries don't cost a channel fetch
 export async function eachGuild(fn) {
-  const ids = new Set([...guildIds(), ...(botClient?.guilds?.cache.keys() ?? [])]);
+  const saved = new Set(guildIds());
+  const ids = new Set([...saved, ...(botClient?.guilds?.cache.keys() ?? [])]);
+  const gone = botClient?.guilds?.cache?.size ? (id) => saved.has(id) && !botClient.guilds.cache.has(id) : () => false;
   for (const id of ids) {
+    if (gone(id)) continue;
     forGuild(id);
     const postChannel = await guildChannel(id);
     if (!postChannel) continue;
@@ -161,7 +172,8 @@ export function stopTracking() {
 function migrateSaved() {
   // saved from before userIds existed
   for (const tournament of Object.values(state.tournaments)) {
-    tournament.userIds ??= [...new Set((tournament.entries ?? []).map((entry) => entry.userId))];
+    tournament.entries ??= [];
+    tournament.userIds ??= [...new Set(tournament.entries.map((entry) => entry.userId))];
   }
   // saved from before trackedAt existed. lastSetAt means they played while tracked, so it
   // counts as the start. otherwise now, so nobody gets pruned for time before this was kept
@@ -253,13 +265,18 @@ export function migrateTracking(now = secondsNow()) {
     delete tournament.discordEventId;
   }
 
-  for (const reminder of Object.values(state.regReminders ?? {})) {
-    const { id, name, slug, startAt, endAt, images } = reminder;
-    const tournament = state.tournaments[id] ??= { id, name, slug, startAt, endAt, images: images ?? [], entries: [], userIds: [] };
-    if (!tournament.tracked) trackTournament(tournament, 'manual', now);
-    tournament.reminder = { deadline: reminder.deadline, next: reminder.next };
+  // single-server leftovers live on the root, but tournaments live per server. only the migrated
+  // server claims them, so whichever guild checks first doesn't take another server's reminders
+  const legacyId = process.env.GUILD_ID;
+  if (!isMultiGuild() || !legacyId || guildId() === legacyId) {
+    for (const reminder of Object.values(state.regReminders ?? {})) {
+      const { id, name, slug, startAt, endAt, images } = reminder;
+      const tournament = state.tournaments[id] ??= { id, name, slug, startAt, endAt, images: images ?? [], entries: [], userIds: [] };
+      if (!tournament.tracked) trackTournament(tournament, 'manual', now);
+      tournament.reminder = { deadline: reminder.deadline, next: reminder.next };
+    }
+    delete state.regReminders;
   }
-  delete state.regReminders;
 
   const pinging = state.messages.calls === true;
   for (const player of Object.values(state.players)) {

@@ -235,3 +235,60 @@ test('the fun queues and the bills rotation are one per bot, not per server', as
   assert.deepEqual(cleaned.funQueue, { bills: [{ id: 'kept' }] });
   assert.deepEqual(cleaned.billsMeta, {});
 });
+
+test('looking at a new server never saves an empty entry for it', async () => {
+  delete process.env.GUILD_ID;
+  delete process.env.CHANNEL_ID;
+  assert.ok(!guildIds().includes('lurker'));
+  await guildLocal.run('lurker', async () => {
+    assert.deepEqual(state.buttons, []);
+    assert.equal(postsChannelId(), null);
+  });
+  assert.ok(!guildIds().includes('lurker'));
+});
+
+test('dropping a server\'s cached channel makes the next check fetch it again', async () => {
+  let fetches = 0;
+  tracker.setBotClient({ channels: { fetch: async (id) => { fetches++; return { id, isTextBased: () => true }; } } });
+  forGuild('dropped').channelId = 'cached-posts';
+  assert.equal((await tracker.guildChannel('dropped')).id, 'cached-posts');
+  assert.equal((await tracker.guildChannel('dropped')).id, 'cached-posts');
+  assert.equal(fetches, 1, 'the second look costs no fetch');
+  tracker.dropGuildChannel('dropped');
+  assert.equal((await tracker.guildChannel('dropped')).id, 'cached-posts');
+  assert.equal(fetches, 2);
+});
+
+test('checks skip servers the bot already left instead of fetching their channels', async () => {
+  forGuild('left-behind').channelId = 'gone-posts';
+  forGuild('gone-too').channelId = 'gone-posts';
+  const fetched = [];
+  tracker.setBotClient({
+    guilds: { cache: new Map([['elsewhere', {}]]) },
+    channels: { fetch: async (id) => { fetched.push(id); return null; } },
+  });
+  const seen = [];
+  await tracker.eachGuild(async (id) => { seen.push(id); });
+  assert.deepEqual(seen, []);
+  assert.ok(!fetched.includes('gone-posts'), 'a left server costs no channel fetch');
+  // the entry stays for if the bot rejoins
+  assert.equal(forGuild('left-behind').channelId, 'gone-posts');
+});
+
+test('only the migrated server claims saved reg reminders in a multi-server build', async () => {
+  process.env.GUILD_ID = 'home';
+  try {
+    state.regReminders = { 5: { id: 5, name: 'Local', slug: 'tournament/local', deadline: 99, next: 1, startAt: 100, endAt: 200, images: [] } };
+    state.tournaments = {};
+    // another server's pass leaves the root's reminders alone
+    await guildLocal.run('away', async () => tracker.migrateTracking(1000));
+    assert.ok(state.regReminders?.[5], 'another server must not take them');
+    assert.equal(guildLocal.run('away', () => state.tournaments[5]), undefined);
+    // the migrated server's pass claims them into its own tournaments
+    await guildLocal.run('home', async () => tracker.migrateTracking(1000));
+    assert.equal(guildLocal.run('home', () => state.tournaments[5]?.tracked?.by), 'manual');
+    assert.equal(state.regReminders, undefined);
+  } finally {
+    delete process.env.GUILD_ID;
+  }
+});

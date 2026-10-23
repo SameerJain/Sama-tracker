@@ -57,22 +57,37 @@ export async function postRankChanges(postChannel = currentChannel()) {
       // removed while this was running, or gone from slippi. kept in case slippi only hiccuped
       if (!profile || state.slippi[entry.uid] !== entry) continue;
       const before = { ...entry };
-      Object.assign(entry, slippiEntry(profile));
-      // the season history has final ratings but no characters or daily placements, so the wrap-up gets
-      // those from here. a profile can turn over before or after the history shows the season ended
-      if (before.season && before.season !== entry.season) {
-        entry.lastSeason = {
+      const next = slippiEntry(profile, entry);
+      // history has ratings but no characters or placements, so the wrap-up reads them from here
+      if (before.season && before.season !== next.season) {
+        next.lastSeason = {
           at: checkedAt,
           characters: before.characters ?? [],
           global: before.global ?? null,
           regional: before.regional ?? null,
         };
       }
-      if (!before.rank || before.season !== entry.season || before.rank === entry.rank) continue;
-      if (slippi.RANKS.indexOf(entry.rank) <= slippi.RANKS.indexOf('Pending')) continue;
-      if (messageEnabled('slippi', checkedAt)) {
-        const { files, characterFile } = await slippi.slippiArt(entry);
-        await postChannel.send({ embeds: [embeds.rankChange(entry, before, state.players, { characterFile })], files, allowedMentions: { parse: [] } });
+      if (!before.rank || before.season !== next.season || before.rank === next.rank) {
+        Object.assign(entry, next);
+        continue;
+      }
+      if (slippi.RANKS.indexOf(next.rank) <= slippi.RANKS.indexOf('Pending')) {
+        Object.assign(entry, next);
+        continue;
+      }
+      if (!messageEnabled('slippi', checkedAt)) {
+        Object.assign(entry, next);
+        continue;
+      }
+      try {
+        const { files, characterFile } = await slippi.slippiArt(next);
+        await postChannel.send({ embeds: [embeds.rankChange(next, before, state.players, { characterFile })], files, allowedMentions: { parse: [] } });
+        Object.assign(entry, next);
+        // saved per post so a crash can't post it again
+        save();
+      } catch (err) {
+        // stays on the old rank so the next check tries again
+        console.error(`posting a slippi rank change for ${before.code ?? before.uid} failed:`, err.message);
       }
     }
     await postSeasonWrapUp(latest, postChannel, checkedAt);
@@ -103,8 +118,6 @@ export async function postSeasonWrapUp(latest, postChannel = currentChannel(), c
     .filter((season) => season && checkedAt - (secondsOf(season.endedAt) ?? -Infinity) <= SEASON_WRAP_DAYS * DAY)
     .sort((a, b) => secondsOf(b.endedAt) - secondsOf(a.endedAt))[0];
   if (!ended || state.slippiWrapped.includes(ended.name)) return;
-  state.slippiWrapped = [...state.slippiWrapped, ended.name].slice(-SEASONS_WRAPPED_KEPT);
-
   const endedAt = secondsOf(ended.endedAt);
   const finishers = [];
   for (const [uid, profile] of latest) {
@@ -129,8 +142,16 @@ export async function postSeasonWrapUp(latest, postChannel = currentChannel(), c
       previous: profile.seasons[at + 1] ?? null,
     });
   }
-  if (!messageEnabled('slippi', endedAt)) return;
+  // skipped while off stays skipped, so that marks it too. a failed send stays unmarked to try again
+  if (!messageEnabled('slippi', endedAt)) {
+    state.slippiWrapped = [...state.slippiWrapped, ended.name].slice(-SEASONS_WRAPPED_KEPT);
+    return;
+  }
   const card = embeds.seasonWrapUp(ended, finishers, state.players);
-  if (!card) return;
+  if (!card) {
+    state.slippiWrapped = [...state.slippiWrapped, ended.name].slice(-SEASONS_WRAPPED_KEPT);
+    return;
+  }
   await postChannel.send({ embeds: [card.embed], files: card.files, allowedMentions: { parse: [] } });
+  state.slippiWrapped = [...state.slippiWrapped, ended.name].slice(-SEASONS_WRAPPED_KEPT);
 }

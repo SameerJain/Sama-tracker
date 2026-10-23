@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
+import { t } from '../i18n.js';
 import { state, save } from '../store.js';
 import { messageEnabled } from '../message-settings.js';
 import { linkedPlayer } from '../commands/shared.js';
@@ -42,7 +43,7 @@ const STREAM_CONFIRM_MS = 30_000;
 // the card in the set's thread, pinging ids, with its head to head button saved to come off later
 async function announce(set, ids, postChannel) {
   const components = h2hRow(set);
-  const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', ids, 'on stream', embeds.onStream(set, state.players), components);
+  const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', ids, t('on stream'), embeds.onStream(set, state.players), components);
   rememberButton(sent, set, components);
 }
 
@@ -54,12 +55,23 @@ export async function postStreamAlerts(postChannel = currentChannel(), confirmAf
     // old saved alerts have no per-person history, so don't replay them on upgrade
     if (!pinged) {
       state.streamPinged.push({ setId: set.id, discordIds: ids });
+      save();
       continue;
     }
     const newIds = ids.filter((id) => !pinged.discordIds.includes(id));
     if (!newIds.length) continue;
-    if (messageEnabled('streams', wentLiveAt(set))) await announce(set, newIds, postChannel);
+    if (messageEnabled('streams', wentLiveAt(set))) {
+      try {
+        await announce(set, newIds, postChannel);
+      } catch (err) {
+        // one bad send leaves this set for the next check but still pings the rest
+        console.error(`posting a stream alert for ${set.id} failed:`, err.message);
+        continue;
+      }
+    }
     pinged.discordIds.push(...newIds);
+    // saved now so a crash can't ping them again
+    save();
   }
 
   const seen = current.filter((set) => !state.streamed.includes(set.id));
@@ -73,10 +85,17 @@ export async function postStreamAlerts(postChannel = currentChannel(), confirmAf
       // only whoever is playing and has /notify streams on
       if (messageEnabled('streams', wentLiveAt(set))) {
         const ids = streamPingIds(set);
-        await announce(set, ids, postChannel);
+        try {
+          await announce(set, ids, postChannel);
+        } catch (err) {
+          console.error(`posting a stream alert for ${id} failed:`, err.message);
+          continue;
+        }
         state.streamPinged.push({ setId: set.id, discordIds: ids });
       }
       state.streamed.push(id);
+      // saved per set so a crash can't ping it again
+      save();
     }
   }
 
@@ -116,7 +135,7 @@ function liveTournaments() {
     // doneAt means every event they're in has finished, or every event at a tracked one
     if (tournament.resultsPosted || tournament.doneAt || !(tournament.startAt <= now)) return false;
     if (now > endTime(tournament) + RUNS_LATE_HOURS * HOUR) return false;
-    return posting(tournament, 'stream') || tournament.entries.some((entry) => alertsOn(state.players[entry.userId]));
+    return posting(tournament, 'stream') || (tournament.entries ?? []).some((entry) => alertsOn(state.players[entry.userId]));
   });
 }
 

@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { articleExcerpt, categoryPages, fetchScreenshots, wiki } from './smashwiki.js';
 import * as youtube from './youtube.js';
 import { postQueue } from './queue.js';
+import { language } from '../i18n.js';
 
 // short timeout so it falls back to the line fast if claude is down
 const defaultClient = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 20_000, maxRetries: 1 }) : null;
@@ -229,7 +230,7 @@ export function makeFun({ name, line, category, prompt, styles, scenarios = [], 
       max_tokens: 2000,
       // one line, so the word limit can't be ignored
       output_config: { effort: 'low' },
-      system: INVENT_PROMPT,
+      system: language() === 'es' ? `${INVENT_PROMPT}\nReply in Spanish.` : INVENT_PROMPT,
       messages: [{ role: 'user', content: inventMessage(prompt, examples) }],
     });
     return textOf(response).split('\n')[0];
@@ -249,12 +250,13 @@ export function makeFun({ name, line, category, prompt, styles, scenarios = [], 
     const left = [...points];
     // what was found live stands in for one of the game's own
     const picks = Array.from({ length: video || article ? 2 : 3 }, () => pickFrom(left));
+    const system = language() === 'es' ? `${prompt}\n${RULES}\nReply in Spanish.` : `${prompt}\n${RULES}`;
     const response = await client.messages.create({
       model: 'claude-haiku-5-5',
       max_tokens: 16000,
       // low effort ignores the word limit
       output_config: { effort: 'medium' },
-      system: `${prompt}\n${RULES}`,
+      system,
       messages: [{ role: 'user', content: funMessage({ style, points: picks, video, article }) }],
     });
     return textOf(response);

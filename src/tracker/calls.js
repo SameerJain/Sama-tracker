@@ -1,5 +1,6 @@
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
+import { t } from '../i18n.js';
 import { state, save } from '../store.js';
 import { messageEnabled } from '../message-settings.js';
 import { linkedPlayer } from '../commands/shared.js';
@@ -33,15 +34,28 @@ export async function postMatchCalls(postChannel = currentChannel()) {
         const watched = state.callPosts.find((each) => each.setId === set.id);
         const newIds = watched ? discordIds.filter((id) => !watched.discordIds.includes(id)) : [];
         if (newIds.length) {
-          if (messageEnabled('calls', set.updatedAt)) await sendMatchCall(set, inSet, newIds, postChannel);
+          if (messageEnabled('calls', set.updatedAt)) {
+            try {
+              await sendMatchCall(set, inSet, newIds, postChannel);
+            } catch (err) {
+              // one bad send leaves this set for the next check but still calls the rest
+              console.error(`posting a match call for ${set.id} failed:`, err.message);
+              continue;
+            }
+          }
           watched.discordIds.push(...newIds);
           save();
         }
         continue;
       }
       if (messageEnabled('calls', set.updatedAt)) {
-        const { sent, text } = await sendMatchCall(set, inSet, discordIds, postChannel);
-        watchCall(sent, set, discordIds, text);
+        try {
+          const { sent, text } = await sendMatchCall(set, inSet, discordIds, postChannel);
+          watchCall(sent, set, discordIds, text);
+        } catch (err) {
+          console.error(`posting a match call for ${set.id} failed:`, err.message);
+          continue;
+        }
       }
       state.called.push(set.id);
       save();
@@ -60,8 +74,13 @@ export async function postMatchCalls(postChannel = currentChannel()) {
       for (const set of sets.sort((a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0))) {
         if (state.called.includes(set.id)) continue;
         if (messageEnabled('calls', set.updatedAt)) {
-          const { sent, text } = await sendMatchCall(set, [], [], postChannel);
-          watchCall(sent, set, [], text);
+          try {
+            const { sent, text } = await sendMatchCall(set, [], [], postChannel);
+            watchCall(sent, set, [], text);
+          } catch (err) {
+            console.error(`posting a match call for ${set.id} failed:`, err.message);
+            continue;
+          }
         }
         state.called.push(set.id);
         save();
@@ -78,7 +97,7 @@ export async function postMatchCalls(postChannel = currentChannel()) {
 async function sendMatchCall(set, inSet, discordIds, postChannel) {
   const components = h2hRow(set, inSet[0]);
   const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
-  const text = set.station ? `You're up - Station ${set.station}` : `You're up`;
+  const text = set.station ? t`You're up - Station ${set.station}` : t(`You're up`);
   const sent = await postChannel.send({
     content: discordIds.length ? `${mentions(discordIds)} ${text}` : undefined,
     embeds: embeds.withImage([embeds.matchCall(set, people)]),
@@ -124,8 +143,8 @@ export async function followCalls(postChannel = currentChannel()) {
       // uncalled: edit first so a failed edit stays watched for the next check
       state.called = state.called.filter((id) => id !== each.setId);
       // an edit never pings, the mentions just stay so they can see it was theirs
-      const struck = each.text ?? `You're up`;
-      const uncalled = 'Uncalled by the TO, wait for the next call';
+      const struck = each.text ?? t(`You're up`);
+      const uncalled = t('Uncalled by the TO, wait for the next call');
       const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~${struck}~~ ${uncalled}` : uncalled;
       await editPost(postChannel, each, { content, allowedMentions: { parse: [] } });
       state.callPosts = state.callPosts.filter((other) => other !== each);

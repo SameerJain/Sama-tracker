@@ -293,7 +293,7 @@ test('/link refuses when commands already find you, and fixes a tracked discord 
   // connected discord on start.gg after the last refresh
   state.players = { 1: { ...crew } };
   mockApi(() => ({ user: { id: 1, slug: 'user/crew', player: { id: 10, gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] } }));
-  assert.match(await run('link', 'crew-discord', { profile: 'start.gg/user/crew' }), /^No need to link/);
+  assert.match((await run('link', 'crew-discord', { profile: 'start.gg/user/crew' })).content, /^No need to link/);
   assert.equal(state.links['crew-discord'], undefined);
   assert.equal(state.players[1].discordId, 'crew-discord');
   mockApi(noStats);

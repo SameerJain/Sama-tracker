@@ -1,4 +1,5 @@
 import * as startgg from '../startgg.js';
+import { t } from '../i18n.js';
 import { state, save } from '../store.js';
 import { buttonRow, h2hButton } from '../commands/shared.js';
 import { currentChannel, secondsNow, editPost, BUTTON_KEPT_HOURS, HOUR } from './shared.js';
@@ -8,7 +9,7 @@ import { currentChannel, secondsNow, editPost, BUTTON_KEPT_HOURS, HOUR } from '.
 // channel doesn't fill up with reports
 export function h2hRow(set, fallback) {
   const player = Object.values(state.players).find((each) => set.sides.some((side) => side.playerIds.includes(each.playerId))) ?? fallback;
-  return player ? buttonRow(h2hButton(set, player, { label: 'Head to head', action: 'private' })) : [];
+  return player ? buttonRow(h2hButton(set, player, { label: t('Head to head'), action: 'private' })) : [];
 }
 
 // saved so clearFinishedButtons can find the post again after a restart. start.gg's preview sets

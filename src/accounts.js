@@ -23,12 +23,16 @@ export function rememberAccounts(participants) {
 // a big tournament is 10 or more pages of participants, and someone who isn't found tends to try again
 // right away, so each list is kept a little. a failed lookup isn't kept
 const PARTICIPANTS_CACHE_MINUTES = 10;
+const LISTS_KEPT = 200;
 const participantLists = new Map();
 function participantsOf(tournamentId) {
   const cached = participantLists.get(tournamentId);
   if (cached && Date.now() - cached.at < PARTICIPANTS_CACHE_MINUTES * 60 * 1000) return cached.list;
   const list = startgg.getParticipants(tournamentId);
+  participantLists.delete(tournamentId);
   participantLists.set(tournamentId, { at: Date.now(), list });
+  // old tournaments fall off, so a long run can't grow this forever
+  for (const old of [...participantLists.keys()].slice(0, -LISTS_KEPT)) participantLists.delete(old);
   list.catch(() => participantLists.delete(tournamentId));
   return list;
 }
@@ -77,7 +81,8 @@ export async function findAccount(discordId) {
   }
 
   const tracked = Object.values(state.tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted);
-  const participants = (await Promise.all(tracked.map((tournament) => participantsOf(tournament.id)))).flat();
+  // one failing lookup leaves the rest, so a bad tournament id can't break /scout
+  const participants = (await Promise.all(tracked.map((tournament) => participantsOf(tournament.id).catch(() => [])))).flat();
   rememberAccounts(participants);
   return connected(discordId, participants.filter((participant) => participant.discordId === discordId).map((participant) => participant.userId));
 }

@@ -6,7 +6,7 @@ import {
 } from '../message-settings.js';
 import { cantMakeEvents } from '../discord-events.js';
 import { count } from '../embeds/shared.js';
-import { commandsFor, LANGUAGES, language } from '../i18n.js';
+import { commandsFor, LANGUAGES, language, t } from '../i18n.js';
 import { isSelf, linkedPlayer, readTracked, replyEphemeral, replyNotTracked } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
 import { isTO, notTO } from './to.js';
@@ -44,7 +44,7 @@ async function configureSettings(interaction) {
   if (day !== null) changes.recapDay = day;
   const time = interaction.options.getString('time')?.trim();
   if (time !== undefined) {
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return fail('Use a 24-hour time in HH:MM format, like 09:00 or 21:30.');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return fail(t('Use a 24-hour time in HH:MM format, like 09:00 or 21:30.'));
     changes.recapTime = time;
   }
   const timezone = interaction.options.getString('timezone')?.trim();
@@ -52,7 +52,7 @@ async function configureSettings(interaction) {
     try {
       changes.timezone = new Intl.DateTimeFormat('en-US', { timeZone: timezone }).resolvedOptions().timeZone;
     } catch {
-      return fail('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
+      return fail(t('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.'));
     }
   }
   const threads = interaction.options.getString('threads');
@@ -60,19 +60,19 @@ async function configureSettings(interaction) {
   const eventLength = interaction.options.getInteger('event_length');
   if (eventLength !== null) {
     if (!Number.isInteger(eventLength) || eventLength < MIN_EVENT_LENGTH_HOURS || eventLength > MAX_EVENT_LENGTH_HOURS) {
-      return fail(`Event length is ${MIN_EVENT_LENGTH_HOURS} to ${MAX_EVENT_LENGTH_HOURS} hours, like 5.`);
+      return fail(t`Event length is ${MIN_EVENT_LENGTH_HOURS} to ${MAX_EVENT_LENGTH_HOURS} hours, like 5.`);
     }
     changes.eventLength = eventLength;
   }
   const pickedLanguage = interaction.options.getString('language');
   if (pickedLanguage !== null) {
-    if (!Object.hasOwn(LANGUAGES, pickedLanguage)) return fail('Pick English or Español.');
+    if (!Object.hasOwn(LANGUAGES, pickedLanguage)) return fail(t('Pick English or Español.'));
     changes.language = pickedLanguage;
   }
   const channel = interaction.options.getChannel?.('channel');
 
   if (!Object.keys(changes).length && !channel) return replyEphemeral(interaction, settingsText());
-  if (!isTO(interaction)) return notTO(interaction, 'change server settings');
+  if (!isTO(interaction)) return notTO(interaction, t('change server settings'));
   // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
   if (changes.events && !previous.events) {
     const cant = cantMakeEvents(interaction.guild);
@@ -86,8 +86,8 @@ async function configureSettings(interaction) {
     const postChannel = channel ?? (channelId && (interaction.client.channels.cache.get(channelId) ?? currentChannel()));
     if (postChannel) {
       const missing = missingThreadPermissions(postChannel);
-      if (!missing) return fail(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
-      if (missing.length) return fail(`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
+      if (!missing) return fail(t`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
+      if (missing.length) return fail(t`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
     }
   }
   const channelLines = channel ? channelChange(interaction, channel) : [];
@@ -117,23 +117,24 @@ async function configureSettings(interaction) {
 // every setting, shown when /t-o settings has no options and after a change
 function settingsText() {
   const settings = messageSettings();
-  const lines = ['**Automatic posts**'];
+  const onOff = (on) => t(on ? 'on' : 'off');
+  const lines = [t('**Automatic posts**')];
   for (const [key, label] of Object.entries(MESSAGE_TYPES)) {
     if (key === 'recap') continue;
-    lines.push(`**${label}:** ${settings[key] ? 'on' : 'off'}`);
+    lines.push(t`**${t(label)}:** ${onOff(settings[key])}`);
   }
-  lines.push(`**Threads:** ${THREAD_MODES[settings.threads]}`);
-  lines.push(`**Event length:** ${settings.eventLength} hours`);
-  lines.push(`**Set result colors:** ${settings.setColors ? 'on' : 'off'}`);
-  lines.push(`**Language:** ${LANGUAGES[language()]}`);
-  if (process.env.MULTI_GUILD === 'true') lines.push(`**Posts channel:** ${state.channelId ? `<#${state.channelId}>` : 'not set'}`);
-  lines.push('', '**Weekly recap**',
-    `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
-    '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
-    '-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events',
-    '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.',
-    '-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.',
-    '-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.');
+  lines.push(t`**Threads:** ${t(THREAD_MODES[settings.threads])}`);
+  lines.push(t`**Event length:** ${settings.eventLength} hours`);
+  lines.push(t`**Set result colors:** ${onOff(settings.setColors)}`);
+  lines.push(t`**Language:** ${LANGUAGES[language()]}`);
+  if (process.env.MULTI_GUILD === 'true') lines.push(state.channelId ? t`**Posts channel:** <#${state.channelId}>` : t('**Posts channel:** not set'));
+  lines.push('', t('**Weekly recap**'),
+    t`**Posts:** ${onOff(settings.recap)} · **Day and time:** ${t(WEEKDAYS[settings.recapDay])} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
+    t('-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.'),
+    t('-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events'),
+    t('-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.'),
+    t('-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.'),
+    t('-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.'));
   return lines.join('\n');
 }
 
@@ -158,28 +159,28 @@ function socialsAdd(interaction) {
   const reply = (content) => replyEphemeral(interaction, content);
   const typed = interaction.options.getString('name', true).trim();
   const url = socialUrl(interaction.options.getString('link', true));
-  if (!url) return reply('That isn\'t a web link. Paste the profile, channel or page link.');
-  if (url.length > SOCIAL_URL_LENGTH) return reply(`Links can be up to ${SOCIAL_URL_LENGTH} characters.`);
+  if (!url) return reply(t('That isn\'t a web link. Paste the profile, channel or page link.'));
+  if (url.length > SOCIAL_URL_LENGTH) return reply(t`Links can be up to ${SOCIAL_URL_LENGTH} characters.`);
 
   const listed = state.socials.find((social) => social.url === url);
-  if (listed) return reply(`That link is already in \`/socials\` under ${listed.name}.`);
+  if (listed) return reply(t`That link is already in \`/socials\` under ${escapeMarkdown(listed.name)}.`);
 
   // "716 esports" goes on the same line as "716 Esports", spelled like the first one
   const name = state.socials.find((social) => social.name.toLowerCase() === typed.toLowerCase())?.name ?? typed;
   state.socials.push({ name, url });
   save();
-  return reply(`Added ${url} under ${name}.`);
+  return reply(t`Added ${url} under ${escapeMarkdown(name)}.`);
 }
 
 function socialsRemove(interaction) {
   // autocomplete sends the saved link, typing it out might leave off the https
   const url = socialUrl(interaction.options.getString('link', true));
   const social = state.socials.find((each) => each.url === url);
-  if (!social) return replyEphemeral(interaction, 'That link isn\'t in `/socials`. Pick one from the list.');
+  if (!social) return replyEphemeral(interaction, t('That link isn\'t in `/socials`. Pick one from the list.'));
 
   state.socials = state.socials.filter((each) => each !== social);
   save();
-  return replyEphemeral(interaction, `Removed ${social.url} from ${social.name}.`);
+  return replyEphemeral(interaction, t`Removed ${social.url} from ${escapeMarkdown(social.name)}.`);
 }
 
 // /track posts switches, the player field each one sets and how the reply names it. onAt saves when set results
@@ -193,11 +194,12 @@ const isOn = (player, field) => player[field] !== false;
 
 // Set results on and stream alerts off, or Set results and stream alerts on when they match
 function switchesText(changes) {
-  const parts = Object.entries(changes).map(([name, on]) => ({ label: POST_SWITCHES[name].label, on }));
+  const parts = Object.entries(changes).map(([name, on]) => ({ label: POST_SWITCHES[name].label, on: on ? 'on' : 'off' }));
   const text = parts.length === 2 && parts[0].on === parts[1].on
-    ? `${parts[0].label} and ${parts[1].label} ${parts[0].on ? 'on' : 'off'}`
-    : parts.map(({ label, on }) => `${label} ${on ? 'on' : 'off'}`).join(' and ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
+    ? `${parts[0].label} and ${parts[1].label} ${parts[0].on}`
+    : parts.map(({ label, on }) => `${label} ${on}`).join(' and ');
+  const capped = text.charAt(0).toUpperCase() + text.slice(1);
+  return t(capped);
 }
 
 // returns what to reply
@@ -211,7 +213,8 @@ function flipPosts(choice, changes) {
     }
   }
   save();
-  return `${switchesText(changes)} for ${choice === 'all' ? 'everyone' : choice.tag}.`;
+  const who = choice === 'all' ? t('everyone') : escapeMarkdown(choice.tag);
+  return t`${switchesText(changes)} for ${who}.`;
 }
 
 // set results off for everyone asks first, since sets finished while they're off never get posted. the target
@@ -224,17 +227,23 @@ confirmable('sets_off', {
     if (stream !== undefined) changes.stream = stream;
     return { content: flipPosts('all', changes) };
   },
-  cancel: () => 'Set results stay the way they were.',
+  cancel: () => t('Set results stay the way they were.'),
 });
 
 // where a player's or everyone's are at, for /track posts with no switches
 function postsText(choice) {
   if (choice !== 'all') {
-    return `${escapeMarkdown(choice.tag)}: set results ${isOn(choice, 'setResults') ? 'on' : 'off'}, stream alerts ${isOn(choice, 'streamAlerts') ? 'on' : 'off'}.`;
+    const tag = escapeMarkdown(choice.tag);
+    const setOn = isOn(choice, 'setResults');
+    const streamOn = isOn(choice, 'streamAlerts');
+    if (setOn && streamOn) return t`${tag}: set results on, stream alerts on.`;
+    if (setOn && !streamOn) return t`${tag}: set results on, stream alerts off.`;
+    if (!setOn && streamOn) return t`${tag}: set results off, stream alerts on.`;
+    return t`${tag}: set results off, stream alerts off.`;
   }
   const players = Object.values(state.players);
   const on = (field) => players.filter((player) => isOn(player, field)).length;
-  return `Set results are on for ${on('setResults')} and stream alerts for ${on('streamAlerts')} of the ${count(players.length, 'tracked player')}.`;
+  return t`Set results are on for ${on('setResults')} and stream alerts for ${on('streamAlerts')} of the ${count(players.length, 'tracked player')}.`;
 }
 
 // /track posts: a tracked player's set results and stream alerts, or everyone's with all. anyone can see them and
@@ -249,14 +258,14 @@ function trackPosts(interaction) {
     if (value) changes[name] = value === 'on';
   }
   if (!Object.keys(changes).length) return interaction.reply({ content: postsText(choice), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
-  if (choice === 'all' && !isTO(interaction)) return notTO(interaction, 'change everyone\'s posts');
-  if (choice !== 'all' && !isSelf(interaction, choice) && !isTO(interaction)) return notTO(interaction, 'change someone else\'s posts. Leave out `player` to change yours');
+  if (choice === 'all' && !isTO(interaction)) return notTO(interaction, t('change everyone\'s posts'));
+  if (choice !== 'all' && !isSelf(interaction, choice) && !isTO(interaction)) return notTO(interaction, t('change someone else\'s posts. Leave out `player` to change yours'));
 
   // nothing to lose when it's already off for everyone
   const players = Object.values(state.players);
   if (choice === 'all' && changes.sets === false && players.some((player) => isOn(player, 'setResults'))) {
     const target = { true: 'all-stream-on', false: 'all-stream-off' }[changes.stream] ?? 'all';
-    return askFirst(interaction, 'sets_off', target, `Turn set results off for all ${players.length} tracked players? Sets they finish while it's off never get posted, even after it's back on.`, 'Turn off');
+    return askFirst(interaction, 'sets_off', target, t`Turn set results off for all ${players.length} tracked players? Sets they finish while it's off never get posted, even after it's back on.`, t('Turn off'));
   }
   return interaction.reply({ content: flipPosts(choice, changes), allowedMentions: { parse: [] } });
 }
@@ -308,20 +317,24 @@ function notifyText(discordId, me, name = null) {
   const yours = !name;
   // match calls and stream alerts go by start.gg, so they're on in name only until there's an account
   const byStartgg = (ping) => {
-    if (!has(ping)) return 'off';
-    return me ? 'on' : `on, but nothing to go by ${yours ? 'until you `/link`' : 'until they `/link`'}`;
+    if (!has(ping)) return t('off');
+    if (me) return t('on');
+    return yours ? t('on, but nothing to go by until you `/link`') : t('on, but nothing to go by until they `/link`');
   };
+  const onOff = (on) => t(on ? 'on' : 'off');
   const lines = [
-    yours ? '**Your pings**' : `**${name}'s pings**`,
-    `**Match calls:** ${byStartgg('calls')}`,
-    `**Stream alerts:** ${byStartgg('streams')}`,
-    `**Reg reminders:** ${has('registration') ? 'on' : 'off'}`,
-    `**Registration DMs:** ${has('dm_registration') ? 'on' : 'off'}`,
-    `**Start DMs:** ${has('dm_start') ? 'on' : 'off'}`,
+    yours ? t('**Your pings**') : t`**${name}'s pings**`,
+    t`**Match calls:** ${byStartgg('calls')}`,
+    t`**Stream alerts:** ${byStartgg('streams')}`,
+    t`**Reg reminders:** ${onOff(has('registration'))}`,
+    t`**Registration DMs:** ${onOff(has('dm_registration'))}`,
+    t`**Start DMs:** ${onOff(has('dm_start'))}`,
   ];
   if (me && state.players[me.userId]) {
-    const posts = `with set results ${isOn(me, 'setResults') ? 'on' : 'off'} and stream alerts ${isOn(me, 'streamAlerts') ? 'on' : 'off'}. \`/track posts\` changes those`;
-    lines.push(yours ? `-# You're tracked as ${escapeMarkdown(me.tag)}, ${posts}` : `-# They're tracked as ${escapeMarkdown(me.tag)}, ${posts}`);
+    const setOn = onOff(isOn(me, 'setResults'));
+    const streamOn = onOff(isOn(me, 'streamAlerts'));
+    const posts = t`with set results ${setOn} and stream alerts ${streamOn}. \`/track posts\` changes those`;
+    lines.push(yours ? t`-# You're tracked as ${escapeMarkdown(me.tag)}, ${posts}` : t`-# They're tracked as ${escapeMarkdown(me.tag)}, ${posts}`);
   }
   return lines.join('\n');
 }
@@ -331,19 +344,24 @@ function changePings(discordId, changes, linked, self) {
   const lines = [];
   for (const [ping, on] of Object.entries(changes)) {
     if ((ping === 'calls' || ping === 'streams') && on && !linked) {
-      const label = ping === 'calls' ? 'Match call' : 'Stream alert';
-      lines.push(self
-        ? `${label} pings need your start.gg, so \`/link\` first. Leave out the link and it finds yours.`
-        : `${label} pings need their start.gg. Ask them to run \`/link\` with their profile link.`);
+      if (self) {
+        lines.push(ping === 'calls'
+          ? t('Match call pings need your start.gg, so `/link` first. Leave out the link and it finds yours.')
+          : t('Stream alert pings need your start.gg, so `/link` first. Leave out the link and it finds yours.'));
+      } else {
+        lines.push(ping === 'calls'
+          ? t('Match call pings need their start.gg. Ask them to run `/link` with their profile link.')
+          : t('Stream alert pings need their start.gg. Ask them to run `/link` with their profile link.'));
+      }
       continue;
     }
     const list = PINGS[ping].list;
     state[list] = state[list].filter((each) => each !== discordId);
     if (on) state[list].push(discordId);
-    lines.push(say(self, PINGS[ping][on ? 'on' : 'off']));
+    lines.push(t(say(self, PINGS[ping][on ? 'on' : 'off'])));
   }
   save();
-  if (changes.calls && linked && !messageEnabled('calls')) lines.push(CALLS_OFF);
+  if (changes.calls && linked && !messageEnabled('calls')) lines.push(t(CALLS_OFF));
   return lines;
 }
 
@@ -370,7 +388,10 @@ async function replyWithRegRole(interaction, member, on, self, lines) {
   } catch (err) {
     // missing permissions. the pings still work without the role
     if (err.code !== 50013) throw err;
-    lines.push(say(self, `-# I couldn't change your ${REG_ROLE} role though, that needs Manage Roles and my role above it.`));
+    const need = self
+      ? `-# I couldn't change your ${REG_ROLE} role though, that needs Manage Roles and my role above it.`
+      : `-# I couldn't change their ${REG_ROLE} role though, that needs Manage Roles and my role above it.`;
+    lines.push(t(need));
   }
   return interaction.editReply(lines.join('\n'));
 }
@@ -382,8 +403,8 @@ function eligibleNotify() {
 
 // "Match calls on and stream alerts off", capitalized like /track posts
 function notifyChangesText(changes) {
-  const parts = Object.entries(changes).map(([ping, on]) => `${PINGS[ping].label} ${on ? 'on' : 'off'}`);
-  const text = new Intl.ListFormat('en').format(parts);
+  const parts = Object.entries(changes).map(([ping, on]) => `${t(PINGS[ping].label)} ${t(on ? 'on' : 'off')}`);
+  const text = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(parts);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -391,7 +412,10 @@ function notifyChangesText(changes) {
 // one char per ping in PINGS order: 1 on, 0 off, - left alone. the old longer form still decodes for buttons already out
 const PING_ORDER = Object.keys(PINGS);
 function encodeNotifyChanges(changes) {
-  return PING_ORDER.map((ping) => (changes[ping] === undefined ? '-' : changes[ping] ? '1' : '0')).join('');
+  return PING_ORDER.map((ping) => {
+    if (changes[ping] === undefined) return '-';
+    return changes[ping] ? '1' : '0';
+  }).join('');
 }
 
 function decodeNotifyChanges(target) {
@@ -421,16 +445,16 @@ function applyNotifyBulk(changes) {
   }
   save();
   const skipped = Object.keys(state.players).length - eligible.length;
-  let content = `Updated /notify for ${count(eligible.length, 'tracked player')}.`;
-  if (skipped) content += ` Skipped ${skipped} without Discord on start.gg.`;
-  if (changes.calls && !messageEnabled('calls')) content += `\n${CALLS_OFF}`;
+  let content = t`Updated /notify for ${count(eligible.length, 'tracked player')}.`;
+  if (skipped) content += t` Skipped ${skipped} without Discord on start.gg.`;
+  if (changes.calls && !messageEnabled('calls')) content += `\n${t(CALLS_OFF)}`;
   return { content };
 }
 
 confirmable('notify_all', {
   command: '/notify player:all',
   run: (target) => applyNotifyBulk(decodeNotifyChanges(target)),
-  cancel: () => 'Bulk ping changes stay the way they were.',
+  cancel: () => t('Bulk ping changes stay the way they were.'),
 });
 
 // player:all, TOs only. looking counts everyone, changing asks first
@@ -439,17 +463,18 @@ function notifyEveryone(interaction, changes) {
   const eligible = eligibleNotify();
   const skipped = players.length - eligible.length;
   if (!Object.keys(changes).length) {
-    if (!players.length) return replyEphemeral(interaction, 'Nobody is tracked yet, `/track add` someone first.');
+    if (!players.length) return replyEphemeral(interaction, t('Nobody is tracked yet, `/track add` someone first.'));
     const on = (ping) => eligible.filter((player) => state[PINGS[ping].list].includes(player.discordId)).length;
-    return replyEphemeral(interaction, `**Pings for ${count(eligible.length, 'tracked player')}**\n`
-      + `**Match calls:** on for ${on('calls')} · **Stream alerts:** on for ${on('streams')}\n`
-      + `**Reg reminders:** on for ${on('registration')} · **Registration DMs:** on for ${on('dm_registration')} · **Start DMs:** on for ${on('dm_start')}`
-      + (skipped ? `\n-# ${count(skipped, 'tracked player has', 'tracked players have')} no Discord on start.gg and stay${skipped === 1 ? 's' : ''} out` : ''));
+    const summary = `${t`**Pings for ${count(eligible.length, 'tracked player')}**`}\n`
+      + `${t`**Match calls:** on for ${on('calls')} · **Stream alerts:** on for ${on('streams')}`}\n`
+      + `${t`**Reg reminders:** on for ${on('registration')} · **Registration DMs:** on for ${on('dm_registration')} · **Start DMs:** on for ${on('dm_start')}`}`
+      + (skipped ? `\n${t`-# ${count(skipped, 'tracked player has', 'tracked players have')} no Discord on start.gg and stay${skipped === 1 ? 's' : ''} out`}` : '');
+    return replyEphemeral(interaction, summary);
   }
-  if (!eligible.length) return replyEphemeral(interaction, 'No tracked players have Discord connected on start.gg, so there is nobody to ping.');
-  const question = `Change /notify for ${count(eligible.length, 'tracked player')}? ${notifyChangesText(changes)}.`
-    + (skipped ? ` ${count(skipped, 'tracked player')} without Discord on start.gg will be skipped.` : '');
-  return askFirst(interaction, 'notify_all', encodeNotifyChanges(changes), question, 'Change pings');
+  if (!eligible.length) return replyEphemeral(interaction, t('No tracked players have Discord connected on start.gg, so there is nobody to ping.'));
+  const base = t`Change /notify for ${count(eligible.length, 'tracked player')}? ${notifyChangesText(changes)}.`;
+  const question = base + (skipped ? t` ${count(skipped, 'tracked player')} without Discord on start.gg will be skipped.` : '');
+  return askFirst(interaction, 'notify_all', encodeNotifyChanges(changes), question, t('Change pings'));
 }
 
 // player:, TOs only. it goes by the discord on their start.gg, since they might not be a member to pick
@@ -459,7 +484,7 @@ async function notifyPlayer(interaction, changes) {
   const tag = escapeMarkdown(player.tag);
   const id = player.discordId;
   if (!Object.keys(changes).length) return replyEphemeral(interaction, notifyText(id ?? '', id && (linkedPlayer(id) ?? player), tag));
-  if (!id) return replyEphemeral(interaction, `${tag} has no Discord connected on start.gg, so there is nobody to ping.`);
+  if (!id) return replyEphemeral(interaction, t`${tag} has no Discord connected on start.gg, so there is nobody to ping.`);
 
   const lines = changePings(id, changes, linkedPlayer(id), false);
   if (!Object.hasOwn(changes, 'registration')) return replyEphemeral(interaction, lines.join('\n'));
@@ -472,10 +497,10 @@ async function notifyPlayer(interaction, changes) {
 async function notifyMember(interaction, picked, changes) {
   const target = picked ?? interaction.user;
   const self = target.id === interaction.user.id;
-  if (picked?.bot) return replyEphemeral(interaction, 'Bots don\'t need pings.');
+  if (picked?.bot) return replyEphemeral(interaction, t('Bots don\'t need pings.'));
   const member = picked ? interaction.options.getMember('user') : interaction.member;
-  if (picked && !member) return replyEphemeral(interaction, 'Pick someone in this server.');
-  if (!self && !isTO(interaction)) return notTO(interaction, 'see or change someone else\'s pings. Leave out `user` for yours');
+  if (picked && !member) return replyEphemeral(interaction, t('Pick someone in this server.'));
+  if (!self && !isTO(interaction)) return notTO(interaction, t('see or change someone else\'s pings. Leave out `user` for yours'));
 
   const me = linkedPlayer(target.id);
   if (!Object.keys(changes).length) {
@@ -493,7 +518,7 @@ async function notifyMember(interaction, picked, changes) {
 function notify(interaction) {
   const picked = interaction.options.getUser('user');
   const player = interaction.options.getString('player');
-  if (picked && player !== null) return replyEphemeral(interaction, 'Pick either `user` or `player`, not both.');
+  if (picked && player !== null) return replyEphemeral(interaction, t('Pick either `user` or `player`, not both.'));
 
   const all = interaction.options.getString('all');
   const changes = {};
@@ -503,10 +528,10 @@ function notify(interaction) {
   }
   if (player === null) return notifyMember(interaction, picked, changes);
   if (player.toLowerCase() === 'all') {
-    if (!isTO(interaction)) return notTO(interaction, 'see or change everyone\'s pings. Leave out `player` for yours');
+    if (!isTO(interaction)) return notTO(interaction, t('see or change everyone\'s pings. Leave out `player` for yours'));
     return notifyEveryone(interaction, changes);
   }
-  if (!isTO(interaction)) return notTO(interaction, 'see or change a tracked player\'s pings. Leave out `player` for yours');
+  if (!isTO(interaction)) return notTO(interaction, t('see or change a tracked player\'s pings. Leave out `player` for yours'));
   return notifyPlayer(interaction, changes);
 }
 
@@ -515,19 +540,23 @@ const POSTING = { ViewChannel: 'View Channel', SendMessages: 'Send Messages', Em
 
 // null means the channel is usable. a string is the private error, and an array is public notes.
 function channelChange(interaction, channel) {
-  if (!interaction.guildId && !interaction.guild?.id) return 'Run `/t-o settings` in a server, not in DMs.';
-  if (!channel.isTextBased?.()) return 'Pick a text channel.';
+  if (!interaction.guildId && !interaction.guild?.id) return t('Run `/t-o settings` in a server, not in DMs.');
+  if (!channel.isTextBased?.()) return t('Pick a text channel.');
   // a channel discord didn't send in full has no permissionsFor, and goes unchecked
   const has = channel.permissionsFor?.(interaction.client.user);
   const missing = has ? Object.keys(POSTING).filter((name) => !has.has(PermissionFlagsBits[name])).map((name) => POSTING[name]) : [];
   if (missing.length) {
-    return `I need ${new Intl.ListFormat('en').format(missing)} in <#${channel.id}> to post there. Add them to my role or the channel, then try again.`;
+    const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(missing);
+    return t`I need ${list} in <#${channel.id}> to post there. Add them to my role or the channel, then try again.`;
   }
-  const lines = [`Automatic posts go in <#${channel.id}>.`];
-  if (has && !has.has(PermissionFlagsBits.AttachFiles)) lines.push('-# Without Attach Files there, posts that upload character art, rank badges or the Slippi logo fail.');
+  const lines = [t`Automatic posts go in <#${channel.id}>.`];
+  if (has && !has.has(PermissionFlagsBits.AttachFiles)) lines.push(t('-# Without Attach Files there, posts that upload character art, rank badges or the Slippi logo fail.'));
   // a tracked tournament always posts in a thread, whatever /t-o settings threads says
   const threads = missingThreadPermissions(channel);
-  if (threads?.length) lines.push(`-# Without ${threads.join(' and ')} there, set results and stream alerts post in the channel instead of threads.`);
+  if (threads?.length) {
+    const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(threads);
+    lines.push(t`-# Without ${list} there, set results and stream alerts post in the channel instead of threads.`);
+  }
   return lines;
 }
 

@@ -1,5 +1,6 @@
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
+import { t } from '../i18n.js';
 import { postQueue } from './queue.js';
 
 const API = 'https://commons.wikimedia.org/w/api.php';
@@ -211,7 +212,7 @@ async function runPost() {
   } catch (err) {
     console.error('bills image download failed:', err.message);
   }
-  return { ...picked, file, title: TITLES[Math.floor(Math.random() * TITLES.length)] };
+  return { ...picked, file, title: t(TITLES[Math.floor(Math.random() * TITLES.length)]) };
 }
 
 // one at a time, so the round-robin and the no-repeat check see each finished post
@@ -241,7 +242,7 @@ export default {
   enabled: true,
   takePost: queue.take,
   format: ({ title, image, file, page, name, source }) => ({
-    embeds: [embeds.funImage(title, file ? `attachment://${file.name}` : image, page, name, source)],
+    embeds: [embeds.funImage(t(title), file ? `attachment://${file.name}` : image, page, name, source)],
     files: file ? [file] : [],
   }),
 };

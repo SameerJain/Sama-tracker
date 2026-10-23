@@ -1,7 +1,7 @@
 import { escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
 import { isMultiGuild } from '../store.js';
-import { colors, FOOTER, baseEmbed, shortSchedule, withLines, withSections, playerLink, count } from './shared.js';
+import { colors, FOOTER, baseEmbed, shortSchedule, withLines, withSections, playerLink, count, t } from './shared.js';
 
 // /t-o tournament posts switches a tracked tournament can have off, named for the list.
 // a custom reminder schedule shows with it, so TOs can see which tournaments don't use the default
@@ -10,15 +10,15 @@ const TOURNAMENT_POSTS = { sets: 'sets off', stream: 'stream alerts off', calls:
 // tracked players, then tracked tournaments that aren't over. linked is how many people linked their own start.gg without being tracked
 export function trackedList(players, linked = 0, tournaments = {}) {
   const all = Object.values(players).sort((a, b) => a.tag.localeCompare(b.tag));
-  const embed = baseEmbed(colors.brand).setTitle(`Tracking ${all.length}`);
+  const embed = baseEmbed(colors.brand).setTitle(t`Tracking ${all.length}`);
   // only what differs from a new player, who has set results and stream alerts off. no field means on
   const lines = all.map((player) => {
-    const notes = [player.setResults !== false && 'set results on', player.streamAlerts !== false && 'stream alerts on'].filter(Boolean);
+    const notes = [player.setResults !== false && t('set results on'), player.streamAlerts !== false && t('stream alerts on')].filter(Boolean);
     return notes.length ? `${playerLink(player)} · ${notes.join(' · ')}` : playerLink(player);
   });
-  if (!all.length) lines.push('Nobody yet. `/track add` tracks you.');
-  lines.push('', '-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Anyone can track or untrack themselves, and TOs can do it for anyone. Players with no reported sets in 6 months come off the list on their own, and `/t-o cleanup` untracks anyone whose start.gg Discord isn\'t in this server. `/link` your own start.gg instead to use the lookups without being posted');
-  if (linked) lines.push(`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
+  if (!all.length) lines.push(t('Nobody yet. `/track add` tracks you.'));
+  lines.push('', t('-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Anyone can track or untrack themselves, and TOs can do it for anyone. Players with no reported sets in 6 months come off the list on their own, and `/t-o cleanup` untracks anyone whose start.gg Discord isn\'t in this server. `/link` your own start.gg instead to use the lookups without being posted'));
+  if (linked) lines.push(t`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
 
   // only what's off, since everything starts on
   const tracked = Object.values(tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted)
@@ -26,27 +26,27 @@ export function trackedList(players, linked = 0, tournaments = {}) {
   const tournamentLines = tracked.map((tournament) => {
     // match calls start off, so a tournament tracked before they existed reads as off too
     const off = (name) => (name === 'calls' ? tournament.tracked.calls !== true : tournament.tracked[name] === false);
-    const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => off(name)).map(([, note]) => note);
+    const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => off(name)).map(([, note]) => t(note));
     if (tournament.tracked.reminders !== false && Array.isArray(tournament.tracked.schedule)) {
-      notes.push(`reminders ${shortSchedule(tournament.tracked.schedule)}`);
+      notes.push(t`reminders ${shortSchedule(tournament.tracked.schedule)}`);
     }
     const when = tournament.startAt ? ` · <t:${tournament.startAt}:d>` : '';
     return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
   });
-  if (!tracked.length) tournamentLines.push('None yet. A TO can track one with `/t-o tournament add`.');
-  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders and match calls with `calls:on`. TOs change that with `/t-o tournament posts`');
-  return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(`Tracked tournaments · ${tracked.length}`), tournamentLines)];
+  if (!tracked.length) tournamentLines.push(t('None yet. A TO can track one with `/t-o tournament add`.'));
+  tournamentLines.push('', t('-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders and match calls with `calls:on`. TOs change that with `/t-o tournament posts`'));
+  return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(t`Tracked tournaments · ${tracked.length}`), tournamentLines)];
 }
 
 // /t-o role list. tos are discord ids, shown as mentions, which never ping from a card. role is the role's name in
 // the server, null when it hasn't been made yet
 export function toList(tos, role) {
-  const embed = baseEmbed(colors.brand).setTitle(`TOs · ${tos.length}`);
+  const embed = baseEmbed(colors.brand).setTitle(t`TOs · ${tos.length}`);
   const lines = role
-    ? (tos.length ? tos.map((id) => `<@${id}>`) : ['Nobody the bot has seen yet.'])
-    : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role, or `/t-o role set` uses one already in the server.'];
-  lines.push('', '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
-  if (role) lines.push(`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
+    ? (tos.length ? tos.map((id) => `<@${id}>`) : [t('Nobody the bot has seen yet.')])
+    : [t('There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role, or `/t-o role set` uses one already in the server.')];
+  lines.push('', t('-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`'));
+  if (role) lines.push(t`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
   return embed.setDescription(lines.join('\n'));
 }
 
@@ -71,18 +71,18 @@ function socialLink(url) {
 // image only has src/, so it can't read them from series/configs.mjs
 export function dataPages() {
   const lines = [
-    '**Samatracker** · [Player lookup, recent results and Slippi ranks](https://samatracker.vercel.app)',
-    '**Monday Night SmashBall** · [Data analysis](https://monday-night-smashball.vercel.app)',
-    '**UB Smash Royale** · [Data analysis](https://ub-smash-royale.vercel.app)',
+    t('**Samatracker** · [Player lookup, recent results and Slippi ranks](https://samatracker.vercel.app)'),
+    t('**Monday Night SmashBall** · [Data analysis](https://monday-night-smashball.vercel.app)'),
+    t('**UB Smash Royale** · [Data analysis](https://ub-smash-royale.vercel.app)'),
     '',
-    '-# Every tournament in each series: attendance over time, biggest crowds, winners, most events entered and characters reported on start.gg',
+    t('-# Every tournament in each series: attendance over time, biggest crowds, winners, most events entered and characters reported on start.gg'),
   ];
-  return [baseEmbed(colors.brand).setTitle('Data pages').setDescription(lines.join('\n'))];
+  return [baseEmbed(colors.brand).setTitle(t('Data pages')).setDescription(lines.join('\n'))];
 }
 
 export function socials(links) {
-  const embed = baseEmbed(colors.brand).setTitle('Socials');
-  if (!links.length) return [embed.setDescription('Nothing yet. Add a link with `/socials_edit add`.')];
+  const embed = baseEmbed(colors.brand).setTitle(t('Socials'));
+  if (!links.length) return [embed.setDescription(t('Nothing yet. Add a link with `/socials_edit add`.'))];
   // a line per name, in the order they were added
   const lines = [...Map.groupBy(links, (link) => link.name)]
     .map(([name, group]) => `**${escapeMarkdown(name)}** · ${group.map((link) => socialLink(link.url)).join(' · ')}`);
@@ -90,72 +90,72 @@ export function socials(links) {
 }
 
 export function status(info) {
-  const ago = (seconds) => (seconds ? `<t:${seconds}:R>` : 'not yet');
+  const ago = (seconds) => (seconds ? `<t:${seconds}:R>` : t('not yet'));
   let setCheck = ago(info.setCheck);
-  if (info.setError) setCheck += `, last try failed (${escapeMarkdown(info.setError)})`;
+  if (info.setError) setCheck += t`, last try failed (${escapeMarkdown(info.setError)})`;
 
-  const lines = [`**Started:** ${ago(info.startedAt)}${info.host ? ` on ${escapeMarkdown(info.host)}` : ''}`];
-  if (info.deployedAt) lines.push(`**Latest version deployed:** <t:${info.deployedAt}:R>`);
+  const lines = [t`**Started:** ${ago(info.startedAt)}${info.host ? ` on ${escapeMarkdown(info.host)}` : ''}`];
+  if (info.deployedAt) lines.push(t`**Latest version deployed:** <t:${info.deployedAt}:R>`);
   if (info.deployMessage) lines.push(escapeMarkdown(info.deployMessage));
   lines.push(
-    `**Last set check:** ${setCheck}`,
-    `**Signups and placements updated:** ${ago(info.tournamentCheck)}`,
-    `**Tracking:** ${count(info.players, 'player')} · ${count(info.tournaments, 'tournament')}`,
+    t`**Last set check:** ${setCheck}`,
+    t`**Signups and placements updated:** ${ago(info.tournamentCheck)}`,
+    t`**Tracking:** ${count(info.players, 'player')} · ${count(info.tournaments, 'tournament')}`,
   );
   if (info.slippi) {
     let slippiCheck = ago(info.slippiCheck);
-    if (info.slippiError) slippiCheck += `, last try failed (${escapeMarkdown(info.slippiError)})`;
-    lines.push(`**Slippi ranks checked:** ${slippiCheck} · ${count(info.slippi, 'player')} on the watchlist`);
+    if (info.slippiError) slippiCheck += t`, last try failed (${escapeMarkdown(info.slippiError)})`;
+    lines.push(t`**Slippi ranks checked:** ${slippiCheck} · ${count(info.slippi, 'player')} on the watchlist`);
   }
-  if (info.threadError) lines.push(`**Threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
-  if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
-  if (info.startggDownSince) lines.push(`**start.gg:** not answering since <t:${info.startggDownSince}:R>. Commands that need it say so right away until it's back`);
-  if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
-  if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
-  lines.push('-# [GitHub](https://github.com/SameerJain/Sama-tracker)');
+  if (info.threadError) lines.push(t`**Threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
+  if (info.queued) lines.push(t`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
+  if (info.startggDownSince) lines.push(t`**start.gg:** not answering since <t:${info.startggDownSince}:R>. Commands that need it say so right away until it's back`);
+  if (info.downSince) lines.push(t`-# Was down from <t:${info.downSince}:f> until it started`);
+  if (info.skippedBefore) lines.push(t`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
+  lines.push(t('-# [GitHub](https://github.com/SameerJain/Sama-tracker)'));
 
-  return baseEmbed(colors.system).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
+  return baseEmbed(colors.system).setTitle(t('Status')).setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
 
 // how long the bot was off, in words
 function downFor(seconds) {
-  if (seconds < 90 * 60) return `about ${count(Math.max(1, Math.round(seconds / 60)), 'minute')}`;
-  if (seconds < 48 * 60 * 60) return `about ${count(Math.round(seconds / 3600), 'hour')}`;
-  return `about ${count(Math.round(seconds / 86400), 'day')}`;
+  if (seconds < 90 * 60) return t`about ${count(Math.max(1, Math.round(seconds / 60)), 'minute')}`;
+  if (seconds < 48 * 60 * 60) return t`about ${count(Math.round(seconds / 3600), 'hour')}`;
+  return t`about ${count(Math.round(seconds / 86400), 'day')}`;
 }
 
 // what people need to know after an outage: when, that their commands never got through, and what catches up.
 // outage is { from, to } in unix seconds, catchUpHours how far back missed set results still post
 function outageLines({ from, to }, catchUpHours) {
   return [
-    `**Down:** <t:${from}:f> to <t:${to}:f>, ${downFor(to - from)}`,
-    'Commands sent then got Discord\'s "The application did not respond" and never reached the bot, so send them again.',
+    t`**Down:** <t:${from}:f> to <t:${to}:f>, ${downFor(to - from)}`,
+    t('Commands sent then got Discord\'s "The application did not respond" and never reached the bot, so send them again.'),
     to - from <= catchUpHours * 60 * 60
-      ? 'Set results from while it was down are posting now.'
-      : `Set results from the last ${count(catchUpHours, 'hour')} are posting now, and older ones are skipped.`,
+      ? t('Set results from while it was down are posting now.')
+      : t`Set results from the last ${count(catchUpHours, 'hour')} are posting now, and older ones are skipped.`,
   ];
 }
 
 // a new railway deployment going live, with when it deployed and the commit message. no commit id.
 // one that came after an outage says so too, instead of a second card
 export function deployUpdate(deploy, outage = null, catchUpHours = 3) {
-  const lines = [`**Latest version deployed:** <t:${deploy.at}:R>`];
+  const lines = [t`**Latest version deployed:** <t:${deploy.at}:R>`];
   if (deploy.message) lines.push(escapeMarkdown(deploy.message));
   if (outage) lines.push('', ...outageLines(outage, catchUpHours));
-  return baseEmbed(colors.system).setTitle('Bot updated').setDescription(lines.join('\n'));
+  return baseEmbed(colors.system).setTitle(t('Bot updated')).setDescription(lines.join('\n'));
 }
 
 // the bot starting again after being off long enough that people noticed, with no new version to explain it
 export function backOnline(outage, catchUpHours = 3) {
-  return baseEmbed(colors.system).setTitle('Back online').setDescription(outageLines(outage, catchUpHours).join('\n'));
+  return baseEmbed(colors.system).setTitle(t('Back online')).setDescription(outageLines(outage, catchUpHours).join('\n'));
 }
 
 // a /matchmaking search ping. a mention in a card never pings, so this one is just a name to click
 export function matchmaking({ label, color, discordId, avatar, message }) {
-  const lines = [`<@${discordId}> is looking for ${label} games.`];
+  const lines = [t`<@${discordId}> is looking for ${label} games.`];
   if (message) lines.push(`> ${message}`);
-  lines.push(`-# \`/matchmaking role game:${label}\` gets you these pings, or stops them`);
-  return baseEmbed(color).setTitle(`${label} matchmaking`).setThumbnail(avatar).setDescription(lines.join('\n'));
+  lines.push(t`-# \`/matchmaking role game:${label}\` gets you these pings, or stops them`);
+  return baseEmbed(color).setTitle(t`${label} matchmaking`).setThumbnail(avatar).setDescription(lines.join('\n'));
 }
 
 export function fun(name, title, { text, screenshot, image }) {
@@ -176,33 +176,33 @@ export function funImage(title, image, page, name, source = 'Wikimedia Commons')
 // the short card /help sends by default. one card, since it fits, with verbose:True for the full list
 function shortHelp() {
   const lines = [
-    '**Start here**',
-    '`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up',
-    '`/track add` post your placements here. TOs can add anyone',
-    ...(isMultiGuild() ? ['`/t-o settings channel:#channel` pick where automatic posts go'] : []),
-    '`/notify` pings for match calls, streams, reg reminders and 1-hour DMs',
-    '`/help verbose:True` the full list with the details',
+    t('**Start here**'),
+    t('`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up'),
+    t('`/track add` post your placements here. TOs can add anyone'),
+    ...(isMultiGuild() ? [t('`/t-o settings channel:#channel` pick where automatic posts go')] : []),
+    t('`/notify` pings for match calls, streams, reg reminders and 1-hour DMs'),
+    t('`/help verbose:True` the full list with the details'),
     '',
-    '**Look up stats**',
-    '`/stats` record and placements · `/recent` latest sets · `/run` current run and next opponent',
-    '`/h2h opponent:` record and one-line odds · `/predict opponent:` odds and why',
-    '`/scout opponent:` form and habits · `/progress` last 30 days vs the 30 before',
-    '`/characters` reported characters · `/doubles` 2v2 record · `/upcoming` tournaments',
+    t('**Look up stats**'),
+    t('`/stats` record and placements · `/recent` latest sets · `/run` current run and next opponent'),
+    t('`/h2h opponent:` record and one-line odds · `/predict opponent:` odds and why'),
+    t('`/scout opponent:` form and habits · `/progress` last 30 days vs the 30 before'),
+    t('`/characters` reported characters · `/doubles` 2v2 record · `/upcoming` tournaments'),
     '',
-    '**TOs**',
-    '`/t-o role add user:` hand out the TO role · `/t-o role set role:` use an existing role',
-    '`/t-o tournament event tournament:` make a Discord event · `/track posts` results and alerts on or off',
-    '-# TOs can use `/t-o settings`, track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one',
+    t('**TOs**'),
+    t('`/t-o role add user:` hand out the TO role · `/t-o role set role:` use an existing role'),
+    t('`/t-o tournament event tournament:` make a Discord event · `/track posts` results and alerts on or off'),
+    t('-# TOs can use `/t-o settings`, track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one'),
     '',
-    '**Tournaments**',
-    '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered',
-    '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks',
-    '`/data` Samatracker and both series data pages',
-    '`/t-o settings` what posts here and when · `/status` uptime and last checks',
-    '`/matchmaking role game:` get game pings · `/matchmaking search game:` find games',
-    '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun',
+    t('**Tournaments**'),
+    t("`/registered tournament:` who's here · `/reg_warn tournament: user:` nudge the unregistered"),
+    t('`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks'),
+    t('`/data` Samatracker and both series data pages'),
+    t('`/t-o settings` what posts here and when · `/status` uptime and last checks'),
+    t('`/matchmaking role game:` get game pings · `/matchmaking search game:` find games'),
+    t('-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun'),
   ];
-  return [baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'))];
+  return [baseEmbed(colors.brand).setTitle(t('Sama-tracker')).setDescription(lines.join('\n'))];
 }
 
 // two of these, top and bottom: '-# Page 99/99\n' is 15, so a card packed to this still fits both
@@ -332,10 +332,11 @@ export function help(verbose = false) {
       '-# Tracked tournaments post their set results and stream alerts in a thread. `/t-o settings threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here',
     ],
   ];
+  const translated = sections.map((section) => section.map((line) => (line ? t(line) : line)));
   // the same page number goes on top and bottom of every card, with room left so none passes 4096
-  const cards = withSections(baseEmbed(colors.brand).setTitle('Sama-tracker'), sections, 4096 - PAGE_RESERVED);
+  const cards = withSections(baseEmbed(colors.brand).setTitle(t('Sama-tracker')), translated, 4096 - PAGE_RESERVED);
   return cards.map((card, i) => {
-    const page = `-# Page ${i + 1}/${cards.length}`;
+    const page = t`-# Page ${i + 1}/${cards.length}`;
     return card.setDescription(`${page}\n${card.data.description}\n${page}`);
   });
 }

@@ -6,6 +6,7 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { ApiError } from '../errors.js';
+import { t, count, listOf, language } from '../i18n.js';
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
 // a slow lookup's reply says how far along start.gg is once there's at least this long left, or this long
@@ -89,23 +90,23 @@ function isSelf(interaction, player) {
 function failureMessage(err) {
   if (err instanceof ApiError) {
     const { source, status } = err;
-    if (source === 'start.gg' && startgg.badToken(err)) return 'start.gg turned down the bot\'s API token, so nothing from start.gg works until whoever runs the bot makes a new one.';
+    if (source === 'start.gg' && startgg.badToken(err)) return t('start.gg turned down the bot\'s API token, so nothing from start.gg works until whoever runs the bot makes a new one.');
     // the whole site, not one slow request. says so plainly, so nobody keeps retrying or blames the bot
     const down = source === 'start.gg' && (status === null || status >= 500) && startgg.startggDownSince();
-    if (down) return `start.gg has been down since <t:${down}:R>, so anything that needs it can't run right now. The bot is fine and picks back up on its own once start.gg answers. \`/status\` shows if it's still down.`;
-    if (status === 429) return `${source} is limiting how fast the bot can ask right now. Try again in a minute.`;
-    if (status === null) return `${source} didn't answer in time. Try again in a minute.`;
-    if (status >= 500) return `${source} is having trouble right now. Try again in a few minutes.`;
-    return `Couldn't get that from ${source} right now. Try again in a minute.`;
+    if (down) return t`start.gg has been down since <t:${down}:R>, so anything that needs it can't run right now. The bot is fine and picks back up on its own once start.gg answers. \`/status\` shows if it's still down.`;
+    if (status === 429) return t`${source} is limiting how fast the bot can ask right now. Try again in a minute.`;
+    if (status === null) return t`${source} didn't answer in time. Try again in a minute.`;
+    if (status >= 500) return t`${source} is having trouble right now. Try again in a few minutes.`;
+    return t`Couldn't get that from ${source} right now. Try again in a minute.`;
   }
   if (err instanceof DiscordAPIError) {
-    if (err.code === RESTJSONErrorCodes.MissingPermissions) return 'Discord says I\'m missing a permission for that. A server admin can check my role, in server settings and on this channel.';
-    if (err.code === RESTJSONErrorCodes.MissingAccess) return 'Discord says I can\'t see what that needs. A server admin can check that my role can view this channel.';
-    if (err.code === RESTJSONErrorCodes.UnknownMember) return 'That person isn\'t in this server anymore.';
-    return 'Discord didn\'t let me do that just now. Try again in a minute.';
+    if (err.code === RESTJSONErrorCodes.MissingPermissions) return t('Discord says I\'m missing a permission for that. A server admin can check my role, in server settings and on this channel.');
+    if (err.code === RESTJSONErrorCodes.MissingAccess) return t('Discord says I can\'t see what that needs. A server admin can check that my role can view this channel.');
+    if (err.code === RESTJSONErrorCodes.UnknownMember) return t('That person isn\'t in this server anymore.');
+    return t('Discord didn\'t let me do that just now. Try again in a minute.');
   }
-  if (err instanceof HTTPError) return 'Discord is having trouble right now. Try again in a few minutes.';
-  return 'Something went wrong in the bot itself, not start.gg or Discord. It\'s in the bot\'s logs.';
+  if (err instanceof HTTPError) return t('Discord is having trouble right now. Try again in a few minutes.');
+  return t('Something went wrong in the bot itself, not start.gg or Discord. It\'s in the bot\'s logs.');
 }
 
 // autocomplete sends the id, typing it out sends the name, spelled close enough.
@@ -146,7 +147,7 @@ async function sendLate(interaction, messages, components) {
   const { id } = interaction.user;
   try {
     await interaction.channel.send({
-      content: `<@${id}> here's your ${commandLabel(interaction)}.`,
+      content: t`<@${id}> here's your ${commandLabel(interaction)}.`,
       embeds: first.batch,
       components,
       files: first.files,
@@ -249,12 +250,12 @@ function parseSince(input) {
   const parts = match?.slice(1).map(Number);
   const at = parts ? Date.UTC(parts[0], parts[1] - 1, parts[2]) / 1000 : NaN;
   const real = Number.isFinite(at) && new Date(at * 1000).toISOString().slice(0, 10) === text;
-  if (!real) return { error: `Couldn't read \`${text}\` as a date. Use YYYY-MM-DD, like 2026-01-01.` };
+  if (!real) return { error: t`Couldn't read \`${text}\` as a date. Use YYYY-MM-DD, like 2026-01-01.` };
   return { since: at };
 }
 
 // under a short report, the same as running it with verbose:True
-const fullReport = (command, options) => reportButton('Full report', 'more', command, options);
+const fullReport = (command, options) => reportButton(t('Full report'), 'more', command, options);
 
 // /h2h between a player and whoever they played or play next in a set. singles only, like /h2h.
 // a shortcut for /h2h in the game the set is in: melee sets filter to melee, the rest
@@ -263,7 +264,7 @@ const fullReport = (command, options) => reportButton('Full report', 'more', com
 function h2hButton(set, player, { label, action = 'new' } = {}) {
   const them = startgg.fromSide(set, player.playerId)?.them;
   if (!them || set.sides.some((side) => side.playerIds.length !== 1)) return null;
-  return reportButton((label ?? `H2H vs ${them.name}`).slice(0, 80), action, 'h2h', { player, opponent: { playerId: them.playerIds[0] }, melee: isMeleeSet(set) });
+  return reportButton((label ?? t`H2H vs ${them.name}`).slice(0, 80), action, 'h2h', { player, opponent: { playerId: them.playerIds[0] }, melee: isMeleeSet(set) });
 }
 
 // the id is the game when start.gg has one, else the display name or event name says melee
@@ -297,7 +298,7 @@ async function playerBySlug(slug) {
 
 // about 40 seconds, about 3 minutes
 function roughly(seconds) {
-  return seconds < 90 ? `${Math.ceil(seconds / 10) * 10} seconds` : `${Math.round(seconds / 60)} minutes`;
+  return seconds < 90 ? count(Math.ceil(seconds / 10) * 10, 'second') : count(Math.round(seconds / 60), 'minute');
 }
 
 // awaits work, which is already running. while start.gg has a lot left for this command, the reply says how
@@ -312,8 +313,7 @@ async function withCountdown(interaction, doing, work, preview) {
     const { sent, waiting, seconds } = progress();
     // with a preview there's something to look at, so it goes up for a shorter wait
     if (!waiting || seconds < (preview ? WAIT_PREVIEW_SECONDS : WAIT_SHOWN_SECONDS)) return;
-    const content = `**${doing}** · ${sent} of ${sent + waiting} start.gg requests done, about ${roughly(seconds)} left\n`
-      + '-# start.gg allows 80 requests a minute, so the first look takes a while. Asking again in the next few hours is quick';
+    const content = t`**${doing}** · ${sent} of ${sent + waiting} start.gg requests done, about ${roughly(seconds)} left\n-# start.gg allows 80 requests a minute, so the first look takes a while. Asking again in the next few hours is quick`;
     // mentions off so a gamertag in the preview can't ping while it loads
     const payload = preview && !previewed
       ? { content, embeds: embeds.messages(preview)[0], allowedMentions: { parse: [] } }
@@ -372,7 +372,7 @@ function closest(records, typed, name) {
 // " Did you mean Leo?" for a typed name, or nothing. escaped and in bold, mentions are off where it goes
 function didYouMean(records, typed, name = 'tag', describe = (record) => record[name]) {
   const near = closest(records, typed, name);
-  return near ? ` Did you mean **${escapeMarkdown(describe(near))}**?` : '';
+  return near ? t` Did you mean **${escapeMarkdown(describe(near))}**?` : '';
 }
 
 // a tracked player picked in player:, or whoever ran it when it's left out. undefined when it's nobody tracked,
@@ -383,18 +383,21 @@ function readTracked(interaction) {
 }
 
 function replyNotTracked(interaction) {
-  if (interaction.options.getString('player') === null) return replyEphemeral(interaction, 'You aren\'t tracked. `/track add` tracks you.');
+  if (interaction.options.getString('player') === null) return replyEphemeral(interaction, t('You aren\'t tracked. `/track add` tracks you.'));
   return replyNoPlayer(interaction, 'player', { trackedOnly: true });
 }
 
 // left out with no start.gg linked, or someone picked who isn't on the list
 function replyNoPlayer(interaction, name = 'player', { trackedOnly = false } = {}) {
   const typed = interaction.options.getString(name);
-  let content = 'Only tracked or linked players can be picked. `/track add` them, or they can `/link` their own start.gg.';
-  if (trackedOnly) content = 'Only tracked players can be picked here. `/track list` shows who\'s tracked.';
-  if (typed === null) content = 'Pick a player, or `/link` your start.gg so leaving it out looks you up.';
+  let content = t('Only tracked or linked players can be picked. `/track add` them, or they can `/link` their own start.gg.');
+  if (trackedOnly) content = t('Only tracked players can be picked here. `/track list` shows who\'s tracked.');
+  if (typed === null) content = t('Pick a player, or `/link` your start.gg so leaving it out looks you up.');
   const near = didYouMean(Object.values(trackedOnly ? state.players : pickable()), typed);
-  if (near) content = `Nobody ${trackedOnly ? 'tracked' : 'tracked or linked'} goes by \`${typed.replaceAll('`', '')}\`.${near}`;
+  if (near) {
+    const code = typed.replaceAll('`', '');
+    content = trackedOnly ? t`Nobody tracked goes by \`${code}\`.${near}` : t`Nobody tracked or linked goes by \`${code}\`.${near}`;
+  }
   return replyEphemeral(interaction, content);
 }
 
@@ -413,7 +416,7 @@ async function typedPlayer(input) {
 // start.gg has nobody for it. whose is just for the wording, "use their/your profile link"
 async function findPlayer(interaction, input, whose = 'their') {
   const { shown, player } = await typedPlayer(input);
-  if (!player) await interaction.editReply({ content: `Couldn't find a start.gg player for \`${shown}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`, allowedMentions: { parse: [] } });
+  if (!player) await interaction.editReply({ content: t`Couldn't find a start.gg player for \`${shown}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`, allowedMentions: { parse: [] } });
   return player;
 }
 
@@ -422,8 +425,8 @@ async function findPlayer(interaction, input, whose = 'their') {
 async function fetchPlayer(interaction, input) {
   const { text, shown, player } = await typedPlayer(input);
   if (!player) {
-    const near = didYouMean(Object.values(pickable()), text) || ' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.';
-    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${shown}\`.${near}`);
+    const near = didYouMean(Object.values(pickable()), text) || t(' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.');
+    await replyEphemeralAfterDefer(interaction, t`Couldn't find a start.gg player for \`${shown}\`.${near}`);
   }
   return player;
 }
@@ -443,5 +446,5 @@ export {
   pickable, readChoice, readPlayer, readTracked, linkedPlayer, isSelf, lookup, nameMatches, didYouMean, recentPicks, rememberPick,
   findPlayer, fetchPlayer, playerBySlug, flag, parseSince,
   sendEmbeds, withCountdown, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, replyNotTracked, failureMessage,
-  reportButton, fullReport, h2hButton, buttonRow, readButton, commandLabel, roughly, LATE_SECONDS,
+  reportButton, fullReport, h2hButton, buttonRow, readButton, commandLabel, roughly, LATE_SECONDS, t, count, listOf, language,
 };

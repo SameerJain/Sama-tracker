@@ -1,5 +1,6 @@
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
+import { t } from '../i18n.js';
 import { state, save } from '../store.js';
 import { REG_ROLE, messageEnabled } from '../message-settings.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
@@ -45,7 +46,7 @@ export async function postRegReminders(postChannel = currentChannel()) {
         // still remembered for /profile, but the ping goes to the role so registered members get it too
         const participants = await startgg.getParticipants(latest.id);
         rememberAccounts(participants);
-        const text = lastCall ? 'last call' : 'registration reminder';
+        const text = lastCall ? t('last call') : t('registration reminder');
         const card = embeds.regReminder(latest, deadline, lastCall);
         const role = regRole(postChannel);
         if (role && state.regPings.length) {
@@ -59,6 +60,8 @@ export async function postRegReminders(postChannel = currentChannel()) {
         }
       }
       reminder.next = due + 1;
+      // saved per tournament so a crash can't ping it again
+      save();
     } catch (err) {
       console.error(`reg reminder for ${named(tournament)} failed:`, err.message);
     }

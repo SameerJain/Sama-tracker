@@ -8,7 +8,7 @@ import { setResultColors } from '../message-settings.js';
 import { count } from '../embeds/shared.js';
 import {
   buttonRow, findPlayer, flag, h2hButton, isSelf, linkedPlayer, readChoice, readPlayer, readTracked, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer,
-  replyNotTracked, sendEmbeds,
+  replyNotTracked, sendEmbeds, t, language,
 } from './shared.js';
 import { askFirst, confirmable, undoRow } from './confirm.js';
 import { isTO, notTO } from './to.js';
@@ -30,11 +30,11 @@ async function trackAdd(interaction) {
   if (!player) return;
   if (!to && player.discordId !== interaction.user.id) {
     const tag = escapeMarkdown(player.tag);
-    const why = player.discordId ? `${tag}'s start.gg has a different Discord connected.` : `If ${tag} is you, connect this Discord on your start.gg first.`;
-    return replyEphemeralAfterDefer(interaction, `Only TOs can track someone else. ${why}`);
+    const why = player.discordId ? t`${tag}'s start.gg has a different Discord connected.` : t`If ${tag} is you, connect this Discord on your start.gg first.`;
+    return replyEphemeralAfterDefer(interaction, t`Only TOs can track someone else. ${why}`);
   }
   if (state.players[player.userId]) {
-    return interaction.editReply({ content: `Already tracking ${escapeMarkdown(player.tag)}.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: t`Already tracking ${escapeMarkdown(player.tag)}.`, allowedMentions: { parse: [] } });
   }
 
   state.players[player.userId] = newTracked(player);
@@ -50,38 +50,40 @@ async function trackAdd(interaction) {
 function trackRemove(interaction) {
   const player = readTracked(interaction);
   if (!player) return replyNotTracked(interaction);
-  if (!isSelf(interaction, player) && !isTO(interaction)) return notTO(interaction, 'untrack someone else. Leave out `player` to untrack yourself');
-  return askFirst(interaction, 'untrack', player.userId, `Stop tracking ${escapeMarkdown(player.tag)}? Their set result and stream alert settings go with them.`, 'Stop tracking');
+  if (!isSelf(interaction, player) && !isTO(interaction)) return notTO(interaction, t('untrack someone else. Leave out `player` to untrack yourself'));
+  return askFirst(interaction, 'untrack', player.userId, t`Stop tracking ${escapeMarkdown(player.tag)}? Their set result and stream alert settings go with them.`, t('Stop tracking'));
 }
 
 confirmable('untrack', {
   command: '/track remove',
   run: (userId) => {
     const player = state.players[userId];
-    if (!player) return { content: 'They aren\'t tracked anymore.' };
+    if (!player) return { content: t('They aren\'t tracked anymore.') };
     delete state.players[userId];
     save();
-    return { content: `Stopped tracking ${escapeMarkdown(player.tag)}.`, undo: player };
+    return { content: t`Stopped tracking ${escapeMarkdown(player.tag)}.`, undo: player };
   },
-  cancel: (userId) => (state.players[userId] ? `Still tracking ${escapeMarkdown(state.players[userId].tag)}.` : 'They aren\'t tracked anymore.'),
+  cancel: (userId) => (state.players[userId] ? t`Still tracking ${escapeMarkdown(state.players[userId].tag)}.` : t('They aren\'t tracked anymore.')),
   undo: (player) => {
-    if (state.players[player.userId]) return `${escapeMarkdown(player.tag)} is already tracked again.`;
+    if (state.players[player.userId]) return t`${escapeMarkdown(player.tag)} is already tracked again.`;
     state.players[player.userId] = player;
     save();
-    return `Tracking ${escapeMarkdown(player.tag)} again, with the same settings as before.`;
+    return t`Tracking ${escapeMarkdown(player.tag)} again, with the same settings as before.`;
   },
-  tooLate: 'Too late to undo. `/track add` them again, with set results and stream alerts starting off.',
+  tooLate: t('Too late to undo. `/track add` them again, with set results and stream alerts starting off.'),
 });
 
 // who /t-o cleanup asked about, by the id its buttons carry, until someone presses one. a restart in between
-// loses it, and the button says to run it again
+// loses it, and the button says to run it again. a question goes stale after a while, so an old button
+// can't untrack from an old list
 const cleanups = new Map();
+const CLEANUP_SECONDS = 15 * 60;
 
 // tracked players whose start.gg discord isn't in this server, which is most of a track list that grew from bulk
 // adds. no discord on start.gg says nothing about where someone is, so they stay unless no_discord says otherwise.
 // asks first, then Undo puts everyone back for a minute. TOs only, since it untracks other people
 async function trackCleanup(interaction) {
-  if (!isTO(interaction)) return notTO(interaction, 'clean up the track list');
+  if (!isTO(interaction)) return notTO(interaction, t('clean up the track list'));
   const noDiscord = flag(interaction, 'no_discord');
 
   await interaction.deferReply();
@@ -90,15 +92,18 @@ async function trackCleanup(interaction) {
   const away = players.filter((player) => player.discordId && !members.has(player.discordId));
   const unknown = players.filter((player) => !player.discordId);
   const going = noDiscord ? [...away, ...unknown] : away;
-  const kept = noDiscord || !unknown.length ? '' : `\n-# ${count(unknown.length, 'player has', 'players have')} no Discord on start.gg and stay${unknown.length === 1 ? 's' : ''}. \`no_discord:True\` untracks them too`;
-  if (!going.length) return interaction.editReply({ content: `Everyone tracked has their start.gg Discord in this server.${kept}`, allowedMentions: { parse: [] } });
+  const kept = noDiscord || !unknown.length ? '' : t`\n-# ${count(unknown.length, 'player has', 'players have')} no Discord on start.gg and stay${unknown.length === 1 ? 's' : ''}. \`no_discord:True\` untracks them too`;
+  if (!going.length) return interaction.editReply({ content: t`Everyone tracked has their start.gg Discord in this server.${kept}`, allowedMentions: { parse: [] } });
 
   const target = String(interaction.id ?? Date.now());
   cleanups.set(target, going.map((player) => player.userId));
+  setTimeout(() => cleanups.delete(target), CLEANUP_SECONDS * 1000).unref?.();
   const names = going.slice(0, CLEANUP_NAMED).map((player) => escapeMarkdown(player.tag));
-  if (going.length > CLEANUP_NAMED) names.push(`${going.length - CLEANUP_NAMED} more`);
-  const question = `Untrack ${count(going.length, 'player')} whose start.gg Discord isn't in this server${noDiscord ? ' or who have none' : ''}? ${new Intl.ListFormat('en').format(names)}.${kept}`;
-  return askFirst(interaction, 'cleanup', target, question, 'Untrack them');
+  if (going.length > CLEANUP_NAMED) names.push(t`${going.length - CLEANUP_NAMED} more`);
+  const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(names);
+  const extra = noDiscord ? t(' or who have none') : '';
+  const question = t`Untrack ${count(going.length, 'player')} whose start.gg Discord isn't in this server${extra}? ${list}.${kept}`;
+  return askFirst(interaction, 'cleanup', target, question, t('Untrack them'));
 }
 
 confirmable('cleanup', {
@@ -106,23 +111,23 @@ confirmable('cleanup', {
   run: (target) => {
     const userIds = cleanups.get(target);
     cleanups.delete(target);
-    if (!userIds) return { content: 'That button doesn\'t work anymore. Run `/t-o cleanup` again.' };
+    if (!userIds) return { content: t('That button doesn\'t work anymore. Run `/t-o cleanup` again.') };
     const removed = userIds.map((userId) => state.players[userId]).filter(Boolean);
     for (const player of removed) delete state.players[player.userId];
     save();
-    return { content: `Untracked ${count(removed.length, 'player')}.`, undo: removed };
+    return { content: t`Untracked ${count(removed.length, 'player')}.`, undo: removed };
   },
   cancel: (target) => {
     cleanups.delete(target);
-    return 'Everyone stays tracked.';
+    return t('Everyone stays tracked.');
   },
   undo: (removed) => {
     const back = removed.filter((player) => !state.players[player.userId]);
     for (const player of back) state.players[player.userId] = player;
     save();
-    return `Tracking ${count(back.length, 'player')} again, with the same settings as before.`;
+    return t`Tracking ${count(back.length, 'player')} again, with the same settings as before.`;
   },
-  tooLate: 'Too late to undo. `/track add` anyone you want back.',
+  tooLate: t('Too late to undo. `/track add` anyone you want back.'),
 });
 
 // only lets commands default to them, they don't get tracked.
@@ -135,26 +140,26 @@ async function link(interaction) {
   const input = interaction.options.getString('profile');
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const player = input ? await findPlayer(interaction, input, 'your') : await ownAccount(interaction, '/link');
+  const player = input ? await findPlayer(interaction, input, t('your')) : await ownAccount(interaction, '/link');
   if (!player) return;
   if (player.discordId !== interaction.user.id) {
     return interaction.editReply(player.discordId
-      ? `${player.tag}'s start.gg has a different Discord account connected.`
-      : 'Connect your Discord on your start.gg profile first, then try again.');
+      ? t`${escapeMarkdown(player.tag)}'s start.gg has a different Discord account connected.`
+      : t('Connect your Discord on your start.gg profile first, then try again.'));
   }
   // tracked, but connected discord after the last profile refresh. saving it finds them right away
   const trackedProfile = state.players[player.userId];
   if (trackedProfile) {
     trackedProfile.discordId = player.discordId;
     save();
-    return interaction.editReply(noLinkNeeded(trackedProfile));
+    return interaction.editReply({ content: noLinkNeeded(trackedProfile), allowedMentions: { parse: [] } });
   }
 
   const previous = state.links[interaction.user.id];
   state.links[interaction.user.id] = player;
   save();
   if (previous?.userId === player.userId) {
-    return interaction.editReply({ content: `Already linked to ${player.tag}. Leave the player out of a command like \`/stats\` to look yourself up.`, allowedMentions: { parse: [] } });
+    return interaction.editReply({ content: t`Already linked to ${escapeMarkdown(player.tag)}. Leave the player out of a command like \`/stats\` to look yourself up.`, allowedMentions: { parse: [] } });
   }
   return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.linked(player, previous)]), allowedMentions: { parse: [] } });
 }
@@ -165,39 +170,38 @@ async function ownAccount(interaction, command) {
   const account = await findAccount(interaction.user.id);
   const player = account && await startgg.getPlayer(account.slug);
   if (!player) {
-    await interaction.editReply('Couldn\'t find a start.gg with this Discord connected among the accounts I\'ve seen. '
-      + `Connect it on your start.gg profile if you haven't, then run \`${command}\` with your profile link, like start.gg/user/f64a83c8.`);
+    await interaction.editReply(t`Couldn't find a start.gg with this Discord connected among the accounts I've seen. Connect it on your start.gg profile if you haven't, then run \`${command}\` with your profile link, like start.gg/user/f64a83c8.`);
   }
   return player;
 }
 
 function noLinkNeeded(player) {
-  return `No need to link. You're tracked as ${player.tag} with this Discord on your start.gg, so leaving the player out of a command already looks you up.`;
+  return t`No need to link. You're tracked as ${escapeMarkdown(player.tag)} with this Discord on your start.gg, so leaving the player out of a command already looks you up.`;
 }
 
 // an Undo button puts the link back for a minute after
 function unlink(interaction) {
   const linked = state.links[interaction.user.id];
-  if (!linked) return replyEphemeral(interaction, 'You weren\'t linked.');
+  if (!linked) return replyEphemeral(interaction, t('You weren\'t linked.'));
   delete state.links[interaction.user.id];
   save();
-  let content = `Unlinked from ${linked.tag}.`;
+  let content = t`Unlinked from ${escapeMarkdown(linked.tag)}.`;
   // tracked with discord connected still counts
   const still = linkedPlayer(interaction.user.id);
-  if (still) content += ` Commands still find you as ${still.tag}, since you're tracked with this Discord on your start.gg.`;
-  else content += ' Leaving the player blank won\'t find you now, you\'re off the player list and `/scout` needs a link.';
+  if (still) content += t` Commands still find you as ${escapeMarkdown(still.tag)}, since you're tracked with this Discord on your start.gg.`;
+  else content += t(' Leaving the player blank won\'t find you now, you\'re off the player list and `/scout` needs a link.');
   return interaction.reply({ content, components: undoRow(interaction, 'unlink', linked.userId, linked), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 }
 
 confirmable('unlink', {
   command: '/unlink',
   undo: (linked, discordId) => {
-    if (state.links[discordId]) return `You've linked ${state.links[discordId].tag} since, so that stays.`;
+    if (state.links[discordId]) return t`You've linked ${escapeMarkdown(state.links[discordId].tag)} since, so that stays.`;
     state.links[discordId] = linked;
     save();
-    return `Linked to ${linked.tag} again.`;
+    return t`Linked to ${escapeMarkdown(linked.tag)} again.`;
   },
-  tooLate: 'Too late to undo. `/link` again with your start.gg profile link.',
+  tooLate: t('Too late to undo. `/link` again with your start.gg profile link.'),
 });
 
 // goes by the discord connected on start.gg, so nobody can claim someone else's
@@ -212,8 +216,8 @@ async function profile(interaction) {
   const picked = interaction.options.getUser('user');
   const user = picked ?? interaction.user;
   const member = picked ? interaction.options.getMember('user') : interaction.member;
-  if (!member) return replyEphemeral(interaction, 'Pick someone in this server.');
-  if (user.bot) return replyEphemeral(interaction, 'Bots don\'t have start.gg accounts.');
+  if (!member) return replyEphemeral(interaction, t('Pick someone in this server.'));
+  if (user.bot) return replyEphemeral(interaction, t('Bots don\'t have start.gg accounts.'));
 
   await interaction.deferReply();
   const account = await findAccount(user.id);
@@ -222,11 +226,11 @@ async function profile(interaction) {
     return interaction.editReply({ content: null, embeds: embeds.withImage([card]), allowedMentions: { parse: [] } });
   }
   if (user.id === interaction.user.id) {
-    return interaction.editReply('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.');
+    return interaction.editReply(t('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.'));
   }
   // their name and not a mention, so nobody gets pinged. a name can spell out a role mention, so mentions are off too
   return interaction.editReply({
-    content: `Couldn't find a start.gg with ${escapeMarkdown(member.displayName)}'s Discord connected.\n-# Ask them to run \`/link\` with their start.gg link once, or to register for a tournament the bot checks, and then this finds them. start.gg can't be searched by Discord`,
+    content: t`Couldn't find a start.gg with ${escapeMarkdown(member.displayName)}'s Discord connected.\n-# Ask them to run \`/link\` with their start.gg link once, or to register for a tournament the bot checks, and then this finds them. start.gg can't be searched by Discord`,
     allowedMentions: { parse: [] },
   });
 }
@@ -298,7 +302,7 @@ async function recent(interaction) {
   const latest = sets
     .sort((a, b) => b.completedAt - a.completedAt)
     .slice(0, 20);
-  if (!latest.length) return interaction.editReply('No sets found.');
+  if (!latest.length) return interaction.editReply(t('No sets found.'));
 
   // someone from /link isn't tracked, the cards still need to know which side is theirs
   const players = choice === 'all' ? state.players : { ...state.players, [choice.userId]: choice };
@@ -355,7 +359,7 @@ async function run(interaction) {
     cards.push(...embeds.run(player, tournament, runs, now));
     nextSets.push(...embeds.nextOpponents(player, runs).map(({ set }) => set));
   }
-  if (!cards.length) return interaction.editReply({ content: `${player.tag} has no current tournament run on start.gg.`, allowedMentions: { parse: [] } });
+  if (!cards.length) return interaction.editReply({ content: t`${escapeMarkdown(player.tag)} has no current tournament run on start.gg.`, allowedMentions: { parse: [] } });
   // the record against whoever's next is one tap away
   return sendEmbeds(interaction, cards, h2hButtons(player, nextSets));
 }

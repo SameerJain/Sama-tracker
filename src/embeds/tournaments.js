@@ -1,7 +1,7 @@
 import { EmbedBuilder, escapeMarkdown } from 'discord.js';
 import { fromSide, startggUrl } from '../startgg.js';
 import {
-  colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, MAJOR_UPSET, shortRecord, count, venueText, mapUrl, bold,
+  colors, FOOTER, baseEmbed, split, withLines, playerLink, setUrl, vodLink, ordinal, medal, scoreText, upsetFactor, MAJOR_UPSET, shortRecord, count, venueText, mapUrl, bold, t, listOf,
 } from './shared.js';
 
 function tournamentEmbed(color, label, tournament) {
@@ -23,18 +23,18 @@ function timeText(seconds) {
 // the venue and its street address when the TO put them on start.gg, linked to a map, otherwise the city.
 // brackets come out of the link text so a venue name can't break the link
 function locationText(tournament) {
-  if (tournament.isOnline) return 'Online';
+  if (tournament.isOnline) return t('Online');
   const place = [tournament.city, tournament.addrState].filter(Boolean).join(', ');
   const venue = venueText(tournament);
   const address = tournament.venueAddress?.trim();
   if (address) return `[${escapeMarkdown(venue.replace(/[[\]]/g, ''))}](${mapUrl(address)})`;
   if (venue) return [escapeMarkdown(venue), place].filter(Boolean).join(', ');
-  return place || 'Location TBA';
+  return place || t('Location TBA');
 }
 
 function eventTitle(entry) {
   if (!entry.entrants) return entry.event;
-  return `${entry.event} · ${entry.entrants} entrants`;
+  return t`${entry.event} · ${entry.entrants} entrants`;
 }
 
 function findTracked(side, players) {
@@ -64,15 +64,15 @@ function setEmbed(set, color, player, { author = true } = {}) {
 
 // heads a /t-o settings threads thread in the channel. tournament is the one sets carry under event
 export function tournamentThread(tournament) {
-  return tournamentEmbed(colors.thread, 'Tournament thread', tournament)
-    .setDescription('Set results and stream alerts from this tournament go in the thread.');
+  return tournamentEmbed(colors.thread, t('Tournament thread'), tournament)
+    .setDescription(t('Set results and stream alerts from this tournament go in the thread.'));
 }
 
 // heads one event's thread with /t-o settings threads set to one per event
 export function eventThread(event) {
   const game = event.videogame?.displayName;
-  return tournamentEmbed(colors.thread, 'Event thread', event.tournament)
-    .setDescription(`**${escapeMarkdown(event.name)}**${game ? ` · ${game}` : ''}\nSet results and stream alerts from this event go in the thread.`);
+  return tournamentEmbed(colors.thread, t('Event thread'), event.tournament)
+    .setDescription(`**${escapeMarkdown(event.name)}**${game ? ` · ${game}` : ''}\n${t('Set results and stream alerts from this event go in the thread.')}`);
 }
 
 export function onStream(set, players) {
@@ -86,9 +86,9 @@ export function onStream(set, players) {
   const watch = streamName ? (twitch ? `[twitch.tv/${escapeMarkdown(streamName)}](${twitch})` : escapeMarkdown(streamName)) : null;
 
   const card = setEmbed(set, colors.stream, trackedA ?? findTracked(b, players), { author: false })
-    .setTitle(`Stream alert · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
+    .setTitle(t`Stream alert · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
     .setURL(twitch ?? setUrl(set));
-  if (watch) card.addFields({ name: 'Watch', value: watch });
+  if (watch) card.addFields({ name: t('Watch'), value: watch });
   return card;
 }
 
@@ -100,11 +100,11 @@ export function matchCall(set, players) {
   const [me, them] = trackedA ? [a, b] : [b, a];
 
   const card = setEmbed(set, colors.live, trackedA ?? findTracked(b, players))
-    .setTitle(`Match call · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
+    .setTitle(t`Match call · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
     .setURL(setUrl(set));
   if (set.station) {
     const [first, ...rest] = (card.data.description ?? '').split('\n');
-    card.setDescription([`${first} · **Station ${set.station}**`, ...rest].join('\n'));
+    card.setDescription([t`${first} · **${t('Station')} ${set.station}**`, ...rest].join('\n'));
   }
   return card;
 }
@@ -119,15 +119,16 @@ export function setResult(set, players, { setColors = false } = {}) {
   const winner = bWon ? b : a;
   const loser = bWon ? a : b;
   // no author, the title already names both sides. the thumbnail still falls back to the tracked player's picture
-  const player = (bWon ? trackedB : trackedA) ?? (bWon ? trackedA : trackedB);
+  const winnerTracked = bWon ? trackedB : trackedA;
+  const player = winnerTracked ?? (bWon ? trackedA : trackedB);
 
   const embed = setEmbed(set, setColors ? resultColor(trackedA, trackedB, bWon) : colors.setDefault, player, { author: false })
-    .setTitle(`Set result · W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
+    .setTitle(t`Set result · ${t('W')} · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · ${t('L')}`)
     .setURL(setUrl(set))
     .setTimestamp(set.completedAt * 1000);
   // DQ wins aren't upsets
   if (scoreText(winner, loser) !== 'DQ' && upsetFactor(winner, loser) >= MAJOR_UPSET) {
-    embed.setDescription(`**Major upset** · seed ${winner.seed} beat seed ${loser.seed}\n${embed.data.description}`);
+    embed.setDescription(`${t`**Major upset** · seed ${winner.seed} beat seed ${loser.seed}`}\n${embed.data.description}`);
   }
 
   const characterLines = [];
@@ -136,9 +137,9 @@ export function setResult(set, players, { setColors = false } = {}) {
       characterLines.push(`${escapeMarkdown(side.name)}: ${side.characters.map(escapeMarkdown).join(', ')}`);
     }
   }
-  if (characterLines.length) embed.addFields({ name: 'Characters', value: characterLines.join('\n') });
+  if (characterLines.length) embed.addFields({ name: t('Characters'), value: characterLines.join('\n') });
   // a ) would end the link early, same as the inline VOD links
-  if (set.vod) embed.addFields({ name: 'VOD', value: `[Watch the VOD](${set.vod.replaceAll('(', '%28').replaceAll(')', '%29')})` });
+  if (set.vod) embed.addFields({ name: t('VOD'), value: `[${t('Watch the VOD')}](${set.vod.replaceAll('(', '%28').replaceAll(')', '%29')})` });
 
   return embed;
 }
@@ -154,26 +155,27 @@ function resultColor(trackedA, trackedB, bWon) {
 // a set result card edited in after the TO changed the winner or score, or reported a reset set again
 export function correctedResult(set, players, options) {
   const embed = setResult(set, players, options);
-  return embed.setDescription(`**Corrected by TO**\n${embed.data.description}`);
+  return embed.setDescription(`${t('**Corrected by TO**')}\n${embed.data.description}`);
 }
 
 // a set result card the TO reset or deleted after it went out. posted is the card as discord has it, kept
 // as it was with the result marked, since start.gg no longer has the result to build it from
 export function resetResult(posted) {
   const embed = EmbedBuilder.from(posted).setColor(colors.reset);
-  if (posted.title && !posted.title.startsWith('Reset by TO')) embed.setTitle(`Reset by TO · ${posted.title}`.slice(0, 256));
-  return embed.setDescription(`${posted.description ?? ''}\n-# The TO reset this set on start.gg. This card changes if it's reported again within an hour of the first result`.trim());
+  const prefix = t('Reset by TO');
+  if (posted.title && !posted.title.startsWith(prefix)) embed.setTitle(`${prefix} · ${posted.title}`.slice(0, 256));
+  return embed.setDescription(`${posted.description ?? ''}\n${t('-# The TO reset this set on start.gg. This card changes if it\'s reported again within an hour of the first result')}`.trim());
 }
 
 // streams are the ones on its start.gg page, [{ name, source }]
 export function rollCall(tournament, players, streams = []) {
-  const lines = [`Starts ${timeText(tournament.startAt)}`, locationText(tournament)];
-  if (streams.length) lines.push(`**Streams:** ${streams.map(streamText).join(' · ')}`);
+  const lines = [t`Starts ${timeText(tournament.startAt)}`, locationText(tournament)];
+  if (streams.length) lines.push(t`**Streams:** ${streams.map(streamText).join(' · ')}`);
   for (const entries of groupByEvent(tournament, players)) {
     lines.push('', `**${escapeMarkdown(eventTitle(entries[0]))}**`, ...entries.map((entry) => playerLink(entry.player)));
   }
-  return withLines(tournamentEmbed(colors.brand, 'Tournament roll call', tournament)
-    .setTitle(`Tournament roll call · ${escapeMarkdown(tournament.name)}`.slice(0, 256)), lines);
+  return withLines(tournamentEmbed(colors.brand, t('Tournament roll call'), tournament)
+    .setTitle(t`Tournament roll call · ${escapeMarkdown(tournament.name)}`.slice(0, 256)), lines);
 }
 
 // a big picture so a reminder stands out: the banner with the logo beside it, or the logo alone
@@ -192,15 +194,16 @@ export function regReminder(tournament, deadline, lastCall) {
   // a late post reads wrong in present tense, like closes 21 hours ago
   const closed = deadline <= Math.floor(Date.now() / 1000);
 
-  const lines = [`## ${closesFirst ? (closed ? 'Registration closed' : 'Registration closes') : 'Starts'} <t:${deadline}:R>`];
-  if (closesFirst) lines.push(`**${closed ? 'Closed' : 'Closes'}:** <t:${deadline}:F>`);
-  lines.push(`**Starts:** <t:${tournament.startAt}:F>`, `**Location:** ${locationText(tournament)}`);
-  if (tournament.numAttendees) lines.push(`**Registered so far:** ${tournament.numAttendees}`);
-  lines.push('', `**[Register on start.gg](${register})**`);
+  const head = closesFirst ? (closed ? t('Registration closed') : t('Registration closes')) : t('Starts');
+  const lines = [`## ${head} <t:${deadline}:R>`];
+  if (closesFirst) lines.push(t`**${closed ? t('Closed') : t('Closes')}:** <t:${deadline}:F>`);
+  lines.push(t`**Starts:** <t:${tournament.startAt}:F>` , t`**Location:** ${locationText(tournament)}`);
+  if (tournament.numAttendees) lines.push(t`**Registered so far:** ${tournament.numAttendees}`);
+  lines.push('', t`**[Register on start.gg](${register})**`);
 
   const embed = baseEmbed(lastCall ? colors.reg : colors.regEarly)
-    .setAuthor({ name: lastCall ? 'Last call to register' : 'Registration reminder' })
-    .setTitle(`Registration reminder · ${escapeMarkdown(tournament.name)}`.slice(0, 256))
+    .setAuthor({ name: lastCall ? t('Last call to register') : t('Registration reminder') })
+    .setTitle(t`Registration reminder · ${escapeMarkdown(tournament.name)}`.slice(0, 256))
     .setURL(register)
     .setDescription(lines.join('\n'));
   return withBanner(embed, tournament);
@@ -210,15 +213,15 @@ export function regReminder(tournament, deadline, lastCall) {
 export function startReminder(tournament) {
   const page = startggUrl(tournament.slug);
   const register = startggUrl(`${tournament.slug}/register`);
-  const lines = [`## Starts <t:${tournament.startAt}:R>`, `**Starts:** <t:${tournament.startAt}:F>`, `**Location:** ${locationText(tournament)}`];
-  if (tournament.numAttendees) lines.push(`**Registered so far:** ${tournament.numAttendees}`);
-  lines.push('', `**[Tournament page on start.gg](${page})**`);
-  if (tournament.isRegistrationOpen !== false) lines.push(`**[Register on start.gg](${register})**`);
+  const lines = [t`## Starts <t:${tournament.startAt}:R>`, t`**Starts:** <t:${tournament.startAt}:F>`, t`**Location:** ${locationText(tournament)}`];
+  if (tournament.numAttendees) lines.push(t`**Registered so far:** ${tournament.numAttendees}`);
+  lines.push('', t`**[Tournament page on start.gg](${page})**`);
+  if (tournament.isRegistrationOpen !== false) lines.push(t`**[Register on start.gg](${register})**`);
 
   // a reminder like the reg ones, not a live card. it hasn't started yet
   const embed = baseEmbed(colors.regEarly)
-    .setAuthor({ name: 'Tournament starts soon' })
-    .setTitle(`Starts soon · ${escapeMarkdown(tournament.name)}`.slice(0, 256))
+    .setAuthor({ name: t('Tournament starts soon') })
+    .setTitle(t`Starts soon · ${escapeMarkdown(tournament.name)}`.slice(0, 256))
     .setURL(page)
     .setDescription(lines.join('\n'));
   return withBanner(embed, tournament);
@@ -250,12 +253,12 @@ const WARNINGS = [
 export function regWarning(tournament, deadline) {
   const register = startggUrl(`${tournament.slug}/register`);
   const lines = [
-    `**NOT REGISTERED YET!!!!** Registration closes <t:${deadline}:R>.`,
+    t`**NOT REGISTERED YET!!!!** Registration closes <t:${deadline}:R>.`,
     '',
-    `**[Register on start.gg](${register})**`,
+    t`**[Register on start.gg](${register})**`,
   ];
   const embed = baseEmbed(colors.reg)
-    .setAuthor({ name: WARNINGS[Math.floor(Math.random() * WARNINGS.length)] })
+    .setAuthor({ name: t(WARNINGS[Math.floor(Math.random() * WARNINGS.length)]) })
     .setTitle(escapeMarkdown(tournament.name))
     .setURL(register)
     .setDescription(lines.join('\n'));
@@ -265,9 +268,9 @@ export function regWarning(tournament, deadline) {
 }
 
 // start.gg tag, then their name in the server when it's different. the tag goes in bold when it heads a group
-function memberName({ tag, name }, bold = false) {
-  const shown = escapeMarkdown(tag ?? name ?? 'Unknown');
-  const main = bold ? `**${shown}**` : shown;
+function memberName({ tag, name }, highlight = false) {
+  const shown = escapeMarkdown(tag ?? name ?? t('Unknown'));
+  const main = highlight ? `**${shown}**` : shown;
   if (!tag || !name || name.toLowerCase() === tag.toLowerCase()) return main;
   return `${main} (${escapeMarkdown(name)})`;
 }
@@ -275,10 +278,10 @@ function memberName({ tag, name }, bold = false) {
 // /registered. members are the participants who are in this server, entries say what they're in.
 // names, not mentions, so nobody looks called out
 export function registered(tournament, members, { byEvent = false } = {}) {
-  const lines = [`**Time:** ${timeText(tournament.startAt)}`, `**Location:** ${locationText(tournament)}`];
+  const lines = [t`**Time:** ${timeText(tournament.startAt)}`, t`**Location:** ${locationText(tournament)}`];
   const entries = tournament.entries ?? [];
   const sorted = members.toSorted((a, b) => (a.tag ?? '').localeCompare(b.tag ?? ''));
-  if (!members.length) lines.push('', 'Nobody from this server yet.');
+  if (!members.length) lines.push('', t('Nobody from this server yet.'));
   else if (byEvent) lines.push(...registeredByEvent(entries, sorted));
   else {
     const events = Map.groupBy(entries, (entry) => entry.userId);
@@ -300,13 +303,13 @@ function registeredByEvent(entries, members) {
     const userIds = new Set(group.map((entry) => entry.userId));
     const people = members.filter((member) => userIds.has(member.userId));
     const { event, entrants } = group[0];
-    lines.push('', `**${escapeMarkdown(event)}** · ${entrants ? `${people.length} of ${entrants} entrants` : people.length}`);
+    lines.push('', entrants ? t`**${escapeMarkdown(event)}** · ${people.length} of ${entrants} entrants` : t`**${escapeMarkdown(event)}** · ${people.length}`);
     lines.push(...people.map((member) => `- ${memberName(member)}`));
   }
   // registered without entering anything
   const entered = new Set(entries.map((entry) => entry.userId));
   const none = members.filter((member) => !entered.has(member.userId));
-  if (none.length) lines.push('', '**Not in an event**', ...none.map((member) => `- ${memberName(member)}`));
+  if (none.length) lines.push('', t('**Not in an event**'), ...none.map((member) => `- ${memberName(member)}`));
   return lines;
 }
 
@@ -318,8 +321,8 @@ export function results(tournament, players) {
     const upsets = (tournament.notableUpsets ?? []).filter((upset) => upset.eventSlug === entries[0].eventSlug)
       .sort((a, b) => b.factor - a.factor).slice(0, 3).map((upset) => upsetText(upset, players));
     if (upsets.length) lines.push('', ...upsets);
-    return withLines(tournamentEmbed(colors.results, `Results · ${eventTitle(entries[0])}`, tournament)
-      .setTitle(`Tracked players' results from ${escapeMarkdown(tournament.name)}`.slice(0, 256)), lines);
+    return withLines(tournamentEmbed(colors.results, t`Results · ${eventTitle(entries[0])}`, tournament)
+      .setTitle(t`Tracked players' results from ${escapeMarkdown(tournament.name)}`.slice(0, 256)), lines);
   });
 }
 
@@ -329,7 +332,7 @@ function upsetText(upset, players) {
   const loser = upset.loserUserId && players[upset.loserUserId] ? playerLink(players[upset.loserUserId]) : bold(upset.loserName);
   const score = upset.winnerScore == null || upset.loserScore == null ? '' : ` ${upset.winnerScore}-${upset.loserScore}`;
   const round = upset.round ? ` · [${escapeMarkdown(upset.round)}](${startggUrl(`${upset.eventSlug}/set/${upset.setId}`)})` : '';
-  return `**Notable upset:** ${winner} beat ${loser} (seed ${upset.loserSeed})${score} as seed ${upset.winnerSeed}${round}`;
+  return t`**Notable upset:** ${winner} beat ${loser} (seed ${upset.loserSeed})${score} as seed ${upset.winnerSeed}${round}`;
 }
 
 // the event's own top 8, everyone in it whether they're tracked or not. one card per event
@@ -337,13 +340,13 @@ export function topEight(tournament, events) {
   return events.map((event) => {
     const lines = event.standings.map((standing) => {
       const name = escapeMarkdown(standing.name);
-      if (!event.done && !standing.final) return `${ordinal(standing.placement)} ${name} (projected)`;
+      if (!event.done && !standing.final) return t`${ordinal(standing.placement)} ${name} (projected)`;
       return `${medal(standing.placement)}${ordinal(standing.placement)} ${name}`;
     });
-    if (!lines.length) lines.push('No placements reported on start.gg.');
-    else if (!event.done) lines.push('-# The bracket wasn\'t finished on start.gg, so unfinished placements are projected');
-    return tournamentEmbed(colors.results, `Top 8 · ${eventTitle(event)}`, tournament)
-      .setTitle(`Top 8 from ${escapeMarkdown(tournament.name)}`.slice(0, 256))
+    if (!lines.length) lines.push(t('No placements reported on start.gg.'));
+    else if (!event.done) lines.push(t('-# The bracket wasn\'t finished on start.gg, so unfinished placements are projected'));
+    return tournamentEmbed(colors.results, t`Top 8 · ${eventTitle(event)}`, tournament)
+      .setTitle(t`Top 8 from ${escapeMarkdown(tournament.name)}`.slice(0, 256))
       .setURL(startggUrl(`${event.eventSlug}/standings`))
       .setDescription(lines.join('\n'));
   });
@@ -353,10 +356,10 @@ export function topEight(tournament, events) {
 export function bracket(tournament) {
   const now = Math.floor(Date.now() / 1000);
   const started = tournament.startAt <= now;
-  const lines = [`${started ? 'Started' : 'Starts'} <t:${tournament.startAt}:R>`, ''];
+  const lines = [t`${started ? t('Started') : t('Starts')} <t:${tournament.startAt}:R>`, ''];
   // a tracked tournament gets its events at the first tournament check
   for (const event of tournament.events ?? []) lines.push(`[${escapeMarkdown(event.name)}](${startggUrl(`${event.slug}/brackets`)})`);
-  return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? 'Live' : 'Starting soon', tournament), lines);
+  return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? t('Live') : t('Starting soon'), tournament), lines);
 }
 
 // start.gg only says which site a stream is on, and twitch is the only one its name makes a link for
@@ -369,16 +372,16 @@ function streamText({ name, source }) {
 export function streamLinks(tournament, streams) {
   const now = Math.floor(Date.now() / 1000);
   const started = tournament.startAt <= now;
-  const lines = [`${started ? 'Started' : 'Starts'} <t:${tournament.startAt}:R>`, '', ...streams.map(streamText)];
-  return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? 'Live' : 'Starting soon', tournament), lines);
+  const lines = [t`${started ? t('Started') : t('Starts')} <t:${tournament.startAt}:R>`, '', ...streams.map(streamText)];
+  return withLines(tournamentEmbed(started ? colors.live : colors.brand, started ? t('Live') : t('Starting soon'), tournament), lines);
 }
 
 function placementText(entry) {
   let name = playerLink(entry.player);
-  if (entry.dq) name += ' (DQ)';
-  if (!entry.placement) return `${name} (not reported)`;
+  if (entry.dq) name += ` ${t('(DQ)')}`;
+  if (!entry.placement) return `${name} ${t('(not reported)')}`;
   // the worst they can finish, so no medal
-  if (!entry.done && !entry.final) return `${ordinal(entry.placement)} ${name} (projected)`;
+  if (!entry.done && !entry.final) return t`${ordinal(entry.placement)} ${name} (projected)`;
   return `${medal(entry.placement)}${ordinal(entry.placement)} ${name}`;
 }
 
@@ -387,17 +390,17 @@ function placementText(entry) {
 export function upcoming(tournaments, players, who, { minimum = 0 } = {}) {
   if (!tournaments.length) {
     const everyone = who === 'everyone';
-    let description = `${everyone ? 'Nobody is' : `${escapeMarkdown(who)} isn't`} registered for anything yet.`;
-    if (minimum > 1 && everyone) description = `No upcoming tournament has ${minimum} or more of the crew registered yet.`;
-    if (minimum > 1 && !everyone) description = `${escapeMarkdown(who)} has no upcoming tournament with ${minimum} or more of the crew registered yet.`;
-    return [baseEmbed(colors.brand).setTitle(`Upcoming · ${escapeMarkdown(who)}`).setDescription(description)];
+    let description = everyone ? t('Nobody is registered for anything yet.') : t`${escapeMarkdown(who)} isn't registered for anything yet.`;
+    if (minimum > 1 && everyone) description = t`No upcoming tournament has ${minimum} or more of the crew registered yet.`;
+    if (minimum > 1 && !everyone) description = t`${escapeMarkdown(who)} has no upcoming tournament with ${minimum} or more of the crew registered yet.`;
+    return [baseEmbed(colors.brand).setTitle(t`Upcoming · ${escapeMarkdown(who)}`).setDescription(description)];
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const more = tournaments.length > 10 ? ` · next 10 of ${tournaments.length}` : '';
+  const more = tournaments.length > 10 ? t` · next 10 of ${tournaments.length}` : '';
   return tournaments.slice(0, 10).map((tournament) => {
     const live = tournament.startAt <= now;
-    return upcomingCard(tournament, players, `${live ? 'Live' : 'Upcoming'} · ${who}${more}`, live ? colors.live : colors.brand);
+    return upcomingCard(tournament, players, t`${live ? t('Live') : t('Upcoming')} · ${who}${more}`, live ? colors.live : colors.brand);
   });
 }
 
@@ -409,10 +412,10 @@ function upcomingCard(tournament, players, label, color) {
   }
 
   const lines = [
-    `**Time:** ${timeText(tournament.startAt)}`,
-    `**Location:** ${locationText(tournament)}`,
+    t`**Time:** ${timeText(tournament.startAt)}`,
+    t`**Location:** ${locationText(tournament)}`,
     // a tracked tournament shows before anyone from the crew signs up
-    eventsByUser.size ? '**Players:**' : 'Nobody from the crew registered yet.',
+    eventsByUser.size ? t('**Players:**') : t('Nobody from the crew registered yet.'),
   ];
   for (const [userId, events] of eventsByUser) {
     lines.push(`${playerLink(players[userId])}: ${events.map(escapeMarkdown).join(', ')}`);
@@ -421,7 +424,7 @@ function upcomingCard(tournament, players, label, color) {
   // a card per tournament, so a big one gets cut off instead of carrying on
   const [shown, ...rest] = split(lines, 4000);
   const hidden = rest.flat().length;
-  if (hidden) shown.push(`-# and ${hidden} more`);
+  if (hidden) shown.push(t`-# and ${hidden} more`);
   return tournamentEmbed(color, label, tournament).setDescription(shown.join('\n'));
 }
 
@@ -451,34 +454,34 @@ function runStatus(player, { entry, sets }) {
 // discord shows the time in each viewer's own timezone
 function nextText({ set, them }, now) {
   const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
-  const station = set.station ? ` · **Station ${set.station}**` : '';
+  const station = set.station ? t` · **${t('Station')} ${set.station}**` : '';
   const time = set.state !== 2 && set.startAt > now ? ` · <t:${set.startAt}:t>` : '';
-  return `${NEXT_TEXT[set.state]} **${escapeMarkdown(them.name)}**${round}${station}${time}`;
+  return `${t(NEXT_TEXT[set.state])} **${escapeMarkdown(them.name)}**${round}${station}${time}`;
 }
 
 function statusText({ entry, finished }) {
-  if (entry.dq) return 'Disqualified';
-  if (finished && !entry.placement) return 'Finished, placement pending';
-  if (finished) return `Finished ${medal(entry.placement)}${ordinal(entry.placement)}${entry.entrants ? ` of ${entry.entrants}` : ''}`;
-  if (!entry.started) return 'Hasn\'t started yet';
-  return 'Still in the bracket';
+  if (entry.dq) return t('Disqualified');
+  if (finished && !entry.placement) return t('Finished, placement pending');
+  if (finished) return t`Finished ${medal(entry.placement)}${ordinal(entry.placement)}${entry.entrants ? t` of ${entry.entrants}` : ''}`;
+  if (!entry.started) return t('Hasn\'t started yet');
+  return t('Still in the bracket');
 }
 
 // the overview says what's next for the ones still going
 function overviewText(status, now) {
   if (status.finished || !status.entry.started) return statusText(status).replace(/^./, (letter) => letter.toLowerCase());
-  return status.next ? nextText(status.next, now) : 'waiting for the next opponent';
+  return status.next ? nextText(status.next, now) : t('waiting for the next opponent');
 }
 
 // one event's sets so far and what's next. completed sets link their VOD when the TO added one
 function runLines(status, now) {
   const lines = status.played.map(({ set, me, them, won }) => {
     const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
-    return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}**${round}${vodLink(set)}`;
+    return t`**${won ? t('W') : t('L')}** ${scoreText(me, them)} vs **${escapeMarkdown(them.name)}**${round}${vodLink(set)}`;
   });
-  if (!lines.length && status.entry.started) lines.push('No completed sets reported yet.');
+  if (!lines.length && status.entry.started) lines.push(t('No completed sets reported yet.'));
   if (status.finished || !status.entry.started) return lines;
-  return [...lines, '', status.next ? `**Next:** ${nextText(status.next, now)}` : 'Next opponent has not been assigned yet.'];
+  return [...lines, '', status.next ? t`**Next:** ${nextText(status.next, now)}` : t('Next opponent has not been assigned yet.')];
 }
 
 // runs is { entry, sets } for each event they're in at the tournament. someone in several brackets goes back
@@ -488,15 +491,15 @@ export function run(player, tournament, runs, now = Math.floor(Date.now() / 1000
   if (statuses.length === 1) {
     const [status] = statuses;
     const lines = [`**${escapeMarkdown(eventTitle(status.entry))}**`, statusText(status), '', ...runLines(status, now)];
-    return withLines(tournamentEmbed(colors.live, `${player.tag}'s run`, tournament), lines);
+    return withLines(tournamentEmbed(colors.live, t`${player.tag}'s run`, tournament), lines);
   }
 
   const overview = statuses.map((status) => {
     const record = status.played.length ? ` (${shortRecord(status.played)})` : '';
     return `**${escapeMarkdown(status.entry.event)}**${record} · ${overviewText(status, now)}`;
   });
-  overview.push('-# The one that needs you soonest is first');
-  const cards = withLines(tournamentEmbed(colors.live, `${player.tag}'s run · ${count(statuses.length, 'bracket')}`, tournament), overview);
+  overview.push(t('-# The one that needs you soonest is first'));
+  const cards = withLines(tournamentEmbed(colors.live, t`${player.tag}'s run · ${count(statuses.length, 'bracket')}`, tournament), overview);
   for (const status of statuses.filter(({ entry }) => entry.started)) {
     const card = baseEmbed(colors.live).setTitle(escapeMarkdown(eventTitle(status.entry))).setURL(startggUrl(status.entry.eventSlug));
     const image = tournament.images?.[0]?.url;

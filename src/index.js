@@ -4,7 +4,7 @@ import { inTurn } from './commands/turns.js';
 import { failureMessage } from './commands/shared.js';
 import { seedFirstTO } from './commands/to.js';
 import { badToken, checkToken } from './startgg.js';
-import { missingThreadPermissions, startTracking, stopTracking } from './tracker.js';
+import { missingThreadPermissions, startTracking, stopTracking, dropGuildChannel } from './tracker.js';
 import { messageSettings } from './message-settings.js';
 import { setFallbackImage } from './embeds/index.js';
 import { setHealthReady, startHealth, stopHealth } from './health.js';
@@ -183,6 +183,12 @@ if (isMultiGuild()) {
     save();
     console.log(`joined ${guild.name}, run /t-o settings channel:#channel there`);
     guildLocal.run(guild.id, () => seedFirstTO(guild)).catch(console.error);
+  });
+  // the saved entry stays for a rejoin, but checks skip it and the channel cache goes,
+  // so a server the bot left costs no fetches until it's back
+  client.on(Events.GuildDelete, (guild) => {
+    dropGuildChannel(guild.id);
+    console.log(`left ${guild.name ?? guild.id}, keeping its saved entry for a rejoin`);
   });
 }
 

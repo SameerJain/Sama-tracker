@@ -1,5 +1,6 @@
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
+import { t } from '../i18n.js';
 import { state, save } from '../store.js';
 import { messageEnabled } from '../message-settings.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
@@ -331,14 +332,14 @@ export async function correctPlacements(tournament, postChannel = currentChannel
     if (entries.length && entries.every(placed)) {
       tournament.entries = latest.entries;
       const final = embeds.results({ ...tournament, entries }, crewOf(tournament));
-      await editPosts(postChannel, projected.results, final, 'results', 'Final placements, the ones above were projected');
+      await editPosts(postChannel, projected.results, final, 'results', t('Final placements, the ones above were projected'));
       projected.results = [];
     }
   }
   if (projected.top8.length) {
     const events = await topEightEvents(eventsOf(tournament).filter((entry) => entry.started));
     if (events.length && events.every((event) => event.done)) {
-      await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', 'Final top 8, the one above was projected');
+      await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', t('Final top 8, the one above was projected'));
       projected.top8 = [];
     }
   } else if (!tournament.top8Posted && posting(tournament, 'top8') && messageEnabled('top8')) {

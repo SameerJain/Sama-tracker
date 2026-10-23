@@ -273,6 +273,8 @@ Run `/t-o settings` without options to see every setting privately. TOs can chan
 
 Times use 24-hour `HH:MM` in the chosen timezone, with daylight saving. Settings save right away and survive restarts. Posts that came due while a type was off stay skipped after you turn it back on. Schedule changes apply to future recaps. Each player's `/track posts`, each tournament's `/t-o tournament posts` and everyone's own `/notify` pings still apply on top.
 
+`/t-o settings language:es` switches everything the bot says to Spanish: command descriptions in Discord, `/help`, every reply, card, automatic post, DM, button and fun post. `language:en` switches back. Single-server builds re-register the commands in the new language, so descriptions change at once. Fun posts reply in Spanish when the server is Spanish, from the same characters and talking points.
+
 ### Threads
 
 `/t-o settings threads` decides where set results and stream alerts go, so a big weekend doesn't flood the channel. A tracked tournament posts every set, so it always gets a thread. It has three modes:
@@ -373,7 +375,9 @@ A command that fails says whose side it failed on: start.gg not answering, start
 | The bot itself, like a crash or a Railway outage | Discord's own "The application did not respond". The bot isn't running, so it can't answer or change that text, and its name shows offline in the member list. Once it's back after 10 minutes or more, it posts **Back online** in the posts channel with when it went down, for how long, and that commands sent then need sending again. A new version that comes up after an outage says the same on its bot update card instead. |
 | start.gg | Once start.gg has sent nothing but timeouts and 5xx errors for 2 minutes, commands that need it answer right away with "start.gg has been down since ..." instead of each waiting about 90 seconds on retries. One command a minute still goes through to check, the automatic checks keep asking, and the first answer ends it for everyone. Meanwhile the bot's status in the member list reads "start.gg is down" and `/status` shows since when. |
 | Slippi | Melee reports wait 3 seconds for Slippi, then use the last rank check's numbers, so they still go out. `/slippi` commands say Slippi didn't answer, and `/status` shows when the last rank check failed. |
-| Discord | Commands say Discord is having trouble. Automatic posts that fail get retried where the post type does that, like top 8s. | Keeping Discord events up to date costs one start.gg request per upcoming event an hour.
+| Discord | Commands say Discord is having trouble. Automatic posts that fail get retried where the post type does that, like top 8s. |
+
+Keeping Discord events up to date costs one start.gg request per upcoming event an hour.
 
 <details>
 <summary>History limits and placement math</summary>

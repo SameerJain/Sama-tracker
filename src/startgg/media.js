@@ -14,6 +14,18 @@ function roster(videogameId) {
   return rosters.get(videogameId);
 }
 
+// discord caps an upload at 8MB, so anything bigger never posts. the length up front
+// drops the obvious ones, the one after covers a reply that lies about it
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+async function download(res, source) {
+  const length = Number(res.headers?.get('content-length'));
+  if (Number.isInteger(length) && length > MAX_IMAGE_BYTES) throw new ApiError(source, 'start.gg image is too big to post');
+  const attachment = Buffer.from(await res.arrayBuffer());
+  if (attachment.length > MAX_IMAGE_BYTES) throw new ApiError(source, 'start.gg image is too big to post');
+  return attachment;
+}
+
 // start.gg's icon for an ultimate character is its render, older games get a smaller portrait.
 // discord can't always load images.start.gg, so this downloads it to upload with the message
 export async function getCharacterArt(name, videogameId) {
@@ -24,7 +36,7 @@ export async function getCharacterArt(name, videogameId) {
   if (!res.ok) throw new ApiError('start.gg', `start.gg image returned ${res.status}`, res.status);
   const extension = new URL(url).pathname.split('.').pop();
   // one per game, a verbose reply has several
-  return { attachment: Buffer.from(await res.arrayBuffer()), name: `character-${videogameId}.${extension}` };
+  return { attachment: await download(res, 'start.gg'), name: `character-${videogameId}.${extension}` };
 }
 
 // discord goes by the file's extension, so it comes from what start.gg says it sent
@@ -45,5 +57,5 @@ export async function getImage(url, name, timeout) {
   if (!res.ok) throw new ApiError('start.gg', `start.gg image returned ${res.status}`, res.status);
   const extension = PICTURE_TYPES[res.headers.get('content-type')?.split(';')[0].trim()];
   if (!extension) throw new ApiError('start.gg', `start.gg image came back as ${res.headers.get('content-type')}`);
-  return { attachment: Buffer.from(await res.arrayBuffer()), name: `${name}.${extension}` };
+  return { attachment: await download(res, 'start.gg'), name: `${name}.${extension}` };
 }

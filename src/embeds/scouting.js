@@ -5,7 +5,7 @@ import { lifetimeStats } from './stats.js';
 import { chancePercent, commonOpponentLines } from './players.js';
 import {
   colors, FOOTER, baseEmbed, withLines, count, gameName, recordOf, section, bold, scoreText, setLink, vodLink, filterLine, closeLine,
-  seedLine, sweepLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine,
+  seedLine, sweepLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine, t, listOf,
 } from './shared.js';
 
 // /scout's form line per game, and how many sets it lists
@@ -33,16 +33,16 @@ function formLines(played, verbose = false) {
   const since = Math.floor(Date.now() / 1000) - 90 * DAY;
   return [...Map.groupBy(played, ({ set }) => gameName(set.event))].slice(0, GAMES_SHOWN).map(([game, list]) => {
     const recent = list.slice(0, RECENT_SETS);
-    const line = `**${escapeMarkdown(game)}:** ${recordOf(recent)} · last ${count(recent.length, 'set')}`;
+    const line = t`**${escapeMarkdown(game)}:** ${recordOf(recent)} · last ${count(recent.length, 'set')}`;
     if (!verbose) return line;
     const lately = list.filter(({ set }) => set.completedAt >= since);
-    return `${line} · ${lately.length ? recordOf(lately) : 'none'} in the last 90 days`;
+    return t`${line} · ${lately.length ? recordOf(lately) : t('none')} in the last 90 days`;
   });
 }
 
 // W 2-1 vs Foo · Tournament · VOD · date, with the round for verbose and the VOD when the TO added one
 function latestSetLine({ set, me, them, won }, round = false) {
-  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)} vs ${bold(them.name)}${round && set.round ? ` · ${set.round}` : ''} · ${setLink(set)}${vodLink(set)} · <t:${set.completedAt}:d>`;
+  return t`**${won ? t('W') : t('L')}** ${scoreText(me, them)} vs ${bold(them.name)}${round && set.round ? ` · ${set.round}` : ''} · ${setLink(set)}${vodLink(set)} · <t:${set.completedAt}:d>`;
 }
 
 // sets between the two from player's side, newest first. both histories since either can get cut off
@@ -84,7 +84,7 @@ function callerRecord(mine, player, tricky) {
     if (won) wins++;
     else losses++;
   }
-  return found ? ` · you're ${wins}-${losses} vs them` : '';
+  return found ? t` · you're ${wins}-${losses} vs them` : '';
 }
 
 function trickyOpponentLine(record) {
@@ -98,7 +98,7 @@ function trickyMatchupLines(characterSets, limit = LEANS_SHOWN) {
     if (!usage.reported) continue;
     const { bad } = leans(usage.against);
     if (!bad.length) continue;
-    lines.push(`**${escapeMarkdown(game.displayName)}:** ${bad.slice(0, limit).map(({ name, wins, games }) => `${escapeMarkdown(name)} ${winLoss(wins, games - wins)}`).join(' · ')}`);
+    lines.push(t`**${escapeMarkdown(game.displayName)}:** ${bad.slice(0, limit).map(({ name, wins, games }) => `${escapeMarkdown(name)} ${winLoss(wins, games - wins)}`).join(' · ')}`);
   }
   return lines;
 }
@@ -109,25 +109,25 @@ export function scout(player, opponent, mine, theirs, characterSets, { melee = f
   const played = singles(theirs, opponent);
   const meetings = meetingsOf(player, opponent, mine, theirs);
   const lines = [];
-  section(lines, 'Recent form', played.length ? formLines(played) : [melee ? 'No recent Melee singles sets.' : 'No recent singles sets.']);
-  section(lines, 'Latest sets', played.slice(0, LATEST_SETS).map((result) => latestSetLine(result)));
+  section(lines, t('Recent form'), played.length ? formLines(played) : [melee ? t('No recent Melee singles sets.') : t('No recent singles sets.')]);
+  section(lines, t('Latest sets'), played.slice(0, LATEST_SETS).map((result) => latestSetLine(result)));
   const characterLines = [];
   for (const { game, usage } of characterUsageByGame(characterSets).slice(0, GAMES_SHOWN)) {
     if (!usage.reported) continue;
-    characterLines.push(`**${escapeMarkdown(game.displayName)}:** ${usage.characters.slice(0, 3).map((c) => `${escapeMarkdown(c.name)} (${count(c.games, 'game')})`).join(', ')}`);
+    characterLines.push(t`**${escapeMarkdown(game.displayName)}:** ${usage.characters.slice(0, 3).map((c) => `${escapeMarkdown(c.name)} (${count(c.games, 'game')})`).join(', ')}`);
   }
-  section(lines, 'Reported characters', characterLines.length ? characterLines : [melee ? 'No Melee characters reported in their recent sets.' : 'No characters reported in their recent sets.']);
+  section(lines, t('Reported characters'), characterLines.length ? characterLines : [melee ? t('No Melee characters reported in their recent sets.') : t('No characters reported in their recent sets.')]);
   const tricky = trickyOpponents(played, TRICKY_QUICK, [player.playerId]);
-  section(lines, 'Toughest opponents', tricky.length ? [tricky.map(trickyOpponentLine).join(' · ')] : []);
-  section(lines, 'Worst matchups', trickyMatchupLines(characterSets));
+  section(lines, t('Toughest opponents'), tricky.length ? [tricky.map(trickyOpponentLine).join(' · ')] : []);
+  section(lines, t('Worst matchups'), trickyMatchupLines(characterSets));
   const h2h = [...Map.groupBy(meetings, ({ set }) => gameName(set.event))].slice(0, GAMES_SHOWN)
-    .map(([game, list]) => `**${escapeMarkdown(game)}:** ${recordOf(list)}`);
-  section(lines, `You vs ${escapeMarkdown(opponent.tag)}`, h2h.length ? h2h
-    : [melee ? 'You haven\'t played each other in Melee singles, as far back as this checks.' : 'You haven\'t played each other in singles, as far back as this checks.']);
-  lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date`);
+    .map(([game, list]) => t`**${escapeMarkdown(game)}:** ${recordOf(list)}`);
+  section(lines, t`You vs ${escapeMarkdown(opponent.tag)}`, h2h.length ? h2h
+    : [melee ? t('You haven\'t played each other in Melee singles, as far back as this checks.') : t('You haven\'t played each other in singles, as far back as this checks.')]);
+  lines.push(melee ? t('-# Melee only. From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date') : t('-# From up to 600 singles sets each, and 400 for characters. Characters only show up if the TO reported them, and that can be out of date'));
   const line = filterLine(filters);
   if (line) lines.push(line);
-  const card = baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(melee ? `Melee scouting ${escapeMarkdown(opponent.tag)}` : `Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug));
+  const card = baseEmbed(colors.brand, melee ? `${FOOTER} · Melee` : undefined).setTitle(melee ? t`Melee scouting ${escapeMarkdown(opponent.tag)}` : t`Scouting ${escapeMarkdown(opponent.tag)}`).setURL(startggUrl(opponent.slug));
   if (opponent.image) card.setThumbnail(opponent.image);
   return withLines(card, lines);
 }
@@ -136,7 +136,7 @@ export function scout(player, opponent, mine, theirs, characterSets, { melee = f
 // odds is from predict and null when you've never played the same game, or Melee. players is everyone tracked.
 // melee means every list holds only Melee, filtered before it got here, and filters only narrowed them
 export function scoutReport(player, opponent, { mine, theirs, characterSets, events, odds, players, melee = false, filters = {} }) {
-  const cards = lifetimeStats(opponent, events, theirs, players, { label: 'Scouting', melee, filters });
+  const cards = lifetimeStats(opponent, events, theirs, players, { label: t('Scouting'), melee, filters });
   const played = singles(theirs, opponent);
   const meetings = meetingsOf(player, opponent, mine, theirs);
   if (!played.length) return [...cards, ...matchup(player, opponent, { meetings, odds, melee, filters })];
@@ -149,43 +149,43 @@ export function scoutReport(player, opponent, { mine, theirs, characterSets, eve
 // /scout verbose, form in every game and how they play the one that matters
 function tendencies(played, focus) {
   const lines = [];
-  section(lines, 'Recent form', formLines(played, true));
-  section(lines, `Habits in ${escapeMarkdown(focus)}`, habitLines(played.filter(({ set }) => gameName(set.event) === focus)));
-  section(lines, 'Latest sets', played.slice(0, SCOUT_LATEST_SETS).map((result) => latestSetLine(result, true)));
-  return withLines(baseEmbed(colors.brand).setTitle('Form and tendencies'), lines);
+  section(lines, t('Recent form'), formLines(played, true));
+  section(lines, t`Habits in ${escapeMarkdown(focus)}`, habitLines(played.filter(({ set }) => gameName(set.event) === focus)));
+  section(lines, t('Latest sets'), played.slice(0, SCOUT_LATEST_SETS).map((result) => latestSetLine(result, true)));
+  return withLines(baseEmbed(colors.brand).setTitle(t('Form and tendencies')), lines);
 }
 
 // close sets, seeds, which side of the bracket and how often sets are one-sided
 function habitLines(played) {
   const lines = [closeLine(played), seedLine(played)];
-  const sides = [['winners side', /winners/i], ['losers side', /losers/i], ['grand finals', GRAND_FINALS]]
+  const sides = [[t('winners side'), /winners/i], [t('losers side'), /losers/i], [t('grand finals'), GRAND_FINALS]]
     .map(([name, pattern]) => [name, played.filter(({ set }) => pattern.test(set.round ?? ''))])
     .filter(([, list]) => list.length);
-  if (sides.length) lines.push(`**Bracket:** ${sides.map(([name, list]) => `${name} ${recordOf(list)}`).join(' · ')}`);
+  if (sides.length) lines.push(t`**Bracket:** ${sides.map(([name, list]) => `${name} ${recordOf(list)}`).join(' · ')}`);
   lines.push(sweepLine(played));
   return lines.filter(Boolean);
 }
 
 // /scout verbose, each game's characters with the matchups and stages they win and lose. focus game first
 function scoutCharacters(characterSets, focus) {
-  const embed = baseEmbed(colors.brand).setTitle('Characters and stages');
+  const embed = baseEmbed(colors.brand).setTitle(t('Characters and stages'));
   const games = characterUsageByGame(characterSets)
     .filter(({ usage }) => usage.reported)
     .sort((a, b) => (b.game.displayName === focus) - (a.game.displayName === focus) || b.usage.games - a.usage.games);
   if (!games.length) {
-    return [embed.setDescription(`No characters reported in their last ${count(characterSets.length, 'singles set')}. Lots of tournaments don't bother.`)];
+    return [embed.setDescription(t`No characters reported in their last ${count(characterSets.length, 'singles set')}. Lots of tournaments don't bother.`)];
   }
 
   const lines = [];
   for (const { game, usage } of games.slice(0, SCOUT_CHARACTER_GAMES)) {
     const more = usage.characters.length - CHARACTERS_SHOWN;
     section(lines, escapeMarkdown(game.displayName), [
-      ...usage.characters.slice(0, CHARACTERS_SHOWN).map((character, i) => `${characterRank(usage, character, i)} · last <t:${character.last}:R>`),
-      more > 0 && `-# and ${more} more`,
-      ...leanLines(usage.against, 'Struggles against', 'Strong against'),
+      ...usage.characters.slice(0, CHARACTERS_SHOWN).map((character, i) => t`${characterRank(usage, character, i)} · last ${`<t:${character.last}:R>`}`),
+      more > 0 && t`-# and ${more} more`,
+      ...leanLines(usage.against, t('Struggles against'), t('Strong against')),
       ...mainTroubleLines(usage),
-      ...leanLines(usage.stages, 'Worst stages', 'Best stages'),
-      `-# Reported in ${usage.reported} of their last ${count(usage.scanned, `${game.displayName} set`)} · TO reporting can be out of date`,
+      ...leanLines(usage.stages, t('Worst stages'), t('Best stages')),
+      t`-# Reported in ${usage.reported} of their last ${count(usage.scanned, `${game.displayName} set`)} · TO reporting can be out of date`,
     ].filter(Boolean));
   }
   return withLines(embed, lines);
@@ -198,7 +198,7 @@ function mainTroubleLines(usage, limit = TRICKY_MAINS) {
     const { bad } = leans([...character.matchups.values()]);
     if (!bad.length) continue;
     const worst = bad[0];
-    lines.push(`**${escapeMarkdown(character.name)} struggles most vs:** ${escapeMarkdown(worst.name)} ${winLoss(worst.wins, worst.games - worst.wins)}`);
+    lines.push(t`**${escapeMarkdown(character.name)} struggles most vs:** ${escapeMarkdown(worst.name)} ${winLoss(worst.wins, worst.games - worst.wins)}`);
   }
   return lines;
 }
@@ -207,7 +207,7 @@ function mainTroubleLines(usage, limit = TRICKY_MAINS) {
 function leanLines(records, badLabel, goodLabel) {
   const { good, bad } = leans(records);
   const list = (each) => each.slice(0, LEANS_SHOWN).map(({ name, wins, games }) => `${escapeMarkdown(name)} ${winLoss(wins, games - wins)}`).join(' · ');
-  return [bad.length && `**${badLabel}:** ${list(bad)}`, good.length && `**${goodLabel}:** ${list(good)}`].filter(Boolean);
+  return [bad.length && t`**${badLabel}:** ${list(bad)}`, good.length && t`**${goodLabel}:** ${list(good)}`].filter(Boolean);
 }
 
 // /scout verbose, the caller against them. mine and played show your record against their toughest
@@ -218,35 +218,38 @@ function matchup(player, opponent, { meetings, odds, melee = false, mine = [], p
   const lines = [];
   if (odds) {
     const chance = chancePercent(odds);
-    lines.push(`**Odds:** ${tagA} ${chance}% · ${100 - chance}% ${tagB} in ${escapeMarkdown(odds.game)}`);
+    lines.push(t`**Odds:** ${tagA} ${chance}% · ${100 - chance}% ${tagB} in ${escapeMarkdown(odds.game)}`);
   }
   if (meetings.length) {
     const byGame = [...Map.groupBy(meetings, ({ set }) => gameName(set.event))];
-    lines.push(`**Head-to-head:** ${byGame.map(([game, list]) => `${escapeMarkdown(game)} ${recordOf(list)}`).join(' · ')}`);
+    lines.push(t`**Head-to-head:** ${byGame.map(([game, list]) => `${escapeMarkdown(game)} ${recordOf(list)}`).join(' · ')}`);
     lines.push(...meetings.slice(0, MEETINGS_SHOWN).map(meetingLine));
-    if (meetings.length > MEETINGS_SHOWN) lines.push(`-# and ${count(meetings.length - MEETINGS_SHOWN, 'older set')}`);
+    if (meetings.length > MEETINGS_SHOWN) lines.push(t`-# and ${count(meetings.length - MEETINGS_SHOWN, 'older set')}`);
   } else {
-    lines.push(`**Head-to-head:** you haven't played each other in ${melee ? 'Melee ' : ''}singles, as far back as this checks`);
+    lines.push(melee ? t('**Head-to-head:** you haven\'t played each other in Melee singles, as far back as this checks') : t('**Head-to-head:** you haven\'t played each other in singles, as far back as this checks'));
   }
   if (played.length) {
     const inFocus = focus ? played.filter(({ set }) => gameName(set.event) === focus) : [];
     const tricky = trickyOpponents(inFocus.length ? inFocus : played, TRICKY_VERBOSE, [player.playerId]);
-    section(lines, `Toughest opponents${focus ? ` in ${escapeMarkdown(focus)}` : ''}`,
+    section(lines, focus ? t`Toughest opponents in ${escapeMarkdown(focus)}` : t('Toughest opponents'),
       tricky.map((record) => `${trickyOpponentLine(record)}${mine.length ? callerRecord(mine, player, record) : ''}`));
     if (focus && characterSets.length) {
       const bad = trickyMatchupLines(characterSets.filter((set) => set.videogame?.displayName === focus), LEANS_SHOWN)
         .map((line) => line.replace(/^\*\*.+?:\*\* /, ''));
-      if (bad.length) section(lines, `Worst matchups in ${escapeMarkdown(focus)}`, bad);
+      if (bad.length) section(lines, t`Worst matchups in ${escapeMarkdown(focus)}`, bad);
     }
   }
-  if (odds?.common.total) section(lines, `Common opponents · ${odds.common.total} in ${escapeMarkdown(odds.game)}`, commonOpponentLines(odds, tagA, tagB));
-  lines.push(`-# ${melee ? 'Melee only. ' : ''}From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. `
-    + `${odds ? 'Odds work like /predict, and characters' : 'Characters'} and stages only show up if the TO reported them, and that can be out of date`);
+  if (odds?.common.total) section(lines, t`Common opponents · ${odds.common.total} in ${escapeMarkdown(odds.game)}`, commonOpponentLines(odds, tagA, tagB));
+  lines.push(melee
+    ? t('-# Melee only. From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. Odds work like /predict, and characters and stages only show up if the TO reported them, and that can be out of date')
+    : odds
+      ? t('-# From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. Odds work like /predict, and characters and stages only show up if the TO reported them, and that can be out of date')
+      : t('-# From up to 1200 of their singles sets, 800 for characters and stages, every event they placed in and up to 600 of yours. Characters and stages only show up if the TO reported them, and that can be out of date'));
   const line = filterLine(filters);
   if (line) lines.push(line);
   const card = baseEmbed(colors.clash)
-    .setAuthor({ name: melee ? `${player.tag} · Melee` : player.tag, iconURL: player.image, url: startggUrl(player.slug) })
-    .setTitle(`${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`);
+    .setAuthor({ name: melee ? t`${player.tag} · Melee` : player.tag, iconURL: player.image, url: startggUrl(player.slug) })
+    .setTitle(t`${escapeMarkdown(player.tag)} vs ${escapeMarkdown(opponent.tag)}`);
   if (opponent.image) card.setThumbnail(opponent.image);
   return withLines(card, lines);
 }

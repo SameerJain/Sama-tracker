@@ -17,7 +17,7 @@ import { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPos
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import {
-  pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag,
+  pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag, t,
 } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
@@ -158,7 +158,7 @@ async function retryExpiredButton(interaction) {
   }
   try {
     await target.channel.send({
-      content: `${target.ping}The button press expired before I could answer. Retrying /${command} now.`,
+      content: t`${target.ping}The button press expired before I could answer. Retrying /${command} now.`,
       allowedMentions: target.ping ? { users: [interaction.user.id] } : { parse: [] },
     });
   } catch (err) {
@@ -230,13 +230,13 @@ async function answerButton(interaction) {
   const { since } = parseSince(sinceText);
   if (action === 'more') await interaction.editReply({ components: disabled(interaction.message) });
   const report = reports[command];
-  if (!report || !['more', 'new', 'private'].includes(action)) return buttonFailed(interaction, 'That button doesn\'t work anymore, run the command again.');
+  if (!report || !['more', 'new', 'private'].includes(action)) return buttonFailed(interaction, t('That button doesn\'t work anymore, run the command again.'));
 
   // /scout compares with whoever ran it, and nobody else can see its buttons
   const who = command === 'scout' ? await verifiedCaller(interaction.user.id) : player && await playerBySlug(player);
-  if (!who && command === 'scout') return buttonFailed(interaction, NOT_LINKED);
+  if (!who && command === 'scout') return buttonFailed(interaction, t(NOT_LINKED));
   const against = opponent ? await playerBySlug(opponent) : null;
-  if (!who || (opponent && !against)) return buttonFailed(interaction, `Couldn't find a start.gg account for that player. Run \`/${command}\` again.`);
+  if (!who || (opponent && !against)) return buttonFailed(interaction, t`Couldn't find a start.gg account for that player. Run \`/${command}\` again.`);
   // head-to-head buttons on /run, match calls and stream alerts are a shortcut for /h2h
   // in the set's game, so they run the short report with no second press
   return report(interaction, { player: who, opponent: against, verbose: action === 'more', melee, game, since, venue });
@@ -286,7 +286,7 @@ async function sameReport(interaction, running, key) {
       return;
     }
   }
-  await interaction.followUp({ content: 'Start.gg is already working on that one. The full report swaps in when it\'s done.', flags: MessageFlags.Ephemeral });
+  await interaction.followUp({ content: t('Start.gg is already working on that one. The full report swaps in when it\'s done.'), flags: MessageFlags.Ephemeral });
   if (await running.then(() => true, () => false)) return;
   // a waiter ahead of this one already started the retry, so share that instead of asking alone
   const shared = inflightButtons.get(key);
@@ -353,12 +353,12 @@ async function autocomplete(interaction) {
   const matches = people.filter((player) => nameMatches(player.tag, focused));
   const starts = (player) => nameMatches(player.tag, focused, { start: true });
   matches.sort((a, b) => starts(b) - starts(a) || recency(a) - recency(b));
-  for (const player of matches) choices.push({ name: state.players[player.userId] ? player.tag : `${player.tag} (linked)`, value: String(player.userId) });
+  for (const player of matches) choices.push({ name: state.players[player.userId] ? player.tag : t`${player.tag} (linked)`, value: String(player.userId) });
 
   // an empty list looks broken, so say why. picking it gets the not found reply
   if (!choices.length) {
-    let why = trackedOnly ? `Nobody tracked matches "${focused}"` : `Nobody tracked or linked matches "${focused}", /track add them first`;
-    if (!people.length) why = 'Nobody is tracked yet, /track add someone first';
+    let why = trackedOnly ? t`Nobody tracked matches "${focused}"` : t`Nobody tracked or linked matches "${focused}", /track add them first`;
+    if (!people.length) why = t('Nobody is tracked yet, /track add someone first');
     choices.push({ name: why.slice(0, 100), value: focused.slice(0, 100) || 'nobody' });
   }
 
