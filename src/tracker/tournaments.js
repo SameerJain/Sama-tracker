@@ -10,7 +10,7 @@ import {
 } from './shared.js';
 import { unpinFinishedThreads, unpinTournamentThread } from './threads.js';
 
-// with /settings posts events on, each upcoming tracked tournament gets a discord event, once. state.discordEvents keeps
+// with /t-o settings events on, each upcoming tracked tournament gets a discord event, once. state.discordEvents keeps
 // it either way, so an event a mod deleted stays deleted. no due time like the posts, since turning it on is
 // asking for events at the tournaments already coming up
 export async function makeTournamentEvents(guild = currentChannel()?.guild) {

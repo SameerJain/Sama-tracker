@@ -9,7 +9,7 @@ export {
 // in the server's language, see i18n.js
 export { count, ordinal, t, listOf } from '../i18n.js';
 
-// each color means one thing, so pick a card's by what it is. the four outcome colors are what /settings posts set_colors
+// each color means one thing, so pick a card's by what it is. the four outcome colors are what /t-o settings set_colors
 // paints set results with, so no other tournament or reminder card uses them or anything close: a match call in red
 // read as a loss. slippi and the games keep their own colors, which their cards' badges and art make plain
 export const colors = {
@@ -31,7 +31,7 @@ export const colors = {
   reg: 0xc2410c,
   // how it went: placements, top 8s and the weekly recap
   results: 0xfacc15,
-  thread: 0x2563eb, // the cards that head the threads from /settings posts threads
+  thread: 0x2563eb, // the cards that head the threads from /t-o settings threads
   system: 0xec4899, // status and bot updates, never feature cards
   slippi: 0x21ba45, // slippi.gg's green, for slippi cards without a rank. rank cards take the rank's color
   // each game's own color, for its fun command and its matchmaking pings

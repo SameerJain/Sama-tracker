@@ -2,7 +2,7 @@ import { state } from './store.js';
 import { count as englishCount, ordinal as englishOrdinal } from './format.js';
 import { es, nouns } from './i18n/es.js';
 
-// what /settings language offers. english is the key everything else is looked up by, so the code reads
+// what /t-o settings language offers. english is the key everything else is looked up by, so the code reads
 // in english and a line with no translation yet still says something
 export const LANGUAGES = { en: 'English', es: 'Español' };
 const LOCALES = { en: 'en-US', es: 'es' };

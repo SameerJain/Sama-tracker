@@ -14,30 +14,26 @@ const { commands, handleCommand } = await import('../src/commands/index.js');
 const { postWeeklyRecap } = await import('../src/tracker.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 
-// the recap's options go to /settings recap, everything else to /settings posts
-const RECAP_OPTIONS = ['day', 'time', 'timezone'];
 async function configure(values = {}, allowed = true, guild = undefined, user = 'manager') {
   let reply;
-  const subcommand = values.language ? 'language' : Object.keys(values).some((name) => RECAP_OPTIONS.includes(name)) ? 'recap' : 'posts';
   await handleCommand({
-    commandName: 'settings', guild, user: { id: user }, member: guild?.members?.cache?.get(user),
+    commandName: 't-o', guild, user: { id: user }, member: guild?.members?.cache?.get(user),
     memberPermissions: { has: permission => allowed && permission === PermissionFlagsBits.ManageGuild },
-    options: { getSubcommand: () => subcommand, getBoolean: name => values[name] ?? null,
-      getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
+    options: { getSubcommandGroup: () => null, getSubcommand: () => 'settings', getBoolean: name => values[name] ?? null,
+      getString: name => values[name] ?? null, getInteger: name => values[name] ?? null, getChannel: name => values[name] ?? null },
     reply: async result => { reply = result; },
   });
   return reply;
 }
 
-test('settings are visible to TOs, with posts and the recap as their own parts', () => {
-  const settings = commands.find(c => c.name === 'settings');
-  assert.equal(settings?.default_member_permissions, undefined);
-  const recap = settings.options.find(o => o.name === 'recap');
-  assert.deepEqual(recap.options.map(o => o.name), ['day', 'time', 'timezone']);
-  assert.equal(recap.options.find(o => o.name === 'timezone').autocomplete, true);
-  const command = settings.options.find(o => o.name === 'posts');
+test('all server settings are options on one /t-o settings command', () => {
+  assert.equal(commands.some(c => c.name === 'settings'), false);
+  const to = commands.find(c => c.name === 't-o');
+  const command = to.options.find(o => o.name === 'settings');
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
     ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
+  assert.ok(['day', 'time', 'timezone', 'language'].every(name => command.options.some(o => o.name === name)));
+  assert.equal(command.options.find(o => o.name === 'timezone').autocomplete, true);
   // three modes, picked by name
   const threads = command.options.find(o => o.name === 'threads');
   assert.equal(threads.type, 3);
@@ -62,10 +58,10 @@ test('status answers where everyone sees it', async () => {
   assert.equal(reply.flags, undefined);
 });
 
-test('only managers or TOs can change settings', async () => {
+test('only TOs can change settings', async () => {
   state.messages = {};
   const reply = await configure({ sets: false }, false);
-  assert.match(reply.content, /Only TOs and people with Manage Server can change settings/);
+  assert.match(reply.content, /Only TOs can change server settings/);
   assert.ok(reply.flags);
   assert.deepEqual(state.messages, {});
 
@@ -81,14 +77,14 @@ test('only managers or TOs can change settings', async () => {
   assert.equal(state.messages.sets, false);
 });
 
-test('only managers or TOs can change the server language', async () => {
+test('only TOs can change the server language', async () => {
   state.messages = {};
   const denied = await configure({ language: 'es' }, false);
-  assert.match(denied.content, /Only TOs and people with Manage Server can change the language/);
+  assert.match(denied.content, /Only TOs can change server settings/);
   assert.equal(state.messages.language, undefined);
 
   const changed = await configure({ language: 'es' });
-  assert.equal(changed.content, 'Ahora hablaré en español.');
+  assert.match(changed.content, /Language:\*\* Español/);
   assert.equal(state.messages.language, 'es');
 });
 
@@ -176,8 +172,8 @@ test('the recap timezone suggests the usual zones, then any zone with what was t
   const suggest = async (typed) => {
     let choices;
     await handleAutocomplete({
-      commandName: 'settings',
-      options: { getSubcommandGroup: () => null, getSubcommand: () => 'recap', getFocused: () => typed },
+      commandName: 't-o',
+      options: { getSubcommandGroup: () => null, getSubcommand: () => 'settings', getFocused: full => full ? { name: 'timezone', value: typed } : typed },
       respond: async (result) => { choices = result; },
     });
     return choices.map((choice) => choice.value);

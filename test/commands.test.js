@@ -9,7 +9,7 @@ import { MessageFlags } from 'discord.js';
 // every command once against a fake start.gg, so a handler that throws shows up here
 const directory = mkdtempSync(join(tmpdir(), 'sama-commands-'));
 process.env.STATE_DIR = directory;
-// multi-server on here so /settings channel is covered too. the fakes carry no guildId,
+// multi-server on here so /t-o settings channel is covered too. the fakes carry no guildId,
 // so every command still runs on the root exactly like single-server mode
 process.env.MULTI_GUILD = 'true';
 // the fun posts would call Claude on import
@@ -204,14 +204,9 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
   ['help', {}, /\/help verbose:True/], ['help', { values: { verbose: true } }, /Linking yourself/],
-  ['status', {}, /Status/], ['settings', { subcommand: 'channel' }, /No posts channel set yet/],
-  ['settings', { subcommand: 'channel', values: { channel: { id: 'channel-9', isTextBased: () => true } } }, /Automatic posts go in <#channel-9>/],
-  ['settings', { subcommand: 'posts' }, /Set results:\*\* off/],
-  ['settings', { subcommand: 'posts', values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
-  ['settings', { subcommand: 'posts', values: { events: false } }, /Discord events for tracked tournaments:\*\* off/],
-  ['settings', { subcommand: 'recap', values: { day: 5, time: '20:00' } }, /Friday 20:00/], ['socials', {}, /Nothing yet/],
-  ['settings', { subcommand: 'language', values: { language: 'es' } }, /Ahora hablaré en español/],
-  ['settings', { subcommand: 'language', values: { language: 'en' } }, /I’ll speak English now/],
+  ['status', {}, /Status/],
+  ['t-o', { subcommand: 'settings', values: { channel: { id: 'channel-9', isTextBased: () => true }, events: false, day: 5, time: '20:00', language: 'en' } }, /Friday 20:00.*Automatic posts go in <#channel-9>/s],
+  ['socials', {}, /Nothing yet/],
   ['data', {}, /Monday Night SmashBall.*monday-night-smashball\.vercel\.app.*UB Smash Royale.*ub-smash-royale\.vercel\.app/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],

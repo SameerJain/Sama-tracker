@@ -13,7 +13,7 @@ import {
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
-import { configureSettings, configureLanguage, setupPosts, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
+import { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import {
@@ -51,10 +51,7 @@ function inGuild(interaction, run) {
 
 const handlers = new Map([
   ['help', (interaction) => sendEmbeds(interaction, embeds.help(flag(interaction, 'verbose')))],
-  ['settings posts', configureSettings],
-  ['settings recap', configureSettings],
-  ['settings language', configureLanguage],
-  ['settings channel', setupPosts],
+  ['t-o settings', configureSettings],
   ['data', (interaction) => sendEmbeds(interaction, embeds.dataPages())],
   ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],
   ['socials_edit add', socialsAdd],
@@ -333,7 +330,7 @@ async function autocomplete(interaction) {
 
   if (name === 'slippi remove' || name === 'slippi rank') return interaction.respond(slippiChoices(focused, { anyCode: name === 'slippi rank' }));
 
-  if (name === 'settings recap') return interaction.respond(timezoneChoices(focused));
+  if (name === 't-o settings' && interaction.options.getFocused(true).name === 'timezone') return interaction.respond(timezoneChoices(focused));
 
   if (name === 'socials_edit remove') {
     for (const social of state.socials) {

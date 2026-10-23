@@ -35,10 +35,13 @@ function fakeChannel(id, allowed = ['ViewChannel', 'SendMessages', 'EmbedLinks',
 async function setup(guildId, channel) {
   let reply;
   await handleCommand({
-    commandName: 'settings', guildId, guild: { id: guildId }, user: { id: 'me' },
+    commandName: 't-o', guildId, guild: { id: guildId }, user: { id: 'me' },
     client: { user: { id: 'bot' } },
     memberPermissions: { has: () => true },
-    options: { getSubcommandGroup: () => null, getSubcommand: () => 'channel', getChannel: () => channel },
+    options: {
+      getSubcommandGroup: () => null, getSubcommand: () => 'settings', getChannel: () => channel,
+      getBoolean: () => null, getString: () => null, getInteger: () => null,
+    },
     reply: async (result) => { reply = result; },
   });
   return reply;
@@ -96,28 +99,29 @@ test('global commands only work in a server, never in a DM with the bot', () => 
   for (const command of commands) assert.deepEqual(command.contexts, [InteractionContextType.Guild], command.name);
 });
 
-test('/settings channel is registered, fits limits and shows in help', async () => {
-  const settings = commands.find((command) => command.name === 'settings');
-  assert.ok(settings?.options.some((option) => option.name === 'channel'), 'no /settings channel');
-  // the handler checks Manage Server or the TO role, so discord can't be the one hiding it
-  assert.equal(settings.default_member_permissions, undefined);
+test('/t-o settings includes the posts channel and shows in help', async () => {
+  const to = commands.find((command) => command.name === 't-o');
+  const settings = to.options.find((option) => option.name === 'settings');
+  assert.ok(settings?.options.some((option) => option.name === 'channel'), 'no channel option');
+  assert.equal(to.default_member_permissions, undefined);
   const short = JSON.stringify(help(false));
-  assert.match(short, /\/settings channel channel:/);
+  assert.match(short, /\/t-o settings channel:/);
   const verbose = JSON.stringify(help(true));
-  assert.match(verbose, /`\/settings channel`/);
+  assert.match(verbose, /`\/t-o settings`/);
 });
 
-test('/settings channel with a guild id writes to that server, not the root', async () => {
+test('/t-o settings with a guild id writes the channel to that server, not the root', async () => {
   const { handleCommand } = await import('../src/commands/index.js');
   const calls = [];
   const interaction = {
-    commandName: 'settings', guildId: 'setup-guild',
+    commandName: 't-o', guildId: 'setup-guild',
     guild: { id: 'setup-guild' },
     user: { id: 'me' },
     memberPermissions: { has: () => true },
     options: {
-      getSubcommandGroup: () => null, getSubcommand: () => 'channel',
+      getSubcommandGroup: () => null, getSubcommand: () => 'settings',
       getChannel: () => ({ id: 'posts-1', isTextBased: () => true }),
+      getBoolean: () => null, getString: () => null, getInteger: () => null,
     },
     reply: async (result) => calls.push(result),
   };
@@ -148,37 +152,40 @@ test('a check waiting on start.gg posts in its own server while another server\'
   assert.equal(tracker.currentChannel(), null);
 });
 
-test('/settings channel moving the posts channel takes effect on the next check, without a restart', async () => {
+test('/t-o settings moving the posts channel takes effect on the next check, without a restart', async () => {
   const channels = { 'old-posts': fakeChannel('old-posts'), 'new-posts': fakeChannel('new-posts') };
   tracker.setBotClient({ channels: { fetch: async (id) => channels[id] ?? null } });
   forGuild('moving').channelId = 'old-posts';
   assert.equal((await tracker.guildChannel('moving')).id, 'old-posts');
-  assert.match((await setup('moving', channels['new-posts'])).content, /^Automatic posts go in <#new-posts>\.$/);
+  assert.match((await setup('moving', channels['new-posts'])).content, /Automatic posts go in <#new-posts>\./);
   assert.equal((await tracker.guildChannel('moving')).id, 'new-posts');
 });
 
-test('anyone can see the posts channel, but only Manage Server or a TO changes it', async () => {
+test('anyone can see the settings, but only a TO changes the posts channel', async () => {
   forGuild('open').channelId = 'posts-open';
   const ask = async (channel) => {
     let reply;
     await handleCommand({
-      commandName: 'settings', guildId: 'open', guild: { id: 'open' }, user: { id: 'member' }, member: { roles: { cache: new Map() } },
+      commandName: 't-o', guildId: 'open', guild: { id: 'open' }, user: { id: 'member' }, member: { roles: { cache: new Map() } },
       memberPermissions: { has: () => false },
-      options: { getSubcommandGroup: () => null, getSubcommand: () => 'channel', getChannel: () => channel },
+      options: {
+        getSubcommandGroup: () => null, getSubcommand: () => 'settings', getChannel: () => channel,
+        getBoolean: () => null, getString: () => null, getInteger: () => null,
+      },
       reply: async (result) => { reply = result; },
     });
     return reply;
   };
   const looked = await ask(null);
-  assert.equal(looked.content, 'Automatic posts go in <#posts-open>.');
+  assert.match(looked.content, /Posts channel:\*\* <#posts-open>/);
   assert.ok(looked.flags, 'looking is private');
   const refused = await ask(fakeChannel('elsewhere'));
-  assert.match(refused.content, /need Manage Server or the TO role/);
+  assert.match(refused.content, /Only TOs can change server settings/);
   assert.ok(refused.flags);
   assert.equal(forGuild('open').channelId, 'posts-open');
 });
 
-test('/settings channel turns down a channel the bot can\'t post in, and notes what only some posts need', async () => {
+test('/t-o settings turns down a channel the bot can\'t post in, and notes what only some posts need', async () => {
   forGuild('picky').channelId = 'posts-ok';
   const muted = await setup('picky', fakeChannel('muted', ['ViewChannel', 'AttachFiles', ...THREADS]));
   assert.equal(muted.content, 'I need Send Messages and Embed Links in <#muted> to post there. Add them to my role or the channel, then try again.');
@@ -187,10 +194,10 @@ test('/settings channel turns down a channel the bot can\'t post in, and notes w
 
   const bare = await setup('picky', fakeChannel('bare', ['ViewChannel', 'SendMessages', 'EmbedLinks']));
   assert.equal(forGuild('picky').channelId, 'bare');
-  assert.match(bare.content, /^Automatic posts go in <#bare>\.\n-# Without Attach Files there.*\n-# Without Create Public Threads and Send Messages in Threads there/);
+  assert.match(bare.content, /Automatic posts go in <#bare>\.\n-# Without Attach Files there.*\n-# Without Create Public Threads and Send Messages in Threads there/);
 });
 
-test('each server\'s posts channel is its own /settings channel pick, with CHANNEL_ID only for the migrated server', async () => {
+test('each server\'s posts channel is its own /t-o settings pick, with CHANNEL_ID only for the migrated server', async () => {
   process.env.GUILD_ID = 'home';
   process.env.CHANNEL_ID = 'home-posts';
   try {

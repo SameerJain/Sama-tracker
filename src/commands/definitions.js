@@ -64,55 +64,31 @@ function venueOption() {
   };
 }
 
+const SETTINGS_OPTIONS = [
+  ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
+  { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green win, red loss, gold crew vs crew, blue otherwise' },
+  {
+    type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
+    choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
+  },
+  { type: Option.Integer, name: 'event_length', description: 'Discord event hours when start.gg has no end time, 2 to 12', min_value: 2, max_value: 12 },
+  { type: Option.Integer, name: 'day', description: 'Weekly recap day', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
+  { type: Option.String, name: 'time', description: 'Weekly recap time in 24-hour HH:MM, like 21:00' },
+  { type: Option.String, name: 'timezone', description: 'Weekly recap timezone, like America/New_York or Europe/London', autocomplete: true },
+  {
+    type: Option.String, name: 'language', description: 'English or Spanish for this server',
+    choices: [{ name: 'English', value: 'en' }, { name: 'Español', value: 'es' }],
+  },
+  ...(isMultiGuild() ? [{
+    type: Option.Channel, name: 'channel', description: 'Channel for automatic posts',
+    channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
+  }] : []),
+];
+
 const commands = [
   {
     name: 'help', description: 'Short command list, verbose:True for the full one with details',
     options: [verboseOption('Every command with the details, instead of the short list')],
-  },
-  // no default_member_permissions, since discord would hide it from TOs without Manage Server. anyone can look,
-  // and a part run with nothing in it shows every setting
-  {
-    name: 'settings',
-    description: 'What gets posted here and how. Anyone can look, TOs or Manage Server change it',
-    options: [
-      {
-        type: Option.Subcommand, name: 'posts', description: 'Turn automatic posts on or off, plus threads, colors and event length',
-        options: [
-          ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
-          { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green win, red loss, gold crew vs crew, blue otherwise' },
-          {
-            type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
-            choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
-          },
-          { type: Option.Integer, name: 'event_length', description: 'Discord event hours when start.gg has no end time, 2 to 12', min_value: 2, max_value: 12 },
-        ],
-      },
-      {
-        type: Option.Subcommand, name: 'recap', description: 'When the weekly recap posts',
-        options: [
-          { type: Option.Integer, name: 'day', description: 'Day of the week', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
-          { type: Option.String, name: 'time', description: 'Time in 24-hour HH:MM, like 21:00' },
-          { type: Option.String, name: 'timezone', description: 'Timezone, like America/New_York or Europe/London', autocomplete: true },
-        ],
-      },
-      {
-        type: Option.Subcommand, name: 'language', description: 'Language for bot replies and automatic posts',
-        options: [{
-          type: Option.String, name: 'language', description: 'English or Spanish for this server', required: true,
-          choices: [{ name: 'English', value: 'en' }, { name: 'Español', value: 'es' }],
-        }],
-      },
-      // multi-server only: single-server builds post in CHANNEL_ID, so there's nothing to pick
-      ...(isMultiGuild() ? [{
-        type: Option.Subcommand, name: 'channel', description: 'The channel automatic posts go in for this server',
-        options: [
-          {
-            type: Option.Channel, name: 'channel', description: 'Channel for set results, roll calls, reminders and recaps',
-            channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
-          },
-        ],
-      }] : []),
-    ],
   },
   { name: 'data', description: 'Samatracker and both series data pages' },
   // two commands since one with subcommands can't be run on its own, and permissions are per command
@@ -247,6 +223,12 @@ const commands = [
         name: 'cleanup',
         description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. TOs only',
         options: [{ type: Option.Boolean, name: 'no_discord', description: 'Also untrack players with no Discord connected on start.gg' }],
+      },
+      {
+        type: Option.Subcommand,
+        name: 'settings',
+        description: 'Automatic posts, recap schedule, language and posts channel. TOs only',
+        options: SETTINGS_OPTIONS,
       },
     ],
   },

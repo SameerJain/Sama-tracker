@@ -29,9 +29,8 @@ function timezoneChoices(focused) {
   return zones.slice(0, 25).map((zone) => ({ name: zone, value: zone }));
 }
 
-// /settings posts and /settings recap. anyone can look, privately. a change needs a TO or Manage Server, and
-// it posts where everyone sees it
-function configureSettings(interaction) {
+// every server setting lives on /t-o settings. leaving the options blank shows them all.
+async function configureSettings(interaction) {
   const fail = (content) => replyEphemeral(interaction, content);
   const previous = messageSettings();
   const changes = {};
@@ -65,11 +64,15 @@ function configureSettings(interaction) {
     }
     changes.eventLength = eventLength;
   }
-
-  if (!Object.keys(changes).length) return replyEphemeral(interaction, settingsText());
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
-    return fail('Only TOs and people with Manage Server can change settings. Leave everything out to see them.');
+  const pickedLanguage = interaction.options.getString('language');
+  if (pickedLanguage !== null) {
+    if (!Object.hasOwn(LANGUAGES, pickedLanguage)) return fail('Pick English or Español.');
+    changes.language = pickedLanguage;
   }
+  const channel = interaction.options.getChannel?.('channel');
+
+  if (!Object.keys(changes).length && !channel) return replyEphemeral(interaction, settingsText());
+  if (!isTO(interaction)) return notTO(interaction, 'change server settings');
   // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
   if (changes.events && !previous.events) {
     const cant = cantMakeEvents(interaction.guild);
@@ -78,15 +81,17 @@ function configureSettings(interaction) {
   if (changes.threads && changes.threads !== 'off') {
     // checked when it's turned on so it doesn't wait for the next tournament to find out. in the posts
     // channel, not wherever this ran. a multi-server build with no posts channel yet posts nothing, and
-    // /settings channel checks threads when it picks one
-    const channelId = postsChannelId();
-    const postChannel = channelId && (interaction.client.channels.cache.get(channelId) ?? currentChannel());
+    // /t-o settings checks threads when it picks a channel
+    const channelId = channel?.id ?? postsChannelId();
+    const postChannel = channel ?? (channelId && (interaction.client.channels.cache.get(channelId) ?? currentChannel()));
     if (postChannel) {
       const missing = missingThreadPermissions(postChannel);
       if (!missing) return fail(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
       if (missing.length) return fail(`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
     }
   }
+  const channelLines = channel ? channelChange(interaction, channel) : [];
+  if (typeof channelLines === 'string') return fail(channelLines);
 
   const now = secondsNow();
   // anything that came due while one was off stays skipped once it's back on
@@ -97,30 +102,19 @@ function configureSettings(interaction) {
     changes.recapChangedAt = now;
   }
   state.messages = { ...state.messages, ...changes };
-  save();
-  return interaction.reply({ content: settingsText(), allowedMentions: { parse: [] } });
-}
-
-async function configureLanguage(interaction) {
-  const picked = interaction.options.getString('language', true);
-  if (!Object.hasOwn(LANGUAGES, picked)) return replyEphemeral(interaction, 'Pick English or Español.');
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
-    return replyEphemeral(interaction, 'Only TOs and people with Manage Server can change the language.');
-  }
-
-  state.messages = { ...state.messages, language: picked };
+  if (channel) state.channelId = channel.id;
   save();
   await interaction.reply({
-    content: picked === 'es' ? 'Ahora hablaré en español.' : 'I’ll speak English now.',
+    content: [settingsText(), ...channelLines].join('\n'),
     allowedMentions: { parse: [] },
   });
-  if (process.env.MULTI_GUILD !== 'true') {
+  if (pickedLanguage && process.env.MULTI_GUILD !== 'true') {
     const { commands } = await import('./definitions.js');
-    await interaction.guild?.commands?.set(commandsFor(commands, picked));
+    await interaction.guild?.commands?.set(commandsFor(commands, pickedLanguage));
   }
 }
 
-// every setting, for /settings with nothing changed and after a change
+// every setting, shown when /t-o settings has no options and after a change
 function settingsText() {
   const settings = messageSettings();
   const lines = ['**Automatic posts**'];
@@ -132,6 +126,7 @@ function settingsText() {
   lines.push(`**Event length:** ${settings.eventLength} hours`);
   lines.push(`**Set result colors:** ${settings.setColors ? 'on' : 'off'}`);
   lines.push(`**Language:** ${LANGUAGES[language()]}`);
+  if (process.env.MULTI_GUILD === 'true') lines.push(`**Posts channel:** ${state.channelId ? `<#${state.channelId}>` : 'not set'}`);
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
@@ -301,7 +296,7 @@ const PINGS = {
   },
 };
 
-const CALLS_OFF = '-# Match calls are off for the whole server, `/settings posts calls:True` turns them on.';
+const CALLS_OFF = '-# Match calls are off for the whole server, `/t-o settings calls:True` turns them on.';
 
 // the same words about someone else
 const say = (self, text) => (self ? text : text.replaceAll('You\'ll', 'They\'ll').replaceAll('your', 'their').replaceAll('you\'re', 'they\'re'));
@@ -518,36 +513,22 @@ function notify(interaction) {
 // what the bot can't post without, named the way discord's settings show them
 const POSTING = { ViewChannel: 'View Channel', SendMessages: 'Send Messages', EmbedLinks: 'Embed Links' };
 
-// /settings channel, multi-server only: where this server's automatic posts go. one channel per server, saved as
-// state.channelId, so each server's sets, roll calls and reminders stay on its own data.
-// the permissions get checked here, since a channel the bot can't post in loses every post quietly
-function setupPosts(interaction) {
-  if (!interaction.guildId && !interaction.guild?.id) return replyEphemeral(interaction, 'Run `/settings channel` in a server, not in DMs.');
-  // anyone can look, privately like the rest of /settings
-  const channel = interaction.options.getChannel('channel');
-  if (!channel) {
-    return replyEphemeral(interaction, state.channelId
-      ? `Automatic posts go in <#${state.channelId}>.`
-      : 'No posts channel set yet. Run `/settings channel channel:#channel`.');
-  }
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
-    return replyEphemeral(interaction, 'You need Manage Server or the TO role to pick the posts channel.');
-  }
-  if (!channel.isTextBased?.()) return replyEphemeral(interaction, 'Pick a text channel.');
+// null means the channel is usable. a string is the private error, and an array is public notes.
+function channelChange(interaction, channel) {
+  if (!interaction.guildId && !interaction.guild?.id) return 'Run `/t-o settings` in a server, not in DMs.';
+  if (!channel.isTextBased?.()) return 'Pick a text channel.';
   // a channel discord didn't send in full has no permissionsFor, and goes unchecked
   const has = channel.permissionsFor?.(interaction.client.user);
   const missing = has ? Object.keys(POSTING).filter((name) => !has.has(PermissionFlagsBits[name])).map((name) => POSTING[name]) : [];
   if (missing.length) {
-    return replyEphemeral(interaction, `I need ${new Intl.ListFormat('en').format(missing)} in <#${channel.id}> to post there. Add them to my role or the channel, then try again.`);
+    return `I need ${new Intl.ListFormat('en').format(missing)} in <#${channel.id}> to post there. Add them to my role or the channel, then try again.`;
   }
-  state.channelId = channel.id;
-  save();
   const lines = [`Automatic posts go in <#${channel.id}>.`];
   if (has && !has.has(PermissionFlagsBits.AttachFiles)) lines.push('-# Without Attach Files there, posts that upload character art, rank badges or the Slippi logo fail.');
-  // a tracked tournament always posts in a thread, whatever /settings posts threads says
+  // a tracked tournament always posts in a thread, whatever /t-o settings threads says
   const threads = missingThreadPermissions(channel);
   if (threads?.length) lines.push(`-# Without ${threads.join(' and ')} there, set results and stream alerts post in the channel instead of threads.`);
-  return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
+  return lines;
 }
 
-export { configureSettings, configureLanguage, timezoneChoices, setupPosts, socialsAdd, socialsRemove, trackPosts, notify };
+export { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify };

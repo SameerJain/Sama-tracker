@@ -62,13 +62,13 @@ function setEmbed(set, color, player, { author = true } = {}) {
   return embed;
 }
 
-// heads a /settings posts threads thread in the channel. tournament is the one sets carry under event
+// heads a /t-o settings threads thread in the channel. tournament is the one sets carry under event
 export function tournamentThread(tournament) {
   return tournamentEmbed(colors.thread, 'Tournament thread', tournament)
     .setDescription('Set results and stream alerts from this tournament go in the thread.');
 }
 
-// heads one event's thread with /settings posts threads set to one per event
+// heads one event's thread with /t-o settings threads set to one per event
 export function eventThread(event) {
   const game = event.videogame?.displayName;
   return tournamentEmbed(colors.thread, 'Event thread', event.tournament)

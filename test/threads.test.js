@@ -386,29 +386,35 @@ test('replacing a deleted thread unpins its old card and pins the new one', asyn
 async function configure(values, channel) {
   let reply;
   await handleCommand({
-    commandName: 'settings', memberPermissions: { has: permission => permission === PermissionFlagsBits.ManageGuild },
+    commandName: 't-o', memberPermissions: { has: permission => permission === PermissionFlagsBits.ManageGuild },
     client: { channels: { cache: new Map(channel ? [['posts', channel]] : []) } },
-    options: { getSubcommand: () => 'posts', getBoolean: name => values[name] ?? null, getString: name => values[name] ?? null, getInteger: () => null },
+    options: {
+      getSubcommandGroup: () => null, getSubcommand: () => 'settings', getBoolean: name => values[name] ?? null,
+      getString: name => values[name] ?? null, getInteger: () => null, getChannel: () => null,
+    },
     reply: async result => { reply = result; },
   });
   return reply.content;
 }
 
-test('/settings posts threads checks CHANNEL_ID, not the channel the command ran in', async () => {
+test('/t-o settings threads checks CHANNEL_ID, not the channel the command ran in', async () => {
   state.messages = {};
   let reply;
   await handleCommand({
-    commandName: 'settings', channelId: 'elsewhere', channel: fakeChannel(),
+    commandName: 't-o', channelId: 'elsewhere', channel: fakeChannel(),
     memberPermissions: { has: permission => permission === PermissionFlagsBits.ManageGuild },
     client: { channels: { cache: new Map([['posts', fakeChannel({ allowed: [] })], ['elsewhere', fakeChannel()]]) } },
-    options: { getSubcommand: () => 'posts', getBoolean: () => null, getString: name => (name === 'threads' ? 'tournament' : null), getInteger: () => null },
+    options: {
+      getSubcommandGroup: () => null, getSubcommand: () => 'settings', getBoolean: () => null,
+      getString: name => (name === 'threads' ? 'tournament' : null), getInteger: () => null, getChannel: () => null,
+    },
     reply: async result => { reply = result; },
   });
   assert.match(reply.content, /^I need Create Public Threads and Send Messages in Threads in <#posts>/);
   assert.deepEqual(state.messages, {});
 });
 
-test('/settings posts threads checks the bot can start threads before turning them on', async () => {
+test('/t-o settings threads checks the bot can start threads before turning them on', async () => {
   state.messages = {};
   let reply = await configure({ threads: 'tournament', sets: false }, fakeChannel({ allowed: ['CreatePublicThreads'] }));
   assert.equal(reply, 'I need Send Messages in Threads in <#posts> to start threads. Add them to my role or the channel, then try again.');
