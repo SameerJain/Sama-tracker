@@ -18,6 +18,8 @@ after(() => rmSync(directory, { recursive: true, force: true }));
 test('single-server builds have no /setup and read the root', async () => {
   assert.equal(isMultiGuild(), false);
   assert.ok(!commands.some((command) => command.name === 'setup'), 'single-server builds register no /setup');
+  // registered to the one server, so they never show in DMs and need no contexts
+  assert.ok(commands.every((command) => command.contexts === undefined));
   assert.doesNotMatch(JSON.stringify(help(false)), /\/setup/);
   assert.doesNotMatch(JSON.stringify(help(true)), /`\/setup`/);
 });

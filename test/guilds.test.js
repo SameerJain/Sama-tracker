@@ -3,6 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { InteractionContextType } from 'discord.js';
 
 // per-server store: one state.json holds every guild under state.guilds[guildId]
 const directory = mkdtempSync(join(tmpdir(), 'sama-guilds-'));
@@ -89,6 +90,10 @@ test('bad guild shapes fall back instead of crashing', async () => {
   const cleaned = cleanState({ players: {}, guilds: { broken: null, half: { players: 'nope' } } });
   assert.deepEqual(cleaned.guilds.broken.players, {});
   assert.deepEqual(cleaned.guilds.half.players, {});
+});
+
+test('global commands only work in a server, never in a DM with the bot', () => {
+  for (const command of commands) assert.deepEqual(command.contexts, [InteractionContextType.Guild], command.name);
 });
 
 test('/setup is registered, fits limits and shows in help', async () => {

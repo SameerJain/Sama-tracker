@@ -152,7 +152,7 @@ async function retryExpiredButton(interaction) {
     target = { channel: toChannel, ping: `<@${interaction.user.id}> ` };
   } else {
     try {
-      target = { channel: await interaction.user.createDM(), ping: '' };
+      target = { channel: await interaction.user.createDM(), ping: '', dm: true };
     } catch (err) {
       console.error(`/${command} button retry failed: couldn't open a DM (${err.message})`);
       return;
@@ -217,7 +217,8 @@ async function relaySend(relay, target, payload) {
   await target.channel.send({
     content: data.content ?? undefined,
     embeds: data.embeds,
-    components: data.components ?? [],
+    // buttons stay in the server. one pressed in a DM gets no answer, see index.js
+    components: target.dm ? [] : data.components ?? [],
     files: data.files ?? [],
     allowedMentions: { parse: [] },
   });

@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType as Option, ApplicationCommandType, ChannelType, PermissionFlagsBits } from 'discord.js';
+import { ApplicationCommandOptionType as Option, ApplicationCommandType, ChannelType, InteractionContextType, PermissionFlagsBits } from 'discord.js';
 import * as startgg from '../startgg.js';
 import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS } from '../message-settings.js';
 import { isMultiGuild } from '../store.js';
@@ -420,5 +420,11 @@ const commands = [
   { type: ApplicationCommandType.User, name: MEMBER_H2H },
   { type: ApplicationCommandType.User, name: MEMBER_SCOUT },
 ];
+
+// global commands also show in DMs with the bot, where the answer would be a DM to someone who might not be in
+// any of its servers. single-server builds register to the one server, so theirs only ever show there
+if (isMultiGuild()) {
+  for (const command of commands) command.contexts = [InteractionContextType.Guild];
+}
 
 export { commands, PICKABLE_GAMES, MEMBER_H2H, MEMBER_SCOUT, MATCHMAKING };

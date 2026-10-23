@@ -185,6 +185,9 @@ if (isMultiGuild()) {
 }
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  // everything the bot does is about a server, and an answer outside one would be a DM to someone who may not
+  // be in it. the commands only show in servers, but a button on an old DM could still be pressed
+  if (!interaction.inGuild()) return;
   if (interaction.isAutocomplete()) {
     await handleAutocomplete(interaction).catch(console.error);
     return;

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EmbedBuilder, MessageFlags } from 'discord.js';
-import { mockApi } from './fixtures.js';
+import { mockApi, node } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-buttons-'));
 process.env.STATE_DIR = directory;
@@ -324,6 +324,21 @@ test('an expired Full report press runs once more, posting the report as a new m
   assert.match(run.posted[0].content, /<@crew-discord>.*expired.*Retrying \/h2h/);
   assert.match(JSON.stringify(run.posted[1].embeds), /Hotel vs India/);
   assert.equal(run.dm.length, 0);
+});
+
+test('a report retried by DM comes without its buttons, since a press in a DM gets no answer', async () => {
+  const player = { userId: 901, playerId: 9010, tag: 'Juliet', slug: 'user/juliet' };
+  state.players = { 901: player };
+  state.links = {};
+  mockApi(({ query }) => {
+    if (query.includes('recentStandings')) return { player: { recentStandings: [], sets: { pageInfo: { totalPages: 1 }, nodes: [node('dm-1', 150, 9010)] } } };
+    throw new Error(`no fake for ${query.slice(0, 60)}`);
+  });
+  const press = expiredPress(reportButton('Stats', 'private', 'stats', { player }));
+  await handleButton(press);
+  const report = press.dm.find((each) => each.embeds?.length);
+  assert.ok(report, 'the report went by DM');
+  assert.deepEqual(report.components, []);
 });
 
 test('an expired press on an ephemeral or private report retries by DM, never the channel', async () => {

@@ -185,7 +185,7 @@ Tournament post changes apply while it is running. Sets turned on start from tha
 
 Reminders go out 7 days, 3 days, 1 day and 6 hours before registration closes, unless a TO sets custom times for that tournament with `schedule:`, like `schedule:7d,12h,1h`. A schedule holds up to 10 reminders, each 1 hour to 30 days out, and the last one is the last call. `/track list` shows a custom schedule next to its tournament. If registration stays open past the tournament start, the start is the deadline. Past reminders are skipped, and a last call set within 6 hours goes out right away. Turning reminders back on, or changing the schedule, with `/t-o tournament posts` starts from the next one still to come.
 
-`/notify dm_registration` sends a DM 1 hour before registration closes. `/notify dm_start` sends one 1 hour before the tournament starts. Both include the link, location, and image, require tournament reminders, and go only to current server members. Registration DMs skip registered players when start.gg has their Discord. If registration closes within an hour of the start, only the start DM goes out because it also has the registration link.
+`/notify dm_registration` sends a DM 1 hour before registration closes. `/notify dm_start` sends one 1 hour before the tournament starts. Both include the link, location, and image, require tournament reminders, and go only to current server members, checked right before each one goes out, so someone who left gets nothing. Leaving keeps your `/notify` switches for if you rejoin. These are the only DMs the bot sends on its own, and it answers nothing sent from a DM. Registration DMs skip registered players when start.gg has their Discord. If registration closes within an hour of the start, only the start DM goes out because it also has the registration link.
 
 Connect Discord on start.gg so the bot recognizes your registration and skips your registration DMs and `/reg_warn`. Channel reminders ping the **Reg Reminders** role for everyone with it. A hidden entrant list blocks these checks. `/reg_warn` sends no ping if registration is closed, the person is registered, the list is hidden, or someone already warned them about that tournament in the last 12 hours. That last one tells only whoever ran it, with when they can be warned again.
 
@@ -313,7 +313,7 @@ You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
 | `STARTGG_TOKEN` | Yes | The start.gg API token. |
 | `GUILD_ID` | Single-server only | The server. Commands register here. Leave out with `MULTI_GUILD=true`, which migrates it into that server's entry on first boot instead. |
 | `CHANNEL_ID` | Single-server only | The channel for automatic posts. Leave out with `MULTI_GUILD=true`. |
-| `MULTI_GUILD` | No | Set to `true` to serve every server the bot is invited to, each with its own track list, settings and `/setup` posts channel. Off by default. |
+| `MULTI_GUILD` | No | Set to `true` to serve every server the bot is invited to, each with its own track list, settings and `/setup` posts channel. Its commands only work in servers, not in a DM with the bot. Off by default. |
 | `ANTHROPIC_API_KEY` | No | Claude Haiku writes the fun command posts. |
 | `YOUTUBE_API_KEY` | No | YouTube videos for fun posts. Enable YouTube Data API v3 in a Google Cloud project and create an API key. OAuth isn't needed. |
 | `STATE_DIR` | No | Where `state.json` lives. See [Hosting](#hosting). |

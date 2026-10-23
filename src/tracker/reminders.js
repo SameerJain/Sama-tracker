@@ -72,22 +72,9 @@ export async function postRegReminders(postChannel = currentChannel()) {
 // TO moving one sends it again for the new time
 export async function postDmReminders(postChannel = currentChannel()) {
   const client = postChannel?.client;
-  if (!client || (!state.regDmPings.length && !state.startDmPings.length)) return;
-
-  // only current server members get DMs, so leavers get nothing until they rejoin. prefs stay saved.
-  // a failed membership check sends nothing and retries next time, so nobody is marked as sent
-  let inServer = null;
+  // DMs only go to members of the posts channel's server, so with no server to check against nobody gets one
   const guild = postChannel?.guild;
-  if (guild) {
-    try {
-      const ids = [...new Set([...state.regDmPings, ...state.startDmPings])].filter(mentionable);
-      inServer = new Set((await serverMembers(guild, ids)).keys());
-    } catch (err) {
-      console.error('DM membership check failed:', err.message);
-      return;
-    }
-  }
-  const memberOnly = (id) => !inServer || inServer.has(id);
+  if (!client || !guild || (!state.regDmPings.length && !state.startDmPings.length)) return;
 
   for (const tournament of Object.values(state.tournaments)) {
     if (!posting(tournament, 'reminders') || !dmSoon(tournament)) continue;
@@ -109,16 +96,19 @@ export async function postDmReminders(postChannel = currentChannel()) {
       // registration closes more than an hour before the start, so the start DM can't cover it
       const separate = deadline < startAt - DM_HOURS_BEFORE * HOUR;
       if (state.regDmPings.length && separate && tournament.dmRegSentFor !== deadline && dmDue(deadline)) {
-        tournament.dmRegSentFor = deadline;
+        let to = [];
         // not open means it filled up
         if (latest.isRegistrationOpen) {
           const participants = await startgg.getParticipants(latest.id);
           rememberAccounts(participants);
           const registered = new Set(participants.map((participant) => participant.discordId));
-          const embed = embeds.regReminder(latest, deadline, true);
-          const unregistered = state.regDmPings.filter((id) => !registered.has(id) && mentionable(id) && memberOnly(id));
-          for (const discordId of unregistered) await dmUser(client, discordId, embed);
+          to = await stillInServer(guild, state.regDmPings.filter((id) => !registered.has(id)));
         }
+        // marked once the lookups worked and before anything goes out, so a failure tries again next check
+        // and nobody gets it twice
+        tournament.dmRegSentFor = deadline;
+        const embed = embeds.regReminder(latest, deadline, true);
+        for (const discordId of to) await dmUser(client, discordId, embed);
       }
     } catch (err) {
       console.error(`registration DMs for ${named(tournament)} failed:`, err.message);
@@ -126,10 +116,10 @@ export async function postDmReminders(postChannel = currentChannel()) {
 
     try {
       if (state.startDmPings.length && tournament.dmStartSentFor !== startAt && dmDue(startAt)) {
+        const to = await stillInServer(guild, state.startDmPings);
         tournament.dmStartSentFor = startAt;
         const embed = embeds.startReminder(latest);
-        const going = state.startDmPings.filter((id) => mentionable(id) && memberOnly(id));
-        for (const discordId of going) await dmUser(client, discordId, embed);
+        for (const discordId of to) await dmUser(client, discordId, embed);
       }
     } catch (err) {
       console.error(`start DMs for ${named(tournament)} failed:`, err.message);
@@ -152,6 +142,16 @@ function dmSoon(tournament, now = secondsNow()) {
   if (state.regDmPings.length && tournament.dmRegSentFor !== deadline) pending.push(deadline);
   if (state.startDmPings.length && tournament.dmStartSentFor !== startAt) pending.push(startAt);
   return pending.some((at) => at > now && at - now <= (DM_HOURS_BEFORE + DM_LOOKAHEAD_HOURS) * HOUR);
+}
+
+// the ones of these discord ids in the server right now. it's asked right before the DMs go out, since a start.gg
+// lookup can take long enough for someone to leave. leavers keep their /notify switches for if they rejoin.
+// throws when discord can't say, so the caller sends nothing
+async function stillInServer(guild, ids) {
+  const wanted = ids.filter(mentionable);
+  if (!wanted.length) return [];
+  const members = await serverMembers(guild, [...new Set(wanted)]);
+  return wanted.filter((id) => members.has(id));
 }
 
 // one DM, skipped when DMs are closed or the user left. failures stay in the logs, the rest still go out

@@ -23,20 +23,11 @@ function mockApi(respond) {
   answerWith(respond);
 }
 
-// a fake post channel whose client DMs into sent instead of discord. inServer lists
-// the discord ids still in the server, null for no guild. fetchFails makes the check fail
-function dmChannel(sent, inServer = null, fetchFails = false) {
-  return {
-    ...(inServer !== null || fetchFails ? {
-      guild: {
-        members: {
-          fetch: async ({ user: ids }) => {
-            if (fetchFails) throw new Error('discord down');
-            return new Map(ids.filter((id) => inServer.includes(id)).map((id) => [id, {}]));
-          },
-        },
-      },
-    } : {}),
+// a fake post channel whose client DMs into sent instead of discord. inServer lists the discord ids in the
+// server, read each time the bot asks, so a test can change it partway. left out it's everyone, and null is
+// a channel with no server at all. fetchFails makes the membership check fail
+function dmChannel(sent, inServer = 'everyone', fetchFails = false) {
+  const channel = {
     client: {
       users: {
         fetch: async (id) => ({
@@ -49,6 +40,17 @@ function dmChannel(sent, inServer = null, fetchFails = false) {
     },
     send: async () => ({}),
   };
+  if (inServer === null) return channel;
+  const member = (id) => inServer === 'everyone' || inServer.includes(id);
+  channel.guild = {
+    members: {
+      fetch: async ({ user: ids }) => {
+        if (fetchFails) throw new Error('discord down');
+        return new Map(ids.filter(member).map((id) => [id, {}]));
+      },
+    },
+  };
+  return channel;
 }
 
 const tracked = { by: 'manual', at: 0, sets: true, stream: true, top8: true, reminders: true };
@@ -369,4 +371,63 @@ test('a failed membership check sends no DMs and leaves them unsent', async () =
   await tracker.postDmReminders(dmChannel(sent, [], true));
   assert.equal(sent.length, 0);
   assert.equal(state.tournaments[1].dmStartSentFor, undefined);
+});
+
+test('no DMs go out without a server to check membership against', async () => {
+  reset();
+  const now = Math.floor(Date.now() / 1000);
+  state.startDmPings = ['fan'];
+  state.tournaments = {
+    1: {
+      id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: {},
+    },
+  };
+  let asked = 0;
+  mockApi(() => {
+    asked++;
+    return {
+      tournament: {
+        id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+        registrationClosesAt: now + 1800, isRegistrationOpen: true, images, numAttendees: 5, events: [],
+        city: 'Buffalo', addrState: 'NY', isOnline: false,
+      },
+    };
+  });
+  const sent = [];
+  await tracker.postDmReminders(dmChannel(sent, null));
+  assert.equal(sent.length, 0);
+  assert.equal(asked, 0);
+  assert.equal(state.tournaments[1].dmStartSentFor, undefined);
+});
+
+test('someone who leaves while start.gg answers gets no DM', async () => {
+  reset();
+  const now = Math.floor(Date.now() / 1000);
+  state.startDmPings = ['stays', 'leaves'];
+  state.tournaments = {
+    1: {
+      id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+      entries: [], userIds: [], tracked: { ...tracked }, reminder: {},
+    },
+  };
+  const inServer = ['stays', 'leaves'];
+  mockApi(({ query }) => {
+    if (query.includes('registrationClosesAt')) {
+      // they leave in the time start.gg takes to answer
+      inServer.splice(inServer.indexOf('leaves'), 1);
+      return {
+        tournament: {
+          id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, endAt: now + 5400,
+          registrationClosesAt: now + 1800, isRegistrationOpen: true, images, numAttendees: 5, events: [],
+          city: 'Buffalo', addrState: 'NY', isOnline: false,
+        },
+      };
+    }
+    throw new Error(`no fake for ${query.slice(0, 60)}`);
+  });
+  const sent = [];
+  await tracker.postDmReminders(dmChannel(sent, inServer));
+  assert.deepEqual(sent.map((each) => each.to), ['stays']);
+  assert.equal(state.tournaments[1].dmStartSentFor, now + 1800);
 });
