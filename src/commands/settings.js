@@ -6,6 +6,7 @@ import {
 } from '../message-settings.js';
 import { cantMakeEvents } from '../discord-events.js';
 import { count } from '../embeds/shared.js';
+import { commandsFor, LANGUAGES, language } from '../i18n.js';
 import { isSelf, linkedPlayer, readTracked, replyEphemeral, replyNotTracked } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
 import { isTO, notTO } from './to.js';
@@ -100,6 +101,25 @@ function configureSettings(interaction) {
   return interaction.reply({ content: settingsText(), allowedMentions: { parse: [] } });
 }
 
+async function configureLanguage(interaction) {
+  const picked = interaction.options.getString('language', true);
+  if (!Object.hasOwn(LANGUAGES, picked)) return replyEphemeral(interaction, 'Pick English or Español.');
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
+    return replyEphemeral(interaction, 'Only TOs and people with Manage Server can change the language.');
+  }
+
+  state.messages = { ...state.messages, language: picked };
+  save();
+  await interaction.reply({
+    content: picked === 'es' ? 'Ahora hablaré en español.' : 'I’ll speak English now.',
+    allowedMentions: { parse: [] },
+  });
+  if (process.env.MULTI_GUILD !== 'true') {
+    const { commands } = await import('./definitions.js');
+    await interaction.guild?.commands?.set(commandsFor(commands, picked));
+  }
+}
+
 // every setting, for /settings with nothing changed and after a change
 function settingsText() {
   const settings = messageSettings();
@@ -111,6 +131,7 @@ function settingsText() {
   lines.push(`**Threads:** ${THREAD_MODES[settings.threads]}`);
   lines.push(`**Event length:** ${settings.eventLength} hours`);
   lines.push(`**Set result colors:** ${settings.setColors ? 'on' : 'off'}`);
+  lines.push(`**Language:** ${LANGUAGES[language()]}`);
   lines.push('', '**Weekly recap**',
     `**Posts:** ${settings.recap ? 'on' : 'off'} · **Day and time:** ${WEEKDAYS[settings.recapDay]} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.',
@@ -529,4 +550,4 @@ function setupPosts(interaction) {
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
-export { configureSettings, timezoneChoices, setupPosts, socialsAdd, socialsRemove, trackPosts, notify };
+export { configureSettings, configureLanguage, timezoneChoices, setupPosts, socialsAdd, socialsRemove, trackPosts, notify };

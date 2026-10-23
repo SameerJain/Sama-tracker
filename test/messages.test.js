@@ -18,7 +18,7 @@ after(() => rmSync(directory, { recursive: true, force: true }));
 const RECAP_OPTIONS = ['day', 'time', 'timezone'];
 async function configure(values = {}, allowed = true, guild = undefined, user = 'manager') {
   let reply;
-  const subcommand = Object.keys(values).some((name) => RECAP_OPTIONS.includes(name)) ? 'recap' : 'posts';
+  const subcommand = values.language ? 'language' : Object.keys(values).some((name) => RECAP_OPTIONS.includes(name)) ? 'recap' : 'posts';
   await handleCommand({
     commandName: 'settings', guild, user: { id: user }, member: guild?.members?.cache?.get(user),
     memberPermissions: { has: permission => allowed && permission === PermissionFlagsBits.ManageGuild },
@@ -79,6 +79,17 @@ test('only managers or TOs can change settings', async () => {
   const changed = await configure({ sets: false }, false, guild, to.id);
   assert.match(changed.content, /Set results:\*\* off/);
   assert.equal(state.messages.sets, false);
+});
+
+test('only managers or TOs can change the server language', async () => {
+  state.messages = {};
+  const denied = await configure({ language: 'es' }, false);
+  assert.match(denied.content, /Only TOs and people with Manage Server can change the language/);
+  assert.equal(state.messages.language, undefined);
+
+  const changed = await configure({ language: 'es' });
+  assert.equal(changed.content, 'Ahora hablaré en español.');
+  assert.equal(state.messages.language, 'es');
 });
 
 test('message switches and recap schedule save immediately and answer where everyone sees them', async (t) => {

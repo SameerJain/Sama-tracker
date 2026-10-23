@@ -210,6 +210,8 @@ const runs = [
   ['settings', { subcommand: 'posts', values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
   ['settings', { subcommand: 'posts', values: { events: false } }, /Discord events for tracked tournaments:\*\* off/],
   ['settings', { subcommand: 'recap', values: { day: 5, time: '20:00' } }, /Friday 20:00/], ['socials', {}, /Nothing yet/],
+  ['settings', { subcommand: 'language', values: { language: 'es' } }, /Ahora hablaré en español/],
+  ['settings', { subcommand: 'language', values: { language: 'en' } }, /I’ll speak English now/],
   ['data', {}, /Monday Night SmashBall.*monday-night-smashball\.vercel\.app.*UB Smash Royale.*ub-smash-royale\.vercel\.app/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],

@@ -193,6 +193,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Command | What it does |
 | --- | --- |
 | `/help` | Short command list. `verbose:True` lists every command with the details. |
+| `/settings language language:<English or Español>` | Set the language for bot replies and automatic posts in this server. TOs or Manage Server only. |
 | `/settings channel channel:#channel` | Multi-server only. Show or set the channel automatic posts go in for this server. Anyone can look, and TOs or Manage Server can change it. A channel the bot can't view, send messages or embed links in gets turned down, and a missing Attach Files or thread permission gets a note. The next check posts in the new channel, no restart needed. Without it the bot answers commands but posts nothing. |
 | `/status` | Uptime, when the latest version was deployed plus its message, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, whether start.gg is down right now, any downtime before the last start, why a post last missed its thread, and a link to the GitHub repo. A copy run on another computer also shows that computer's name. |
 | `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |

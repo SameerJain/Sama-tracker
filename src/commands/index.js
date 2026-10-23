@@ -13,7 +13,7 @@ import {
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
-import { configureSettings, setupPosts, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
+import { configureSettings, configureLanguage, setupPosts, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import {
@@ -53,6 +53,7 @@ const handlers = new Map([
   ['help', (interaction) => sendEmbeds(interaction, embeds.help(flag(interaction, 'verbose')))],
   ['settings posts', configureSettings],
   ['settings recap', configureSettings],
+  ['settings language', configureLanguage],
   ['settings channel', setupPosts],
   ['data', (interaction) => sendEmbeds(interaction, embeds.dataPages())],
   ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],

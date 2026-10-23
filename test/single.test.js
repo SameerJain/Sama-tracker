@@ -18,7 +18,7 @@ after(() => rmSync(directory, { recursive: true, force: true }));
 test('single-server builds have no /settings channel and read the root', async () => {
   assert.equal(isMultiGuild(), false);
   const settings = commands.find((command) => command.name === 'settings');
-  assert.deepEqual(settings.options.map((option) => option.name), ['posts', 'recap'], 'single-server builds post in CHANNEL_ID');
+  assert.deepEqual(settings.options.map((option) => option.name), ['posts', 'recap', 'language'], 'single-server builds post in CHANNEL_ID');
   // registered to the one server, so they never show in DMs and need no contexts
   assert.ok(commands.every((command) => command.contexts === undefined));
   assert.doesNotMatch(JSON.stringify(help(false)), /\/settings channel/);

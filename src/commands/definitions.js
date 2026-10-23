@@ -95,6 +95,13 @@ const commands = [
           { type: Option.String, name: 'timezone', description: 'Timezone, like America/New_York or Europe/London', autocomplete: true },
         ],
       },
+      {
+        type: Option.Subcommand, name: 'language', description: 'Language for bot replies and automatic posts',
+        options: [{
+          type: Option.String, name: 'language', description: 'English or Spanish for this server', required: true,
+          choices: [{ name: 'English', value: 'en' }, { name: 'Español', value: 'es' }],
+        }],
+      },
       // multi-server only: single-server builds post in CHANNEL_ID, so there's nothing to pick
       ...(isMultiGuild() ? [{
         type: Option.Subcommand, name: 'channel', description: 'The channel automatic posts go in for this server',
