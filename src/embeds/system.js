@@ -150,11 +150,11 @@ export function backOnline(outage, catchUpHours = 3) {
   return baseEmbed(colors.system).setTitle('Back online').setDescription(outageLines(outage, catchUpHours).join('\n'));
 }
 
-// a /matchmaking_search ping. a mention in a card never pings, so this one is just a name to click
+// a /matchmaking search ping. a mention in a card never pings, so this one is just a name to click
 export function matchmaking({ label, color, discordId, avatar, message }) {
   const lines = [`<@${discordId}> is looking for ${label} games.`];
   if (message) lines.push(`> ${message}`);
-  lines.push(`-# \`/matchmaking_role game:${label}\` gets you these pings, or stops them`);
+  lines.push(`-# \`/matchmaking role game:${label}\` gets you these pings, or stops them`);
   return baseEmbed(color).setTitle(`${label} matchmaking`).setThumbnail(avatar).setDescription(lines.join('\n'));
 }
 
@@ -179,27 +179,27 @@ function shortHelp() {
     '**Start here**',
     '`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up',
     '`/track add` post your placements here. TOs can add anyone',
-    ...(isMultiGuild() ? ['`/setup channel:#channel` pick where automatic posts go (Manage Server or TOs). Then `/messages` controls what posts'] : []),
+    ...(isMultiGuild() ? ['`/settings channel channel:#channel` pick where automatic posts go (TOs or Manage Server)'] : []),
     '`/notify` pings for match calls, streams, reg reminders and 1-hour DMs',
     '`/help verbose:True` the full list with the details',
     '',
     '**Look up stats**',
     '`/stats` record and placements · `/recent` latest sets · `/run` current run and next opponent',
     '`/h2h opponent:` record and one-line odds · `/predict opponent:` odds and why',
-    '`/scout profile:` form and habits · `/progress` last 30 days vs the 30 before',
+    '`/scout opponent:` form and habits · `/progress` last 30 days vs the 30 before',
     '`/characters` reported characters · `/doubles` 2v2 record · `/upcoming` tournaments',
     '',
     '**TOs**',
     '`/t-o role add user:` hand out the TO role · `/t-o role set role:` use an existing role',
     '`/t-o tournament event tournament:` make a Discord event · `/track posts` results and alerts on or off',
-    '-# TOs can control `/messages`, track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one',
+    '-# TOs can change `/settings`, track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one',
     '',
     '**Tournaments**',
     '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered',
     '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks',
     '`/data` Samatracker and both series data pages',
-    '`/messages` automatic posts and threads, for TOs or Manage Server · `/status` uptime and last checks',
-    '`/matchmaking_role game:` get game pings · `/matchmaking_search game:` find games · `/matchmaking_channel` where searches go',
+    '`/settings` what posts here and when, anyone can look · `/status` uptime and last checks',
+    '`/matchmaking role game:` get game pings · `/matchmaking search game:` find games',
     '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun',
   ];
   return [baseEmbed(colors.brand).setTitle('Sama-tracker').setDescription(lines.join('\n'))];
@@ -215,12 +215,17 @@ export function help(verbose = false) {
       '**General**',
       '`/help` this list',
       '`/status` uptime, when the latest version was deployed, the last start.gg and Slippi checks, and whether start.gg is down',
-      ...(isMultiGuild() ? ['`/setup` show or set the channel automatic posts go in for this server. Anyone can look, Manage Server or TOs change it, and it checks the bot can post there'] : []),
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
       '`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, most events entered and characters',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
-      '`/messages` automatic posts on or off, threads, event length, set result colors and the recap schedule. TOs or Manage Server',
+    ],
+    [
+      '**Settings**',
+      '`/settings posts` automatic posts on or off, threads, set result colors and Discord event length',
+      '`/settings recap` the day, time and timezone of the weekly recap',
+      ...(isMultiGuild() ? ['`/settings channel` the channel automatic posts go in for this server. It checks the bot can post there'] : []),
+      '-# Run one with nothing filled in to see every setting, privately. Anyone can look, TOs or Manage Server change them',
     ],
     [
       '**Tracking players**',
@@ -250,9 +255,9 @@ export function help(verbose = false) {
     ],
     [
       '**Matchmaking**',
-      '`/matchmaking_role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many hours, like 2 or 0.5 for 30 minutes, then it comes off on its own',
-      '`/matchmaking_search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them, named like `Melee:Sam (10/21)`. Only people with the role can',
-      '`/matchmaking_channel` where a game\'s searches post with `game:` and `channel:`. TOs only to change it, anyone can look. Left out means wherever the command runs. `clear:True` goes back to that',
+      '`/matchmaking role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many hours, like 2 or 0.5 for 30 minutes, then it comes off on its own',
+      '`/matchmaking search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them, named like `Melee:Sam (10/21)`. Only people with the role can',
+      '`/matchmaking channel` where a game\'s searches post with `game:` and `channel:`. TOs only to change it, anyone can look. Left out means wherever the command runs. `clear:True` goes back to that',
       '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it',
     ],
     [
@@ -266,8 +271,7 @@ export function help(verbose = false) {
       '`/stats` set record, placements and best upset',
       '`/doubles` one player\'s 2v2 record, partners and placements',
       '`/h2h` record against someone, with one-line odds',
-      '`/predict` odds of beating someone, and why',
-      '`/predict_explained` full breakdown of the odds, with shares, model numbers and bars',
+      '`/predict` odds of beating someone, and why. `verbose:True` is the full breakdown, with how much each part counts and bars',
       '`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg',
       '`/progress` last 30 days vs the 30 before, by game',
       '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more',
@@ -309,24 +313,24 @@ export function help(verbose = false) {
       '`/pplus` a Project+ player who wants you on netplay',
       '`/bills` Live pro-Bills photos and official Bills GIFs. Never sends the same image twice in a row',
       '`/view_pfp` my profile picture, full size',
-      '-# `/messages bills:True` posts Bills final scores here after each game, green for a win and red for a loss',
+      '-# `/settings posts bills:True` posts Bills final scores here after each game, green for a win and red for a loss',
     ],
     [
       '**Posted here automatically**',
-      '**Set results.** Every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked. `/messages set_colors` colors them green for a win, red for a loss, gold for crew vs crew and blue when nobody tracked played',
+      '**Set results.** Every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked. `/settings posts set_colors` colors them green for a win, red for a loss, gold for crew vs crew and blue when nobody tracked played',
       '**Stream alerts.** Sets on stream or up next in the stream queue for 30 seconds, at tracked tournaments and for tracked players with stream alerts on, pinging whoever is playing with `/notify streams` on',
       '**Match call pings.** Called sets, pinging whoever has `/notify calls` on with You\'re up and the station when start.gg has one, all four in one message for doubles. A tracked tournament with `calls:on` posts every called set even with nobody to ping. A call the TO takes back gets crossed out, and calling it again pings again',
       '**Tournament roll calls.** An hour before a tournament with 3+ of the crew, with the streams from its start.gg page. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server',
       '**Tournament placements.** Where the crew placed, with the top 8 when every event finishes at a tracked tournament, even if top 8 posts are off. Otherwise 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
       '**Registration reminders.** Tracked tournaments 7 days, 3 days and a day out, then a last call 6 hours before, pinging the Reg Reminders role, unless a TO sets custom times with `schedule:`. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start, both only while you\'re in this server. When registration closes within an hour of the start there\'s one DM, the start one',
-      '**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/messages events` turns it on',
+      '**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/settings posts events` turns it on',
       '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg. When a season ends, a wrap-up with the final ranks, biggest climbers and most played characters',
-      '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',
-      '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
+      '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/settings posts bills` turns it on',
+      '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/settings recap` changes it',
       '**Bot updates.** A new version going live on Railway, with when it deployed and the commit message',
       '**Back online.** After the bot was off 10 minutes or more, for how long and that commands sent then need sending again. While start.gg is down, commands say so right away and the bot\'s status shows it',
-      '-# Tracked tournaments post their set results and stream alerts in a thread. `/messages threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here',
+      '-# Tracked tournaments post their set results and stream alerts in a thread. `/settings posts threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here',
     ],
   ];
   // the same page number goes on top and bottom of every card, with room left so none passes 4096

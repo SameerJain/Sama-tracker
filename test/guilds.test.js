@@ -35,10 +35,10 @@ function fakeChannel(id, allowed = ['ViewChannel', 'SendMessages', 'EmbedLinks',
 async function setup(guildId, channel) {
   let reply;
   await handleCommand({
-    commandName: 'setup', guildId, guild: { id: guildId }, user: { id: 'me' },
+    commandName: 'settings', guildId, guild: { id: guildId }, user: { id: 'me' },
     client: { user: { id: 'bot' } },
     memberPermissions: { has: () => true },
-    options: { getSubcommandGroup: () => null, getSubcommand: () => false, getChannel: () => channel },
+    options: { getSubcommandGroup: () => null, getSubcommand: () => 'channel', getChannel: () => channel },
     reply: async (result) => { reply = result; },
   });
   return reply;
@@ -96,27 +96,27 @@ test('global commands only work in a server, never in a DM with the bot', () => 
   for (const command of commands) assert.deepEqual(command.contexts, [InteractionContextType.Guild], command.name);
 });
 
-test('/setup is registered, fits limits and shows in help', async () => {
-  const setup = commands.find((command) => command.name === 'setup');
-  assert.ok(setup, 'no /setup command');
+test('/settings channel is registered, fits limits and shows in help', async () => {
+  const settings = commands.find((command) => command.name === 'settings');
+  assert.ok(settings?.options.some((option) => option.name === 'channel'), 'no /settings channel');
   // the handler checks Manage Server or the TO role, so discord can't be the one hiding it
-  assert.equal(setup.default_member_permissions, undefined);
+  assert.equal(settings.default_member_permissions, undefined);
   const short = JSON.stringify(help(false));
-  assert.match(short, /\/setup channel/);
+  assert.match(short, /\/settings channel channel:/);
   const verbose = JSON.stringify(help(true));
-  assert.match(verbose, /`\/setup`/);
+  assert.match(verbose, /`\/settings channel`/);
 });
 
-test('/setup with a guild id writes to that server, not the root', async () => {
+test('/settings channel with a guild id writes to that server, not the root', async () => {
   const { handleCommand } = await import('../src/commands/index.js');
   const calls = [];
   const interaction = {
-    commandName: 'setup', guildId: 'setup-guild',
+    commandName: 'settings', guildId: 'setup-guild',
     guild: { id: 'setup-guild' },
     user: { id: 'me' },
     memberPermissions: { has: () => true },
     options: {
-      getSubcommandGroup: () => null, getSubcommand: () => false,
+      getSubcommandGroup: () => null, getSubcommand: () => 'channel',
       getChannel: () => ({ id: 'posts-1', isTextBased: () => true }),
     },
     reply: async (result) => calls.push(result),
@@ -148,7 +148,7 @@ test('a check waiting on start.gg posts in its own server while another server\'
   assert.equal(tracker.currentChannel(), null);
 });
 
-test('/setup moving the posts channel takes effect on the next check, without a restart', async () => {
+test('/settings channel moving the posts channel takes effect on the next check, without a restart', async () => {
   const channels = { 'old-posts': fakeChannel('old-posts'), 'new-posts': fakeChannel('new-posts') };
   tracker.setBotClient({ channels: { fetch: async (id) => channels[id] ?? null } });
   forGuild('moving').channelId = 'old-posts';
@@ -162,21 +162,23 @@ test('anyone can see the posts channel, but only Manage Server or a TO changes i
   const ask = async (channel) => {
     let reply;
     await handleCommand({
-      commandName: 'setup', guildId: 'open', guild: { id: 'open' }, user: { id: 'member' }, member: { roles: { cache: new Map() } },
+      commandName: 'settings', guildId: 'open', guild: { id: 'open' }, user: { id: 'member' }, member: { roles: { cache: new Map() } },
       memberPermissions: { has: () => false },
-      options: { getSubcommandGroup: () => null, getSubcommand: () => false, getChannel: () => channel },
+      options: { getSubcommandGroup: () => null, getSubcommand: () => 'channel', getChannel: () => channel },
       reply: async (result) => { reply = result; },
     });
     return reply;
   };
-  assert.equal((await ask(null)).content, 'Automatic posts go in <#posts-open>.');
+  const looked = await ask(null);
+  assert.equal(looked.content, 'Automatic posts go in <#posts-open>.');
+  assert.ok(looked.flags, 'looking is private');
   const refused = await ask(fakeChannel('elsewhere'));
   assert.match(refused.content, /need Manage Server or the TO role/);
   assert.ok(refused.flags);
   assert.equal(forGuild('open').channelId, 'posts-open');
 });
 
-test('/setup turns down a channel the bot can\'t post in, and notes what only some posts need', async () => {
+test('/settings channel turns down a channel the bot can\'t post in, and notes what only some posts need', async () => {
   forGuild('picky').channelId = 'posts-ok';
   const muted = await setup('picky', fakeChannel('muted', ['ViewChannel', 'AttachFiles', ...THREADS]));
   assert.equal(muted.content, 'I need Send Messages and Embed Links in <#muted> to post there. Add them to my role or the channel, then try again.');
@@ -188,7 +190,7 @@ test('/setup turns down a channel the bot can\'t post in, and notes what only so
   assert.match(bare.content, /^Automatic posts go in <#bare>\.\n-# Without Attach Files there.*\n-# Without Create Public Threads and Send Messages in Threads there/);
 });
 
-test('each server\'s posts channel is its own /setup pick, with CHANNEL_ID only for the migrated server', async () => {
+test('each server\'s posts channel is its own /settings channel pick, with CHANNEL_ID only for the migrated server', async () => {
   process.env.GUILD_ID = 'home';
   process.env.CHANNEL_ID = 'home-posts';
   try {

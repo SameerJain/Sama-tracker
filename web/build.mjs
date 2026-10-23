@@ -1,7 +1,7 @@
 // bundles the series pages' data into the one file the web hub reads. it only reads what the series
 // builds wrote, so the hub needs no token and works as a plain static page
 // usage: node web/build.mjs (series/build-all.mjs runs it too)
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { copyFileSync, readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { charCounts, crossSeries, headToHeadSets } from '../series/shared/compute.mjs';
@@ -44,7 +44,20 @@ export function unifyPlayers(seriesData) {
   return Object.values(byId).sort((a, b) => b.totalEvents - a.totalEvents || b.totalWins - a.totalWins || a.tag.localeCompare(b.tag));
 }
 
+// the bot's own files the page imports, so the page and the bot can't disagree on a rank, a connect code or a
+// plural. copied rather than linked, since Vercel only uploads web/
+function copyFromBot() {
+  const lib = path.join(ROOT, 'web', 'lib');
+  mkdirSync(path.join(lib, 'ranks'), { recursive: true });
+  copyFileSync(path.join(ROOT, 'src', 'format.js'), path.join(lib, 'format.js'));
+  copyFileSync(path.join(ROOT, 'src', 'slippi', 'shared.js'), path.join(lib, 'slippi.js'));
+  const ranks = path.join(ROOT, 'src', 'assets', 'ranks');
+  for (const file of readdirSync(ranks)) copyFileSync(path.join(ranks, file), path.join(lib, 'ranks', file));
+  copyFileSync(path.join(ROOT, 'src', 'assets', 'slippi.png'), path.join(lib, 'slippi.png'));
+}
+
 export function buildHub() {
+  copyFromBot();
   const out = path.join(ROOT, 'web', 'data');
   mkdirSync(out, { recursive: true });
   const series = [];

@@ -313,7 +313,7 @@ test('/t-o tournament event then add_event lands on the same event, and only the
   assert.equal(state.discordEvents[6].eventId, first.created[0].id);
 });
 
-// /messages events, for tracked tournaments. 6 was tracked for a tournament admin before the TO role
+// /settings posts events, for tracked tournaments. 6 was tracked for a tournament admin before the TO role
 function trackedTournaments() {
   const tracked = (by) => ({ by, at: now, sets: true, stream: true, top8: true, reminders: true });
   state.discordEvents = { 11: { eventId: 'event-old', slug: 'tournament/has-one', startAt: soon.startAt, synced: null } };
@@ -326,7 +326,7 @@ function trackedTournaments() {
   };
 }
 
-test('with /messages events off, tracked tournaments get no events and nothing is asked', async () => {
+test('with /settings posts events off, tracked tournaments get no events and nothing is asked', async () => {
   await reset();
   state.tournaments = trackedTournaments();
   const { guild, created } = fakeGuild();
@@ -335,7 +335,7 @@ test('with /messages events off, tracked tournaments get no events and nothing i
   assert.deepEqual(asked, []);
 });
 
-test('with /messages events on, each upcoming tracked tournament gets one event, once', async () => {
+test('with /settings posts events on, each upcoming tracked tournament gets one event, once', async () => {
   await reset();
   state.messages = { events: true };
   state.tournaments = trackedTournaments();

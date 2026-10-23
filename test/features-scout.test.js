@@ -28,7 +28,7 @@ test('registers run, scout, and progress with their required inputs', () => {
     assert.equal(command?.options[0].name, 'player');
     assert.equal(command.options[0].autocomplete, true);
   }
-  assert.equal(commands.find(c => c.name === 'scout')?.options[0].name, 'profile');
+  assert.equal(commands.find(c => c.name === 'scout')?.options[0].name, 'opponent');
   assert.equal(commands.find(c => c.name === 'scout').options[0].autocomplete, true);
 });
 
@@ -53,7 +53,7 @@ test('scout refuses untracked Discord callers before fetching an opponent', asyn
   const replies = [];
   await handleCommand({
     commandName: 'scout', user: { id: 'outsider' },
-    options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'target' : null) },
+    options: { getSubcommand: () => null, getString: (name) => (name === 'opponent' ? 'target' : null) },
     deferReply: async () => {}, editReply: async r => replies.push(r),
   });
   assert.match(replies.at(-1), /\/link/);
@@ -73,7 +73,7 @@ test('tracked callers can scout an untracked opponent without adding them', asyn
   let reply;
   await handleCommand({
     commandName: 'scout', user: { id: 'allowed' }, deferred: true,
-    options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'https://www.start.gg/user/target' : null), getBoolean: () => null },
+    options: { getSubcommand: () => null, getString: (name) => (name === 'opponent' ? 'https://www.start.gg/user/target' : null), getBoolean: () => null },
     deferReply: async options => assert.ok(options.flags), editReply: async result => { reply = result; },
   });
   const text = reply.embeds.map(e => e.toJSON().description).join('\n');
@@ -95,7 +95,7 @@ test('scout takes a tracked player pick, with no start.gg link lookup', async ()
   let reply;
   await handleCommand({
     commandName: 'scout', user: { id: 'allowed' }, deferred: true,
-    options: { getSubcommand: () => null, getString: (name) => name === 'profile' ? '2' : null, getBoolean: () => null },
+    options: { getSubcommand: () => null, getString: (name) => name === 'opponent' ? '2' : null, getBoolean: () => null },
     deferReply: async options => assert.ok(options.flags), editReply: async result => { reply = result; },
   });
   const cards = reply.embeds.map((e) => e.toJSON());
@@ -264,7 +264,7 @@ test('scout verbose goes through their whole history and every event, and stays 
   const replies = [];
   const interaction = {
     commandName: 'scout', user: { id: 'allowed' },
-    options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'start.gg/user/deep' : null), getBoolean: (name) => name === 'verbose' },
+    options: { getSubcommand: () => null, getString: (name) => (name === 'opponent' ? 'start.gg/user/deep' : null), getBoolean: (name) => name === 'verbose' },
     deferReply: async options => { assert.ok(options.flags); Object.assign(interaction, { deferred: true, ephemeral: true }); },
     editReply: async r => replies.push(r),
     followUp: async r => { assert.ok(r.flags, 'follow-ups stay private'); replies.push(r); },

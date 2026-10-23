@@ -6,7 +6,7 @@ export {
 export { stats, progress, weeklyRecap, lifetimeStats } from './stats.js';
 export { doubles, doublesReport } from './doubles.js';
 export { scout, scoutReport } from './scouting.js';
-export { headToHead, prediction, predictionExplained, characters, linked, profile, added } from './players.js';
+export { headToHead, prediction, characters, linked, profile, added } from './players.js';
 export { trackedList, toList, dataPages, socials, status, deployUpdate, backOnline, matchmaking, fun, funImage, help } from './system.js';
 export {
   slippiRank, slippiLeaderboard, leaderboardOrder, rankChange, seasonWrapUp, withSlippi, withRankedCharacters, slippiMatchup,

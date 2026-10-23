@@ -63,8 +63,7 @@ test('bundle carries podiums, characters, tournaments and finals', () => {
 });
 
 test('shared bundle math: search, shared events, finals, titles', async () => {
-  await import('../web/stats.js');
-  const { searchPlayers, sharedEvents, finalsBetween, recentTitles } = globalThis.SamaStats;
+  const { searchPlayers, sharedEvents, finalsBetween, recentTitles } = await import('../web/stats.js');
   const players = [{ id: '1', tag: 'Ann' }, { id: '2', tag: 'Annie' }, { id: '3', tag: 'Bo' }];
   assert.deepEqual(searchPlayers(players, 'an').map((p) => p.id), ['1', '2']);
   assert.deepEqual(searchPlayers(players, 'ANN').map((p) => p.id), ['1']);
@@ -78,8 +77,7 @@ test('shared bundle math: search, shared events, finals, titles', async () => {
 });
 
 test('head-to-head set records read the same from either side', async () => {
-  await import('../web/stats.js');
-  const { setRecord } = globalThis.SamaStats;
+  const { setRecord } = await import('../web/stats.js');
   // keyed lower id first: 10 won 7 sets and 15 games, 20 won 5 and 12, 9 sets had a score
   const h2h = { '10|20': [7, 5, 15, 12, 9, '2026-10-19'] };
   assert.deepEqual(setRecord('10', '20', h2h), { sets: 12, aSets: 7, bSets: 5, aGames: 15, bGames: 12, scored: 9, last: '2026-10-19' });

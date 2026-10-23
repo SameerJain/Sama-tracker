@@ -9,7 +9,7 @@ import { MessageFlags } from 'discord.js';
 // every command once against a fake start.gg, so a handler that throws shows up here
 const directory = mkdtempSync(join(tmpdir(), 'sama-commands-'));
 process.env.STATE_DIR = directory;
-// multi-server on here so /setup is covered too. the fakes carry no guildId,
+// multi-server on here so /settings channel is covered too. the fakes carry no guildId,
 // so every command still runs on the root exactly like single-server mode
 process.env.MULTI_GUILD = 'true';
 // the fun posts would call Claude on import
@@ -204,11 +204,12 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
   ['help', {}, /\/help verbose:True/], ['help', { values: { verbose: true } }, /Linking yourself/],
-  ['status', {}, /Status/], ['setup', {}, /No posts channel set yet/],
-  ['setup', { values: { channel: { id: 'channel-9', isTextBased: () => true } } }, /Automatic posts go in <#channel-9>/],
-  ['messages', {}, /Set results:\*\* off/],
-  ['messages', { values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
-  ['messages', { values: { events: false } }, /Discord events for tracked tournaments:\*\* off/], ['socials', {}, /Nothing yet/],
+  ['status', {}, /Status/], ['settings', { subcommand: 'channel' }, /No posts channel set yet/],
+  ['settings', { subcommand: 'channel', values: { channel: { id: 'channel-9', isTextBased: () => true } } }, /Automatic posts go in <#channel-9>/],
+  ['settings', { subcommand: 'posts' }, /Set results:\*\* off/],
+  ['settings', { subcommand: 'posts', values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
+  ['settings', { subcommand: 'posts', values: { events: false } }, /Discord events for tracked tournaments:\*\* off/],
+  ['settings', { subcommand: 'recap', values: { day: 5, time: '20:00' } }, /Friday 20:00/], ['socials', {}, /Nothing yet/],
   ['data', {}, /Monday Night SmashBall.*monday-night-smashball\.vercel\.app.*UB Smash Royale.*ub-smash-royale\.vercel\.app/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
   ['socials_edit', { subcommand: 'remove', values: { link: 'https://twitch.tv/716esports' } }, /Removed/],
@@ -229,14 +230,14 @@ const runs = [
   // crew is on the slippi watchlist, rival and opponent aren't, so only crew shows up
   ['progress', { values: { melee: true } }, /No Melee singles results in the last 60 days.*Slippi ranked.*CREW#1.*Gold 2\*\* · 1600\.0 · 12-8 this season.*Since Season 4:\*\* 1500\.0 to 1600\.0 \(\+100\.0\)/],
   ['progress', { values: { verbose: true, melee: true } }, /No Melee singles results in the last 180 days/],
-  ['scout', { values: { profile: 'start.gg/user/opponent' } }, /Scouting Opponent/],
-  ['scout', { values: { profile: '2' } }, /Scouting Rival/],
-  ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
-  ['scout', { values: { profile: 'start.gg/user/opponent', melee: true } }, /No recent Melee singles sets\..*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
-  ['scout', { values: { profile: 'start.gg/user/opponent', verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
+  ['scout', { values: { opponent: 'start.gg/user/opponent' } }, /Scouting Opponent/],
+  ['scout', { values: { opponent: '2' } }, /Scouting Rival/],
+  ['scout', { values: { opponent: 'start.gg/user/opponent', verbose: true } }, /Crew vs Opponent/],
+  ['scout', { values: { opponent: 'start.gg/user/opponent', melee: true } }, /No recent Melee singles sets\..*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
+  ['scout', { values: { opponent: 'start.gg/user/opponent', verbose: true, melee: true } }, /No Melee sets or events on start\.gg yet\./],
   // the fake tournaments are all offline, so online leaves rival with no recent sets
-  ['scout', { values: { profile: '2', venue: 'online' } }, /No recent singles sets\./],
-  ['scout', { values: { profile: '2', since: '2026-01-01', venue: 'offline' } }, /Scouting Rival.*Offline only/],
+  ['scout', { values: { opponent: '2', venue: 'online' } }, /No recent singles sets\./],
+  ['scout', { values: { opponent: '2', since: '2026-01-01', venue: 'offline' } }, /Scouting Rival.*Offline only/],
   ['h2h', { values: { opponent: '2' } }, /Crew 2-0 Rival.*Predicted.*Ultimate/], ['h2h', { values: { opponent: '2', verbose: true } }, /Predicted.*Ultimate.*First played/],
   // the fake sets are all ultimate
   ['h2h', { values: { opponent: '2', melee: true } }, /in Melee singles on start\.gg yet\..*2 sets in other games left out.*Slippi ranked.*\*\*Crew\*\*: \[CREW#1\]/],
@@ -268,17 +269,13 @@ const runs = [
   ['doubles', { values: { melee: true } }, /^(?!.*Slippi ranked).*No Melee doubles sets on start\.gg yet\./],
   ['characters', {}, /Fox/], ['characters', { values: { verbose: true } }, /Fox/],
   ['characters', { values: { game: 1 } }, /Slippi ranked.*Fox\*\* · 30 games.*CREW#1/],
-  ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /^(?!.*Slippi ranked).*How it adds up/],
+  ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/], ['predict', { values: { opponent: '2', verbose: true } }, /^(?!.*Slippi ranked).*Crew \d+% · \d+% Rival.*How it adds up.*How sure it is/],
   ['predict', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles on start\.gg\..*Leave out `melee` for Ultimate odds.*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
   ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
-  ['predict', { values: { opponent: '2', verbose: true, since: '2026-01-01', venue: 'offline' } }, /How it adds up.*Offline only/],
+  ['predict', { values: { opponent: '2', verbose: true, since: '2026-01-01', venue: 'offline' } }, /How it adds up.*give or take.*Offline only/],
   ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
-  ['predict_explained', { values: { opponent: '2' } }, /^(?!.*Slippi ranked).*Crew \d+% · \d+% Rival.*How it adds up.*How sure it is/],
-  ['predict_explained', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles/],
-  ['predict_explained', { values: { opponent: '2', since: '2026-01-01', venue: 'offline' } }, /give or take.*Offline only/],
-  ['predict_explained', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
-  ['predict_explained', { values: { opponent: '2', since: 'someday' } }, /Couldn't read `someday` as a date/],
-  ['predict_explained', { values: { opponent: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
+  ['predict', { values: { opponent: '2', since: 'someday' } }, /Couldn't read `someday` as a date/],
+  ['predict', { values: { opponent: 'start.gg/user/nobody', verbose: true } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
   // crew has no set results field, which counts as on
   ['track', { subcommand: 'posts', values: { player: '1' } }, /Crew: set results on, stream alerts on\./],
   ['track', { subcommand: 'posts', values: { player: 'all', stream: 'off' } }, /Stream alerts off for everyone\./],
@@ -289,12 +286,12 @@ const runs = [
   ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off for the whole server/],
   ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your set is on stream.*Reg Reminders role and its pings.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['notify', { values: { dm_registration: 'on', dm_start: 'on' } }, /DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
-  ['matchmaking_role', { values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
-  ['matchmaking_role', { values: { game: 'melee', duration: 0.5 } }, /for 30 minutes.*comes off on its own/],
-  ['matchmaking_search', { values: { game: 'ult' } }, /You need the \*\*Ultimate Matchmaking\*\* role to ping it\. `\/matchmaking_role game:Ultimate`/],
-  ['matchmaking_channel', { values: { game: 'melee' } }, /searches post wherever the command runs/],
-  ['matchmaking_channel', { values: { game: 'melee', channel: { id: 'lfg-1' } } }, /searches will post in <#lfg-1>/],
-  ['matchmaking_channel', { values: { game: 'melee' } }, /searches post in <#lfg-1>/],
+  ['matchmaking', { subcommand: 'role', values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
+  ['matchmaking', { subcommand: 'role', values: { game: 'melee', duration: 0.5 } }, /for 30 minutes.*comes off on its own/],
+  ['matchmaking', { subcommand: 'search', values: { game: 'ult' } }, /You need the \*\*Ultimate Matchmaking\*\* role to ping it\. `\/matchmaking role game:Ultimate`/],
+  ['matchmaking', { subcommand: 'channel', values: { game: 'melee' } }, /searches post wherever the command runs/],
+  ['matchmaking', { subcommand: 'channel', values: { game: 'melee', channel: { id: 'lfg-1' } } }, /searches will post in <#lfg-1>/],
+  ['matchmaking', { subcommand: 'channel', values: { game: 'melee' } }, /searches post in <#lfg-1>/],
   ['slippi', { subcommand: 'leaderboard' }, /Slippi leaderboard · 1","thumbnail":\{"url":"attachment:\/\/rank-gold-2\.png"\}/],
   // left out, it's the code on crew's start.gg netplay registrations
   ['slippi', { subcommand: 'add' }, /Crew is already on the Slippi watchlist.*Crew · CREW#1.*Gold 2/],
@@ -430,7 +427,7 @@ const presses = [
   ['stats', {}, 'Full report', /Lifetime stats/],
   ['doubles', {}, 'Full report', /Full doubles stats/],
   ['characters', {}, 'Full report', /Fox/],
-  ['scout', { values: { profile: '2' } }, 'Full report', /Crew vs Rival/],
+  ['scout', { values: { opponent: '2' } }, 'Full report', /Crew vs Rival/],
   ['h2h', { values: { opponent: '2' } }, 'Full report', /First played/],
   ['predict', { values: { opponent: '2' } }, 'Full report', /How it adds up/],
   // whoever's next, by the player id in the set. a shortcut for short /h2h, so no second press
@@ -488,11 +485,10 @@ test('every report button answers the way its command would, and the full report
   const sent = recent.calls.filter(([kind]) => kind === 'edit' || kind === 'followUp').map(([, result]) => result);
   assert.ok(sent.some((result) => result.embeds?.length), '/recent never answers');
   assert.ok(sent.every((result) => !result.components?.length), '/recent has buttons');
-  // verbose is the full report, so it never offers another one. explained is always the full one
+  // verbose is the full report, so it never offers another one
   const verboseRuns = [
     ['stats', {}], ['doubles', {}], ['progress', {}], ['characters', {}],
-    ['scout', { values: { profile: '2' } }], ['h2h', { values: { opponent: '2' } }], ['predict', { values: { opponent: '2' } }],
-    ['predict_explained', { values: { opponent: '2' } }],
+    ['scout', { values: { opponent: '2' } }], ['h2h', { values: { opponent: '2' } }], ['predict', { values: { opponent: '2' } }],
   ];
   for (const [name, options] of verboseRuns) {
     const what = `/${name} verbose`;

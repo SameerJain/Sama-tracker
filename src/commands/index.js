@@ -8,12 +8,12 @@ import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, recent, run } from './players.js';
 import {
-  progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED,
+  progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED,
 } from './stats.js';
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
-import { configureMessages, setupPosts, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
+import { configureSettings, setupPosts, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import {
@@ -51,8 +51,9 @@ function inGuild(interaction, run) {
 
 const handlers = new Map([
   ['help', (interaction) => sendEmbeds(interaction, embeds.help(flag(interaction, 'verbose')))],
-  ['messages', configureMessages],
-  ['setup', setupPosts],
+  ['settings posts', configureSettings],
+  ['settings recap', configureSettings],
+  ['settings channel', setupPosts],
   ['data', (interaction) => sendEmbeds(interaction, embeds.dataPages())],
   ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],
   ['socials_edit add', socialsAdd],
@@ -67,9 +68,9 @@ const handlers = new Map([
   ['t-o role remove', toRemove],
   ['t-o role list', toList],
   ['notify', notify],
-  ['matchmaking_role', matchmakingRole],
-  ['matchmaking_search', matchmakingSearch],
-  ['matchmaking_channel', matchmakingChannel],
+  ['matchmaking role', matchmakingRole],
+  ['matchmaking search', matchmakingSearch],
+  ['matchmaking channel', matchmakingChannel],
   ['link', link],
   ['unlink', unlink],
   ['profile', profile],
@@ -83,7 +84,6 @@ const handlers = new Map([
   ['doubles', doubles],
   ['characters', characters],
   ['predict', predict],
-  ['predict_explained', predictExplained],
   ['slippi add', slippiAdd],
   ['slippi remove', slippiRemove],
   ['slippi rank', slippiRank],
@@ -331,6 +331,8 @@ async function autocomplete(interaction) {
   if (Object.hasOwn(TAKES_TOURNAMENT, name)) return interaction.respond(tournamentChoices(focused, { only: TAKES_TOURNAMENT[name] }));
 
   if (name === 'slippi remove' || name === 'slippi rank') return interaction.respond(slippiChoices(focused, { anyCode: name === 'slippi rank' }));
+
+  if (name === 'settings recap') return interaction.respond(timezoneChoices(focused));
 
   if (name === 'socials_edit remove') {
     for (const social of state.socials) {

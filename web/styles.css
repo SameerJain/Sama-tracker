@@ -24,6 +24,7 @@ footer.pagefoot{font-size:12px;color:#888;margin:24px 0 8px}
 .hitbtn{margin:2px 4px 2px 0}
 #player button,#h2h-picks button{margin:2px 4px 2px 0}
 .rank{font-weight:bold}
+.rank-badge{vertical-align:middle}
 @media (max-width:640px){
   body{padding:10px}
   h1{font-size:22px;margin:8px 0 4px}

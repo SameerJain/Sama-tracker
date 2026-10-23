@@ -20,12 +20,18 @@ function zoneLabel(timezone) {
   return label && /^[A-Z]{2,4}$/.test(label) ? label : timezone;
 }
 
-function configureMessages(interaction) {
-  // failures stay private, but the settings themselves post where everyone sees them
+// the recap timezone's autocomplete: zones with what's typed in them, the usual ones when nothing is
+const COMMON_ZONES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'UTC'];
+function timezoneChoices(focused) {
+  const typed = focused.trim().toLowerCase().replaceAll(' ', '_');
+  const zones = typed ? Intl.supportedValuesOf('timeZone').filter((zone) => zone.toLowerCase().includes(typed)) : COMMON_ZONES;
+  return zones.slice(0, 25).map((zone) => ({ name: zone, value: zone }));
+}
+
+// /settings posts and /settings recap. anyone can look, privately. a change needs a TO or Manage Server, and
+// it posts where everyone sees it
+function configureSettings(interaction) {
   const fail = (content) => replyEphemeral(interaction, content);
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
-    return fail('You need to be a TO or have Manage Server permission to control automatic messages.');
-  }
   const previous = messageSettings();
   const changes = {};
   for (const type of Object.keys(MESSAGE_TYPES)) {
@@ -34,9 +40,9 @@ function configureMessages(interaction) {
   }
   const setColors = interaction.options.getBoolean('set_colors');
   if (setColors !== null) changes.setColors = setColors;
-  const day = interaction.options.getInteger('recap_day');
+  const day = interaction.options.getInteger('day');
   if (day !== null) changes.recapDay = day;
-  const time = interaction.options.getString('recap_time')?.trim();
+  const time = interaction.options.getString('time')?.trim();
   if (time !== undefined) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return fail('Use a 24-hour time in HH:MM format, like 09:00 or 21:30.');
     changes.recapTime = time;
@@ -49,25 +55,8 @@ function configureMessages(interaction) {
       return fail('Unknown timezone. Use one like America/New_York, America/Los_Angeles, Europe/London or UTC.');
     }
   }
-  // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
-  if (changes.events && !previous.events) {
-    const cant = cantMakeEvents(interaction.guild);
-    if (cant) return fail(cant);
-  }
   const threads = interaction.options.getString('threads');
-  if (threads !== null) {
-    // checked when it's turned on so it doesn't wait for the next tournament to find out. in the posts
-    // channel, not wherever this ran. a multi-server build with no /setup yet posts nothing, and /setup
-    // checks threads when it picks one
-    const channelId = postsChannelId();
-    const postChannel = channelId && (interaction.client.channels.cache.get(channelId) ?? currentChannel());
-    if (threads !== 'off' && postChannel) {
-      const missing = missingThreadPermissions(postChannel);
-      if (!missing) return fail(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
-      if (missing.length) return fail(`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
-    }
-    changes.threads = threads;
-  }
+  if (threads !== null) changes.threads = threads;
   const eventLength = interaction.options.getInteger('event_length');
   if (eventLength !== null) {
     if (!Number.isInteger(eventLength) || eventLength < MIN_EVENT_LENGTH_HOURS || eventLength > MAX_EVENT_LENGTH_HOURS) {
@@ -76,18 +65,43 @@ function configureMessages(interaction) {
     changes.eventLength = eventLength;
   }
 
-  if (Object.keys(changes).length) {
-    const now = secondsNow();
-    // anything that came due while one was off stays skipped once it's back on
-    const reenabled = Object.keys(MESSAGE_TYPES).filter((type) => changes[type] && !previous[type]);
-    if (reenabled.length) changes.enabledAt = { ...previous.enabledAt, ...Object.fromEntries(reenabled.map((type) => [type, now])) };
-    // a new schedule starts with the next recap
-    if (['recapDay', 'recapTime', 'timezone'].some((key) => Object.hasOwn(changes, key) && changes[key] !== previous[key])) {
-      changes.recapChangedAt = now;
-    }
-    state.messages = { ...state.messages, ...changes };
-    save();
+  if (!Object.keys(changes).length) return replyEphemeral(interaction, settingsText());
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
+    return fail('Only TOs and people with Manage Server can change settings. Leave everything out to see them.');
   }
+  // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
+  if (changes.events && !previous.events) {
+    const cant = cantMakeEvents(interaction.guild);
+    if (cant) return fail(cant);
+  }
+  if (changes.threads && changes.threads !== 'off') {
+    // checked when it's turned on so it doesn't wait for the next tournament to find out. in the posts
+    // channel, not wherever this ran. a multi-server build with no posts channel yet posts nothing, and
+    // /settings channel checks threads when it picks one
+    const channelId = postsChannelId();
+    const postChannel = channelId && (interaction.client.channels.cache.get(channelId) ?? currentChannel());
+    if (postChannel) {
+      const missing = missingThreadPermissions(postChannel);
+      if (!missing) return fail(`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
+      if (missing.length) return fail(`I need ${missing.join(' and ')} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
+    }
+  }
+
+  const now = secondsNow();
+  // anything that came due while one was off stays skipped once it's back on
+  const reenabled = Object.keys(MESSAGE_TYPES).filter((type) => changes[type] && !previous[type]);
+  if (reenabled.length) changes.enabledAt = { ...previous.enabledAt, ...Object.fromEntries(reenabled.map((type) => [type, now])) };
+  // a new schedule starts with the next recap
+  if (['recapDay', 'recapTime', 'timezone'].some((key) => Object.hasOwn(changes, key) && changes[key] !== previous[key])) {
+    changes.recapChangedAt = now;
+  }
+  state.messages = { ...state.messages, ...changes };
+  save();
+  return interaction.reply({ content: settingsText(), allowedMentions: { parse: [] } });
+}
+
+// every setting, for /settings with nothing changed and after a change
+function settingsText() {
   const settings = messageSettings();
   const lines = ['**Automatic posts**'];
   for (const [key, label] of Object.entries(MESSAGE_TYPES)) {
@@ -104,7 +118,7 @@ function configureMessages(interaction) {
     '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.',
     '-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.',
     '-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.');
-  return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
+  return lines.join('\n');
 }
 
 // twitch.tv/name works without the https. null for anything that isn't a web link
@@ -266,7 +280,7 @@ const PINGS = {
   },
 };
 
-const CALLS_OFF = '-# Match calls are off for the whole server, `/messages calls` turns them on.';
+const CALLS_OFF = '-# Match calls are off for the whole server, `/settings posts calls:True` turns them on.';
 
 // the same words about someone else
 const say = (self, text) => (self ? text : text.replaceAll('You\'ll', 'They\'ll').replaceAll('your', 'their').replaceAll('you\'re', 'they\'re'));
@@ -483,18 +497,17 @@ function notify(interaction) {
 // what the bot can't post without, named the way discord's settings show them
 const POSTING = { ViewChannel: 'View Channel', SendMessages: 'Send Messages', EmbedLinks: 'Embed Links' };
 
-// /setup: where this server's automatic posts go. one channel per server, saved as
+// /settings channel, multi-server only: where this server's automatic posts go. one channel per server, saved as
 // state.channelId, so each server's sets, roll calls and reminders stay on its own data.
 // the permissions get checked here, since a channel the bot can't post in loses every post quietly
 function setupPosts(interaction) {
-  if (!interaction.guildId && !interaction.guild?.id) return replyEphemeral(interaction, 'Run `/setup` in a server, not in DMs.');
-  // anyone can look
+  if (!interaction.guildId && !interaction.guild?.id) return replyEphemeral(interaction, 'Run `/settings channel` in a server, not in DMs.');
+  // anyone can look, privately like the rest of /settings
   const channel = interaction.options.getChannel('channel');
   if (!channel) {
-    return interaction.reply({
-      content: state.channelId ? `Automatic posts go in <#${state.channelId}>.` : 'No posts channel set yet. Run `/setup channel:#channel`.',
-      allowedMentions: { parse: [] },
-    });
+    return replyEphemeral(interaction, state.channelId
+      ? `Automatic posts go in <#${state.channelId}>.`
+      : 'No posts channel set yet. Run `/settings channel channel:#channel`.');
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !isTO(interaction)) {
     return replyEphemeral(interaction, 'You need Manage Server or the TO role to pick the posts channel.');
@@ -510,10 +523,10 @@ function setupPosts(interaction) {
   save();
   const lines = [`Automatic posts go in <#${channel.id}>.`];
   if (has && !has.has(PermissionFlagsBits.AttachFiles)) lines.push('-# Without Attach Files there, posts that upload character art, rank badges or the Slippi logo fail.');
-  // a tracked tournament always posts in a thread, whatever /messages threads says
+  // a tracked tournament always posts in a thread, whatever /settings posts threads says
   const threads = missingThreadPermissions(channel);
   if (threads?.length) lines.push(`-# Without ${threads.join(' and ')} there, set results and stream alerts post in the channel instead of threads.`);
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
-export { configureMessages, setupPosts, socialsAdd, socialsRemove, trackPosts, notify };
+export { configureSettings, timezoneChoices, setupPosts, socialsAdd, socialsRemove, trackPosts, notify };

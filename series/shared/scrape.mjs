@@ -1,38 +1,18 @@
-// start.gg requests for the series scrapes. they don't go through the bot's queue, so they space
-// themselves out, 900ms apart unless the caller asks for more
-const API_URL = 'https://api.start.gg/gql/alpha';
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let nextSlot = 0;
-export async function throttle(gapMs = 900) {
-  const wait = nextSlot - Date.now();
-  if (wait > 0) await sleep(wait);
-  nextSlot = Date.now() + gapMs;
+// start.gg requests for the series scrapes, through the bot's own queue in src/startgg/queue.js: the same rate
+// limit, retries, outage tracking and page splitting. the scrapes share the token with the deployed bot, so they
+// ask a little slower than its 800ms
+import { allPages, fitPage, pagesOf, query, setRequestGap } from '../../src/startgg/queue.js';
+
+setRequestGap(900);
+
+// a clear error instead of start.gg's 401 when the token isn't loaded
+function needToken() {
+  if (!process.env.STARTGG_TOKEN) throw new Error('missing STARTGG_TOKEN, run it with --env-file=.env');
 }
-export async function gql(query, variables, { retries = 2, gapMs = 900 } = {}) {
-  const TOKEN = process.env.STARTGG_TOKEN;
-  if (!TOKEN) throw new Error('missing STARTGG_TOKEN');
-  await throttle(gapMs);
-  let res;
-  try {
-    res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
-      body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(30_000),
-    });
-  } catch (err) {
-    if (retries > 0) { nextSlot = Date.now(); return gql(query, variables, { retries: retries - 1, gapMs }); }
-    throw err;
-  }
-  if (res.status === 429 && retries > 0) { nextSlot = Date.now() + 15_000; return gql(query, variables, { retries: retries - 1, gapMs }); }
-  if (res.status >= 500 && retries > 0) return gql(query, variables, { retries: retries - 1, gapMs });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body.errors) {
-    const msg = body.errors?.[0]?.message ?? `HTTP ${res.status}`;
-    if (/complexity/i.test(msg)) { const e = new Error('complexity:' + msg); e.complexity = true; throw e; }
-    throw new Error(`start.gg: ${msg}`);
-  }
-  return body.data;
+
+function ask(text, variables) {
+  needToken();
+  return query(text, variables);
 }
 
 const TOURN_Q = `query ($page: Int!, $perPage: Int!, $filter: TournamentPageFilter) {
@@ -47,7 +27,7 @@ export async function searchTournaments({ state = 'NY', after, before, perPage =
   const all = [];
   let page = 1, totalPages = 1;
   while (page <= totalPages) {
-    const data = await gql(TOURN_Q, { page, perPage, filter: { addrState: state, afterDate: after, beforeDate: before } });
+    const data = await ask(TOURN_Q, { page, perPage, filter: { addrState: state, afterDate: after, beforeDate: before } });
     totalPages = data.tournaments.pageInfo.totalPages;
     all.push(...data.tournaments.nodes);
     if (onPage) onPage(page, totalPages, data.tournaments.pageInfo.total);
@@ -59,14 +39,14 @@ export async function searchTournaments({ state = 'NY', after, before, perPage =
 
 const EVENTS_Q = `query ($id: ID!) { tournament(id: $id) { events { id name slug numEntrants videogame { id displayName } } } }`;
 export async function getEvents(tournamentId) {
-  const data = await gql(EVENTS_Q, { id: tournamentId });
+  const data = await ask(EVENTS_Q, { id: tournamentId });
   return data?.tournament?.events ?? [];
 }
 
 const STANDINGS_Q = `query ($id: ID!) { event(id: $id) {
   standings(query: { perPage: 4, page: 1 }) { nodes { placement entrant { name participants { player { id gamerTag } } } } } } }`;
 export async function getTop4(eventId) {
-  const data = await gql(STANDINGS_Q, { id: eventId });
+  const data = await ask(STANDINGS_Q, { id: eventId });
   return (data?.event?.standings?.nodes ?? []).map((n) => ({
     placement: n.placement,
     name: n.entrant?.name,
@@ -82,7 +62,7 @@ export async function getEntrants(eventId, perPage = 50) {
   const out = [];
   let page = 1, totalPages = 1;
   while (page <= totalPages) {
-    const data = await gql(ENTRANTS_Q, { id: eventId, page, perPage });
+    const data = await ask(ENTRANTS_Q, { id: eventId, page, perPage });
     totalPages = data?.event?.entrants?.pageInfo?.totalPages ?? 1;
     for (const n of data?.event?.entrants?.nodes ?? []) {
       out.push({ name: n.name, players: (n.participants ?? []).map((p) => ({ id: p?.player?.id ?? null, tag: p?.player?.gamerTag ?? null })) });
@@ -100,37 +80,12 @@ const setsQuery = (fields) => `query ($id: ID!, $page: Int!, $perPage: Int!) { e
 const SETS_Q = setsQuery(`${SET_FIELDS} games { winnerId selections { entrant { id } character { name } } }`);
 // results only, no games, so a page holds 4 times as many sets
 const RESULTS_Q = setsQuery(SET_FIELDS);
-async function getSetsPage(eventId, page, perPage, query = SETS_Q, opts = {}) {
-  try {
-    return await gql(query, { id: eventId, page, perPage }, opts);
-  } catch (err) {
-    if (err.complexity && perPage > 1) {
-      // split the failed page into smaller pages covering the same sets
-      const half = Math.max(1, Math.floor(perPage / 2));
-      const count = Math.ceil(perPage / half);
-      const firstSub = Math.floor(((page - 1) * perPage) / half) + 1;
-      const nodes = [];
-      let subTotalPages = 0;
-      for (let k = 0; k < count; k++) {
-        const sub = await getSetsPage(eventId, firstSub + k, half, query, opts);
-        nodes.push(...(sub?.event?.sets?.nodes ?? []));
-        subTotalPages = sub?.event?.sets?.pageInfo?.totalPages ?? subTotalPages;
-      }
-      return { event: { sets: { nodes, pageInfo: { totalPages: Math.ceil((subTotalPages * half) / perPage) } } } };
-    }
-    throw err;
-  }
-}
-
-async function allSetNodes(eventId, perPage, query, opts) {
-  const first = await getSetsPage(eventId, 1, perPage, query, opts).catch((err) => {
-    if (err.complexity) return getSetsPage(eventId, 1, 2, query, opts);
-    throw err;
-  });
-  const nodes = [...(first?.event?.sets?.nodes ?? [])];
-  const totalPages = first?.event?.sets?.pageInfo?.totalPages ?? 1;
-  for (let page = 2; page <= totalPages; page++) nodes.push(...((await getSetsPage(eventId, page, perPage, query, opts))?.event?.sets?.nodes ?? []));
-  return nodes;
+// every finished set's node in an event. a page start.gg calls too complex gets asked for again as smaller pages
+async function allSetNodes(eventId, perPage, setsQuery) {
+  needToken();
+  const getPage = pagesOf(setsQuery, { id: eventId }, (data) => data.event?.sets);
+  const pages = await allPages((page) => fitPage(getPage, page, perPage));
+  return pages.flatMap((page) => page.nodes);
 }
 
 // each entrant's players, by entrant id, from the slots of a page of sets
@@ -165,16 +120,16 @@ export function setResults(nodes, emap = entrantPlayers(nodes)) {
 }
 
 // every finished set in an event as winner, loser and score, without the games. what the set backfill uses
-export async function getSetResults(eventId, { perPage = 40, gapMs } = {}) {
-  return setResults(await allSetNodes(eventId, perPage, RESULTS_Q, gapMs ? { gapMs } : {}));
+export async function getSetResults(eventId, perPage = 40) {
+  return setResults(await allSetNodes(eventId, perPage, RESULTS_Q));
 }
 // an off-week night's real singles bracket. the rest of what those nights run, items, randoms, squad strike,
 // redemption and house-rule brackets, stays out of rivalries
 export const OFFWEEK_SINGLES_RE = /ultimate singles|off week singles|^smash ultimate$/i;
 
 // every finished set in an event with per-game characters + both sides' players
-export async function getCharGames(eventId, perPage = 10, { gapMs } = {}) {
-  const nodes = await allSetNodes(eventId, perPage, SETS_Q, gapMs ? { gapMs } : {});
+export async function getCharGames(eventId, perPage = 10) {
+  const nodes = await allSetNodes(eventId, perPage, SETS_Q);
   const emap = entrantPlayers(nodes);
   const games = [];
   let gamesTotal = 0;

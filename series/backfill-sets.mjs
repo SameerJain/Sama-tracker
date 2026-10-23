@@ -7,12 +7,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getCharGames, getSetResults, OFFWEEK_SINGLES_RE } from './shared/scrape.mjs';
+import { setRequestGap } from '../src/startgg/queue.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REG = JSON.parse(fs.readFileSync(path.join(ROOT, 'series', 'series.json'), 'utf8'));
 const SAVE_EVERY = 5;
 const DAY = 86400;
-const GAP_MS = 1500;
+setRequestGap(1500);
 
 // scored means a set list saved since scores were, so an event from the first pass without them goes again.
 // one with no sets goes again until it's been looked at after the night, since the refresh can find a
@@ -45,7 +46,7 @@ async function backfill(slug) {
   console.log(`[${slug}] ${todo.length} of ${rows.length} events need set results`);
   let fetched = 0;
   for (const row of todo) {
-    row.sets = await getSetResults(row.eventId, { gapMs: GAP_MS });
+    row.sets = await getSetResults(row.eventId);
     row.setsCheckedAt = Math.floor(Date.now() / 1000);
     fetched++;
     // the set count from the first scrape should match, short of sets reset since
@@ -79,7 +80,7 @@ async function backfillOffweeks(slug) {
   console.log(`[${slug}] ${todo.length} off-week singles brackets need sets`);
   let fetched = 0;
   for (const { t, eventId, eventName } of todo) {
-    const { totalSets, sets, games, gamesTotal, setsWithChars, gamesPlayed } = await getCharGames(eventId, 10, { gapMs: GAP_MS });
+    const { totalSets, sets, games, gamesTotal, setsWithChars, gamesPlayed } = await getCharGames(eventId, 10);
     const row = {
       eventId, tournamentId: t.id, tournamentName: t.name, startAt: t.startAt, game: 'Ultimate', eventName, totalSets,
       gamesReported: games.length, gamesTotal, setsWithChars, gamesPlayed, sets, games, setsCheckedAt: Math.floor(Date.now() / 1000),

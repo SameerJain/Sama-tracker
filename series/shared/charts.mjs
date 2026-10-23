@@ -1,5 +1,6 @@
 // the svg charts on the series pages
-const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+import { esc } from './page.mjs';
+
 const trunc = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
 // a wide invisible stroke over a thin line, so it's easy to hover and click

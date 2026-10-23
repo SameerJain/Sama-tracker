@@ -4,9 +4,16 @@ The web companion to the Sama-tracker Discord bot. No server, no secrets, no
 start.gg token: `index.html` reads the cached bundle in `data/buffalo.json`
 and Slippi lookups go straight from the visitor's browser to slippi.gg.
 
-View: open `index.html` in a browser (double-click). `data/buffalo.json` has to
-exist first, so build it with `node web/build.mjs` (it only reads the committed
+View: serve the folder with any static server, since a page opened straight from
+disk can't read its own data file or load modules. `data/buffalo.json` and `lib/`
+have to exist first, so build them with `node web/build.mjs` (it only reads the
 `data/*.json` in each series folder).
+
+`lib/` is the bot's own code, copied in by the build: `src/format.js` for counts,
+placements and medals, `src/slippi/shared.js` for ranks, connect codes and Slippi
+profiles, and the rank badges from `src/assets`. So a rank or a plural reads the
+same here as in Discord. Both files import nothing, which is what lets a browser
+load them, so keep it that way.
 
 ## What's inside
 
@@ -24,8 +31,9 @@ and pings, and AI posts stay in Discord.
   without posting anything. "This is me" is `/link` without an account.
 - Buffalo overall: players in both series, by combined events.
 - Series leaders and recent tournaments across both series.
-- Slippi ranked lookup by connect code, plus a watchlist kept in the
-  browser's own localStorage (this device only, and it never pings anyone).
+- Slippi ranked lookup by connect code, with the same rank badges as the bot's
+  cards, plus a watchlist kept in the browser's own localStorage (this device
+  only, and it never pings anyone). "Refresh ranks" asks slippi.gg again.
 - Status card with the bundle's freshness, so the staleness is visible.
 
 ## Rebuild

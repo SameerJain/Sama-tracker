@@ -1,7 +1,15 @@
 import { EmbedBuilder, embedLength, escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
+import { percent, recordOf, scoreText, step } from '../format.js';
+import { t } from '../i18n.js';
 
-// each color means one thing, so pick a card's by what it is. the four outcome colors are what /messages set_colors
+export {
+  step, percent, topText, medal, scoreText, upsetFactor, MAJOR_UPSET, winLoss, winsOf, recordOf, shortRecord,
+} from '../format.js';
+// in the server's language, see i18n.js
+export { count, ordinal, t, listOf } from '../i18n.js';
+
+// each color means one thing, so pick a card's by what it is. the four outcome colors are what /settings posts set_colors
 // paints set results with, so no other tournament or reminder card uses them or anything close: a match call in red
 // read as a loss. slippi and the games keep their own colors, which their cards' badges and art make plain
 export const colors = {
@@ -23,7 +31,7 @@ export const colors = {
   reg: 0xc2410c,
   // how it went: placements, top 8s and the weekly recap
   results: 0xfacc15,
-  thread: 0x2563eb, // the cards that head /messages threads threads
+  thread: 0x2563eb, // the cards that head the threads from /settings posts threads
   system: 0xec4899, // status and bot updates, never feature cards
   slippi: 0x21ba45, // slippi.gg's green, for slippi cards without a rank. rank cards take the rank's color
   // each game's own color, for its fun command and its matchmaking pings
@@ -35,13 +43,6 @@ export const colors = {
   pplus: 0x14b8a6,
   bills: 0x00338d,
 };
-
-// double elim placements: 1, 2, 3, 4, 5, 7, 9, 13, 17, 25...
-const PLACEMENTS = [1, 2];
-for (let n = 2; n <= 4096; n *= 2) PLACEMENTS.push(n + 1, n * 1.5 + 1);
-
-// index into PLACEMENTS, so seed 9 and 9th place are both 6
-export const step = (n) => PLACEMENTS.findLastIndex((place) => place <= n);
 
 // how many of each a card lists
 export const CHARACTERS_SHOWN = 5;
@@ -140,8 +141,8 @@ export const filtersOn = ({ since, venue } = {}) => Boolean(since || venue);
 // what a filtered report says about since and venue, '' when neither is on
 function filterNote({ since, venue } = {}) {
   const parts = [];
-  if (venue) parts.push(`${venue} only`);
-  if (since) parts.push(`since <t:${since}:D>`);
+  if (venue) parts.push(venue === 'online' ? t('online only') : t('offline only'));
+  if (since) parts.push(t`since ${`<t:${since}:D>`}`);
   return parts.join(' · ');
 }
 
@@ -174,70 +175,13 @@ export function mapUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`.replaceAll('(', '%28').replaceAll(')', '%29');
 }
 
-export function percent(part, whole) {
-  return `${Math.round((part / whole) * 100)}%`;
-}
-
-// 0.05 -> top 5%. rounded up so nobody's ever the top 0%
-export const topText = (share) => `top ${Math.ceil(share * 100)}%`;
-
-export function ordinal(n) {
-  const lastTwo = n % 100;
-  if (lastTwo >= 11 && lastTwo <= 13) return `${n}th`;
-
-  const last = n % 10;
-  if (last === 1) return `${n}st`;
-  if (last === 2) return `${n}nd`;
-  if (last === 3) return `${n}rd`;
-  return `${n}th`;
-}
-
-export function medal(placement) {
-  if (placement === 1) return '🥇 ';
-  if (placement === 2) return '🥈 ';
-  if (placement === 3) return '🥉 ';
-  return '';
-}
-
 // reminder hours the way /track list shows them: 7d, 3d, 1d, 6h
 export function shortSchedule(schedule) {
   return schedule.map((hours) => (hours % 24 ? `${hours}h` : `${hours / 24}d`)).join(', ');
 }
 
-export function scoreText(me, them) {
-  if (me.score === -1 || them.score === -1) return 'DQ'; // start.gg's DQ score
-  if (me.score === null || them.score === null) return 'vs';
-  return `${me.score}-${them.score}`;
-}
-
-export function upsetFactor(winner, loser) {
-  if (!winner.seed || !loser.seed) return 0;
-  return step(winner.seed) - step(loser.seed);
-}
-
-// seed 13 beating seed 1, or seed 17 beating seed 2. set results and crew cards only call this big a win notable
-export const MAJOR_UPSET = 7;
-
-export function winLoss(wins, losses) {
-  return `${wins}-${losses}${wins + losses ? ` (${percent(wins, wins + losses)})` : ''}`;
-}
-
-export const winsOf = (list) => list.filter(({ won }) => won).length;
-
-// for a list of results from fromSide
-export function recordOf(list) {
-  const wins = winsOf(list);
-  return winLoss(wins, list.length - wins);
-}
-
-// 2-1, without the percent
-export function shortRecord(list) {
-  const wins = winsOf(list);
-  return `${wins}-${list.length - wins}`;
-}
-
 export function gameName(event) {
-  return event.videogame?.displayName ?? 'Other';
+  return event.videogame?.displayName ?? t('Other');
 }
 
 export const GRAND_FINALS = /grand final/i;
@@ -253,7 +197,7 @@ const isClose = ({ me, them }) => me.score > 0 && them.score > 0 && Math.abs(me.
 
 export function closeLine(played) {
   const close = played.filter(isClose);
-  return close.length ? `**Close sets:** ${recordOf(close)}` : null;
+  return close.length ? t`**Close sets:** ${recordOf(close)}` : null;
 }
 
 // against people seeded a placement tier above them in that bracket, then below
@@ -261,7 +205,7 @@ export function seedLine(played) {
   const seeded = played.filter(({ me, them }) => me.seed && them.seed);
   const higher = seeded.filter(({ me, them }) => step(them.seed) < step(me.seed));
   const lower = seeded.filter(({ me, them }) => step(them.seed) > step(me.seed));
-  const parts = [higher.length && `**Vs higher seeds:** ${recordOf(higher)}`, lower.length && `**Vs lower seeds:** ${recordOf(lower)}`].filter(Boolean);
+  const parts = [higher.length && t`**Vs higher seeds:** ${recordOf(higher)}`, lower.length && t`**Vs lower seeds:** ${recordOf(lower)}`].filter(Boolean);
   return parts.length ? parts.join(' · ') : null;
 }
 
@@ -271,9 +215,9 @@ export function sweepLine(played) {
   const wins = scored.filter(({ won }) => won);
   const losses = scored.filter(({ won }) => !won);
   const sweeps = [];
-  if (wins.length) sweeps.push(`won ${wins.filter(({ them }) => them.score === 0).length} of ${wins.length} without dropping a game`);
-  if (losses.length) sweeps.push(`lost ${losses.filter(({ me }) => me.score === 0).length} of ${losses.length} without taking one`);
-  return sweeps.length ? `**Sweeps:** ${sweeps.join(' · ')}` : null;
+  if (wins.length) sweeps.push(t`won ${wins.filter(({ them }) => them.score === 0).length} of ${wins.length} without dropping a game`);
+  if (losses.length) sweeps.push(t`lost ${losses.filter(({ me }) => me.score === 0).length} of ${losses.length} without taking one`);
+  return sweeps.length ? t`**Sweeps:** ${sweeps.join(' · ')}` : null;
 }
 
 // played is newest first. the run at the newest end, then the longest each way
@@ -295,7 +239,7 @@ export function streaks(played) {
 
 // W 2-1 · Winners Final · Tournament · VOD · date, with the VOD only when the TO added one
 export function meetingLine({ set, me, them, won }) {
-  return `**${won ? 'W' : 'L'}** ${scoreText(me, them)}${set.round ? ` · ${set.round}` : ''} · ${setLink(set)}${vodLink(set)} · <t:${set.completedAt}:d>`;
+  return `**${won ? t('W') : t('L')}** ${scoreText(me, them)}${set.round ? ` · ${set.round}` : ''} · ${setLink(set)}${vodLink(set)} · <t:${set.completedAt}:d>`;
 }
 
 // a small heading over the list, which leaves bold for the labels and names inside it
@@ -317,12 +261,8 @@ export function bold(name) {
 
 // 1. Fox · 70% of games · won 40 of 60 (67%)
 export function characterRank(usage, character, i) {
-  const share = usage.characters.length > 1 ? ` · ${percent(character.games, usage.games)} of games` : '';
-  const won = `won ${character.wins} of ${character.games} (${percent(character.wins, character.games)})`;
+  const share = usage.characters.length > 1 ? t` · ${percent(character.games, usage.games)} of games` : '';
+  const won = t`won ${character.wins} of ${character.games} (${percent(character.wins, character.games)})`;
   // escaped so discord shows "1." as typed instead of making it a list
   return `${i + 1}\\. ${bold(character.name)}${share} · ${won}`;
-}
-
-export function count(n, word, plural = `${word}s`) {
-  return `${n} ${n === 1 ? word : plural}`;
 }

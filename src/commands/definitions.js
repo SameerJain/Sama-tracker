@@ -69,33 +69,45 @@ const commands = [
     name: 'help', description: 'Short command list, verbose:True for the full one with details',
     options: [verboseOption('Every command with the details, instead of the short list')],
   },
+  // no default_member_permissions, since discord would hide it from TOs without Manage Server. anyone can look,
+  // and a part run with nothing in it shows every setting
   {
-    name: 'messages', description: 'Show or change posts, threads, event length, colors and the recap',
+    name: 'settings',
+    description: 'What gets posted here and how. Anyone can look, TOs or Manage Server change it',
     options: [
-      ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
-      { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green win, red loss, gold crew vs crew, blue otherwise' },
       {
-        type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
-        choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
+        type: Option.Subcommand, name: 'posts', description: 'Turn automatic posts on or off, plus threads, colors and event length',
+        options: [
+          ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
+          { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green win, red loss, gold crew vs crew, blue otherwise' },
+          {
+            type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
+            choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
+          },
+          { type: Option.Integer, name: 'event_length', description: 'Discord event hours when start.gg has no end time, 2 to 12', min_value: 2, max_value: 12 },
+        ],
       },
-      { type: Option.Integer, name: 'event_length', description: 'Discord event hours when start.gg has no end time, 2 to 12', min_value: 2, max_value: 12 },
-      { type: Option.Integer, name: 'recap_day', description: 'Day of the weekly recap', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
-      { type: Option.String, name: 'recap_time', description: 'Weekly recap time in 24-hour HH:MM, like 21:00' },
-      { type: Option.String, name: 'timezone', description: 'Recap timezone, like America/New_York or Europe/London' },
+      {
+        type: Option.Subcommand, name: 'recap', description: 'When the weekly recap posts',
+        options: [
+          { type: Option.Integer, name: 'day', description: 'Day of the week', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
+          { type: Option.String, name: 'time', description: 'Time in 24-hour HH:MM, like 21:00' },
+          { type: Option.String, name: 'timezone', description: 'Timezone, like America/New_York or Europe/London', autocomplete: true },
+        ],
+      },
+      // multi-server only: single-server builds post in CHANNEL_ID, so there's nothing to pick
+      ...(isMultiGuild() ? [{
+        type: Option.Subcommand, name: 'channel', description: 'The channel automatic posts go in for this server',
+        options: [
+          {
+            type: Option.Channel, name: 'channel', description: 'Channel for set results, roll calls, reminders and recaps',
+            channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
+          },
+        ],
+      }] : []),
     ],
   },
   { name: 'data', description: 'Samatracker and both series data pages' },
-  // multi-server only: single-server builds post in CHANNEL_ID, so there's nothing to pick. no
-  // default_member_permissions, like /messages, since discord would hide it from TOs without Manage Server
-  ...(isMultiGuild() ? [{
-    name: 'setup', description: 'Show or set the channel automatic posts go in for this server',
-    options: [
-      {
-        type: Option.Channel, name: 'channel', description: 'Channel for set results, roll calls, reminders and recaps',
-        channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
-      },
-    ],
-  }] : []),
   // two commands since one with subcommands can't be run on its own, and permissions are per command
   { name: 'socials', description: 'Streams and social links saved for this server' },
   {
@@ -247,32 +259,35 @@ const commands = [
   },
   // not under /notify: these are roles people ping each other with, not posts the bot sends
   {
-    name: 'matchmaking_role',
-    description: 'Get the Ultimate or Melee role for a while, or take it off if you have it',
+    name: 'matchmaking',
+    description: 'Ultimate and Melee roles people give themselves to find games, and the pings that find them',
     options: [
-      matchmakingGame('Which role'),
-      { type: Option.Number, name: 'duration', description: 'Hours to keep it, like 2 or 0.5 for 30 minutes. Leave out to keep it until you take it off', min_value: 0.5, max_value: 24 },
-    ],
-  },
-  {
-    name: 'matchmaking_search',
-    description: 'Ping Ultimate or Melee Matchmaking to find games. Only people with that role can',
-    options: [
-      matchmakingGame('Which role to ping'),
-      { type: Option.String, name: 'message', description: 'What you want, like netplay with your connect code or where you\'re playing', max_length: 300 },
-      { type: Option.Boolean, name: 'thread', description: 'Start a thread on your search to arrange games' },
-    ],
-  },
-  {
-    name: 'matchmaking_channel',
-    description: 'Where Ultimate or Melee searches post. Anyone can look, TOs only to change',
-    options: [
-      matchmakingGame('Which searches'),
       {
-        type: Option.Channel, name: 'channel', description: 'Channel for these searches. Leave out to see where they go',
-        channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
+        type: Option.Subcommand, name: 'role', description: 'Get the Ultimate or Melee role for a while, or take it off if you have it',
+        options: [
+          matchmakingGame('Which role'),
+          { type: Option.Number, name: 'duration', description: 'Hours to keep it, like 2 or 0.5 for 30 minutes. Leave out to keep it until you take it off', min_value: 0.5, max_value: 24 },
+        ],
       },
-      { type: Option.Boolean, name: 'clear', description: 'Back to posting where the command runs' },
+      {
+        type: Option.Subcommand, name: 'search', description: 'Ping Ultimate or Melee Matchmaking to find games. Only people with that role can',
+        options: [
+          matchmakingGame('Which role to ping'),
+          { type: Option.String, name: 'message', description: 'What you want, like netplay with your connect code or where you\'re playing', max_length: 300 },
+          { type: Option.Boolean, name: 'thread', description: 'Start a thread on your search to arrange games' },
+        ],
+      },
+      {
+        type: Option.Subcommand, name: 'channel', description: 'Where Ultimate or Melee searches post. Anyone can look, TOs only to change',
+        options: [
+          matchmakingGame('Which searches'),
+          {
+            type: Option.Channel, name: 'channel', description: 'Channel for these searches. Leave out to see where they go',
+            channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
+          },
+          { type: Option.Boolean, name: 'clear', description: 'Back to posting where the command runs' },
+        ],
+      },
     ],
   },
   {
@@ -304,7 +319,7 @@ const commands = [
   {
     name: 'scout', description: 'Scout any start.gg opponent. Needs you tracked or linked, with Discord connected on start.gg',
     options: [
-      { type: Option.String, name: 'profile', description: 'Tracked or linked opponent, or a start.gg profile link or ID', required: true, autocomplete: true },
+      playerOption(MATCHUP, 'opponent'),
       verboseOption('More history, habits, toughest opponents and worst matchups, stages and your odds. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and Melee odds, plus Slippi ranks toward them' },
       sinceOption(), venueOption(),
@@ -356,16 +371,7 @@ const commands = [
     description: 'Odds of beating another player',
     options: [
       playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
-      verboseOption('Show how each part of the prediction counts'),
-      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks which count toward them' },
-      sinceOption(), venueOption(),
-    ],
-  },
-  {
-    name: 'predict_explained',
-    description: 'Full breakdown of the odds, with shares, model numbers and bars',
-    options: [
-      playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
+      verboseOption('The full breakdown: how much each part counts, with bars and how sure the odds are'),
       { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks which count toward them' },
       sinceOption(), venueOption(),
     ],

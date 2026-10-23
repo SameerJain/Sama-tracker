@@ -170,9 +170,9 @@ async function scout(interaction) {
   const player = await verifiedCaller(interaction.user.id);
   if (!player) return interaction.editReply(NOT_LINKED);
 
-  const input = interaction.options.getString('profile', true);
+  const input = interaction.options.getString('opponent', true);
   // a tracked or linked pick from autocomplete, otherwise a start.gg link or ID
-  const opponent = readPlayer(interaction, 'profile') ?? await findPlayer(interaction, input);
+  const opponent = readPlayer(interaction, 'opponent') ?? await findPlayer(interaction, input);
   if (!opponent) return;
   if (player.playerId === opponent.playerId) return interaction.editReply('Use an opponent\'s profile, not your own.');
   const filters = filterOptions(interaction);
@@ -385,12 +385,6 @@ async function predict(interaction) {
   if (picked) return predictReport(interaction, { ...picked, ...reportOptions(interaction) });
 }
 
-// the full breakdown lives here, so /predict stays short. same odds, more detail
-async function predictExplained(interaction) {
-  const picked = await matchup(interaction);
-  if (picked) return predictExplainedReport(interaction, { ...picked, melee: flag(interaction, 'melee') });
-}
-
 // meetings go back past the histories, usually in one request, so head-to-head matches /h2h.
 // events say how big each bracket was, which helps seeding count. null when the lookup
 // failed, and the odds still work without events. doing is the countdown line
@@ -420,8 +414,9 @@ async function noPredictions(interaction, a, b, { melee, filters, profiles, scop
   return null;
 }
 
+// verbose is the full breakdown: how much each part counts, with bars, and how sure the odds are
 async function predictReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
-  const doing = `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets`;
+  const doing = `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets${verbose ? ' for the full breakdown' : ''}`;
   const { odds, profiles, filters, ...rest } = await oddsFor(interaction, a, b, { melee, since, venue, doing });
   // netplay players can have a rank without a melee set on start.gg, which is when it says the most
   if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
@@ -430,14 +425,6 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
   await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, { ...filters, melee }), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }), more);
 }
 
-async function predictExplainedReport(interaction, { player: a, opponent: b, melee, since, venue }) {
-  const doing = `Going through ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s sets for the full breakdown`;
-  const { odds, profiles, filters, ...rest } = await oddsFor(interaction, a, b, { melee, since, venue, doing });
-  if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
-
-  // no Full report button, this is the full one
-  await sendEmbeds(interaction, embeds.withSlippi(embeds.predictionExplained(a, b, odds, { ...filters, melee }), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }));
-}
 
 // long-press someone in the server, then Apps. nothing to type, which is the point on a phone. checks the
 // member before deferring, and goes by the start.gg with their discord connected. null when it answered
@@ -494,4 +481,4 @@ const reports = {
   progress: progressReport, scout: scoutReport, h2h: headToHeadReport, stats: statsReport, doubles: doublesReport, characters: charactersReport, predict: predictReport,
 };
 
-export { progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED };
+export { progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED };

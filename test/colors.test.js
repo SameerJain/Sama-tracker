@@ -12,7 +12,7 @@ const { colors } = await import('../src/embeds/shared.js');
 const embeds = await import('../src/embeds/index.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 
-// what /messages set_colors paints set results with
+// what /settings posts set_colors paints set results with
 const OUTCOMES = ['win', 'loss', 'clash', 'setDefault'];
 // cards that land in the channel next to set results. slippi and the games keep their own brand colors
 const NEAR_RESULTS = ['brand', 'live', 'stream', 'regEarly', 'reg', 'results', 'thread', 'system', 'reset'];

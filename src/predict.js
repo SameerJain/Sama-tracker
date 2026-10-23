@@ -1,5 +1,5 @@
 import { singles } from './startgg.js';
-import { rankOf } from './slippi.js';
+import { rankOf } from './slippi/shared.js';
 
 // form is someone's last this many sets in the game, against anyone but the other player
 export const FORM_SETS = 40;

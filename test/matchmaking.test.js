@@ -80,14 +80,16 @@ function person(held = [], fail = null) {
   };
 }
 
-async function run(commandName, { guild = server(), member = person(), values = {}, appPermissions, user, threadFail = null, channelId = 'here-channel', memberPermissions = null } = {}) {
+// run('matchmaking role', ...) is the role subcommand
+async function run(command, { guild = server(), member = person(), values = {}, appPermissions, user, threadFail = null, channelId = 'here-channel', memberPermissions = null } = {}) {
+  const [commandName, subcommand] = command.split(' ');
   const calls = [];
   const threads = [];
   const interaction = {
     commandName, guild, member, appPermissions, channelId, memberPermissions,
     user: user ?? { id: 'me-discord', username: 'Me' },
     options: {
-      getSubcommandGroup: () => null, getSubcommand: () => null,
+      getSubcommandGroup: () => null, getSubcommand: () => subcommand,
       getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null,
       getInteger: (name) => values[name] ?? null, getNumber: (name) => values[name] ?? null,
       getChannel: (name) => values[name] ?? null,
@@ -123,9 +125,10 @@ const lastText = (calls) => {
 };
 
 test('the toggle takes a required game first, with an optional duration in hours', () => {
-  const toggle = commands.find((command) => command.name === 'matchmaking_role');
-  const ping = commands.find((command) => command.name === 'matchmaking_search');
-  const channel = commands.find((command) => command.name === 'matchmaking_channel');
+  const subcommand = (name) => commands.find((command) => command.name === 'matchmaking').options.find((option) => option.name === name);
+  const toggle = subcommand('role');
+  const ping = subcommand('search');
+  const channel = subcommand('channel');
   for (const command of [toggle, ping, channel]) {
     assert.equal(command.options[0].name, 'game');
     assert.equal(command.options[0].required, true);
@@ -149,7 +152,7 @@ test('the toggle takes a required game first, with an optional duration in hours
 test('the first toggle makes a mentionable role that grants nothing, saves its id and hands it out', async () => {
   const guild = server();
   const member = person();
-  const calls = await run('matchmaking_role', { guild, member, values: { game: 'melee' } });
+  const calls = await run('matchmaking role', { guild, member, values: { game: 'melee' } });
 
   // making a role can take discord past 3 seconds, so the private reply comes first
   assert.deepEqual(calls[0], ['defer', { flags: MessageFlags.Ephemeral }]);
@@ -160,14 +163,14 @@ test('the first toggle makes a mentionable role that grants nothing, saves its i
   assert.equal(guild.made[0].colors, undefined);
   assert.ok(member.held.has('made-1'));
   assert.equal(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmaking.melee, 'made-1');
-  assert.match(lastText(calls), /You have the \*\*Melee Matchmaking\*\* role now.*`\/matchmaking_search game:Melee` pings it, and so does typing @Melee Matchmaking/);
+  assert.match(lastText(calls), /You have the \*\*Melee Matchmaking\*\* role now.*`\/matchmaking search game:Melee` pings it, and so does typing @Melee Matchmaking/);
 });
 
 test('running it again takes the role off without making another', async () => {
   const guild = server();
   const member = person();
-  await run('matchmaking_role', { guild, member, values: { game: 'ult' } });
-  const calls = await run('matchmaking_role', { guild, member, values: { game: 'ult' } });
+  await run('matchmaking role', { guild, member, values: { game: 'ult' } });
+  const calls = await run('matchmaking role', { guild, member, values: { game: 'ult' } });
 
   assert.equal(guild.made.length, 1);
   assert.equal(member.held.size, 0);
@@ -177,8 +180,8 @@ test('running it again takes the role off without making another', async () => {
 test('each game has its own role', async () => {
   const guild = server();
   const member = person();
-  await run('matchmaking_role', { guild, member, values: { game: 'ult' } });
-  await run('matchmaking_role', { guild, member, values: { game: 'melee' } });
+  await run('matchmaking role', { guild, member, values: { game: 'ult' } });
+  await run('matchmaking role', { guild, member, values: { game: 'melee' } });
 
   assert.deepEqual(guild.made.map((role) => role.name), ['Ultimate Matchmaking', 'Melee Matchmaking']);
   assert.deepEqual(state.matchmaking, { ult: 'made-1', melee: 'made-2' });
@@ -189,19 +192,19 @@ test('a role renamed in server settings is still the one it hands out and pings'
   state.matchmaking = { ult: 'ult-role' };
   const guild = server([{ id: 'ult-role', name: 'Ult LFG', mentionable: true }]);
   const member = person();
-  const toggled = await run('matchmaking_role', { guild, member, values: { game: 'ult' } });
+  const toggled = await run('matchmaking role', { guild, member, values: { game: 'ult' } });
 
   assert.equal(guild.made.length, 0);
   assert.ok(member.held.has('ult-role'));
   assert.match(lastText(toggled), /You have the \*\*Ult LFG\*\* role now/);
 
-  const pinged = await run('matchmaking_search', { guild, member, values: { game: 'ult' } });
+  const pinged = await run('matchmaking search', { guild, member, values: { game: 'ult' } });
   assert.equal(lastText(pinged), '<@&ult-role>');
 });
 
 test('a role someone made by hand with the right name gets used and remembered', async () => {
   const guild = server([{ id: 'by-hand', name: 'Melee Matchmaking', mentionable: true }]);
-  await run('matchmaking_role', { guild, values: { game: 'melee' } });
+  await run('matchmaking role', { guild, values: { game: 'melee' } });
 
   assert.equal(guild.made.length, 0);
   assert.equal(state.matchmaking.melee, 'by-hand');
@@ -209,20 +212,20 @@ test('a role someone made by hand with the right name gets used and remembered',
 
 test('pinging needs the role, whether or not anyone has made it yet', async () => {
   for (const guild of [server(), server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }])]) {
-    const calls = await run('matchmaking_search', { guild, values: { game: 'melee' } });
+    const calls = await run('matchmaking search', { guild, values: { game: 'melee' } });
     assert.equal(calls.length, 1);
     const [kind, result] = calls[0];
     assert.equal(kind, 'reply');
     assert.equal(result.flags, MessageFlags.Ephemeral);
     assert.deepEqual(result.allowedMentions, { parse: [] });
-    assert.match(result.content, /You need the \*\*Melee Matchmaking\*\* role to ping it\. `\/matchmaking_role game:Melee` gives it to you\./);
+    assert.match(result.content, /You need the \*\*Melee Matchmaking\*\* role to ping it\. `\/matchmaking role game:Melee` gives it to you\./);
   }
 });
 
 test('a ping mentions only the role, with a card naming who asked and their message', async () => {
   state.matchmaking = { melee: 'melee-role' };
   const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }]);
-  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee', message: '  @everyone netplay? FOXY#420  ' } });
+  const calls = await run('matchmaking search', { guild, member: person(['melee-role']), values: { game: 'melee', message: '  @everyone netplay? FOXY#420  ' } });
 
   assert.equal(calls.length, 1);
   const [kind, result] = calls[0];
@@ -234,15 +237,15 @@ test('a ping mentions only the role, with a card naming who asked and their mess
   const card = result.embeds[0].data;
   assert.equal(card.title, 'Melee matchmaking');
   assert.equal(card.thumbnail.url, 'https://cdn.example/me.png');
-  assert.equal(card.description, '<@me-discord> is looking for Melee games.\n> @everyone netplay? FOXY#420\n-# `/matchmaking_role game:Melee` gets you these pings, or stops them');
+  assert.equal(card.description, '<@me-discord> is looking for Melee games.\n> @everyone netplay? FOXY#420\n-# `/matchmaking role game:Melee` gets you these pings, or stops them');
 });
 
 test('a ping without a message leaves out the quote', async () => {
   state.matchmaking = { ult: 'ult-role' };
   const guild = server([{ id: 'ult-role', name: 'Ultimate Matchmaking', mentionable: true }]);
-  const calls = await run('matchmaking_search', { guild, member: person(['ult-role']), values: { game: 'ult', message: '   ' } });
+  const calls = await run('matchmaking search', { guild, member: person(['ult-role']), values: { game: 'ult', message: '   ' } });
 
-  assert.equal(calls[0][1].embeds[0].data.description, '<@me-discord> is looking for Ultimate games.\n-# `/matchmaking_role game:Ultimate` gets you these pings, or stops them');
+  assert.equal(calls[0][1].embeds[0].data.description, '<@me-discord> is looking for Ultimate games.\n-# `/matchmaking role game:Ultimate` gets you these pings, or stops them');
 });
 
 test('a role with mentions turned off only gets pinged when the bot has Mention Everyone', async () => {
@@ -250,18 +253,18 @@ test('a role with mentions turned off only gets pinged when the bot has Mention 
   const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: false }]);
   const member = person(['melee-role']);
 
-  const refused = await run('matchmaking_search', { guild, member, values: { game: 'melee' } });
+  const refused = await run('matchmaking search', { guild, member, values: { game: 'melee' } });
   assert.equal(refused[0][1].flags, MessageFlags.Ephemeral);
   assert.match(refused[0][1].content, /\*\*Melee Matchmaking\*\* can't be pinged right now.*Allow anyone to @mention this role/);
 
   const appPermissions = { has: (permission) => permission === PermissionFlagsBits.MentionEveryone };
-  const sent = await run('matchmaking_search', { guild, member, values: { game: 'melee' }, appPermissions });
+  const sent = await run('matchmaking search', { guild, member, values: { game: 'melee' }, appPermissions });
   assert.equal(sent[0][1].content, '<@&melee-role>');
 });
 
 test('missing Manage Roles, or a role above the bot\'s, gets a reply saying so', async () => {
   const fail = Object.assign(new Error('Missing Permissions'), { code: 50013 });
-  const calls = await run('matchmaking_role', { member: person([], fail), values: { game: 'ult' } });
+  const calls = await run('matchmaking role', { member: person([], fail), values: { game: 'ult' } });
 
   assert.match(lastText(calls), /I couldn't change your \*\*Ultimate Matchmaking\*\* role\. That needs Manage Roles, with my role above Ultimate Matchmaking\./);
 });
@@ -269,7 +272,7 @@ test('missing Manage Roles, or a role above the bot\'s, gets a reply saying so',
 test('any other discord failure says to try again instead of blaming start.gg', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
   const fail = Object.assign(new Error('Service Unavailable'), { status: 503 });
-  const calls = await run('matchmaking_role', { member: person([], fail), values: { game: 'melee' } });
+  const calls = await run('matchmaking role', { member: person([], fail), values: { game: 'melee' } });
 
   assert.match(lastText(calls), /Discord didn't let me change your \*\*Melee Matchmaking\*\* role just now\. Try again in a minute\./);
   assert.equal(logged.mock.callCount(), 1);
@@ -281,7 +284,7 @@ test('thread:True starts a thread on the ping, left out it sends none', async ()
   const member = { ...person(['melee-role']), displayName: 'Sam' };
 
   const before = Math.floor(Date.now() / 1000);
-  const withThread = await run('matchmaking_search', { guild, member, values: { game: 'melee', thread: true }, user: { id: 'me-discord', username: 'Sam' } });
+  const withThread = await run('matchmaking search', { guild, member, values: { game: 'melee', thread: true }, user: { id: 'me-discord', username: 'Sam' } });
   assert.equal(withThread[0][1].content, '<@&melee-role>');
   assert.equal(withThread.threads.length, 1);
   const today = new Date();
@@ -291,7 +294,7 @@ test('thread:True starts a thread on the ping, left out it sends none', async ()
   assert.ok(state.matchmakingThreads[0].at >= before);
   assert.deepEqual(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmakingThreads, state.matchmakingThreads);
 
-  const withoutThread = await run('matchmaking_search', { guild, member, values: { game: 'melee' } });
+  const withoutThread = await run('matchmaking search', { guild, member, values: { game: 'melee' } });
   assert.equal(withoutThread[0][1].content, '<@&melee-role>');
   assert.equal(withoutThread.threads.length, 0);
 });
@@ -301,7 +304,7 @@ test('a thread that cannot start still posts the ping and says so privately', as
   state.matchmaking = { ult: 'ult-role' };
   const guild = server([{ id: 'ult-role', name: 'Ultimate Matchmaking', mentionable: true }]);
   const member = { ...person(['ult-role']), displayName: 'Sam' };
-  const calls = await run('matchmaking_search', {
+  const calls = await run('matchmaking search', {
     guild, member, values: { game: 'ult', thread: true },
     user: { id: 'me-discord', username: 'Sam' }, threadFail: new Error('Missing Permissions'),
   });
@@ -318,7 +321,7 @@ test('duration hands out the role and saves when it comes off', async () => {
   const guild = server();
   const member = person();
   const before = Math.floor(Date.now() / 1000);
-  const calls = await run('matchmaking_role', { guild, member, values: { game: 'melee', duration: 0.5 } });
+  const calls = await run('matchmaking role', { guild, member, values: { game: 'melee', duration: 0.5 } });
 
   assert.ok(member.held.has('made-1'));
   const key = expiryKey('me-discord', 'melee');
@@ -332,17 +335,17 @@ test('duration hands out the role and saves when it comes off', async () => {
 test('duration on someone who has the role keeps it and moves the timer', async () => {
   const guild = server();
   const member = person();
-  await run('matchmaking_role', { guild, member, values: { game: 'ult' } });
+  await run('matchmaking role', { guild, member, values: { game: 'ult' } });
   assert.ok(member.held.has('made-1'));
   assert.equal(state.matchmakingExpiry[expiryKey('me-discord', 'ult')], undefined);
 
-  const kept = await run('matchmaking_role', { guild, member, values: { game: 'ult', duration: 2 } });
+  const kept = await run('matchmaking role', { guild, member, values: { game: 'ult', duration: 2 } });
   assert.ok(member.held.has('made-1'));
   assert.equal(guild.made.length, 1);
   assert.ok(state.matchmakingExpiry[expiryKey('me-discord', 'ult')] > Math.floor(Date.now() / 1000));
   assert.match(lastText(kept), /Keeping your \*\*Ultimate Matchmaking\*\* role for 2 hours, then it comes off on its own/);
 
-  const off = await run('matchmaking_role', { guild, member, values: { game: 'ult' } });
+  const off = await run('matchmaking role', { guild, member, values: { game: 'ult' } });
   assert.equal(member.held.size, 0);
   assert.equal(state.matchmakingExpiry[expiryKey('me-discord', 'ult')], undefined);
   assert.match(lastText(off), /Took off your \*\*Ultimate Matchmaking\*\* role/);
@@ -352,7 +355,7 @@ test('a bad duration says so and changes nothing', async () => {
   const guild = server();
   const member = person();
   for (const duration of [0.1, 25]) {
-    const calls = await run('matchmaking_role', { guild, member, values: { game: 'melee', duration } });
+    const calls = await run('matchmaking role', { guild, member, values: { game: 'melee', duration } });
     assert.match(lastText(calls), /Duration is hours to keep the role, 0\.5-24/);
   }
   assert.equal(guild.made.length, 0);
@@ -397,7 +400,7 @@ test('someone who left or took it off by hand just clears the timer', async () =
   assert.deepEqual(state.matchmakingExpiry, {});
 });
 
-// a TO's member for /matchmaking_channel, on a server with the role and these channels
+// a TO's member for /matchmaking channel, on a server with the role and these channels
 function toServer(channels = new Map()) {
   const guild = server([{ id: 'to-role', name: 'TO' }], new Map(), channels);
   return { guild, member: person(['to-role']) };
@@ -406,25 +409,25 @@ function toServer(channels = new Map()) {
 test('anyone can see where searches go, only TOs change it', async () => {
   const nobody = { has: () => false };
 
-  const unset = await run('matchmaking_channel', { values: { game: 'melee' }, memberPermissions: nobody });
+  const unset = await run('matchmaking channel', { values: { game: 'melee' }, memberPermissions: nobody });
   assert.equal(unset.length, 1);
   assert.equal(unset[0][0], 'reply');
   assert.equal(unset[0][1].flags, MessageFlags.Ephemeral);
   assert.match(unset[0][1].content, /\*\*Melee\*\* searches post wherever the command runs\./);
 
   state.matchmakingChannels = { melee: 'lfg-melee' };
-  const set = await run('matchmaking_channel', { values: { game: 'melee' }, memberPermissions: nobody });
+  const set = await run('matchmaking channel', { values: { game: 'melee' }, memberPermissions: nobody });
   assert.match(set[0][1].content, /\*\*Melee\*\* searches post in <#lfg-melee>\./);
 
-  const denied = await run('matchmaking_channel', { values: { game: 'melee', channel: { id: 'lfg-melee' } }, memberPermissions: nobody });
+  const denied = await run('matchmaking channel', { values: { game: 'melee', channel: { id: 'lfg-melee' } }, memberPermissions: nobody });
   assert.match(lastText(denied), /Only TOs can set matchmaking channels/);
   assert.equal(state.matchmakingChannels.melee, 'lfg-melee');
 
-  const deniedClear = await run('matchmaking_channel', { values: { game: 'melee', clear: true }, memberPermissions: nobody });
+  const deniedClear = await run('matchmaking channel', { values: { game: 'melee', clear: true }, memberPermissions: nobody });
   assert.match(lastText(deniedClear), /Only TOs can set matchmaking channels/);
   assert.equal(state.matchmakingChannels.melee, 'lfg-melee');
 
-  const both = await run('matchmaking_channel', { values: { game: 'melee', channel: { id: 'lfg-melee' }, clear: true }, memberPermissions: nobody });
+  const both = await run('matchmaking channel', { values: { game: 'melee', channel: { id: 'lfg-melee' }, clear: true }, memberPermissions: nobody });
   assert.match(lastText(both), /Pick either a channel or `clear:True`, not both\./);
 });
 
@@ -433,13 +436,13 @@ test('a TO sets, then clears, a game channel', async () => {
   const { guild, member } = toServer(new Map([['lfg-melee', lfg]]));
   guild.members.me = { id: 'bot' };
 
-  const calls = await run('matchmaking_channel', { guild, member, values: { game: 'melee', channel: { id: 'lfg-melee' } } });
+  const calls = await run('matchmaking channel', { guild, member, values: { game: 'melee', channel: { id: 'lfg-melee' } } });
   assert.deepEqual(calls[0], ['defer', { flags: MessageFlags.Ephemeral }]);
   assert.match(lastText(calls), /\*\*Melee\*\* searches will post in <#lfg-melee>\./);
   assert.equal(state.matchmakingChannels.melee, 'lfg-melee');
   assert.equal(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmakingChannels.melee, 'lfg-melee');
 
-  const cleared = await run('matchmaking_channel', { guild, member, values: { game: 'melee', clear: true } });
+  const cleared = await run('matchmaking channel', { guild, member, values: { game: 'melee', clear: true } });
   assert.match(lastText(cleared), /\*\*Melee\*\* searches post wherever the command runs now\./);
   assert.deepEqual(state.matchmakingChannels, {});
 });
@@ -449,16 +452,16 @@ test('a channel the bot cannot use or see is refused', async () => {
   const { guild, member } = toServer(new Map([['quiet', quiet]]));
   guild.members.me = { id: 'bot' };
 
-  const denied = await run('matchmaking_channel', { guild, member, values: { game: 'ult', channel: { id: 'quiet' } } });
+  const denied = await run('matchmaking channel', { guild, member, values: { game: 'ult', channel: { id: 'quiet' } } });
   assert.match(lastText(denied), /I can't post in <#quiet>\. Give me View Channel and Send Messages there first\./);
   assert.deepEqual(state.matchmakingChannels, {});
 
-  const missing = await run('matchmaking_channel', { guild, member, values: { game: 'ult', channel: { id: 'gone' } } });
+  const missing = await run('matchmaking channel', { guild, member, values: { game: 'ult', channel: { id: 'gone' } } });
   assert.match(lastText(missing), /Couldn't use that channel for \*\*Ultimate\*\* searches\. Pick one in this server\./);
   assert.deepEqual(state.matchmakingChannels, {});
 
   const voice = { id: 'voice', isTextBased: () => false };
-  const notText = await run('matchmaking_channel', { guild: { ...guild, channels: { fetch: async (id) => (id === 'voice' ? voice : null) } }, member, values: { game: 'ult', channel: { id: 'voice' } } });
+  const notText = await run('matchmaking channel', { guild: { ...guild, channels: { fetch: async (id) => (id === 'voice' ? voice : null) } }, member, values: { game: 'ult', channel: { id: 'voice' } } });
   assert.match(lastText(notText), /\*\*Ultimate\*\* searches need a text channel\./);
   assert.deepEqual(state.matchmakingChannels, {});
 });
@@ -472,7 +475,7 @@ test('a search posts in its game channel', async () => {
     new Map(),
     new Map([['lfg-melee', lfg]]),
   );
-  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'here-channel' });
+  const calls = await run('matchmaking search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'here-channel' });
 
   assert.equal(lfg.sent.length, 1);
   assert.equal(lfg.sent[0].content, '<@&melee-role>');
@@ -493,7 +496,7 @@ test('a search run in its own channel stays there', async () => {
     new Map(),
     new Map([['lfg-melee', lfg]]),
   );
-  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'lfg-melee' });
+  const calls = await run('matchmaking search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'lfg-melee' });
 
   assert.equal(lfg.sent.length, 0);
   assert.equal(calls.length, 1);
@@ -505,7 +508,7 @@ test('a deleted search channel posts here and clears itself', async () => {
   state.matchmaking = { melee: 'melee-role' };
   state.matchmakingChannels = { melee: 'gone' };
   const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }]);
-  const calls = await run('matchmaking_search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'here-channel' });
+  const calls = await run('matchmaking search', { guild, member: person(['melee-role']), values: { game: 'melee' }, channelId: 'here-channel' });
 
   assert.equal(calls[0][1].content, '<@&melee-role>');
   assert.equal(calls[1][0], 'followUp');
@@ -523,7 +526,7 @@ test('a search the bot cannot post fails privately', async () => {
     new Map(),
     new Map([['quiet', quiet]]),
   );
-  const calls = await run('matchmaking_search', { guild, member: person(['ult-role']), values: { game: 'ult' }, channelId: 'here-channel' });
+  const calls = await run('matchmaking search', { guild, member: person(['ult-role']), values: { game: 'ult' }, channelId: 'here-channel' });
 
   assert.equal(quiet.sent.length, 0);
   assert.equal(calls.length, 1);
@@ -543,7 +546,7 @@ test('a redirected search still starts its thread', async () => {
     new Map([['lfg-melee', lfg]]),
   );
   const member = { ...person(['melee-role']), displayName: 'Sam' };
-  const calls = await run('matchmaking_search', {
+  const calls = await run('matchmaking search', {
     guild, member, values: { game: 'melee', thread: true },
     user: { id: 'me-discord', username: 'Sam' }, channelId: 'here-channel',
   });

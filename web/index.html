@@ -65,7 +65,7 @@
 <p><small>Live lookup straight from your browser to slippi.gg — no bot needed. The watchlist below lives in this browser only, so it won't ping anyone and it won't survive a different device.</small></p>
 <p><input id="code" class="tablefilter" type="text" placeholder="Connect code, like ABCD#123" aria-label="Connect code" spellcheck="false"> <button id="lookup" type="button">Look up</button></p>
 <div id="slippi-out"><p><small>Rank, rating, season record and characters show up here.</small></p></div>
-<h3>Watchlist (this browser)</h3>
+<h3>Watchlist (this browser) <button id="refresh-watch" type="button" hidden>Refresh ranks</button></h3>
 <div id="watch"><p><small>Nothing yet. Look someone up, then add them.</small></p></div>
 </div>
 
@@ -82,11 +82,10 @@
 <tr><td>/slippi rank</td><td>Slippi ranked lookup, live from slippi.gg</td></tr>
 <tr><td>/slippi leaderboard</td><td>The watchlist, best rank first</td></tr>
 <tr><td>/predict, /scout verbose, /progress, /doubles</td><td>Discord only: they need live set histories</td></tr>
-<tr><td>/upcoming, /run, /bracket, /streams, /registered, /t-o, /notify, /messages, fun</td><td>Discord only: live tournaments, server roles and pings, AI posts</td></tr>
+<tr><td>/upcoming, /run, /bracket, /stream_link, /registered, /t-o, /notify, /messages, fun</td><td>Discord only: live tournaments, server roles and pings, AI posts</td></tr>
 </table></div>
 </div>
 
 <footer class="pagefoot">Samatracker · cached series data, live Slippi ranks · <a href="https://github.com/SameerJain/Sama-tracker">bot repo</a></footer>
-<script src="stats.js"></script>
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body></html>

@@ -70,18 +70,11 @@ test('single-player options are optional, and h2h and predict take the opponent 
     assert.equal(verbose.name, 'verbose');
     assert.ok(!verbose.required);
   }
-  // explained takes the same pair with no verbose, since it's always the full breakdown
-  {
-    const [opponent, player, ...rest] = commands.find(c => c.name === 'predict_explained').options;
-    assert.deepEqual([opponent.name, opponent.required], ['opponent', true]);
-    assert.deepEqual([player.name, player.required], ['player', false]);
-    assert.ok(rest.every((option) => option.name !== 'verbose'));
-  }
   for (const name of ['progress']) {
     const melee = commands.find(c => c.name === name).options.at(-1);
     assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined], name);
   }
-  for (const name of ['h2h', 'stats', 'scout', 'predict', 'predict_explained']) {
+  for (const name of ['h2h', 'stats', 'scout', 'predict']) {
     const [melee, since, venue] = commands.find(c => c.name === name).options.slice(-3);
     assert.deepEqual([melee.name, melee.type, melee.required], ['melee', 5, undefined], name);
     assert.deepEqual([since.name, since.required], ['since', undefined], name);
@@ -266,7 +259,7 @@ test('/scout works for someone linked, as long as start.gg still has their disco
     });
     const interaction = {
       commandName: 'scout', user: { id: 'me-discord' },
-      options: { getSubcommand: () => null, getString: (name) => (name === 'profile' ? 'start.gg/user/them' : null), getBoolean: () => null },
+      options: { getSubcommand: () => null, getString: (name) => (name === 'opponent' ? 'start.gg/user/them' : null), getBoolean: () => null },
       deferReply: async () => { interaction.deferred = true; }, editReply: async (reply) => replies.push(reply),
     };
     return handleCommand(interaction);
@@ -284,7 +277,7 @@ test('/scout says the same thing as /track add when start.gg has nobody for the 
   mockApi(({ query }) => (query.includes('user(id:')
     ? { u1: { player: { gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] } }
     : { user: null }));
-  const reply = await run('scout', 'crew-discord', { profile: 'start.gg/user/ghost' });
+  const reply = await run('scout', 'crew-discord', { opponent: 'start.gg/user/ghost' });
   assert.match(reply.content, /Couldn't find a start\.gg player for `start\.gg\/user\/ghost`\./);
 });
 
@@ -987,7 +980,7 @@ test('predict verbose explains the same odds the short version shows', () => {
   assert.equal(embeds.prediction(a, b, { ...odds, game: 'Melee' })[0].data.author.name, 'A · Melee');
   const text = full.map(e => e.data.description).join('\n');
   assert.match(text, /How it adds up/);
-  assert.match(text, /\*\*Head-to-head:\*\* counts for \d+%/);
+  assert.match(text, /\*\*Head-to-head:\*\* [█░]{10} \d+%/);
   assert.match(text, /### Common opponents\n\*\*P30\*\*: \*\*A\*\* 1-1 · \*\*B\*\* 0-2/);
   assert.match(text, /Shared brackets/);
 });

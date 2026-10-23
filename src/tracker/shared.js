@@ -55,7 +55,7 @@ export const SLIPPI_SKIPPED_KEPT = 1000;
 // check after a long outage, or after this shipped, doesn't post about an old season
 export const SEASON_WRAP_DAYS = 7;
 export const SEASONS_WRAPPED_KEPT = 20;
-// /messages threads needs these in the channel, named the way discord's settings show them
+// /settings posts threads needs these in the channel, named the way discord's settings show them
 export const THREAD_PERMISSIONS = { CreatePublicThreads: 'Create Public Threads', SendMessagesInThreads: 'Send Messages in Threads' };
 // longer than any tournament runs, then the thread is forgotten
 export const THREAD_KEPT_DAYS = 14;
@@ -186,7 +186,7 @@ export const mentionable = (id) => Boolean(id) && /^[\w-]+$/.test(String(id));
 export const mentions = (discordIds) => discordIds.filter(mentionable).map((id) => `<@${id}>`).join(' ');
 
 // the card and its buttons go with the first batch of pings, or alone if there's nobody to ping. the rest
-// stop if /messages turns the type off partway through. returns the message with the card
+// stop if /settings turns the type off partway through. returns the message with the card
 export async function sendPinging(postChannel, type, ids, text, embed, components = []) {
   let first;
   for (let i = 0; i === 0 || i < ids.length; i += MENTIONS_PER_MESSAGE) {

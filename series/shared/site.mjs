@@ -10,6 +10,7 @@ import {
   seasonality, ULTIMATE_ROSTER, wilson, charUsers, headToHead, headToHeadSets, hasTop4, podiumRates, podiumTrend,
   periodRetention, favourites, titleSpread,
 } from './compute.mjs';
+import { count, ordinal } from '../../src/format.js';
 import { CSS, CSS_EXTRA, esc, dstr, trunc, csv, pill, card, scrollTable, seriesSwitcher, filterInput, pageFooter, CLIENT_JS_SORT, CLIENT_JS_UI, MODAL_HTML, clientModal } from './page.mjs';
 import { VIEWER, HUB } from '../configs.mjs';
 
@@ -227,7 +228,7 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   const winInfo = {};
   for (const w of winners) {
     const links = placeByPid[w.id]?.[1] ?? [];
-    if (links.length) winInfo['p1:' + w.id] = { title: `${w.tag} · ${links.length} 1st place${links.length === 1 ? '' : 's'}`, links };
+    if (links.length) winInfo['p1:' + w.id] = { title: `${w.tag} · ${count(links.length, '1st place')}`, links };
   }
   if (has('redemption')) {
     const redWinByPid = {};
@@ -242,12 +243,12 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
     }
     for (const w of redWinners) {
       const links = redWinByPid[w.id] ?? [];
-      if (links.length) winInfo['r:' + w.id] = { title: `${w.tag} · ${links.length} redemption win${links.length === 1 ? '' : 's'}`, links };
+      if (links.length) winInfo['r:' + w.id] = { title: `${w.tag} · ${count(links.length, 'redemption win')}`, links };
     }
   }
   for (const p of enteredList) {
     const links = enteredByPid[p.id] ?? [];
-    if (links.length) winInfo['e:' + p.id] = { title: `${p.tag} · entered ${links.length} event${links.length === 1 ? '' : 's'}`, links };
+    if (links.length) winInfo['e:' + p.id] = { title: `${p.tag} · entered ${count(links.length, 'event')}`, links };
   }
   // loyalty histogram bars: everyone in that events-entered bracket, most first
   histogram.forEach((b, i) => {
@@ -256,7 +257,7 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
       .sort((a, z) => z.events - a.events || a.tag.localeCompare(z.tag));
     if (players.length) winInfo['h:' + i] = {
       title: `Players with ${b.label} event${b.label === '1' ? '' : 's'} (${players.length})`,
-      items: players.map((p) => `${esc(p.tag)} · ${p.events} event${p.events === 1 ? '' : 's'}`),
+      items: players.map((p) => `${esc(p.tag)} · ${count(p.events, 'event')}`),
     };
   });
   streaks.forEach((r, i) => {
@@ -273,11 +274,11 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   // year bars: every tournament in that period
   for (const r of yearRows) {
     const links = byDate.filter((t) => new Date(t.startAt * 1000).getUTCFullYear() === Number(r.key)).map((t) => tLink(t));
-    if (links.length) winInfo['y:' + r.key] = { title: `${r.year} · ${links.length} tournament${links.length === 1 ? '' : 's'}`, links };
+    if (links.length) winInfo['y:' + r.key] = { title: `${r.year} · ${count(links.length, 'tournament')}`, links };
   }
   if (acadRows) for (const r of acadRows) {
     const links = byDate.filter((t) => academicStartYear(t.startAt) === Number(r.key)).map((t) => tLink(t));
-    if (links.length) winInfo['ya:' + r.key] = { title: `${r.year} academic year · ${links.length} tournament${links.length === 1 ? '' : 's'}`, links };
+    if (links.length) winInfo['ya:' + r.key] = { title: `${r.year} academic year · ${count(links.length, 'tournament')}`, links };
   }
 
   // the images/ files stay svg. the page draws its bars as html rows and gives each line chart a
@@ -510,7 +511,7 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   const darkMonths = season.filter((r) => r.tournaments === 0).map((r) => r.name);
   const seasonTbl = season.map((r) => `<tr><td>${r.name}</td><td>${r.tournaments}</td><td>${r.avgAttendees == null ? '—' : r.avgAttendees.toFixed(1)}</td><td>${r.tournaments ? r.totalAttendees : '—'}</td></tr>`).join('\n');
   add('season', 'Seasonality', card('season', 'Seasonality (average attendance by month of year)',
-    `<p>Biggest month: <b>${esc(bigMonth.name)}</b>, ${bigMonth.avgAttendees.toFixed(1)} average over ${bigMonth.tournaments} tournament${bigMonth.tournaments === 1 ? '' : 's'}. `
+    `<p>Biggest month: <b>${esc(bigMonth.name)}</b>, ${bigMonth.avgAttendees.toFixed(1)} average over ${count(bigMonth.tournaments, 'tournament')}. `
     + `Quietest month with any: <b>${esc(quietMonth.name)}</b>, ${quietMonth.avgAttendees.toFixed(1)} over ${quietMonth.tournaments}.`
     + `${darkMonths.length ? ` No tournaments at all in ${esc(darkMonths.join(', '))}.` : ''}</p>`
     + '<p><small>Click a bar to see its month (X) and average attendance (Y). Grey months never ran a tournament. Pooled over all years.</small></p>'
@@ -565,7 +566,7 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   const openNights = favResults.filter((r) => r.outcome === 'open').length;
   const firstTitles = favResults.filter((r) => r.firstTitle);
   const champCount = new Set(favResults.map((r) => r.winner.id)).size;
-  const ordinal = (p) => p == null ? 'outside top 4' : p + ({ 1: 'st', 2: 'nd', 3: 'rd' }[p] ?? 'th');
+  const placeText = (p) => (p == null ? 'outside top 4' : ordinal(p));
   const favouriteCell = (r) => (r.favouriteRate == null
     ? '<td data-v="">—</td>'
     : `<td data-v="${r.favouriteRate.toFixed(4)}">${pct0(r.favouriteRate)} <small class="nw">${r.favourite}/${r.favourite + r.upset}</small></td>`);
@@ -580,13 +581,13 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   const upsetTbl = upsets.map((r, i) => `<tr><td>${i + 1}</td><td>${dstr(r.startAt)}</td>`
     + `<td>${esc(tagOf(r.winner.id, r.winner.tag))} <small>(${r.winnerTitles})</small></td>`
     + `<td>${r.favourites.map((f) => esc(tagOf(f.id, f.tag))).join(' / ')} <small>(${r.favouriteTitles})</small></td>`
-    + `<td>${r.behind}</td><td>${ordinal(r.favouritePlace)}</td></tr>`).join('\n');
+    + `<td>${r.behind}</td><td>${placeText(r.favouritePlace)}</td></tr>`).join('\n');
   const firstTbl = [...firstTitles].reverse().map((r) => `<tr><td>${dstr(r.startAt)}</td><td>${esc(tagOf(r.winner.id, r.winner.tag))}</td><td>${winById[r.winner.id] ?? 1}</td></tr>`).join('\n');
   if (favResults.length) {
     const newest = firstTitles.at(-1);
     const favouriteLine = decided.length ? `The favourite won <b>${favWon} of ${decided.length}</b> nights (${pct0(favWon / decided.length)}). ` : '';
     const newestLine = newest ? `, the newest first-time champion being <b>${esc(tagOf(newest.winner.id, newest.winner.tag))}</b> on ${dstr(newest.startAt)}` : '';
-    const openLine = openNights ? `${openNights} night${openNights === 1 ? '' : 's'} had nobody entered with a title in the past 12 months and ${openNights === 1 ? 'isn\'t' : 'aren\'t'} counted. ` : '';
+    const openLine = openNights ? `${count(openNights, 'night')} had nobody entered with a title in the past 12 months and ${openNights === 1 ? 'isn\'t' : 'aren\'t'} counted. ` : '';
     add('upsets', 'Upsets', card('upsets', 'Favourites, upsets and new champions',
       `<p class="stat">${favouriteLine}<b>${champCount}</b> different players have won${newestLine}.</p>`
       + '<p><small>The favourite is whoever entered with the most titles here in the 12 months before that night. '

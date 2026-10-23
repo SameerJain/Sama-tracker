@@ -14,7 +14,7 @@ export function missingThreadPermissions(postChannel = currentChannel()) {
   return Object.keys(THREAD_PERMISSIONS).filter((name) => !has?.has(PermissionFlagsBits[name])).map((name) => THREAD_PERMISSIONS[name]);
 }
 
-// stands in for the channel when posting a set. with /messages threads on it sends to the tournament's
+// stands in for the channel when posting a set. with /settings posts threads on it sends to the tournament's
 // or the event's thread, and to the channel when the thread can't be used, so a permission change never loses a post.
 // a tracked tournament posts every set, so it gets its own thread even with threads off
 export function tournamentPosts(set, postChannel) {

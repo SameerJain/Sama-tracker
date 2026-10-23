@@ -63,7 +63,7 @@ function postsText(tournament) {
 
 // every set and stream alert goes in its thread, so say when that can't happen yet
 function threadWarning(interaction) {
-  // the posts channel, not wherever this ran. a multi-server build with no /setup yet has none
+  // the posts channel, not wherever this ran. a multi-server build with no /settings channel yet has none
   const channelId = postsChannelId();
   const postChannel = channelId && interaction.client?.channels?.cache?.get(channelId);
   if (!postChannel) return null;

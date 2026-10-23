@@ -14,21 +14,28 @@ const { commands, handleCommand } = await import('../src/commands/index.js');
 const { postWeeklyRecap } = await import('../src/tracker.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 
+// the recap's options go to /settings recap, everything else to /settings posts
+const RECAP_OPTIONS = ['day', 'time', 'timezone'];
 async function configure(values = {}, allowed = true, guild = undefined, user = 'manager') {
   let reply;
+  const subcommand = Object.keys(values).some((name) => RECAP_OPTIONS.includes(name)) ? 'recap' : 'posts';
   await handleCommand({
-    commandName: 'messages', guild, user: { id: user }, member: guild?.members?.cache?.get(user),
+    commandName: 'settings', guild, user: { id: user }, member: guild?.members?.cache?.get(user),
     memberPermissions: { has: permission => allowed && permission === PermissionFlagsBits.ManageGuild },
-    options: { getSubcommand: () => null, getBoolean: name => values[name] ?? null,
+    options: { getSubcommand: () => subcommand, getBoolean: name => values[name] ?? null,
       getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
     reply: async result => { reply = result; },
   });
   return reply;
 }
 
-test('message controls are visible to TOs', () => {
-  const command = commands.find(c => c.name === 'messages');
-  assert.equal(command?.default_member_permissions, undefined);
+test('settings are visible to TOs, with posts and the recap as their own parts', () => {
+  const settings = commands.find(c => c.name === 'settings');
+  assert.equal(settings?.default_member_permissions, undefined);
+  const recap = settings.options.find(o => o.name === 'recap');
+  assert.deepEqual(recap.options.map(o => o.name), ['day', 'time', 'timezone']);
+  assert.equal(recap.options.find(o => o.name === 'timezone').autocomplete, true);
+  const command = settings.options.find(o => o.name === 'posts');
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
     ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
   // three modes, picked by name
@@ -58,7 +65,7 @@ test('status answers where everyone sees it', async () => {
 test('only managers or TOs can change settings', async () => {
   state.messages = {};
   const reply = await configure({ sets: false }, false);
-  assert.match(reply.content, /TO or have Manage Server/);
+  assert.match(reply.content, /Only TOs and people with Manage Server can change settings/);
   assert.ok(reply.flags);
   assert.deepEqual(state.messages, {});
 
@@ -77,7 +84,8 @@ test('only managers or TOs can change settings', async () => {
 test('message switches and recap schedule save immediately and answer where everyone sees them', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
-  const reply = await configure({ sets: false, streams: false, recap_day: 0, recap_time: '18:30', timezone: 'America/Los_Angeles' });
+  await configure({ sets: false, streams: false });
+  const reply = await configure({ day: 0, time: '18:30', timezone: 'America/Los_Angeles' });
   assert.equal(reply.flags, undefined);
   assert.deepEqual(reply.allowedMentions, { parse: [] });
   assert.match(reply.content, /Set results:\*\* off/);
@@ -121,28 +129,28 @@ test('event length saves, shows, and defaults to 5 hours without writing', async
 test('event length outside 2 to 12 hours fails privately and saves nothing', async () => {
   for (const event_length of [1, 13]) {
     state.messages = {};
-    const reply = await configure({ sets: false, event_length });
+    const reply = await configure({ set_colors: true, event_length });
     assert.match(reply.content, /Event length is 2 to 12 hours/);
     assert.ok(reply.flags);
     assert.deepEqual(state.messages, {});
   }
 });
 
-test('invalid schedules do not partially apply accompanying switches', async () => {
-  for (const invalid of [{ recap_time: '25:00' }, { recap_time: '7:30' }, { timezone: 'no/such-zone' }]) {
+test('an invalid recap time or timezone saves none of the schedule', async () => {
+  for (const invalid of [{ time: '25:00' }, { time: '7:30' }, { timezone: 'no/such-zone' }]) {
     state.messages = {};
-    const reply = await configure({ sets: false, ...invalid });
+    const reply = await configure({ day: 2, ...invalid });
     assert.match(reply.content, /HH:MM|timezone/i);
     assert.ok(reply.flags);
     assert.deepEqual(state.messages, {});
   }
 });
 
-test('running messages without options shows defaults without writing settings', async (t) => {
+test('running settings without options shows the defaults privately, to anyone, without writing', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
-  const reply = await configure();
-  assert.equal(reply.flags, undefined);
+  const reply = await configure({}, false);
+  assert.ok(reply.flags, 'private');
   assert.match(reply.content, /Set results:\*\* on/);
   // each person turns their own match calls on, and top 8s only come from tracked tournaments
   assert.match(reply.content, /Match call pings:\*\* on/);
@@ -150,6 +158,24 @@ test('running messages without options shows defaults without writing settings',
   assert.match(reply.content, /Bills final results:\*\* off/);
   assert.match(reply.content, /Sunday 21:00 EST/);
   assert.deepEqual(state.messages, {});
+});
+
+test('the recap timezone suggests the usual zones, then any zone with what was typed in it', async () => {
+  const { handleAutocomplete } = await import('../src/commands/index.js');
+  const suggest = async (typed) => {
+    let choices;
+    await handleAutocomplete({
+      commandName: 'settings',
+      options: { getSubcommandGroup: () => null, getSubcommand: () => 'recap', getFocused: () => typed },
+      respond: async (result) => { choices = result; },
+    });
+    return choices.map((choice) => choice.value);
+  };
+  assert.deepEqual(await suggest(''), ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'UTC']);
+  // spaces read as underscores, and case doesn't matter
+  assert.ok((await suggest('los ang')).includes('America/Los_Angeles'));
+  // discord takes 25 at most
+  assert.equal((await suggest('a')).length, 25);
 });
 
 test('threads footnote says each thread pins its card until the tournament or event ends', async () => {

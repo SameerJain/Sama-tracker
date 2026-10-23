@@ -86,9 +86,9 @@ test('verbose says how the parts add up and how much a seed is worth', () => {
   const sets = Array.from({ length: 8 }, (_, i) => set(1, 2, i < 6, { mySeed: 2, theirSeed: 6, event: `w${i}`, daysAgo: i * 7 }));
   const odds = predict(a, b, sets, mirror(sets), { now });
   const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
-  assert.match(text, /\*\*Head-to-head:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
-  assert.match(text, /\*\*Seeding and form:\*\* counts for \d+%/);
-  assert.match(text, /\*\*Starting from even:\*\* counts for \d+%/);
+  assert.match(text, /\*\*Head-to-head:\*\* [█░]{10} \d+% · on its own, \*\*A\*\* \d+%/);
+  assert.match(text, /\*\*Seeding and form:\*\* [█░]{10} \d+%/);
+  assert.match(text, /\*\*Starting from even:\*\* [█░]{10} \d+%/);
   assert.match(text, /Going by the 8 seeded sets the two of them played in Ultimate, when one seed number is double the other's, the player with the lower one wins about \d+%/);
   assert.match(text, /Seeding:\*\* \*\*A\*\* got the better seed in 8 of 8 shared brackets, \*\*B\*\*'s average seed number was 3\.0x \*\*A\*\*'s/);
   const short = embeds.prediction(a, b, odds, false)[0].data.description;
@@ -170,7 +170,7 @@ test('slippi ratings count toward melee odds when both are ranked, the same from
   const short = embeds.prediction(a, b, odds, false, { melee: true })[0].data.description;
   assert.match(short, /\*\*Slippi ranked:\*\*/);
   const text = embeds.prediction(a, b, odds, true, { melee: true }).map((embed) => embed.data.description).join('\n');
-  assert.match(text, /\*\*Slippi ranked:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
+  assert.match(text, /\*\*Slippi ranked:\*\* [█░]{10} \d+% · on its own, \*\*A\*\* \d+%/);
   assert.match(text, /Slippi ratings are netplay Elo/);
 });
 
@@ -204,7 +204,7 @@ test('the gap and variance match the chance, and thin evidence stays near 50%', 
   // 1-1 with little else is mostly prior, so it stays near even
   assert.ok(Math.abs(odds.chance - 0.5) < 0.1, `${odds.chance}`);
   assert.ok(odds.prior > 0.1, `${odds.prior}`);
-  const text = embeds.predictionExplained(a, b, odds).map((embed) => embed.data.description).join('\n');
+  const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
   assert.match(text, /\*\*If the evidence were certain:\*\* .*\d+%\. How thin or mixed it is brings that to \d+%/);
   assert.match(text, /The gap is -?\d+\.\d+ in log-odds, give or take \d+\.\d+/);
   assert.match(text, /Starting from even:/);
@@ -219,13 +219,13 @@ test('more slippi updates mean the same rating gap counts for more', () => {
   assert.ok(many.variance < few.variance, `${few.variance} -> ${many.variance}`);
 });
 
-test('explained shows bars and model numbers behind the same odds', () => {
+test('the full breakdown shows bars and model numbers behind the same odds', () => {
   const sets = Array.from({ length: 8 }, (_, i) => set(1, 2, i < 6, { mySeed: 2, theirSeed: 6, event: `w${i}`, daysAgo: i * 7 }));
   const odds = predict(a, b, sets, mirror(sets), { now });
   const short = embeds.prediction(a, b, odds, false, { melee: true })[0].data.description;
-  const text = embeds.predictionExplained(a, b, odds).map((embed) => embed.data.description).join('\n');
+  const text = embeds.prediction(a, b, odds, true).map((embed) => embed.data.description).join('\n');
   // same title odds as the short card
-  assert.equal(embeds.predictionExplained(a, b, odds)[0].data.title, embeds.prediction(a, b, odds, false)[0].data.title);
+  assert.equal(embeds.prediction(a, b, odds, true)[0].data.title, embeds.prediction(a, b, odds, false)[0].data.title);
   assert.match(text, /How it adds up/);
   assert.match(text, /█.*░.*Head-to-head|Head-to-head.*█/);
   assert.match(text, /How sure it is/);
@@ -235,7 +235,7 @@ test('explained shows bars and model numbers behind the same odds', () => {
   // with seeded sets against other people, the record behind the form line shows too
   const others = Array.from({ length: 6 }, (_, i) => set(1, 100 + i, i < 4, { mySeed: 3, theirSeed: 5, event: `o${i}`, daysAgo: i + 1 }));
   const withForm = predict(a, b, [...sets, ...others], mirror(sets), { now });
-  const formText = embeds.predictionExplained(a, b, withForm).map((embed) => embed.data.description).join('\n');
+  const formText = embeds.prediction(a, b, withForm, true).map((embed) => embed.data.description).join('\n');
   assert.match(formText, /\*\*Last \d+ sets, seeded or not:\*\* \*\*A\*\* 4-2 · \*\*B\*\* 0-0/);
   // the shares add up: every factor plus starting from even is the whole answer
   const shares = odds.factors.reduce((sum, { share }) => sum + share, odds.prior);
@@ -274,5 +274,5 @@ test('slippi alone predicts melee when both are ranked with no sets on start.gg'
   assert.match(short, /\*\*Slippi ranked:\*\*/);
   const text = embeds.prediction(a, b, odds, true, { melee: true }).map((embed) => embed.data.description).join('\n');
   assert.match(text, /\*\*Head-to-head:\*\* nothing to go on/);
-  assert.match(text, /\*\*Slippi ranked:\*\* counts for \d+% · on its own, \*\*A\*\* \d+%/);
+  assert.match(text, /\*\*Slippi ranked:\*\* [█░]{10} \d+% · on its own, \*\*A\*\* \d+%/);
 });

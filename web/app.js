@@ -1,36 +1,14 @@
 // samatracker reads the bundle web/build.mjs makes, so it needs no discord or start.gg token. slippi
-// lookups go from the browser straight to slippi.gg, which needs no login. the bundle math is in
-// stats.js, loaded first
+// lookups go from the browser straight to slippi.gg, which needs no login. lib/ is the bot's own code,
+// copied in by the build, so ranks, connect codes and plurals read the same here as in discord
+import { count, medal } from './lib/format.js';
+import { API_URL, PROFILE_FIELDS, profileUrl, rankFile, rankOf, readCode, toProfile } from './lib/slippi.js';
+import { finalsBetween, recentTitles, searchPlayers, setRecord, sharedEvents } from './stats.js';
+
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-// same cutoffs as the bot (src/slippi.js, slippi.gg's own numbers). a daily
-// leaderboard placement is what makes a master rating grandmaster
-const TIERS = [
-  ['Bronze 1', -Infinity], ['Bronze 2', 765.43], ['Bronze 3', 913.72],
-  ['Silver 1', 1054.87], ['Silver 2', 1188.88], ['Silver 3', 1315.75],
-  ['Gold 1', 1435.48], ['Gold 2', 1548.07], ['Gold 3', 1653.52],
-  ['Platinum 1', 1751.83], ['Platinum 2', 1843], ['Platinum 3', 1927.03],
-  ['Diamond 1', 2003.92], ['Diamond 2', 2073.67], ['Diamond 3', 2136.28],
-  ['Master 1', 2191.75], ['Master 2', 2275], ['Master 3', 2350],
-];
-const rankOf = ({ rating, updates, global, regional }) => {
-  if (!updates) return 'Unranked';
-  if (updates < 5) return 'Pending';
-  if (rating >= 2191.75 && (global || regional)) return 'Grandmaster';
-  return TIERS.filter(([, min]) => rating >= min).at(-1)[0];
-};
-// ABCD#123, abcd-123 or a slippi.gg/user/abcd-123 link, as ABCD#123
-const readCode = (input) => {
-  const m = String(input).trim().match(/(?:^|[^a-z0-9])([a-z0-9]{1,8})[#-](\d{1,7})\/?$/i);
-  return m ? `${m[1].toUpperCase()}#${m[2]}` : null;
-};
-// FOX is Fox. these are the ones that aren't one word
-const CHARACTERS = {
-  CAPTAIN_FALCON: 'Captain Falcon', DONKEY_KONG: 'Donkey Kong', GAME_AND_WATCH: 'Mr. Game & Watch', ICE_CLIMBERS: 'Ice Climbers',
-  YOUNG_LINK: 'Young Link', DR_MARIO: 'Dr. Mario',
-};
-const charName = (id) => CHARACTERS[id] ?? id.charAt(0) + id.slice(1).toLowerCase();
+// the same badge a /slippi card shows
+const badge = (rank) => `<img class="rank-badge" src="lib/ranks/${rankFile(rank)}" alt="" width="28" height="28">`;
 
 let BUNDLE = null;
 const byId = (id) => BUNDLE?.players.find((p) => p.id === id) ?? null;
@@ -51,7 +29,7 @@ async function load() {
     return;
   }
   $('built').textContent = ` (built ${BUNDLE.built})`;
-  $('series-summary').textContent = BUNDLE.series.map((s) => `${s.name}: ${s.tournaments} tournaments${s.distinctPlayers ? `, ${s.distinctPlayers} players` : ''}`).join(' · ');
+  $('series-summary').textContent = BUNDLE.series.map((s) => `${s.name}: ${count(s.tournaments, 'tournament')}${s.distinctPlayers ? `, ${count(s.distinctPlayers, 'player')}` : ''}`).join(' · ');
   renderStatus();
   renderBoth();
   renderLeaders();
@@ -64,7 +42,7 @@ async function load() {
 
 function renderStatus() {
   const tournaments = BUNDLE.series.reduce((s, x) => s + x.tournaments, 0);
-  const counts = `${tournaments} tournaments · ${BUNDLE.players.length} players · ${BUNDLE.events.length} finals recorded`;
+  const counts = `${count(tournaments, 'tournament')} · ${count(BUNDLE.players.length, 'player')} · ${count(BUNDLE.events.length, 'final')} recorded`;
   $('status-line').innerHTML = `<small>Cached ${esc(BUNDLE.built)} · ${counts}. New tournaments join the next scrape; everything else on this page is instant.</small>`;
 }
 
@@ -99,7 +77,7 @@ $('q').addEventListener('input', () => {
   const out = $('player');
   $('hits').innerHTML = '';
   if (!BUNDLE) return;
-  const hits = SamaStats.searchPlayers(BUNDLE.players, $('q').value);
+  const hits = searchPlayers(BUNDLE.players, $('q').value);
   if (!hits.length) {
     if ($('q').value.trim()) out.innerHTML = `<p>No cached player matches “${esc($('q').value.trim())}”. Tags come from start.gg player ids, merged across aliases.</p>`;
     return;
@@ -118,13 +96,13 @@ function renderPlayer(id) {
   const following = readFollowed().includes(p.id);
   const per = BUNDLE.series.map((s) => {
     const r = p.per[s.slug];
-    return r ? `<span class="pill ${s.slug === BUNDLE.series[0].slug ? 'u' : 's'}">${esc(s.short)}</span> ${r.events} events, ${r.wins} wins` : null;
+    return r ? `<span class="pill ${s.slug === BUNDLE.series[0].slug ? 'u' : 's'}">${esc(s.short)}</span> ${count(r.events, 'event')}, ${count(r.wins, 'win')}` : null;
   }).filter(Boolean).join(' · ');
   const chars = p.topChars.length ? p.topChars.map((c) => `${esc(c.n)} (${c.g})`).join(' · ') : 'no reported characters';
   const aka = (p.aliases ?? []).filter((a) => a !== p.tag).slice(0, 3);
-  const titles = SamaStats.recentTitles(p.id, BUNDLE.events, 5).map((e) => `<div>${tlink(e.t)}</div>`).join('');
+  const titles = recentTitles(p.id, BUNDLE.events, 5).map((e) => `<div>${tlink(e.t)}</div>`).join('');
   $('player').innerHTML = `<p><b>${esc(p.tag)}</b>${me ? ' <span class="pill u">you</span>' : ''}${aka.length ? `<br><small>aka ${aka.map(esc).join(' · ')}</small>` : ''}</p>`
-    + `<p>${per}<br><small>Combined: ${p.totalEvents} events, ${p.totalWins} wins, ${p.totalPodiums} top 4s (1st ${p.totalWins} · 2nd ${p.seconds} · 3rd ${p.thirds} · 4th ${p.fourths}). Cached, not live.</small></p>`
+    + `<p>${per}<br><small>Combined: ${count(p.totalEvents, 'event')}, ${count(p.totalWins, 'win')}, ${count(p.totalPodiums, 'top 4')} (${medal(1)}${p.totalWins} · ${medal(2)}${p.seconds} · ${medal(3)}${p.thirds} · 4th ${p.fourths}). Cached, not live.</small></p>`
     + `<p><small>Characters: ${chars}<br>First: ${esc(p.first ?? '—')} · Last: ${esc(p.last ?? '—')}</small></p>`
     + (titles ? `<p><small>Latest titles:</small>${titles}</p>` : '')
     + `<p><button type="button" id="sel-follow">${following ? 'Unfollow' : 'Follow'}</button>`
@@ -161,7 +139,7 @@ function renderFollowed() {
     ? ids.sort((a, b) => byId(b).totalEvents - byId(a).totalEvents).map((id) => {
       const p = byId(id);
       const wins = BUNDLE.series.map((s) => (p.per[s.slug] ? `${s.short} ${p.per[s.slug].wins}` : null)).filter(Boolean).join(' · ');
-      return `<div class="watch-row"><span><b>${esc(p.tag)}</b> · ${p.totalEvents} events, ${p.totalWins} wins <small>${esc(wins)}</small></span>`
+      return `<div class="watch-row"><span><b>${esc(p.tag)}</b> · ${count(p.totalEvents, 'event')}, ${count(p.totalWins, 'win')} <small>${esc(wins)}</small></span>`
         + `<span><button type="button" data-open="${esc(id)}">Open</button> <button type="button" data-i="${esc(id)}">Remove</button></span></div>`;
     }).join('')
     : '<p><small>Nobody yet. Follow players from their cards.</small></p>';
@@ -182,7 +160,7 @@ let h2hA = null, h2hB = null;
 for (const [box, side] of [[$('h2h-a'), 'a'], [$('h2h-b'), 'b']]) {
   box.addEventListener('input', () => {
     if (!BUNDLE) return;
-    const hits = SamaStats.searchPlayers(BUNDLE.players, box.value, 5);
+    const hits = searchPlayers(BUNDLE.players, box.value, 5);
     renderH2HPicks(hits, side);
   });
 }
@@ -209,17 +187,17 @@ function renderH2H() {
   const a = h2hA ? byId(h2hA) : null, b = h2hB ? byId(h2hB) : null;
   if (!a || !b) { out.innerHTML = '<p><small>Pick two tags to compare.</small></p>'; return; }
   if (a.id === b.id) { out.innerHTML = '<p>Pick two different players.</p>'; return; }
-  const shared = SamaStats.sharedEvents(a.tids, b.tids, BUNDLE.tmap);
-  const finals = SamaStats.finalsBetween(a.id, b.id, BUNDLE.events);
-  const aTitles = SamaStats.recentTitles(a.id, BUNDLE.events, 5), bTitles = SamaStats.recentTitles(b.id, BUNDLE.events, 5);
+  const shared = sharedEvents(a.tids, b.tids, BUNDLE.tmap);
+  const finals = finalsBetween(a.id, b.id, BUNDLE.events);
+  const aTitles = recentTitles(a.id, BUNDLE.events, 5), bTitles = recentTitles(b.id, BUNDLE.events, 5);
   const titleDates = (titles) => (titles.length ? titles.map((e) => BUNDLE.tmap[e.t]?.d ?? '').join(', ') : 'none cached');
   // every ultimate singles set they played at either series, not only the ones with characters reported
-  const rec = SamaStats.setRecord(a.id, b.id, BUNDLE.h2h);
+  const rec = setRecord(a.id, b.id, BUNDLE.h2h);
   const record = rec
     ? `<p>Sets <b>${rec.aSets}–${rec.bSets}</b>${rec.scored ? ` · games <b>${rec.aGames}–${rec.bGames}</b>` : ''}</p>`
-      + `<p><small>Every Ultimate Singles set they've played at these series, ${rec.sets} in all${rec.last ? `, last on ${esc(rec.last)}` : ''}. DQs don't count. Games come from the ${rec.scored} set${rec.scored === 1 ? '' : 's'} with a score reported.</small></p>`
+      + `<p><small>Every Ultimate Singles set they've played at these series, ${rec.sets} in all${rec.last ? `, last on ${esc(rec.last)}` : ''}. DQs don't count. Games come from the ${count(rec.scored, 'set')} with a score reported.</small></p>`
     : '<p><small>No Ultimate Singles sets against each other at these series.</small></p>';
-  out.innerHTML = `<p><b>${esc(a.tag)}</b> vs <b>${esc(b.tag)}</b> · ${shared.length} shared event${shared.length === 1 ? '' : 's'}, ${finals.length} final${finals.length === 1 ? '' : 's'} together</p>`
+  out.innerHTML = `<p><b>${esc(a.tag)}</b> vs <b>${esc(b.tag)}</b> · ${count(shared.length, 'shared event')}, ${count(finals.length, 'final')} together</p>`
     + record
     + (finals.length
       ? `<h3>Finals (${finals.length})</h3>` + finals.map((e) => {
@@ -232,30 +210,16 @@ function renderH2H() {
     + `<p><small>Odds need live set histories, so /predict in Discord has those.</small></p>`;
 }
 
+// one profile, asked for and read the same way the bot does. null when slippi has nobody with the code
 async function slippiLookup(code) {
-  const res = await fetch('https://internal.slippi.gg/graphql', {
+  const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: 'query($code:String){getUser(connectCode:$code){displayName connectCode{code} rankedNetplayProfile{id ratingOrdinal ratingUpdateCount wins losses dailyGlobalPlacement dailyRegionalPlacement characters{character gameCount}}}}',
-      variables: { code },
-    }),
+    body: JSON.stringify({ query: `query ($code: String) { getUser(connectCode: $code) { ${PROFILE_FIELDS} } }`, variables: { code } }),
     signal: AbortSignal.timeout(15000),
   });
   const body = await res.json().catch(() => null);
-  const u = body?.data?.getUser;
-  if (!u) return null;
-  const r = u.rankedNetplayProfile ?? {};
-  return {
-    name: u.displayName || code,
-    code: u.connectCode?.code ?? code,
-    rating: r.ratingOrdinal ?? null,
-    updates: r.ratingUpdateCount ?? 0,
-    wins: r.wins ?? 0,
-    losses: r.losses ?? 0,
-    rank: rankOf({ rating: r.ratingOrdinal ?? 0, updates: r.ratingUpdateCount ?? 0, global: r.dailyGlobalPlacement, regional: r.dailyRegionalPlacement }),
-    characters: (r.characters ?? []).filter((c) => c.gameCount > 0).map((c) => `${charName(c.character)} (${c.gameCount})`).sort().slice(0, 3),
-  };
+  return toProfile(body?.data?.getUser);
 }
 
 $('lookup').onclick = async () => {
@@ -263,41 +227,40 @@ $('lookup').onclick = async () => {
   const code = readCode($('code').value);
   if (!code) { out.innerHTML = '<p>That isn’t a connect code. Try ABCD#123.</p>'; return; }
   out.innerHTML = '<p><small>Asking slippi.gg…</small></p>';
-  let p;
-  try {
-    p = await slippiLookup(code);
-  } catch {
-    p = null;
-  }
+  const p = await slippiLookup(code).catch(() => null);
   if (!p) {
-    out.innerHTML = `<p>No Slippi profile answered for ${esc(code)}. This browser may block the request, or Slippi may be down. You can <a href="https://slippi.gg/user/${esc(code.replace('#', '-'))}">try slippi.gg directly</a>.</p>`;
+    out.innerHTML = `<p>No Slippi profile answered for ${esc(code)}. This browser may block the request, or Slippi may be down. You can <a href="${esc(profileUrl(code))}">try slippi.gg directly</a>.</p>`;
     return;
   }
+  const rank = rankOf(p).name;
   const record = `${p.wins}–${p.losses} this season`;
-  out.innerHTML = `<p><span class="rank">${esc(p.rank)}</span> <b>${esc(p.name)}</b> (${esc(p.code)})`
+  const mains = p.characters.slice(0, 3).map((c) => `${c.name} (${c.games})`);
+  out.innerHTML = `<p>${badge(rank)} <span class="rank">${esc(rank)}</span> <b>${esc(p.name)}</b> (<a href="${esc(profileUrl(p.code ?? code))}">${esc(p.code ?? code)}</a>)`
     + (p.rating != null ? ` · ${Math.round(p.rating)} rating, ${esc(record)}` : ` · ${esc(record)}, unrated so far`)
-    + (p.characters.length ? `<br><small>${esc(p.characters.join(' · '))}</small>` : '')
-    + `<br><button id="addwatch" type="button">Add to watchlist</button></p>`;
-  $('addwatch').onclick = () => addWatch(p);
+    + (p.region ? ` · ${esc(p.region)}` : '')
+    + (mains.length ? `<br><small>${esc(mains.join(' · '))}</small>` : '')
+    + '<br><button id="addwatch" type="button">Add to watchlist</button></p>';
+  $('addwatch').onclick = () => addWatch({ code: p.code ?? code, name: p.name, rank, rating: p.rating });
 };
 
 const watchKey = 'samatracker-slippi-watch';
 const readWatch = () => { try { return JSON.parse(localStorage.getItem(watchKey)) ?? []; } catch { return []; } };
 const writeWatch = (w) => localStorage.setItem(watchKey, JSON.stringify(w));
 
-function addWatch(p) {
-  const w = readWatch().filter((e) => e.code !== p.code);
-  w.unshift({ code: p.code, name: p.name, rank: p.rank, rating: p.rating, at: new Date().toISOString().slice(0, 10) });
+function addWatch({ code, name, rank, rating }) {
+  const w = readWatch().filter((e) => e.code !== code);
+  w.unshift({ code, name, rank, rating, at: new Date().toISOString().slice(0, 10) });
   writeWatch(w.slice(0, 50));
   renderWatch();
 }
 
 function renderWatch() {
   const w = readWatch().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+  $('refresh-watch').hidden = !w.length;
   $('watch').innerHTML = w.length
     ? w.map((e) => {
       const rating = e.rating != null ? ` · ${Math.round(e.rating)}` : '';
-      return `<div class="watch-row"><span><span class="rank">${esc(e.rank)}</span> <b>${esc(e.name)}</b> (${esc(e.code)})${rating} <small>added ${esc(e.at)}</small></span>`
+      return `<div class="watch-row"><span>${badge(e.rank)} <span class="rank">${esc(e.rank)}</span> <b>${esc(e.name)}</b> (${esc(e.code)})${rating} <small>as of ${esc(e.at)}</small></span>`
         + `<button type="button" data-i="${esc(e.code)}">Remove</button></div>`;
     }).join('')
     : '<p><small>Nothing yet. Look someone up, then add them.</small></p>';
@@ -305,6 +268,24 @@ function renderWatch() {
     b.onclick = () => { writeWatch(readWatch().filter((e) => e.code !== b.dataset.i)); renderWatch(); };
   });
 }
+
+// asks slippi.gg about everyone on the watchlist again, a second apart like the bot does. one that doesn't
+// answer keeps what it had
+$('refresh-watch').onclick = async () => {
+  const button = $('refresh-watch');
+  button.disabled = true;
+  const entries = readWatch();
+  for (const [i, entry] of entries.entries()) {
+    button.textContent = `Refreshing ${i + 1} of ${entries.length}…`;
+    const p = await slippiLookup(entry.code).catch(() => null);
+    if (p) Object.assign(entry, { name: p.name, rank: rankOf(p).name, rating: p.rating, at: new Date().toISOString().slice(0, 10) });
+    if (i < entries.length - 1) await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  writeWatch(entries);
+  button.disabled = false;
+  button.textContent = 'Refresh ranks';
+  renderWatch();
+};
 
 // dark mode, same as the series pages
 const darkBtn = $('darkbtn');

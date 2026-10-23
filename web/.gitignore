@@ -1,5 +1,4 @@
 .vercel
 .env*
-
-.vercel
-.env*
+# copied from src/ by build.mjs
+lib/

@@ -45,7 +45,7 @@ for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN']) {
   if (!process.env[name]) quit(`${name} isn't set, put it in .env or the host's environment variables`);
 }
 // single-server builds need to know which server and channel are theirs. multi-server builds
-// (MULTI_GUILD=true) leave both out and each server picks its posts channel with /setup
+// (MULTI_GUILD=true) leave both out and each server picks its posts channel with /settings channel
 if (!isMultiGuild()) {
   for (const name of ['GUILD_ID', 'CHANNEL_ID']) {
     if (!process.env[name]) quit(`${name} isn't set, put it in .env or the host's environment variables`);
@@ -84,7 +84,7 @@ function missingPosting(postChannel) {
 }
 
 // not worth quitting over: cards without an uploaded picture still post, and thread posts go in the channel
-// until it's fixed. threadsOn is the server's /messages threads
+// until it's fixed. threadsOn is the server's /settings posts threads
 function warnPosting(postChannel, where, threadsOn) {
   if (!postChannel.permissionsFor(client.user)?.has(PermissionFlagsBits.AttachFiles)) {
     console.error(`missing Attach Files in ${where}, so messages that upload character art, rank badges or the Slippi logo will fail`);
@@ -105,17 +105,17 @@ function goLive(singleChannel) {
   setHealthReady(true);
 }
 
-// every server the bot is in, each posting in the channel /setup picked there
+// every server the bot is in, each posting in the channel /settings channel picked there
 async function bootMulti() {
   // one registration for every server. global commands can take up to an hour to show up
-  // on a server that just invited the bot, which is why /setup says to wait a little
+  // on a server that just invited the bot, which is why /settings channel says to wait a little
   await client.application.fetch().catch(() => null);
   await registerCommands(client.application.commands);
 
   if (process.env.GUILD_ID) migrateLegacyToGuild(process.env.GUILD_ID, process.env.CHANNEL_ID);
   const guilds = [...client.guilds.cache.values()];
   for (const guild of guilds) forGuild(guild.id);
-  if (!guilds.length) console.error('bot isn\'t in any server yet, invite it with the invite link in the README, then run /setup there');
+  if (!guilds.length) console.error('bot isn\'t in any server yet, invite it with the invite link in the README, then run /settings channel there');
 
   for (const guild of guilds) {
     const channelId = postsChannelId(guild.id);
@@ -124,11 +124,11 @@ async function bootMulti() {
       return null;
     });
     if (!postChannel) {
-      console.error(`no posts channel set in ${guild.name}, run /setup channel:#channel there`);
+      console.error(`no posts channel set in ${guild.name}, run /settings channel channel:#channel there`);
       continue;
     }
     if (!postChannel.isTextBased()) {
-      console.error(`can't see a text channel for ${guild.name}, run /setup channel:#channel there`);
+      console.error(`can't see a text channel for ${guild.name}, run /settings channel channel:#channel there`);
       continue;
     }
     const where = `#${postChannel.name} (${guild.name})`;
@@ -174,12 +174,12 @@ async function bootSingle() {
 client.once(Events.ClientReady, () => (isMultiGuild() ? bootMulti() : bootSingle()));
 
 // multi-server only: a server that invites the bot later gets its own empty entry. global
-// commands can take up to an hour to appear there, and /setup picks its posts channel
+// commands can take up to an hour to appear there, and /settings channel picks its posts channel
 if (isMultiGuild()) {
   client.on(Events.GuildCreate, async (guild) => {
     forGuild(guild.id);
     save();
-    console.log(`joined ${guild.name}, run /setup channel:#channel there`);
+    console.log(`joined ${guild.name}, run /settings channel channel:#channel there`);
     guildLocal.run(guild.id, () => seedFirstTO(guild)).catch(console.error);
   });
 }

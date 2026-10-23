@@ -217,7 +217,7 @@ test('separate reg and start windows send two DMs', async () => {
   assert.match(later[0].embeds[0].data.title, /Starts soon/);
 });
 
-test('only /notify and the tournament reminders switch decide, not /messages', async () => {
+test('only /notify and the tournament reminders switch decide, not /settings', async () => {
   reset();
   const now = Math.floor(Date.now() / 1000);
   state.regDmPings = ['fan'];

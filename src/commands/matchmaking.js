@@ -42,7 +42,7 @@ function findRole(guild, game) {
 // it's only there to be pinged, so it grants nothing. mentionable so anyone can @ it without the bot,
 // and no color, which would recolor the name of everyone who has it
 async function makeRole(guild, game) {
-  const role = await guild.roles.create({ name: MATCHMAKING[game].role, permissions: [], mentionable: true, reason: 'first /matchmaking_role' });
+  const role = await guild.roles.create({ name: MATCHMAKING[game].role, permissions: [], mentionable: true, reason: 'first /matchmaking role' });
   state.matchmaking[game] = role.id;
   save();
   return role;
@@ -60,7 +60,7 @@ function setExpiry(key, minutes) {
   save();
 }
 
-// /matchmaking_role: hands whoever ran it the role, or takes it back if they have it. the role gets made the
+// /matchmaking role: hands whoever ran it the role, or takes it back if they have it. the role gets made the
 // first time. duration keeps it for that many minutes, then the background check takes it off.
 // making and handing out roles can take discord past the 3 seconds a command gets, so it defers first
 async function matchmakingRole(interaction) {
@@ -74,7 +74,7 @@ async function matchmakingRole(interaction) {
   const { guild, member } = interaction;
   let role = findRole(guild, game);
   const name = role?.name ?? MATCHMAKING[game].role;
-  const howToPing = `\`/matchmaking_search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
+  const howToPing = `\`/matchmaking search game:${MATCHMAKING[game].label}\` pings it, and so does typing @${name}.`;
   let reply;
   try {
     if (role && member.roles.cache.has(role.id)) {
@@ -163,16 +163,16 @@ async function checkMatchmakingExpiry(guild, now = Math.floor(Date.now() / 1000)
   return removed;
 }
 
-// /matchmaking_search: pings the role with a card saying who's looking. only people with the role can, so it can't
+// /matchmaking search: pings the role with a card saying who's looking. only people with the role can, so it can't
 // be used to ping a group someone isn't in. thread:True starts a thread on the ping to arrange games.
-// a TO can point each game's searches at their own channel with /matchmaking_channel, otherwise they
+// a TO can point each game's searches at their own channel with /matchmaking channel, otherwise they
 // post wherever the command ran
 async function matchmakingSearch(interaction) {
   const game = interaction.options.getString('game', true);
   const { label } = MATCHMAKING[game];
   const role = findRole(interaction.guild, game);
   if (!role || !interaction.member.roles.cache.has(role.id)) {
-    return replyEphemeral(interaction, `You need the **${role?.name ?? MATCHMAKING[game].role}** role to ping it. \`/matchmaking_role game:${label}\` gives it to you.`);
+    return replyEphemeral(interaction, `You need the **${role?.name ?? MATCHMAKING[game].role}** role to ping it. \`/matchmaking role game:${label}\` gives it to you.`);
   }
   // discord drops a bot's ping to a role that isn't mentionable unless the bot has Mention Everyone
   if (!role.mentionable && !interaction.appPermissions?.has(PermissionFlagsBits.MentionEveryone)) {
@@ -207,7 +207,7 @@ async function matchmakingSearch(interaction) {
     delete state.matchmakingChannels[game];
     save();
     await interaction.reply(ping);
-    await interaction.followUp({ content: `The saved ${label} channel is gone, so this posted here. A TO can set a new one with \`/matchmaking_channel\`.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    await interaction.followUp({ content: `The saved ${label} channel is gone, so this posted here. A TO can set a new one with \`/matchmaking channel\`.`, flags: MessageFlags.Ephemeral }).catch(() => {});
   } else {
     await interaction.reply(ping);
   }
@@ -230,7 +230,7 @@ async function startSearchThread(interaction, posted, label) {
   }
 }
 
-// /matchmaking_channel: where a game's searches post. anyone can look, only TOs change it.
+// /matchmaking channel: where a game's searches post. anyone can look, only TOs change it.
 // left out means wherever the command runs. the channel gets checked when it's set, so a missing
 // permission fails there instead of on the next search
 async function matchmakingChannel(interaction) {
