@@ -1,7 +1,6 @@
 import { escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
 import { isMultiGuild } from '../store.js';
-import { HUB } from '../../series/configs.mjs';
 import { colors, FOOTER, baseEmbed, shortSchedule, withLines, withSections, playerLink, count } from './shared.js';
 
 // /t-o tournament posts switches a tracked tournament can have off, named for the list.
@@ -68,10 +67,11 @@ function socialLink(url) {
   return site ? `[${site}](${url})` : url;
 }
 
-// /data: the series data pages on Vercel, plus the web hub once it's deployed (HUB.url in series/configs.mjs)
+// /data: the web hub and the series data pages on Vercel. the addresses are written out here because the bot's
+// image only has src/, so it can't read them from series/configs.mjs
 export function dataPages() {
   const lines = [
-    ...(HUB.url ? [`**Samatracker** · [Player lookup, recent results and Slippi ranks](${HUB.url})`] : []),
+    '**Samatracker** · [Player lookup, recent results and Slippi ranks](https://samatracker.vercel.app)',
     '**Monday Night SmashBall** · [Data analysis](https://monday-night-smashball.vercel.app)',
     '**UB Smash Royale** · [Data analysis](https://ub-smash-royale.vercel.app)',
     '',
