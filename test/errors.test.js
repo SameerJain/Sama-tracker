@@ -53,6 +53,47 @@ function answering(...statuses) {
   return seen;
 }
 
+test('once start.gg has been down 2 minutes, commands hear so right away, one a minute still checks, and an answer ends it', async (t) => {
+  startgg.resetOutage();
+  t.mock.timers.enable({ apis: ['Date'], now: 1_000_000_000 });
+  const command = () => startgg.asCommand(() => startgg.checkToken()).catch((err) => err);
+  const seen = answering('down');
+
+  // one request that timed out three times is a bad moment, not an outage
+  await command();
+  assert.equal(seen.length, 3);
+  assert.equal(startgg.startggDownSince(), null);
+  assert.equal(failureMessage(await command()), 'start.gg didn\'t answer in time. Try again in a minute.');
+
+  t.mock.timers.tick(2 * 60 * 1000);
+  assert.equal(startgg.startggDownSince(), 1_000_000);
+  // the first command after goes through to check, the next doesn't wait on start.gg at all
+  const before = seen.length;
+  await command();
+  assert.equal(seen.length, before + 1);
+  const skipped = await command();
+  assert.equal(seen.length, before + 1);
+  assert.equal(failureMessage(skipped), 'start.gg has been down since <t:1000000:R>, so anything that needs it can\'t run right now. The bot is fine and picks back up on its own once start.gg answers. `/status` shows if it\'s still down.');
+  // background checks keep asking
+  await startgg.inBackground(() => startgg.checkToken()).catch(() => null);
+  assert.equal(seen.length, before + 4);
+
+  // a minute on, a command checks again, and start.gg answering ends it for everyone
+  t.mock.timers.tick(60 * 1000);
+  answering(200);
+  assert.equal(await command(), undefined);
+  assert.equal(startgg.startggDownSince(), null);
+  assert.equal(await command(), undefined);
+
+  // a refused token is start.gg answering, so it ends an outage the same as a good answer
+  answering('down', 'down', 'down', 401);
+  await command();
+  t.mock.timers.tick(3 * 60 * 1000);
+  await command();
+  assert.equal(startgg.startggDownSince(), null);
+  startgg.resetOutage();
+});
+
 test('a 5xx from start.gg gets the same 2 retries as a timeout, and a refused token gets none', async () => {
   const recovered = answering(502, 503, 200);
   await startgg.checkToken();

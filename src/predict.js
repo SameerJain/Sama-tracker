@@ -12,7 +12,8 @@ const HALF_LIFE_DAYS = 365;
 
 // everything below is in log odds, where 0 is a coin flip, 1 is 73%, 2 is 88% and 3 is 95%. the three
 // priors were widened after backtesting on 368 sets between tracked players, where narrower ones made the
-// favourite win more often than the odds said. how far apart two players could be before looking at anything
+// favourite win more often than the odds said. scripts/backtest.js reruns that kind of check after a change.
+// how far apart two players could be before looking at anything
 const GAP_PRIOR = 3;
 // how much better or worse than the two of them a common opponent could be
 const OPPONENT_PRIOR = 3;
@@ -293,7 +294,9 @@ function fit(parts) {
 // where the histories stop. now is when the odds are for, which only changes how much older sets count.
 // slippiA and slippiB are their slippi profiles, which count when both are ranked and the game is melee.
 // with no sets on start.gg but both ranked, the odds come from slippi alone. null if there's nothing to go on
-export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, historyA, historyB), now = Date.now() / 1000, eventsA, eventsB, meetings: allMeetings = [], slippiA = null, slippiB = null } = {}) {
+export function predict(a, b, historyA, historyB, options = {}) {
+  const { now = Date.now() / 1000, eventsA, eventsB, meetings: allMeetings = [], slippiA = null, slippiB = null } = options;
+  let { game = sharedGame(a, b, historyA, historyB) } = options;
   // slippi is melee-only, so two ranked profiles are a melee matchup even with nothing on start.gg
   if (!game && slippiGap('Melee', slippiA, slippiB)) game = 'Melee';
   if (!game) return null;
@@ -307,7 +310,9 @@ export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, hist
   // the histories too, in case meetings wasn't looked up. deduped by set id, from a's side
   const met = new Map();
   const meet = (list, them, sign) => {
-    for (const { set, opponent, won, weight } of list) if (opponent === them.playerId) met.set(set.id, { sign: won ? sign : -sign, weight });
+    for (const { set, opponent, won, weight } of list) {
+      if (opponent === them.playerId) met.set(set.id, { sign: won ? sign : -sign, weight });
+    }
   };
   meet(results(allMeetings, a, game, now), b, 1);
   meet(listA, b, 1);
@@ -341,10 +346,14 @@ export function predict(a, b, historyA, historyB, { game = sharedGame(a, b, hist
   const shared = [...bracketsA.values()].filter(({ slug }) => bracketsB.has(slug))
     .map(({ slug, name, seed, weight }) => ({ slug, name, a: seed, b: bracketsB.get(slug).seed, weight }))
     .sort((x, y) => y.weight - x.weight);
+  // how many times higher a was seeded, on average, weighting newer brackets more
+  const totalWeight = shared.reduce((sum, { weight }) => sum + weight, 0);
+  const logRatio = shared.reduce((sum, { a: x, b: y, weight }) => sum + weight * Math.log(y / x), 0);
   const seeding = {
-    higher: shared.filter(({ a: x, b: y }) => x < y).length, lower: shared.filter(({ a: x, b: y }) => x > y).length, total: shared.length,
-    // how many times higher a was seeded, on average
-    ratio: shared.length ? Math.exp(shared.reduce((sum, { a: x, b: y, weight }) => sum + weight * Math.log(y / x), 0) / shared.reduce((sum, { weight }) => sum + weight, 0)) : 1,
+    higher: shared.filter(({ a: x, b: y }) => x < y).length,
+    lower: shared.filter(({ a: x, b: y }) => x > y).length,
+    total: shared.length,
+    ratio: shared.length ? Math.exp(logRatio / totalWeight) : 1,
     brackets: shared,
   };
   const level = { a: usualSeed(bracketsA), b: usualSeed(bracketsB) };

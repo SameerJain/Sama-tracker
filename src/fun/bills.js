@@ -1,5 +1,6 @@
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
+import { postQueue } from './queue.js';
 
 const API = 'https://commons.wikimedia.org/w/api.php';
 const GIPHY = 'https://giphy.com/buffalobills';
@@ -166,8 +167,8 @@ let lastImage;
 // the rotation across restarts, so the no-repeat and even photo/gif split survive one.
 // pools still reload live, only the queued posts and this spot in the rotation are kept
 try {
-  if (typeof state.billsMeta?.lastImage === 'string') lastImage = state.billsMeta.lastImage;
-  if (Array.isArray(state.billsMeta?.kinds) && state.billsMeta.kinds.every((kind) => kind === 0 || kind === 1)) kinds = [...state.billsMeta.kinds];
+  if (typeof state.billsMeta.lastImage === 'string') lastImage = state.billsMeta.lastImage;
+  if (Array.isArray(state.billsMeta.kinds) && state.billsMeta.kinds.every((kind) => kind === 0 || kind === 1)) kinds = [...state.billsMeta.kinds];
 } catch {
   // a corrupt entry just restarts the rotation
 }
@@ -221,113 +222,24 @@ function makePost() {
   return next;
 }
 
-// made ahead of time so the command replies right away, kept full for busy servers.
-// completed ones are saved without their file bytes, so a restart serves them instead of
-// loading the pools again. the bytes download again on restore
-const QUEUE_SIZE = 3;
-const queue = [];
-let nextId = 0;
-
-function persist(id, post) {
-  try {
-    state.funQueue ??= {};
-    const saved = state.funQueue.bills ??= [];
-    if (!saved.some((each) => each.id === id)) {
-      const { file, ...rest } = post;
-      saved.push({ id, ...rest });
-    }
-    state.funQueue.bills = saved.slice(-QUEUE_SIZE);
-    save();
-  } catch (err) {
-    console.error('bills queued post save failed:', err.message);
-  }
-}
-
-function unpersist(id) {
-  try {
-    const saved = state.funQueue?.bills;
-    if (!saved?.some((each) => each.id === id)) return;
-    state.funQueue.bills = saved.filter((each) => each.id !== id);
-    save();
-  } catch (err) {
-    console.error('bills queued post save failed:', err.message);
-  }
-}
-
-// posts saved by the run before this one. a file that won't download again falls back to
-// the url, the way a fresh post does, and corrupt entries are dropped
-function restore() {
-  const saved = state.funQueue?.bills ?? [];
-  const kept = [];
-  for (const entry of saved.slice(-QUEUE_SIZE)) {
-    const { id, title, name, image, page, source } = entry ?? {};
-    if (typeof id !== 'number' || typeof title !== 'string' || typeof image !== 'string') continue;
-    if (blockedFile(page ?? image)) continue;
-    kept.push({ id, title, name, image, page, source });
-    nextId = Math.max(nextId, id + 1);
-    const pending = download(image).then(
-      (file) => ({ title, name, image, page, source, file }),
-      () => ({ title, name, image, page, source, file: undefined }),
-    );
-    pending._queueId = id;
-    pending.catch(() => {}); // handled in takePost
-    queue.push(pending);
-  }
-  if (kept.length !== saved.length) {
-    try {
-      state.funQueue ??= {};
-      state.funQueue.bills = kept;
-      save();
-    } catch (err) {
-      console.error('bills queued post save failed:', err.message);
-    }
-  }
-}
-
-function prepare() {
-  while (queue.length < QUEUE_SIZE) {
-    const id = nextId++;
-    const pending = makePost().then(
-      (post) => {
-        persist(id, post);
-        return post;
-      },
-    );
-    pending._queueId = id;
-    pending.catch(() => {}); // handled in takePost
-    queue.push(pending);
-  }
-}
-
-function takePost() {
-  const ready = queue.shift() ?? makePost();
-  prepare();
-  // the persist above lands before this removal, so a post taken while still pending
-  // saves then removes itself instead of lingering. a failed prefetch tries again now
-  if (ready._queueId !== undefined) {
-    const id = ready._queueId;
-    return ready.then(
-      (post) => {
-        unpersist(id);
-        return post;
-      },
-      (err) => {
-        unpersist(id);
-        throw err;
-      },
-    ).catch(makePost);
-  }
-  return ready.catch(makePost);
-}
-
-restore();
+const queue = postQueue('bills', {
+  make: makePost,
+  toSaved: ({ file, ...rest }) => rest,
+  // the pools stay unloaded. a file that won't download again falls back to the url, the way a fresh post does
+  fromSaved: ({ title, name, image, page, source }) => {
+    if (typeof title !== 'string' || typeof image !== 'string' || blockedFile(page ?? image)) return null;
+    const post = { title, name, image, page, source };
+    return download(image).then((file) => ({ ...post, file }), () => ({ ...post, file: undefined }));
+  },
+});
+queue.restore();
 
 export default {
   name: 'bills',
   line: 'GO BILLS! 🦬🔥',
   description: 'Live pro-Bills photos and official GIFs with a message',
   enabled: true,
-  takePost,
+  takePost: queue.take,
   format: ({ title, image, file, page, name, source }) => ({
     embeds: [embeds.funImage(title, file ? `attachment://${file.name}` : image, page, name, source)],
     files: file ? [file] : [],

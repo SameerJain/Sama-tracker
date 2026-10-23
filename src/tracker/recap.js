@@ -3,9 +3,9 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { periodSummary, weeklyPeriod } from '../reports.js';
 import { messageEnabled, messageSettings } from '../message-settings.js';
-import { channel, secondsNow } from './shared.js';
+import { currentChannel, secondsNow } from './shared.js';
 
-export async function postWeeklyRecap(postChannel = channel, now = secondsNow()) {
+export async function postWeeklyRecap(postChannel = currentChannel(), now = secondsNow()) {
   const period = weeklyPeriod(now, messageSettings());
   // turning it back on or changing the schedule waits for the next recap instead of sending an overdue one
   const canPost = () => messageEnabled('recap', period.until) && period.until > (messageSettings().recapChangedAt ?? 0);

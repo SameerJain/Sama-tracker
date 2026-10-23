@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EmbedBuilder, MessageFlags } from 'discord.js';
+import { mockApi } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-buttons-'));
 process.env.STATE_DIR = directory;
@@ -17,10 +18,6 @@ const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
-
-function mockApi(respond) {
-  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
-}
 
 const crew = { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew', discordId: 'crew-discord' };
 const rival = { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival' };

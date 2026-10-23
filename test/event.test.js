@@ -438,16 +438,43 @@ test('a cover that won\'t download leaves the event without one instead of faili
   assert.match(result.url, /discord\.com\/events/);
 });
 
-test('the event runs to start.gg\'s end time, or 6 hours when it has none', async () => {
+test('the event runs to start.gg\'s end time, or the tuned length when it has none', async () => {
   await reset();
   const { guild, created } = fakeGuild();
   await ensureDiscordEvent(soon, guild);
   assert.deepEqual(created[0].scheduledEndTime, new Date(soon.endAt * 1000));
 
-  state.discordEvents = {};
-  const open = { ...soon, id: 24, slug: 'tournament/open', endAt: null };
-  await ensureDiscordEvent(open, guild);
-  assert.deepEqual(created[1].scheduledEndTime, new Date((open.startAt + 6 * 3600) * 1000));
+  // no end time: untuned servers get 5 hours, tuned ones get theirs
+  const open = (id, slug, extra) => ({ ...soon, id, slug, endAt: null, ...extra });
+  const ends = async (tournament) => {
+    state.discordEvents = {};
+    await ensureDiscordEvent(tournament, guild);
+    return created.at(-1).scheduledEndTime;
+  };
+  state.messages = {};
+  assert.deepEqual(await ends(open(24, 'tournament/open')), new Date((soon.startAt + 5 * 3600) * 1000));
+  state.messages = { eventLength: 3 };
+  assert.deepEqual(await ends(open(25, 'tournament/short', { numAttendees: 20 })), new Date((soon.startAt + 3 * 3600) * 1000));
+  state.messages = { eventLength: 8 };
+  assert.deepEqual(await ends(open(26, 'tournament/long', { numAttendees: 20 })), new Date((soon.startAt + 8 * 3600) * 1000));
+});
+
+test('a major or regional with no end time gets pushed to 12 hours, never pulled in', async () => {
+  await reset();
+  const { guild, created } = fakeGuild();
+  const ends = async (tournament) => {
+    state.discordEvents = {};
+    await ensureDiscordEvent(tournament, guild);
+    return created.at(-1).scheduledEndTime;
+  };
+  const regional = (id, slug, extra) => ({ ...soon, id, slug, endAt: null, ...extra });
+  // tuned short, still pushed back. a hidden entrant list still counts by its brackets
+  state.messages = { eventLength: 3 };
+  assert.deepEqual(await ends(regional(30, 'tournament/regional', { numAttendees: 200 })), new Date((soon.startAt + 12 * 3600) * 1000));
+  assert.deepEqual(await ends(regional(31, 'tournament/five-events', { numAttendees: null, events: [{}, {}, {}, {}, {}] })), new Date((soon.startAt + 12 * 3600) * 1000));
+  // tuned long, a small weekly keeps it instead of dropping to the failsafe or the default
+  state.messages = { eventLength: 8 };
+  assert.deepEqual(await ends(regional(32, 'tournament/weekly', { numAttendees: 20 })), new Date((soon.startAt + 8 * 3600) * 1000));
 });
 
 test('reminders, DMs and roll calls show the venue and address as a map link, or the city without them', async () => {

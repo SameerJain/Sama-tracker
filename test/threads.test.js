@@ -394,6 +394,20 @@ async function configure(values, channel) {
   return reply.content;
 }
 
+test('/messages threads checks CHANNEL_ID, not the channel the command ran in', async () => {
+  state.messages = {};
+  let reply;
+  await handleCommand({
+    commandName: 'messages', channelId: 'elsewhere', channel: fakeChannel(),
+    memberPermissions: { has: permission => permission === PermissionFlagsBits.ManageGuild },
+    client: { channels: { cache: new Map([['posts', fakeChannel({ allowed: [] })], ['elsewhere', fakeChannel()]]) } },
+    options: { getSubcommand: () => null, getBoolean: () => null, getString: name => (name === 'threads' ? 'tournament' : null), getInteger: () => null },
+    reply: async result => { reply = result; },
+  });
+  assert.match(reply.content, /^I need Create Public Threads and Send Messages in Threads in <#posts>/);
+  assert.deepEqual(state.messages, {});
+});
+
 test('/messages threads checks the bot can start threads before turning them on', async () => {
   state.messages = {};
   let reply = await configure({ threads: 'tournament', sets: false }, fakeChannel({ allowed: ['CreatePublicThreads'] }));
@@ -474,8 +488,8 @@ test('a tracked tournament posts every finished set in its thread even with thre
     'Set result · W · Visitor 2-1 Guest · L',
     'Set result · W · Active 2-1 Opponent · L',
   ]);
-  // every set result is green, whoever played
-  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.color), [0x22c55e, 0x22c55e]);
+  // every set result is blue, whoever played
+  assert.deepEqual(thread.sent.map((message) => message.embeds[0].data.color), [0x0891b2, 0x0891b2]);
   assert.ok(state.tournaments[5].lastCheck > lastCheck);
 
   // a later check skips what's posted

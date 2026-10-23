@@ -1,8 +1,8 @@
 # Sama-tracker
 
-> **This bot has no invite link.** It's built for one Discord server, so you can't add it to yours the usual way. To use it you have to host your own copy, running 24/7 on a machine you control or on a cloud host. See [Run your own copy](#run-your-own-copy).
+> **One server by default.** The bot serves a single Discord server set by `GUILD_ID` and `CHANNEL_ID`, so there is no invite link. Set `MULTI_GUILD=true` to serve every server it's invited to instead: invite it with `https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=139870764032&scope=bot%20applications.commands` (replace `YOUR_CLIENT_ID` with the app's client id from the Developer Portal), then run `/setup channel:#channel` in each server. Commands register globally in that mode, so they can take up to an hour to appear on a server that just invited it. To run the code yourself instead, see [Run your own copy](#run-your-own-copy).
 
-A Discord bot that follows a Smash crew and its local tournaments on start.gg and Slippi. It posts results and stream alerts in one channel, sends registration reminders, and answers slash commands with stats, head-to-heads and odds.
+A Discord bot that follows a Smash crew and its local tournaments on start.gg and Slippi. It posts results and stream alerts in one channel, sends registration reminders, and answers slash commands with stats, head-to-heads and odds. With `MULTI_GUILD=true` each server gets its own track list, settings and posts channel from the one copy.
 
 <img src="screenshots/predict.png" alt="/predict" width="56%"> <img src="screenshots/h2h.png" alt="/h2h" width="42%">
 
@@ -14,12 +14,13 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 
 ## Get started
 
-1. **Link yourself.** Connect Discord on your start.gg profile, then run `/link`. Commands then know who you are, and nothing gets posted about you. Tracked players with Discord connected can skip this.
-2. **Set up the TO role.** `/t-o role set role:@TO(Buffalo)` uses a role already in the server, or `/t-o role add user:@someone` makes the default **TO** role and gives it to someone. TOs use `/t-o tournament`, control `/messages` and can change tracking for anyone. See [TOs](#tos).
-3. **Track your tournaments.** A TO's `/t-o tournament add tournament:<link>` posts every set, stream alert, results card and top 8 from a tournament, plus registration reminders. `/t-o tournament event tournament:<link>` makes a Discord event from a link that keeps up with start.gg.
-4. **Track yourself.** `/track add` posts your placements wherever you play, found by the Discord on your start.gg. `/track posts` turns on your set results and stream alerts too. TOs can do both for anyone.
-5. **Pick your pings.** `/notify` pings you when your match is called, when your set is on stream, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
-6. **Follow Slippi ranked.** `/slippi add` puts your connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
+1. **Pick the posts channel (multi-server only).** With `MULTI_GUILD=true` someone with Manage Server or the TO role runs `/setup channel:#channel` in each server. Every server tracks its own players and tournaments, with its own settings, in its own channel. Without it the bot answers commands but posts nothing. Single-server builds skip this: they post in `CHANNEL_ID`.
+2. **Link yourself.** Connect Discord on your start.gg profile, then run `/link`. Commands then know who you are, and nothing gets posted about you. Tracked players with Discord connected can skip this.
+3. **Set up the TO role.** `/t-o role set role:@TO(Buffalo)` uses a role already in the server, or `/t-o role add user:@someone` gives the default **TO** role to someone. TOs use `/t-o tournament`, control `/messages` and can change tracking for anyone. See [TOs](#tos).
+4. **Track your tournaments.** A TO's `/t-o tournament add tournament:<link>` posts every set, stream alert, results card and top 8 from a tournament, plus registration reminders. `/t-o tournament event tournament:<link>` makes a Discord event from a link that keeps up with start.gg.
+5. **Track yourself.** `/track add` posts your placements wherever you play, found by the Discord on your start.gg. `/track posts` turns on your set results and stream alerts too. TOs can do both for anyone.
+6. **Pick your pings.** `/notify` pings you when your match is called, when your set is on stream, or for registration reminders, plus 1-hour DMs before registration closes and before the start. `/matchmaking_role` gets you pinged when someone wants Ultimate or Melee games, and `/matchmaking_search` asks. `/messages` controls posts for the whole server.
+7. **Follow Slippi ranked.** `/slippi add` puts your connect code on the watchlist. Tracked players get added on their own once their code shows up on start.gg.
 
 `/help` in Discord lists the commands in short form, on one card. `/help verbose:True` is the full list with the details.
 
@@ -49,7 +50,7 @@ Player pickers start with the last 5 people you picked. Once you type, names tha
 | `/track remove` | Stop tracking yourself, or anyone with `player:` if you're a TO. Asks first, then an **Undo** button puts them back with all their settings for a minute. |
 | `/track list` | Tracked players, who has set results or stream alerts on, and the tracked tournaments. |
 | `/track posts sets:<on or off> stream:<on or off>` | Your set results and stream alerts. Leave both out to see them. A TO can change anyone's with `player:<name>`, or everyone's with `player:all`, which asks first for `sets:off` unless it's already off for everyone. Anyone can look at anyone's. Sets finished before results go on aren't posted. |
-| `/t-o cleanup` | Untrack everyone whose start.gg Discord isn't in this server. Names them and asks first, then **Undo** puts them back for a minute. Players with no Discord on start.gg stay unless you add `no_discord:True`. T.O.s only. |
+| `/t-o cleanup` | Untrack everyone whose start.gg Discord isn't in this server. Names them and asks first, then **Undo** puts them back for a minute. Players with no Discord on start.gg stay unless you add `no_discord:True`. TOs only. |
 | `/link profile:<link or ID>` | Link your own start.gg account. Leave out `profile` to find it by the Discord connected on start.gg, among the accounts `/profile` searches. |
 | `/unlink` | Remove your link, with an **Undo** button for a minute. Tracking stays as it was. |
 | `/upcoming` | Tracked tournaments, and any other live or upcoming tournament with 3 or more of the crew registered. `player:` checks one person instead, live from start.gg when they're linked but not tracked. |
@@ -64,9 +65,9 @@ Anyone can track, untrack and change posts for themselves. Yourself means the st
 
 | Command | What it does |
 | --- | --- |
-| `/t-o role add user:<@someone>` | Give someone the **TO** role. T.O.s only. |
+| `/t-o role add user:<@someone>` | Give someone the **TO** role. TOs only. |
 | `/t-o role set role:<@role>` | Use any existing server role for TO privileges. Needs **Manage Server**. |
-| `/t-o role remove user:<@someone>` | Take the TO role off someone. Refuses to remove the last known TO. T.O.s only. |
+| `/t-o role remove user:<@someone>` | Take the TO role off someone. Refuses to remove the last known TO. TOs only. |
 | `/t-o role list` | The TOs. Anyone can look. |
 
 TOs can control `/messages`, manage tracking and pings for anyone, remove anyone from the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Only TOs add or remove TOs. The role grants no Discord permissions.
@@ -148,18 +149,20 @@ Netplay tournaments on start.gg ask for a connect code at registration, and star
 
 Ranks use slippi.gg's cutoffs: Bronze 1 through Master 3 by rating, and Grandmaster for a Master rating with a placement on Slippi's daily leaderboards. A player with fewer than 5 ranked sets in the season is Pending. Slippi doesn't share ranked match results, so posts show the new rank and rating change, not who they played.
 
+When a ranked season ends, the bot posts a wrap-up of it once: the watchlist's final ranks with ratings and records (the top 10), the 3 biggest rating gains on the season before, and the 3 characters the watchlist played most. Final ratings and records come from slippi.gg's season history, so a player who hasn't played the new season yet counts the same. Characters and daily leaderboard placements aren't in that history, so they come from the bot's last check before each player's reset. It goes out within 30 minutes of Slippi listing the season as finished, and a season that ended over a week before the bot sees it gets none. `/messages slippi` turns it off with the rank changes.
+
 > [!NOTE]
 > Slippi has no public API. The bot uses the one slippi.gg uses, so a change on Slippi's side can stop rank checks until the bot is updated. `/status` shows when the last check failed.
 
 ### Tournaments
 
-A tracked tournament posts every set, whoever played, plus its stream alerts, results card and each event's top 8. Sets and stream alerts go in its own thread. It also sends registration reminders. Tracking players works alongside it: a tracked player with set results on gets posted at any tournament, tracked or not.
+A tracked tournament posts every set, whoever played, plus its stream alerts, results card and each event's top 8. Sets and stream alerts go in its own thread. It also sends registration reminders, and posts every called set with `calls:on` in `/t-o tournament posts`. Tracking players works alongside it: a tracked player with set results on gets posted at any tournament, tracked or not.
 
 | Command | What it does |
 | --- | --- |
 | `/t-o tournament add tournament:<link>` | Track a tournament: every finished set, stream alerts, results, top 8s and registration reminders. `reminders:off` leaves out the reminders, `schedule:7d,3d,1d,6h` sets custom reminder times, `add_event:on` also makes a Discord event. |
 | `/t-o tournament remove tournament:<name>` | Stop tracking it. Asks first, then **Undo** puts it back for a minute. |
-| `/t-o tournament posts tournament:<name>` | Turn its `sets`, `stream`, `top8` and `reminders` on or off. `schedule:` changes the reminder times, `schedule:default` goes back to the usual four. Leave them all out to see them. |
+| `/t-o tournament posts tournament:<name>` | Turn its `sets`, `stream`, `calls`, `top8` and `reminders` on or off. `schedule:` changes the reminder times, `schedule:default` goes back to the usual four. Leave them all out to see them. `calls` posts every called set, even with nobody to ping, and starts off. |
 | `/t-o tournament event tournament:<link>` | Make a Discord event from a start.gg link, with the time and end time, venue, close time, events, streams and cover photo. It doesn't track the tournament. |
 | `/bracket` | Bracket links for tracked tournaments, from 30 minutes before the start until 6 hours after the end. |
 | `/stream_link` | Streams added on start.gg for tracked tournaments and tournaments tracked players entered, in the same window as `/bracket`. Twitch streams are links, and other sites show the stream name. If none are going on, none have a stream, or start.gg doesn't answer, it says to ask a TO in another channel. |
@@ -170,7 +173,7 @@ A tracked tournament posts every set, whoever played, plus its stream alerts, re
 
 `tournament` takes a start.gg link, or a tournament the bot already knows from the list: tracked ones and ones tracked players are in, soonest first. Tournaments nobody tracks are forgotten a month after they end. `/t-o tournament add` lists only ones that aren't tracked yet, and `/t-o tournament remove` and `/t-o tournament posts` only tracked ones. `/t-o tournament event` lists only upcoming ones, since Discord events have to start in the future, each once. `/t-o tournament add add_event:on` tracks the tournament and makes its Discord event. `/t-o tournament event` only makes the event. Both find an event made earlier for the same link instead of making another.
 
-Discord events sync hourly with start.gg until they start. The bot copies changes to the name, times, cover, venue, registration close, streams, and events. It cancels an event if start.gg deletes or unpublishes the tournament. Changing the start.gg link does not cancel it because the bot uses the tournament ID. Discord edits remain until start.gg changes. The bot leaves started or manually deleted events alone. An event without an end time on start.gg lasts 6 hours.
+Discord events sync hourly with start.gg until they start. The bot copies changes to the name, times, cover, venue, registration close, streams, and events. It cancels an event if start.gg deletes or unpublishes the tournament. Changing the start.gg link does not cancel it because the bot uses the tournament ID. Discord edits remain until start.gg changes. The bot leaves started or manually deleted events alone. An event without an end time on start.gg runs `event_length` hours (5 unless the server changed it with `/messages event_length:`). A major or regional with no end time still gets 12 hours.
 
 `/messages events:True` makes a Discord event on its own for each upcoming tracked tournament, once. An event a mod deletes isn't made again. It's off by default.
 
@@ -191,10 +194,11 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Command | What it does |
 | --- | --- |
 | `/help` | Short command list. `verbose:True` lists every command with the details. |
-| `/status` | Uptime, when the latest version was deployed plus its message, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, any downtime before the last start, why a post last missed its thread, and a link to the GitHub repo. A copy run on another computer also shows that computer's name. |
+| `/setup channel:#channel` | Multi-server only. Show or set the channel automatic posts go in for this server. Anyone can look, and Manage Server or TOs can change it. A channel the bot can't view, send messages or embed links in gets turned down, and a missing Attach Files or thread permission gets a note. The next check posts in the new channel, no restart needed. Without it the bot answers commands but posts nothing. |
+| `/status` | Uptime, when the latest version was deployed plus its message, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, whether start.gg is down right now, any downtime before the last start, why a post last missed its thread, and a link to the GitHub repo. A copy run on another computer also shows that computer's name. |
 | `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
-| `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event), set result colors and the recap schedule. Needs the TO role or **Manage Server**. |
-| `/data` | Links to the [Monday Night SmashBall data page](https://monday-night-smashball.vercel.app) and the [UB Smash Royale data page](https://ub-smash-royale.vercel.app): every tournament's attendance, winners, most events entered and characters. |
+| `/messages` | Show or change automatic posts, threads (off, one per tournament or one per event), event length, set result colors and the recap schedule. Needs the TO role or **Manage Server**. |
+| `/data` | Links to [Samatracker](https://samatracker.vercel.app), the web companion with cached player lookup, recent results and Slippi ranks, and both series data pages: the [Monday Night SmashBall data page](https://monday-night-smashball.vercel.app) and the [UB Smash Royale data page](https://ub-smash-royale.vercel.app), with every tournament's attendance, winners, most events entered and characters. |
 | `/socials` | Saved streams and social links. |
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional, and links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |
@@ -223,7 +227,7 @@ Ping changes apply during a tournament. Turning calls or streams on catches one 
 | --- | --- | --- |
 | Set results | Every finished set at a tracked tournament. Anywhere else, when a tracked player with set results on finishes a set. | `/track posts sets` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. |
 | Stream alerts | Every set on stream or next in the stream queue at a tracked tournament. Anywhere else, when a tracked player with stream alerts on has a set there. A new alert waits 30 seconds to confirm. | `/track posts stream` controls a tracked player outside tracked tournaments. A tracked tournament includes everyone. `/notify streams` pings whoever is playing. |
-| Match call pings | When start.gg marks a set called for someone with `/notify calls` on. The ping includes the station when available. A call taken back gets crossed out. | One card per set names everyone in it. `/notify calls` controls each person's ping. |
+| Match call pings | When start.gg marks a set called for someone with `/notify calls` on. The ping includes the station when available. A call taken back gets crossed out. At a tracked tournament with `calls:on`, every called set posts even with nobody to ping. | One card per set names everyone in it. `/notify calls` controls each person's ping. |
 | Tournament roll calls | An hour before a tournament with at least 3 of the crew registered, with the stream links from its start.gg page. | Tracked players appear. At a tracked tournament, registered server members whose Discord is connected on start.gg count too. Linking alone does not add someone. |
 | Tournament placements | With the top 8 as soon as every event finishes at a tracked tournament, even when top 8 posts are off. Otherwise 12 hours after the tournament ends. Unfinished placements are marked as projected. Notable upset wins by tracked players go under the placements. | Tracked players appear. At a tracked tournament, the same registered server members as roll calls appear too. |
 | Top 8s | As soon as every event finishes at a tracked tournament. Delayed or failed top 8s retry as described below. | Everyone in each top 8 appears, tracked or not. |
@@ -231,18 +235,22 @@ Ping changes apply during a tournament. Turning calls or streams on catches one 
 | Registration DMs | 1 hour before registration closes at a tracked tournament. | DM with the tournament link, location and image. `/notify dm_registration` controls who gets one, skipped once registered when start.gg has their Discord. Only to current server members. Needs the tournament's reg reminders on. |
 | Start DMs | 1 hour before a tracked tournament starts. | DM with the tournament link, location and image. `/notify dm_start` controls who gets one, only to current server members. Needs the tournament's reg reminders on. When registration closes within an hour of the start, only this one goes out. |
 | Discord events | Off by default. Within 15 minutes of an upcoming tournament getting tracked. | `/messages events` controls it. With it off, a tournament only gets one from `/t-o tournament event` or `add_event:on`. |
-| Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank. A new season reset is not posted. | `/slippi add` and `/slippi remove` control the watchlist. Tracked players can be discovered from connect codes entered on start.gg. Linked-only players cannot. |
+| Slippi rank changes | Within 30 minutes of a watchlist player moving to another rank. A new season reset is not posted, the wrap-up covers it. | `/slippi add` and `/slippi remove` control the watchlist. Tracked players can be discovered from connect codes entered on start.gg. Linked-only players cannot. |
+| Slippi season wrap-ups | Once per ranked season, within 30 minutes of Slippi listing it as finished. | Watchlist players with sets that season. Final ranks, biggest climbers and most played characters. `/messages slippi` controls it with rank changes. |
 | Bills final results | Off by default. After each Bills game, with quarters and yards. | No player appears. |
 | Weekly crew recap | Sunday at 9 pm New York time by default. A notable upset win by a tracked player goes on top. | Tracked players with a non-DQ singles set that week appear. There is no separate player switch. |
-| Bot updates | When Railway starts a new deployment. | No player appears. Always posts, with when it deployed and the commit message. |
+| Bot updates | When Railway starts a new deployment. | No player appears. Always posts, with when it deployed and the commit message, plus the outage below when there was one. |
+| Back online | When the bot starts after being off for 10 minutes or more, like a crash or a hosting outage. A normal redeploy is quicker and doesn't post. | No player appears. Always posts, with how long it was down, that commands sent then need sending again, and what catches up. |
 
-Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. Tournament placements and the weekly recap list the same kind of wins by tracked players as notable upsets. `/messages set_colors` colors them green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played, so a small crew sees each member at a glance. Off, every card stays green. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. A top 8 lookup that fails at placements time holds them back 12 hours, then they go without it. A top 8 that fails to send retries for up to 3 days.
+Set result cards put the winner on the left with a W and the loser on the right with an L. A winner seeded 7 or more placement tiers lower, like seed 17 over seed 2, gets Major upset. Tournament placements and the weekly recap list the same kind of wins by tracked players as notable upsets. `/messages set_colors` colors them green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played, so a small crew sees each member at a glance. Off, every card stays blue. Only a tracked player's first DQ per event is posted, so no-shows at a tracked tournament stay out. Top 8s list everyone, one card per event. An event that has not started holds the top 8 until the tournament's end time. A top 8 lookup that fails at placements time holds them back 12 hours, then they go without it. A top 8 that fails to send retries for up to 3 days.
+
+Each card's side color says what kind of post it is. Only set results and the Bills final use the `set_colors` green, red and blue, and a set the TO resets turns grey. Gold is two players meeting: crew vs crew results, and `/h2h`, `/predict` and `/scout`'s matchup card. Match calls, `/run`, and `/bracket`, `/stream_link` and `/upcoming` once a tournament starts are magenta, next to Twitch purple for stream alerts. Registration reminders and the start DM are orange, and dark orange for the last call, its DM and `/reg_warn`. Placements, top 8s and the weekly recap are yellow, thread cards blue, `/status` and bot updates pink, and lookups and roll calls violet. Slippi cards take the rank's color, or Slippi green without one.
 
 Singles stream alerts and match calls get a **Head to head** button for the short report that replies privately to whoever presses it. It comes off when the set ends or is deleted, or 12 hours after the post.
 
 The set, stream and match call checks run every 2 minutes. Each asks start.gg only about players with that switch on, 20 players per request, so the checks stay small however many players are tracked. A tracked tournament that's going on adds one request per 20 of its events for its new sets, and one per live tournament for its stream queue. When the stream check finds a new set on stream, it asks again 30 seconds later to confirm. A set in a stream queue links that queue's stream. Rechecking recent set results and match calls takes one request per 50 posts, plus 1 per 10 set results whose winner or score changed. Bills finals check ESPN daily, every 15 minutes from an hour before kickoff until 8 hours after: one request plus one per new final. A roll call adds one request for its streams. 1-hour DMs look a tournament up every 15 minutes, only in the 3 hours before one is due, plus one request for who's registered before a registration DM.
 
-After the bot has been down, set results from the last 3 hours still post and older ones are skipped. `/status` says when that happened.
+After the bot has been down, set results from the last 3 hours still post and older ones are skipped. `/status` says when that happened. See [When something is down](#when-something-is-down) for what people see.
 
 ### Fixing posts that turn out wrong
 
@@ -251,7 +259,7 @@ TOs report the wrong winner, fix it a minute later, or call a set and take it ba
 | Post | What changes |
 | --- | --- |
 | Set results | For an hour after a result posts, the bot checks it again every 2 minutes. If the TO changes the winner or score, the card is replaced with the new result marked **Corrected by TO**. If the TO resets or deletes the set, the card turns grey and its title starts with **Reset by TO**. If the set is reported again within that hour, the card shows the new result. |
-| Match call pings | For 15 minutes after a call, the bot checks it every 2 minutes. If the set goes back to waiting, the ping is crossed out with "Uncalled by the TO", and calling it again pings again. If the set is still called 5 minutes in, the players get pinged once more in a reply ("You're still up, 5 min in. TOs usually DQ at 10"). This needs the `calls` switch on. |
+| Match call pings | For 15 minutes after a call, the bot checks it every 2 minutes. If the set goes back to waiting, the ping is crossed out with "Uncalled by the TO", and calling it again pings again. This needs the `calls` switch on. |
 | Discord events | Checked hourly until they start. A new time, end time, cover photo, name, venue, close time, streams or event list on start.gg gets edited in, and a tournament deleted there gets its event cancelled. Nothing is posted about it. |
 | Placements and top 8s | Projected placements are checked hourly for 3 days. Once start.gg has every placement final, or every event in the top 8 finished, the post is edited to the final standings. If the final version no longer splits into the same number of messages, it goes out as a new post saying so. A top 8 with nothing reported when placements posted goes out as a new message once the bracket is finished. |
 
@@ -259,7 +267,7 @@ Some TOs tag an event with the wrong game, like a "Melee Singles" tagged as Ulti
 
 ### Turning posts on and off
 
-Run `/messages` without options to see the current settings. TOs and members with Manage Server can change any of the eleven switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `top8`, `registration`, `events`, `slippi`, `recap` and `bills`. Only Bills finals and Discord events start off server-wide. `set_colors` colors set result cards green for a tracked win, red for a loss, gold when two tracked players meet and purple when nobody tracked played, and starts off. Turning `events` on checks for Manage Events first, and it makes events for upcoming tournaments already tracked. The `/notify` DMs go by each person's own setting and the tournament's reminders, not these switches. Match calls only ping people who turned on `/notify calls`, stream alerts only ping whoever is playing with `/notify streams` on, and top 8s only come from tracked tournaments.
+Run `/messages` without options to see the current settings. TOs and members with Manage Server can change any of the eleven switches: `sets`, `streams`, `calls`, `rollcall`, `results`, `top8`, `registration`, `events`, `slippi`, `recap` and `bills`, plus `event_length`. Only Bills finals and Discord events start off server-wide. `set_colors` colors set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played, and starts off. Turning `events` on checks for Manage Events first, and it makes events for upcoming tournaments already tracked. The `/notify` DMs go by each person's own setting and the tournament's reminders, not these switches. Match calls only ping people who turned on `/notify calls`, stream alerts only ping whoever is playing with `/notify streams` on, and top 8s only come from tracked tournaments.
 
 ```text
 /messages sets:False streams:False
@@ -286,9 +294,9 @@ The bot needs **Create Public Threads** and **Send Messages in Threads** in the 
 
 You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
 
-1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications). Invite it with the `bot` and `applications.commands` scopes and these permissions: View Channel, Send Messages, Embed Links and Attach Files. For threads, add Create Public Threads and Send Messages in Threads, plus Manage Messages so thread cards get pinned. For `/t-o tournament event`, `add_event:on` and `/messages events`, add Manage Events so it can make and update scheduled events. Manage Roles lets `/t-o role` make and hand out the TO role, `/notify registration` hand out the Reg Reminders role, and `/matchmaking_role` make and hand out the matchmaking roles. Reg reminder pings work without it, and without a TO role Manage Server counts as a TO. It needs no privileged intents.
+1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications). Invite it with the `bot` and `applications.commands` scopes and these permissions: View Channel, Send Messages, Embed Links and Attach Files. For threads, add Create Public Threads and Send Messages in Threads, plus Manage Messages so thread cards get pinned. For `/t-o tournament event`, `add_event:on` and `/messages events`, add Manage Events so it can make and update scheduled events. Manage Roles lets `/t-o role` make and hand out the TO role, `/notify registration` hand out the Reg Reminders role, and `/matchmaking_role` make and hand out the matchmaking roles. Reg reminder pings work without it, and without a TO role Manage Server counts as a TO. It needs no privileged intents. With `MULTI_GUILD=true` commands register globally, so invite it to as many servers as you like and run `/setup channel:#channel` in each.
 2. Create a start.gg API token under Settings > Developer Settings.
-3. Copy [.env.example](.env.example) to `.env` and fill it in. With Discord Developer Mode on, right-click the server and channel to copy their IDs.
+3. Copy [.env.example](.env.example) to `.env` and fill it in. Single-server builds need `GUILD_ID` and `CHANNEL_ID` for their one server and channel. Multi-server builds leave both out and set `MULTI_GUILD=true` instead.
 4. Install and start it:
 
    ```sh
@@ -303,20 +311,21 @@ You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
 | --- | --- | --- |
 | `DISCORD_TOKEN` | Yes | The bot's token from the Developer Portal. |
 | `STARTGG_TOKEN` | Yes | The start.gg API token. |
-| `GUILD_ID` | Yes | The server. Commands register here. |
-| `CHANNEL_ID` | Yes | The channel for automatic posts. |
+| `GUILD_ID` | Single-server only | The server. Commands register here. Leave out with `MULTI_GUILD=true`, which migrates it into that server's entry on first boot instead. |
+| `CHANNEL_ID` | Single-server only | The channel for automatic posts. Leave out with `MULTI_GUILD=true`. |
+| `MULTI_GUILD` | No | Set to `true` to serve every server the bot is invited to, each with its own track list, settings and `/setup` posts channel. Off by default. |
 | `ANTHROPIC_API_KEY` | No | Claude Haiku writes the fun command posts. |
 | `YOUTUBE_API_KEY` | No | YouTube videos for fun posts. Enable YouTube Data API v3 in a Google Cloud project and create an API key. OAuth isn't needed. |
 | `STATE_DIR` | No | Where `state.json` lives. See [Hosting](#hosting). |
 
 > [!WARNING]
-> Run one copy of the bot per server. A second copy posts everything twice and shares start.gg's rate limit with the first.
+> Run one copy of the bot total. It serves every server it's invited to from that one copy. A second copy posts everything twice and shares start.gg's rate limit with the first.
 
 ### Hosting
 
 The bot quits at startup only when start.gg turns down `STARTGG_TOKEN`. If start.gg is down or slow when it starts, it logs that and starts anyway, and every check picks back up once start.gg answers.
 
-Keep `state.json` on persistent storage so tracking and settings survive redeploys. Every save also refreshes an hourly `state.json.bak`, which the bot falls back to if the main file ever reads corrupt. The bot stores it in `STATE_DIR`, else Railway's `RAILWAY_VOLUME_MOUNT_PATH` if set, else `data/` in the project folder.
+Keep `state.json` on persistent storage so tracking and settings survive redeploys. With `MULTI_GUILD=true` one file holds every server under `state.guilds[guildId]`, each with its own players, tournaments, settings and posts channel. Every save also refreshes an hourly `state.json.bak`, which the bot falls back to if the main file ever reads corrupt. The bot stores it in `STATE_DIR`, else Railway's `RAILWAY_VOLUME_MOUNT_PATH` if set, else `data/` in the project folder. Every push to master redeploys, same as before.
 
 **Node host.** Use systemd or pm2 to keep `npm start` running.
 
@@ -327,11 +336,18 @@ docker build -t sama-tracker .
 docker run -d --name sama-tracker --restart unless-stopped --env-file .env -v sama-data:/app/data sama-tracker
 ```
 
-**Railway.** Deploy this repository and Railway builds the included Dockerfile. Add the required `.env.example` values under the service's Variables, plus any optional keys. Attach a persistent volume, and the bot uses its path unless `STATE_DIR` says otherwise. Every push to master redeploys it, and each new deployment posts a bot update here.
+**Railway.** Deploy this repository and Railway builds the included Dockerfile. Add the required `.env.example` values under the service's Variables, plus any optional keys. Attach a persistent volume, and the bot uses its path unless `STATE_DIR` says otherwise. Every push to master redeploys it, and each new deployment posts a bot update where it posts everything else: the one channel, or each server's posts channel with `MULTI_GUILD=true`. Set the service's healthcheck path to `/health` so Railway waits for the new version to log in before switching traffic to it. It listens on Railway's `PORT`, or 3000 when that's unset. A port something else already holds gets logged, and the bot runs on without the healthcheck. The old version saves and signs off when Railway stops it. A volume can't be mounted on two deploys at once, so a redeploy still has a short gap while the new one starts, and sets from the last 3 hours post on catch-up.
 
 ### Development
 
 `npm run dev` restarts on file changes. `npm run check` syntax-checks every file with node's own parser. `npm test` runs against fake Discord and start.gg responses and posts nothing. Both `npm start` and `npm run dev` join the real server with the tokens in `.env`, so don't run them next to a deployed copy.
+
+`scripts/backtest.js` checks the `/predict` odds against sets the tracked players already played each other. Each set gets predicted from only what happened before it, and it prints log loss, Brier score and how often favourites at each level of confidence won. Fetching uses the start.gg token and shares its rate limit with a deployed copy, so save the histories once and score the saved copy after each change to `src/predict.js`:
+
+```sh
+node --env-file=.env scripts/backtest.js --save data/backtest.json
+node scripts/backtest.js --load data/backtest.json
+```
 
 ## Data and limits
 
@@ -351,7 +367,16 @@ Your commands take turns with start.gg one at a time. A command sent while your 
 
 A public report that finishes more than a minute after you ran it goes out as a new message that pings you, and the loading reply is removed. Private answers, like `/scout`, stay private and don't ping.
 
-A command that fails says whose side it failed on: start.gg not answering, start.gg having trouble or limiting the bot, start.gg turning down the bot's token, Slippi, Discord missing a permission, or a bug in the bot itself. The details go in the bot's logs. A start.gg request that times out or gets a 5xx error is tried twice more before that. Keeping Discord events up to date costs one start.gg request per upcoming event an hour.
+A command that fails says whose side it failed on: start.gg not answering, start.gg having trouble or limiting the bot, start.gg turning down the bot's token, Slippi, Discord missing a permission, or a bug in the bot itself. The details go in the bot's logs. A start.gg request that times out or gets a 5xx error is tried twice more before that.
+
+### When something is down
+
+| What's down | What people see |
+| --- | --- |
+| The bot itself, like a crash or a Railway outage | Discord's own "The application did not respond". The bot isn't running, so it can't answer or change that text, and its name shows offline in the member list. Once it's back after 10 minutes or more, it posts **Back online** in the posts channel with when it went down, for how long, and that commands sent then need sending again. A new version that comes up after an outage says the same on its bot update card instead. |
+| start.gg | Once start.gg has sent nothing but timeouts and 5xx errors for 2 minutes, commands that need it answer right away with "start.gg has been down since ..." instead of each waiting about 90 seconds on retries. One command a minute still goes through to check, the automatic checks keep asking, and the first answer ends it for everyone. Meanwhile the bot's status in the member list reads "start.gg is down" and `/status` shows since when. |
+| Slippi | Melee reports wait 3 seconds for Slippi, then use the last rank check's numbers, so they still go out. `/slippi` commands say Slippi didn't answer, and `/status` shows when the last rank check failed. |
+| Discord | Commands say Discord is having trouble. Automatic posts that fail get retried where the post type does that, like top 8s. | Keeping Discord events up to date costs one start.gg request per upcoming event an hour.
 
 <details>
 <summary>History limits and placement math</summary>

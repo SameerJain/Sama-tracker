@@ -36,6 +36,11 @@ test('message controls are visible to TOs', () => {
   assert.equal(threads.type, 3);
   assert.deepEqual(threads.choices.map(c => c.value), ['off', 'tournament', 'event']);
   assert.ok([threads.description, ...threads.choices.map(c => c.name)].every(text => text.length <= 100));
+  const eventLength = command.options.find(o => o.name === 'event_length');
+  assert.equal(eventLength.type, 4);
+  assert.equal(eventLength.min_value, 2);
+  assert.equal(eventLength.max_value, 12);
+  assert.ok(eventLength.description.length <= 100);
 });
 
 test('status answers where everyone sees it', async () => {
@@ -100,6 +105,27 @@ test('set result colors save and show, off until a small crew turns them on', as
   await configure({ set_colors: false });
   assert.equal(state.messages.setColors, false);
   assert.equal(setResultColors(), false);
+});
+
+test('event length saves, shows, and defaults to 5 hours without writing', async () => {
+  state.messages = {};
+  assert.match((await configure()).content, /Event length:\*\* 5 hours/);
+  assert.deepEqual(state.messages, {});
+
+  const reply = await configure({ event_length: 3 });
+  assert.match(reply.content, /Event length:\*\* 3 hours/);
+  assert.equal(state.messages.eventLength, 3);
+  assert.match(reply.content, /no end time.*still gets 12 hours/);
+});
+
+test('event length outside 2 to 12 hours fails privately and saves nothing', async () => {
+  for (const event_length of [1, 13]) {
+    state.messages = {};
+    const reply = await configure({ sets: false, event_length });
+    assert.match(reply.content, /Event length is 2 to 12 hours/);
+    assert.ok(reply.flags);
+    assert.deepEqual(state.messages, {});
+  }
 });
 
 test('invalid schedules do not partially apply accompanying switches', async () => {

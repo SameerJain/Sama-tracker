@@ -4,7 +4,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { messageEnabled } from '../message-settings.js';
 import { linkedPlayer } from '../commands/shared.js';
-import { channel, secondsNow, sendPinging, posting, alertsOn, endTime, RUNS_LATE_HOURS, HOUR } from './shared.js';
+import { currentChannel, secondsNow, sendPinging, posting, alertsOn, endTime, RUNS_LATE_HOURS, HOUR } from './shared.js';
 import { tournamentPosts } from './threads.js';
 import { h2hRow, rememberButton } from './buttons.js';
 
@@ -25,7 +25,9 @@ async function streamedNow() {
     try {
       const everyone = posting(tournament, 'stream');
       for (const queue of await startgg.getStreamQueues(tournament.id)) {
-        for (const set of setsToAnnounce(queue.sets).filter((each) => everyone || hasPlayerWithAlerts(each))) found.set(set.id, set);
+        for (const set of setsToAnnounce(queue.sets)) {
+          if (everyone || hasPlayerWithAlerts(set)) found.set(set.id, set);
+        }
       }
     } catch (err) {
       console.error(`checking stream queue at ${tournament.name} failed:`, err.message);
@@ -37,8 +39,14 @@ async function streamedNow() {
 // TOs misclick a set onto stream and take it back seconds later, so a new one has to still be there after this
 const STREAM_CONFIRM_MS = 30_000;
 
-export async function postStreamAlerts(postChannel = channel, confirmAfter = STREAM_CONFIRM_MS) {
-  state.streamPinged ??= [];
+// the card in the set's thread, pinging ids, with its head to head button saved to come off later
+async function announce(set, ids, postChannel) {
+  const components = h2hRow(set);
+  const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', ids, 'on stream', embeds.onStream(set, state.players), components);
+  rememberButton(sent, set, components);
+}
+
+export async function postStreamAlerts(postChannel = currentChannel(), confirmAfter = STREAM_CONFIRM_MS) {
   const current = [...(await streamedNow()).values()];
   for (const set of current.filter((each) => state.streamed.includes(each.id))) {
     const ids = streamPingIds(set);
@@ -50,11 +58,7 @@ export async function postStreamAlerts(postChannel = channel, confirmAfter = STR
     }
     const newIds = ids.filter((id) => !pinged.discordIds.includes(id));
     if (!newIds.length) continue;
-    if (messageEnabled('streams', wentLiveAt(set))) {
-      const components = h2hRow(set);
-      const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', newIds, 'on stream', embeds.onStream(set, state.players), components);
-      rememberButton(sent, set, components);
-    }
+    if (messageEnabled('streams', wentLiveAt(set))) await announce(set, newIds, postChannel);
     pinged.discordIds.push(...newIds);
   }
 
@@ -68,10 +72,8 @@ export async function postStreamAlerts(postChannel = channel, confirmAfter = STR
       if (!set || set.stream.streamName !== stream.streamName || state.streamed.includes(id)) continue;
       // only whoever is playing and has /notify streams on
       if (messageEnabled('streams', wentLiveAt(set))) {
-        const components = h2hRow(set);
         const ids = streamPingIds(set);
-        const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', ids, 'on stream', embeds.onStream(set, state.players), components);
-        rememberButton(sent, set, components);
+        await announce(set, ids, postChannel);
         state.streamPinged.push({ setId: set.id, discordIds: ids });
       }
       state.streamed.push(id);
@@ -79,7 +81,7 @@ export async function postStreamAlerts(postChannel = channel, confirmAfter = STR
   }
 
   state.streamed = state.streamed.slice(-200);
-  state.streamPinged = (state.streamPinged ?? []).filter((each) => state.streamed.includes(each.setId)).slice(-200);
+  state.streamPinged = state.streamPinged.filter((each) => state.streamed.includes(each.setId)).slice(-200);
   save();
 }
 

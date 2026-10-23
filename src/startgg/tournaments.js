@@ -1,4 +1,4 @@
-import { MISS_CACHE_MS, allPages, chunk, cleanId, connectionPage, fitPage, lookupMany, miss, missedCache, query } from './queue.js';
+import { MISS_CACHE_MS, aliases, allPages, chunk, cleanId, fitPage, lookupMany, miss, missedCache, pagesOf, query } from './queue.js';
 
 // venueName and venueAddress are strings, which don't count toward the object limit
 const TOURNAMENT_FIELDS = `
@@ -17,19 +17,17 @@ const TOURNAMENT_FIELDS = `
 
 // Map of tournament id to the streams TOs added on its start.gg page, [{ name, source }]. none is an empty list
 export async function getTournamentStreams(tournamentIds) {
-  const data = await lookupMany(tournamentIds, (group) => `{
-    ${group.map((id) => `t${cleanId(id)}: tournament(id: ${cleanId(id)}) { streams { streamName streamSource } }`).join('\n')}
-  }`);
-  return new Map(tournamentIds.map((id) => [String(id), (data[`t${id}`]?.streams ?? [])
-    .filter((stream) => stream?.streamName)
-    .map(({ streamName, streamSource }) => ({ name: streamName, source: streamSource }))]));
+  const data = await lookupMany(tournamentIds, (group) => `{ ${aliases(group, 't', 'tournament', 'streams { streamName streamSource }')} }`);
+  return new Map(tournamentIds.map((id) => {
+    const streams = (data[`t${id}`]?.streams ?? []).filter((stream) => stream?.streamName);
+    return [String(id), streams.map(({ streamName, streamSource }) => ({ name: streamName, source: streamSource }))];
+  }));
 }
 
 // [userId, tournaments] for each of them. also returns ones they only admin, those just end up with no entries
 export async function getUpcomingTournaments(userIds) {
-  const data = await lookupMany(userIds, (group) => `{
-    ${group.map((id) => `u${cleanId(id)}: user(id: ${cleanId(id)}) { tournaments(query: { perPage: 20, filter: { upcoming: true, past: false } }) { nodes { ${TOURNAMENT_FIELDS} } } }`).join('\n')}
-  }`);
+  const tournaments = `tournaments(query: { perPage: 20, filter: { upcoming: true, past: false } }) { nodes { ${TOURNAMENT_FIELDS} } }`;
+  const data = await lookupMany(userIds, (group) => `{ ${aliases(group, 'u', 'user', tournaments)} }`);
 
   return userIds.map((userId) => [userId, data[`u${userId}`]?.tournaments?.nodes ?? []]);
 }
@@ -50,7 +48,8 @@ export async function getTournament(tournamentId, userIds) {
 
     const { events, ...rest } = tournament;
     // every event, crew in it or not, for a tracked tournament's top 8 and /bracket
-    info = { ...rest, events: (events ?? []).map(({ id, name, slug, state, numEntrants }) => ({ id, name, slug, state, numEntrants })) };
+    const eventList = (events ?? []).map(({ id, name, slug, state, numEntrants }) => ({ id, name, slug, state, numEntrants }));
+    info = { ...rest, events: eventList };
     for (const event of events ?? []) {
       for (const userId of group) {
         const entrant = event[`u${userId}`];
@@ -104,13 +103,16 @@ async function lookupEntries(tournamentId, userIds) {
 // for the top 8 post: Map of eventId to { done, standings } with everyone, tracked or not.
 // double elimination ties fill 8 exactly (5th and 7th go two each). an event is ~17 objects here
 export async function getTopEight(eventIds) {
-  const data = await lookupMany(eventIds, (group) => `{
-    ${group.map((id) => `e${cleanId(id)}: event(id: ${cleanId(id)}) { state standings(query: { page: 1, perPage: 8 }) { nodes { placement isFinal entrant { name } } } }`).join('\n')}
-  }`);
+  const standings = 'state standings(query: { page: 1, perPage: 8 }) { nodes { placement isFinal entrant { name } } }';
+  const data = await lookupMany(eventIds, (group) => `{ ${aliases(group, 'e', 'event', standings)} }`);
   return new Map(eventIds.filter((id) => data[`e${id}`]).map((id) => {
     const event = data[`e${id}`];
-    const standings = (event.standings?.nodes ?? []).map((node) => ({ placement: node.placement, final: node.isFinal ?? false, name: node.entrant?.name ?? 'Unknown' }));
-    return [id, { done: event.state === 'COMPLETED', standings }];
+    const top = (event.standings?.nodes ?? []).map((node) => ({
+      placement: node.placement,
+      final: node.isFinal ?? false,
+      name: node.entrant?.name ?? 'Unknown',
+    }));
+    return [id, { done: event.state === 'COMPLETED', standings: top }];
   }));
 }
 
@@ -161,7 +163,7 @@ export async function getRegistrationById(id) {
 // everyone registered, with the discord they connected on start.gg if they did, and the slug a tracked
 // tournament's crew card links them by. a participant is ~3 objects, so 200 a page stays under the limit
 export async function getParticipants(tournamentId) {
-  const pages = await allPages((page) => fitPage(async (page, perPage) => connectionPage((await query(`
+  const getPage = pagesOf(`
     query ($id: ID!, $page: Int!, $perPage: Int!) {
       tournament(id: $id) {
         participants(query: { page: $page, perPage: $perPage }) {
@@ -170,11 +172,16 @@ export async function getParticipants(tournamentId) {
         }
       }
     }
-  `, { id: tournamentId, page, perPage })).tournament?.participants), page, 200));
+  `, { id: tournamentId }, (data) => data.tournament?.participants);
+  const pages = await allPages((page) => fitPage(getPage, page, 200));
 
   // TOs can add people who don't have an account
-  return pages.flatMap((page) => page.nodes)
-    .map((node) => ({ tag: node.gamerTag, userId: node.user?.id, slug: node.user?.slug, discordId: node.user?.authorizations?.[0]?.externalId }));
+  return pages.flatMap((page) => page.nodes).map((node) => ({
+    tag: node.gamerTag,
+    userId: node.user?.id,
+    slug: node.user?.slug,
+    discordId: node.user?.authorizations?.[0]?.externalId,
+  }));
 }
 
 // a TO can hide who's registered. start.gg then sends no participants and no count, which is only

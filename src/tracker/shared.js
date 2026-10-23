@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { RESTJSONErrorCodes } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
@@ -16,6 +17,10 @@ export const RESULTS_WAIT_HOURS = 12;
 export const TOP8_RETRY_HOURS = 12;
 // after downtime, don't post sets older than this
 export const CATCH_UP_HOURS = 3;
+// off this long gets a back online post, which a railway redeploy's minute or two never does. the heartbeat
+// that measures it gets written this often
+export const OUTAGE_MINUTES = 10;
+export const HEARTBEAT_SECONDS = 60;
 // some TOs set the end date years out by mistake
 export const MAX_TOURNAMENT_DAYS = 7;
 // tournaments over a day out barely change, so they get looked at less
@@ -46,6 +51,10 @@ export const BILLS_POSTGAME_HOURS = 8;
 // players with no connect code on start.gg get looked at again this often, in case they play a netplay tournament since
 export const SLIPPI_SEARCH_DAYS = 7;
 export const SLIPPI_SKIPPED_KEPT = 1000;
+// a season that ended longer ago than this when the history first shows it gets no wrap-up, so the first
+// check after a long outage, or after this shipped, doesn't post about an old season
+export const SEASON_WRAP_DAYS = 7;
+export const SEASONS_WRAPPED_KEPT = 20;
 // /messages threads needs these in the channel, named the way discord's settings show them
 export const THREAD_PERMISSIONS = { CreatePublicThreads: 'Create Public Threads', SendMessagesInThreads: 'Send Messages in Threads' };
 // longer than any tournament runs, then the thread is forgotten
@@ -81,11 +90,21 @@ export const health = {
   billsCheck: null, billsError: null,
 };
 
-export let channel;
+// the posts channel. a single-server build sets it once at startup. multi-server checks all run at once,
+// so each server's goes inside inChannel: a shared variable would let a check that awaited start.gg come
+// back to the channel another server's check had switched it to, and post there
+const channelLocal = new AsyncLocalStorage();
+let rootChannel = null;
 
 export function setChannel(postChannel) {
-  channel = postChannel;
+  rootChannel = postChannel;
 }
+
+export const currentChannel = () => channelLocal.getStore() ?? rootChannel;
+export const inChannel = (postChannel, fn) => channelLocal.run(postChannel, fn);
+
+// a tournament in the logs. one saved before its name came back has only the id
+export const named = (tournament) => tournament.name ?? tournament.id;
 
 // whether a tracked tournament has this /t-o tournament posts switch on. untracked ones have none
 export function posting(tournament, kind) {
@@ -137,7 +156,7 @@ export function queued(check) {
 
 // fewest messages that fit discord's limits. the switch gets checked before each one in case it's turned off partway.
 // returns the messages that went out
-export async function post(list, type, dueAt, postChannel = channel) {
+export async function post(list, type, dueAt, postChannel = currentChannel()) {
   const sent = [];
   for (const batch of embeds.messages(list)) {
     // roll calls and placements name people but never ping them

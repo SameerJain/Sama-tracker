@@ -9,6 +9,9 @@ import { MessageFlags } from 'discord.js';
 // every command once against a fake start.gg, so a handler that throws shows up here
 const directory = mkdtempSync(join(tmpdir(), 'sama-commands-'));
 process.env.STATE_DIR = directory;
+// multi-server on here so /setup is covered too. the fakes carry no guildId,
+// so every command still runs on the root exactly like single-server mode
+process.env.MULTI_GUILD = 'true';
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
@@ -201,7 +204,9 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
 // [command, options, what the answer should have in it]. players left out mean whoever ran it, which is Crew
 const runs = [
   ['help', {}, /\/help verbose:True/], ['help', { values: { verbose: true } }, /Linking yourself/],
-  ['status', {}, /Status/], ['messages', {}, /Set results:\*\* off/],
+  ['status', {}, /Status/], ['setup', {}, /No posts channel set yet/],
+  ['setup', { values: { channel: { id: 'channel-9', isTextBased: () => true } } }, /Automatic posts go in <#channel-9>/],
+  ['messages', {}, /Set results:\*\* off/],
   ['messages', { values: { events: true } }, /Discord events for tracked tournaments:\*\* on/],
   ['messages', { values: { events: false } }, /Discord events for tracked tournaments:\*\* off/], ['socials', {}, /Nothing yet/],
   ['data', {}, /Monday Night SmashBall.*monday-night-smashball\.vercel\.app.*UB Smash Royale.*ub-smash-royale\.vercel\.app/],
@@ -303,6 +308,8 @@ const runs = [
   ['t-o', { group: 'tournament', subcommand: 'add', values: { tournament: 'start.gg/tournament/soon' } }, /Tracking Soon\..*gets pinged 6 hours before registration ends/],
   ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Soon.*Every set:\*\* on/],
   ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', top8: 'off' } }, /Top 8s:\*\* off/],
+  ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', calls: 'on' } }, /Match calls:\*\* on/],
+  ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon' } }, /Match calls:\*\* on/],
   ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', schedule: '2d,6h' } }, /Reg reminders:\*\* on \(2d, 6h\).*Reg reminders go out 2 days and 6 hours/],
   ['t-o', { group: 'tournament', subcommand: 'posts', values: { tournament: 'tournament/soon', schedule: 'soon' } }, /Couldn't read `soon` as a reminder time/],
   ['t-o', { group: 'tournament', subcommand: 'event', values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],

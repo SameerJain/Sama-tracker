@@ -42,7 +42,12 @@ function historyCache(getPage, keep) {
     if (stale) base = base.then((history) => topUp(getPage, playerId, history).catch(() => history));
     const known = base.then((history) => (history.ends.length < Math.min(pages, history.totalPages) ? extend(getPage, playerId, history, pages) : history));
 
-    const entry = { at: fresh || stale ? now : cached.at, fullAt: fresh ? now : cached.fullAt, pages: Math.max(pages, fresh ? 0 : cached.pages), known };
+    const entry = {
+      at: fresh || stale ? now : cached.at,
+      fullAt: fresh ? now : cached.fullAt,
+      pages: Math.max(pages, fresh ? 0 : cached.pages),
+      known,
+    };
     // more pages failing keeps the copy it was adding to, as long as that one came back fine
     known.catch(() => base.then(() => !fresh, () => false).then((keepCached) => {
       if (players.get(playerId) !== entry) return;
@@ -109,70 +114,54 @@ const characterHistory = (playerId) => characterHistories(playerId, CHARACTER_PA
 const lifetimeHistory = (playerId) => setHistories(playerId, LIFETIME_PAGES);
 const lifetimeCharacterHistory = (playerId) => characterHistories(playerId, LIFETIME_CHARACTER_PAGES);
 
-// event histories are a few pages at most, so they're kept whole for as long as set histories go
-// without a refresh. a failed lookup isn't kept
-const EVENT_CACHE_PLAYERS = 50;
-const eventHistories = new Map();
-function eventHistory(userId) {
-  const cached = eventHistories.get(userId);
-  if (cached && Date.now() - cached.at < HISTORY_CACHE_MINUTES * 60 * 1000) return cached.events;
-  const events = startgg.getEventHistory(userId);
-  eventHistories.delete(userId);
-  eventHistories.set(userId, { at: Date.now(), events });
-  events.catch(() => eventHistories.delete(userId));
-  // map order is oldest first
-  for (const id of [...eventHistories.keys()].slice(0, -EVENT_CACHE_PLAYERS)) eventHistories.delete(id);
-  return events;
+// a lookup's promise kept under its key for a while, so repeat and concurrent lookups share one fetch.
+// a failed one isn't kept, and past size whoever was looked up longest ago goes first
+function keptPromises(minutes, size) {
+  const kept = new Map();
+  return (key, fetch) => {
+    const hit = kept.get(key);
+    // map order is least recently looked up first
+    kept.delete(key);
+    if (hit && Date.now() - hit.at < minutes * 60 * 1000) {
+      kept.set(key, hit);
+      return hit.promise;
+    }
+    const entry = { at: Date.now(), promise: fetch() };
+    kept.set(key, entry);
+    entry.promise.catch(() => {
+      if (kept.get(key) === entry) kept.delete(key);
+    });
+    for (const old of [...kept.keys()].slice(0, -size)) kept.delete(old);
+    return entry.promise;
+  };
 }
 
+// event histories are a few pages at most, so they're kept whole for as long as set histories go without a refresh
+const EVENT_CACHE_PLAYERS = 50;
+const eventLookups = keptPromises(HISTORY_CACHE_MINUTES, EVENT_CACHE_PLAYERS);
+const eventHistory = (userId) => eventLookups(userId, () => startgg.getEventHistory(userId));
+
 // every meeting between two players, newest first. the short and full /h2h and /predict reports
-// all read the same meetings, so one lookup covers the command and its Full report button.
-// concurrent lookups share it too, the way the history caches share a fetch. kept 10 minutes
-// like the other caches, and a failed lookup isn't kept
+// all read the same meetings, so one lookup covers the command and its Full report button
 const H2H_CACHE_MINUTES = 10;
 const H2H_CACHE_PAIRS = 200;
-const h2hMeetings = new Map();
+const meetingLookups = keptPromises(H2H_CACHE_MINUTES, H2H_CACHE_PAIRS);
 function h2hHistory(playerId, opponentId) {
   // numbers in, so the strict id checks in getHeadToHead can't miss on a string. NaN fails fast at start.gg
   const [a, b] = [Number(playerId), Number(opponentId)];
   // either order is the same meetings
   const key = [a, b].sort((x, y) => x - y).join(':');
-  const cached = h2hMeetings.get(key);
-  if (cached && Date.now() - cached.at < H2H_CACHE_MINUTES * 60 * 1000) {
-    h2hMeetings.delete(key);
-    h2hMeetings.set(key, cached);
-    return cached.meetings;
-  }
-  const meetings = startgg.getHeadToHead(a, b);
-  h2hMeetings.delete(key);
-  h2hMeetings.set(key, { at: Date.now(), meetings });
-  meetings.catch(() => { if (h2hMeetings.get(key)?.meetings === meetings) h2hMeetings.delete(key); });
-  // map order is oldest first
-  for (const old of [...h2hMeetings.keys()].slice(0, -H2H_CACHE_PAIRS)) h2hMeetings.delete(old);
-  return meetings;
+  return meetingLookups(key, () => startgg.getHeadToHead(a, b));
 }
 
-// short /stats refetched its window every run. the window moves when they play, so this is
-// shorter than the meeting cache: repeat and concurrent lookups with the same filters share
-// one fetch, and anything with different since or venue asks again. a failed lookup isn't kept
+// the short /stats window. it moves when they play, so it's kept for less time than the meetings,
+// and a different since or venue is a different lookup
 const STATS_CACHE_MINUTES = 3;
 const STATS_CACHE_ENTRIES = 200;
-const statsLookups = new Map();
+const statsLookups = keptPromises(STATS_CACHE_MINUTES, STATS_CACHE_ENTRIES);
 function statsHistory(playerId, { videogameId, since, venue } = {}) {
   const key = [String(playerId), videogameId ?? '', since ?? '', venue ?? ''].join(':');
-  const cached = statsLookups.get(key);
-  if (cached && Date.now() - cached.at < STATS_CACHE_MINUTES * 60 * 1000) {
-    statsLookups.delete(key);
-    statsLookups.set(key, cached);
-    return cached.stats;
-  }
-  const stats = startgg.getStats(playerId, { videogameId, since, venue });
-  statsLookups.delete(key);
-  statsLookups.set(key, { at: Date.now(), stats });
-  stats.catch(() => { if (statsLookups.get(key)?.stats === stats) statsLookups.delete(key); });
-  // map order is oldest first
-  for (const old of [...statsLookups.keys()].slice(0, -STATS_CACHE_ENTRIES)) statsLookups.delete(old);
-  return stats;
+  return statsLookups(key, () => startgg.getStats(playerId, { videogameId, since, venue }));
 }
 
 const doublesHistories = historyCache(startgg.getDoublesHistory, DOUBLES_CACHE_PAGES);
@@ -197,7 +186,11 @@ async function doublesEvents(player, eventIds) {
     const each = new Map(missing.map((id) => [id, lookup.then((found) => found.get(id) ?? null)]));
     for (const [id, event] of each) cached.events.set(id, event);
     // a failed lookup isn't kept
-    lookup.catch(() => { for (const [id, event] of each) if (cached.events.get(id) === event) cached.events.delete(id); });
+    lookup.catch(() => {
+      for (const [id, event] of each) {
+        if (cached.events.get(id) === event) cached.events.delete(id);
+      }
+    });
   }
   const events = (await Promise.all(eventIds.map((id) => cached.events.get(id)))).filter(Boolean);
   return events.sort((a, b) => b.event.startAt - a.event.startAt);

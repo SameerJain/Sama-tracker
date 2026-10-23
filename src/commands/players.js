@@ -217,7 +217,10 @@ async function profile(interaction) {
 
   await interaction.deferReply();
   const account = await findAccount(user.id);
-  if (account) return interaction.editReply({ content: null, embeds: embeds.withImage([embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() })]), allowedMentions: { parse: [] } });
+  if (account) {
+    const card = embeds.profile(account, { name: member.displayName, avatar: member.displayAvatarURL() });
+    return interaction.editReply({ content: null, embeds: embeds.withImage([card]), allowedMentions: { parse: [] } });
+  }
   if (user.id === interaction.user.id) {
     return interaction.editReply('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.');
   }
@@ -313,9 +316,10 @@ function h2hButtons(player, sets) {
   const buttons = [];
   for (const set of sets) {
     const them = startgg.fromSide(set, player.playerId)?.them;
-    const button = them && !seen.has(String(them.playerIds[0])) && h2hButton(set, player);
+    const opponent = them && String(them.playerIds[0]);
+    const button = opponent && !seen.has(opponent) && h2hButton(set, player);
     if (!button) continue;
-    seen.add(String(them.playerIds[0]));
+    seen.add(opponent);
     buttons.push(button);
     if (buttons.length === 5) break;
   }

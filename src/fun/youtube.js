@@ -1,4 +1,4 @@
-// YouTube Data API for the fun posts. Search is the expensive call, so its results are reused for a day.
+// youtube for the fun posts. search is the expensive call, so its results get reused for a day
 const API = 'https://www.googleapis.com/youtube/v3';
 // links, sponsors and socials are most of a description, so only the start is worth sending
 const DESCRIPTION_CHARS = 500;
@@ -39,8 +39,8 @@ export async function searchVideos(q) {
   return known.length ? known : videos;
 }
 
-// Viewer reactions give the post some community context that titles and view counts miss.
-// YouTube ranks these by relevance; names are deliberately left out.
+// a few top comments, for what people thought of the video. youtube sorts them by relevance, and
+// commenters' names stay out
 export async function addCommunity(video) {
   const { items = [] } = await get('commentThreads', {
     part: 'snippet', videoId: video.id, maxResults: String(COMMENTS_SHOWN), order: 'relevance', textFormat: 'plainText',

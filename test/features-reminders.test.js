@@ -3,7 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { crewPlayer, tracked, node, DAY } from './fixtures.js';
+import { mockApi, crewPlayer, tracked, node, DAY } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-features-reminders-'));
 process.env.STATE_DIR = directory;
@@ -17,10 +17,6 @@ const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
-
-function mockApi(respond) {
-  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
-}
 
 test('a new deploy saves when it first started, and a restart of the same one keeps that time', (t) => {
   state.deploy = null;
@@ -57,14 +53,14 @@ test('a bot update posts the date and commit message, never the commit id', asyn
 
   const sent = [];
   const channel = { send: async (payload) => { sent.push(payload); return { id: 'm1', channelId: 'c1' }; } };
-  await tracker.postDeployUpdate(channel, { id: 'd2', at: 90, message: 'Fixed a few bugs' });
+  await tracker.postStartNotice({ deploy: { id: 'd2', at: 90, message: 'Fixed a few bugs' } }, channel);
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0].allowedMentions, { parse: [] });
   assert.equal(sent[0].embeds[0].data.title, 'Bot updated');
   assert.match(sent[0].embeds[0].data.description, /Fixed a few bugs/);
 
   // a failed send logs instead of throwing, and the deploy id stays saved so it won't repeat
-  await tracker.postDeployUpdate({ send: async () => { throw new Error('down'); } }, { id: 'd2', at: 90 });
+  await tracker.postStartNotice({ deploy: { id: 'd2', at: 90 } }, { send: async () => { throw new Error('down'); } });
 });
 
 test('/status shows when the latest version was deployed, and a local run shows its computer instead', () => {
@@ -138,7 +134,7 @@ test('saved reg reminders become tracked tournaments, and match call pings move 
   tracker.migrateTracking(now);
 
   assert.equal(state.regReminders, undefined);
-  assert.deepEqual(state.tournaments[5].tracked, { by: 'manual', at: now, sets: true, stream: true, top8: true, reminders: true });
+  assert.deepEqual(state.tournaments[5].tracked, { by: 'manual', at: now, sets: true, stream: true, top8: true, reminders: true, calls: false });
   assert.deepEqual(state.tournaments[5].reminder, { deadline: now + 3600, next: 2 });
   // its sets are looked at from now on, and the next tournament check fills in the rest
   assert.equal(state.tournaments[5].lastCheck, now);

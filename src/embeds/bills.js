@@ -13,17 +13,19 @@ export function billsFinal(game, details = null) {
   if (game.url) embed.setURL(game.url);
   const lines = [];
   const where = [game.week, game.venue].filter(Boolean).join(' · ');
-  lines.push(`**${game.won ? 'Bills win' : `${escapeMarkdown(opponent.displayName)} win`}**${where ? ` · ${escapeMarkdown(where)}` : ''} · <t:${game.date}:D>`);
-  const records = [`Bills${game.billsRecord ? ` (${game.billsRecord})` : ''}`, `${opponent.displayName}${opponent.record ? ` (${opponent.record})` : ''}`];
-  lines.push(records.map(escapeMarkdown).join(' · '));
+  const winner = game.won ? 'Bills win' : `${escapeMarkdown(opponent.displayName)} win`;
+  lines.push(`**${winner}**${where ? ` · ${escapeMarkdown(where)}` : ''} · <t:${game.date}:D>`);
+  const withRecord = (team, record) => (record ? `${team} (${record})` : team);
+  lines.push([withRecord('Bills', game.billsRecord), withRecord(opponent.displayName, opponent.record)].map(escapeMarkdown).join(' · '));
   const quarters = details?.lines;
   if (quarters && Object.values(quarters).some((each) => each.length)) {
     const line = (abbr, scores) => scores?.length ? `${abbr} ${scores.join('-')}` : null;
     const parts = [line('BUF', quarters.BUF), line(opponent.abbreviation, quarters[opponent.abbreviation])].filter(Boolean);
     if (parts.length) lines.push(`**By quarter:** ${parts.join(' · ')}`);
   }
-  const stats = details?.stats;
-  const snapshot = [statLine(stats?.BUF, stats?.[opponent.abbreviation], 'Yards', 'yards'), statLine(stats?.BUF, stats?.[opponent.abbreviation], 'Turnovers', 'turnovers')].filter(Boolean);
+  const ours = details?.stats?.BUF;
+  const theirs = details?.stats?.[opponent.abbreviation];
+  const snapshot = [statLine(ours, theirs, 'Yards', 'yards'), statLine(ours, theirs, 'Turnovers', 'turnovers')].filter(Boolean);
   if (snapshot.length) lines.push(snapshot.join(' · '));
   if (game.attendance) lines.push(`-# ${game.attendance.toLocaleString('en-US')} at ${escapeMarkdown(game.venue ?? 'the game')}`);
   return embed.setDescription(lines.join('\n'));

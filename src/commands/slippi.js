@@ -17,6 +17,11 @@ function watched(value) {
   return Object.values(state.slippi).find((entry) => (code && entry.code === code) || entry.name.toLowerCase() === typed);
 }
 
+// the watchlist entry tied to this start.gg user, if there is one
+function entryFor(userId) {
+  return Object.values(state.slippi).find((entry) => String(entry.userId) === String(userId));
+}
+
 // the connect code on a tracked or linked player's start.gg netplay registrations. called after deferring
 async function codeOnStartgg(player) {
   const code = (await startgg.getConnectCodes([player.playerId])).get(player.playerId);
@@ -37,8 +42,9 @@ function noCodeOnStartgg(player) {
 // whose watchlist entry this is: the start.gg player it came from, or whoever added their own code by hand.
 // a TO's typed code belongs to nobody
 function ownsEntry(interaction, entry) {
+  if (entry.discordId === interaction.user.id) return true;
   const me = linkedPlayer(interaction.user.id);
-  return entry.discordId === interaction.user.id || (Boolean(me) && Boolean(entry.userId) && String(entry.userId) === String(me.userId));
+  return Boolean(me && entry.userId) && String(entry.userId) === String(me.userId);
 }
 
 // with the code left out, it's yours from start.gg. a code found there is tied to that start.gg player.
@@ -108,9 +114,7 @@ function takeOff(interaction, entry) {
 async function slippiRank(interaction) {
   const typed = interaction.options.getString('player');
   const me = linkedPlayer(interaction.user.id);
-  let entry = typed
-    ? watched(typed)
-    : me && Object.values(state.slippi).find((each) => String(each.userId) === String(me.userId));
+  let entry = typed ? watched(typed) : me && entryFor(me.userId);
   const code = typed && !entry ? slippi.readCode(typed) : null;
   if (typed && !entry && !code) return replyEphemeral(interaction, `Nobody on the watchlist goes by that.${nearestWatched(typed) || ' Pick someone from the list, or type a connect code like ABCD#123.'}`);
   if (!typed && !entry && !me) return replyEphemeral(interaction, 'Pick someone, or `/link` your start.gg so leaving it out finds your connect code.');
@@ -147,7 +151,7 @@ const SLIPPI_WAIT_MS = 3000;
 const looked = new Map();
 
 async function slippiFor(player) {
-  const entry = Object.values(state.slippi).find((each) => String(each.userId) === String(player.userId));
+  const entry = entryFor(player.userId);
   if (!entry) return null;
   const kept = looked.get(entry.uid);
   if (kept && Date.now() - kept.at < SLIPPI_KEPT_MINUTES * 60 * 1000) return kept.profile;
@@ -166,7 +170,7 @@ async function slippiFor(player) {
 // a report's slippi profiles, one per player. melee:True starts asking right away, next to the start.gg requests.
 // otherwise it waits to see whether everything the report found was melee anyway. null when nobody's on the watchlist
 function slippiLookup(players, melee) {
-  const any = () => players.some((player) => Object.values(state.slippi).some((entry) => String(entry.userId) === String(player.userId)));
+  const any = () => players.some((player) => entryFor(player.userId));
   let started = melee && any() ? Promise.all(players.map(slippiFor)) : null;
   return async (show) => (show && any() ? (started ??= Promise.all(players.map(slippiFor))) : null);
 }

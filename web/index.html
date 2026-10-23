@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Samatracker</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<h1>Samatracker</h1>
+<p class="series-switch">More: <a class="series-link" href="https://monday-night-smashball.vercel.app">MNSB</a> · <a class="series-link" href="https://ub-smash-royale.vercel.app">Royale</a> · <span class="pill s">Samatracker</span></p>
+<div class="card banner">The web companion to the Sama-tracker Discord bot: player lookup, recent results and Slippi ranks, in your browser.<br><small>Series data is cached from the latest scrape<span id="built"></span> — Slippi lookups go straight to slippi.gg, live.</small></div>
+<div id="toolbar"><button id="darkbtn">🌙 dark</button></div>
+
+<div class="card" id="series">
+<h2>Series data pages</h2>
+<p>Every tournament, winner and character table, with the attendance and loyalty breakdowns.</p>
+<p class="biglinks"><a class="biglink" href="https://monday-night-smashball.vercel.app">Monday Night SmashBall</a> <a class="biglink" href="https://ub-smash-royale.vercel.app">UB Smash Royale</a></p>
+<p><small id="series-summary">Loading cached data…</small></p>
+</div>
+
+<div class="card" id="status">
+<h2>Status</h2>
+<p id="status-line"><small>Loading cached data…</small></p>
+</div>
+
+<div class="card" id="search">
+<h2>Player lookup</h2>
+<p><small>The bot's lookup commands on the web, from the same cached data. No live sets here; run those in Discord.</small></p>
+<p><input id="q" class="tablefilter" type="search" placeholder="Search players…" aria-label="Search players"></p>
+<div id="hits"></div>
+<div id="player"><p><small>Type a tag to see their events, podiums and characters.</small></p></div>
+</div>
+
+<div class="card" id="followed">
+<h2>Followed</h2>
+<p><small>Your track list, kept in this browser only. It never posts or pings anyone.</small></p>
+<div id="followed-list"><p><small>Nobody yet. Follow players from their cards.</small></p></div>
+</div>
+
+<div class="card" id="h2h">
+<h2>Head-to-head</h2>
+<p><small>Shared tournaments and finals from cached standings. Odds need live sets — run /predict in Discord.</small></p>
+<p><input id="h2h-a" class="tablefilter" type="search" placeholder="First player (you, once set)…" aria-label="First player"> <input id="h2h-b" class="tablefilter" type="search" placeholder="Second player…" aria-label="Second player"></p>
+<div id="h2h-picks"></div>
+<div id="h2h-out"><p><small>Pick two tags to compare.</small></p></div>
+</div>
+
+<div class="card" id="overall">
+<h2>Buffalo overall</h2>
+<p><small>Players in both series, by combined events. From the cached bundle, top 20.</small></p>
+<div class="scroll"><table id="both-tbl"><tr><th>#</th><th>Player</th><th>Combined events</th><th>Combined wins</th></tr></table></div>
+</div>
+
+<div class="card" id="leaders">
+<h2>Series leaders</h2>
+<p><small>Most Ultimate wins in each series, cached.</small></p>
+<div id="leaders-tbls"></div>
+</div>
+
+<div class="card" id="recent">
+<h2>Recent tournaments</h2>
+<p><small>Latest across both series, cached.</small></p>
+<div class="scroll"><table id="recent-tbl"><tr><th>Date</th><th>Tournament</th><th>Att.</th><th>Winner</th></tr></table></div>
+</div>
+
+<div class="card" id="slippi">
+<h2>Slippi ranked</h2>
+<p><small>Live lookup straight from your browser to slippi.gg — no bot needed. The watchlist below lives in this browser only, so it won't ping anyone and it won't survive a different device.</small></p>
+<p><input id="code" class="tablefilter" type="text" placeholder="Connect code, like ABCD#123" aria-label="Connect code" spellcheck="false"> <button id="lookup" type="button">Look up</button></p>
+<div id="slippi-out"><p><small>Rank, rating, season record and characters show up here.</small></p></div>
+<h3>Watchlist (this browser)</h3>
+<div id="watch"><p><small>Nothing yet. Look someone up, then add them.</small></p></div>
+</div>
+
+<div class="card" id="help">
+<h2>Bot commands → web</h2>
+<p><small>What runs here, and what still needs Discord.</small></p>
+<div class="scroll"><table>
+<tr><th>Bot</th><th>Web</th></tr>
+<tr><td>/stats, /characters</td><td>Player lookup: events, podiums, characters, first and last appearance</td></tr>
+<tr><td>/h2h</td><td>Head-to-head: shared events and finals (odds need live sets)</td></tr>
+<tr><td>/recent, /status</td><td>Recent tournaments and the status card above</td></tr>
+<tr><td>/track</td><td>Followed: your list, this browser only</td></tr>
+<tr><td>/link</td><td>"This is me" on your card; head-to-head defaults to you</td></tr>
+<tr><td>/slippi rank</td><td>Slippi ranked lookup, live from slippi.gg</td></tr>
+<tr><td>/slippi leaderboard</td><td>The watchlist, best rank first</td></tr>
+<tr><td>/predict, /scout verbose, /progress, /doubles</td><td>Discord only: they need live set histories</td></tr>
+<tr><td>/upcoming, /run, /bracket, /streams, /registered, /t-o, /notify, /messages, fun</td><td>Discord only: live tournaments, server roles and pings, AI posts</td></tr>
+</table></div>
+</div>
+
+<footer class="pagefoot">Samatracker · cached series data, live Slippi ranks · <a href="https://github.com/SameerJain/Sama-tracker">bot repo</a></footer>
+<script src="stats.js"></script>
+<script src="app.js"></script>
+</body></html>

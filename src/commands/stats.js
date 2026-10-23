@@ -56,13 +56,30 @@ function filterOptions(interaction) {
 // stays out once filtering is on. character sets have no tournament to go by, so venue leaves them alone
 const onlineOf = (tournament) => tournament?.isOnline ?? null;
 const venueMatch = (venue, online) => !venue || online === (venue === 'online');
+// since is null from the command and missing from the Apps menu, and both mean everything
+const onOrAfter = (since, at) => !since || (at ?? 0) >= since;
 
 const scopeSets = ({ since, venue }) => (list) => (list ?? []).filter((set) =>
-  (!since || (set.completedAt ?? 0) >= since) && venueMatch(venue, onlineOf(set.event?.tournament)));
+  onOrAfter(since, set.completedAt) && venueMatch(venue, onlineOf(set.event?.tournament)));
 // null stays null, so a failed event lookup still reads seeding from the sets themselves
 const scopeEntries = ({ since, venue }) => (list) => (!list ? list : list.filter((entry) =>
-  (!since || (entry.event?.startAt ?? 0) >= since) && venueMatch(venue, onlineOf(entry.event?.tournament))));
-const scopeCharacters = ({ since }) => (list) => (!list ? list : list.filter((set) => (set.completedAt ?? 0) >= since));
+  onOrAfter(since, entry.event?.startAt) && venueMatch(venue, onlineOf(entry.event?.tournament))));
+const scopeCharacters = ({ since }) => (list) => (!list ? list : list.filter((set) => onOrAfter(since, set.completedAt)));
+
+// a report's melee, since and venue options, as one filter per kind of list it reads
+function scoped({ melee, since, venue }) {
+  const only = onlyMelee(melee);
+  const filters = { since, venue };
+  return {
+    only,
+    filters,
+    sets: (list) => scopeSets(filters)(only(list)),
+    events: (list) => scopeEntries(filters)(only(list)),
+    characters: (list) => scopeCharacters(filters)(only(list)),
+    // the odds pick their own game out of a history, so since and venue narrow it but melee doesn't
+    anyGame: scopeSets(filters),
+  };
+}
 
 // the same odds with slippi ratings when both are ranked and the game is melee. slippi never sinks
 // the report, so anything going wrong here leaves the start.gg odds as they were
@@ -103,6 +120,20 @@ async function pair(interaction) {
     return null;
   }
   return [first, second];
+}
+
+// pair plus the since and venue filters, deferred and ready for a report. null when it answered
+async function matchup(interaction) {
+  const filters = filterOptions(interaction);
+  if (filters.error) {
+    await replyEphemeral(interaction, filters.error);
+    return null;
+  }
+  const players = await pair(interaction);
+  if (!players) return null;
+  // pair only has to defer itself when it looked a link up
+  if (!interaction.deferred) await interaction.deferReply();
+  return { player: players[0], opponent: players[1], ...filters };
 }
 
 async function progress(interaction) {
@@ -152,18 +183,15 @@ async function scout(interaction) {
 
 // player is always whoever ran it, so its button only carries the opponent
 async function scoutReport(interaction, { player, opponent, verbose, melee, since, venue, sinceText }) {
-  const only = onlyMelee(melee);
-  const filters = { since, venue };
-  const inScope = (list) => scopeSets(filters)(only(list));
-  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
-  const inScopeCharacters = (list) => scopeCharacters(filters)(only(list));
+  const scope = scoped({ melee, since, venue });
   const ranked = slippiLookup([player, opponent], melee);
   const [mine, theirs, characters] = await withCountdown(interaction, `Scouting ${escapeMarkdown(opponent.tag)}`, Promise.all([
     setHistory(player.playerId), setHistory(opponent.playerId), characterHistory(opponent.playerId),
   ]));
-  const mySets = inScope(mine);
+  const mySets = scope.sets(mine);
   const profiles = await ranked(allMelee(melee, theirs, characters));
-  const quick = embeds.withSlippi(embeds.scout(player, opponent, mySets, inScope(theirs), inScopeCharacters(characters), { melee, filters }), [player, opponent], profiles);
+  const card = embeds.scout(player, opponent, mySets, scope.sets(theirs), scope.characters(characters), { melee, filters: scope.filters });
+  const quick = embeds.withSlippi(card, [player, opponent], profiles);
   if (!verbose) return sendEmbeds(interaction, quick, buttonRow(fullReport('scout', { opponent, melee, since: sinceText, venue })));
 
   // more of them on top of the same pages, so the quick one shows while it loads. yours is only for
@@ -172,32 +200,29 @@ async function scoutReport(interaction, { player, opponent, verbose, melee, sinc
     setHistories(opponent.playerId, SCOUT_PAGES), characterHistories(opponent.playerId, SCOUT_CHARACTER_PAGES), eventHistory(opponent.userId),
     eventHistory(player.userId).catch(() => null),
   ]), quick);
-  const theirSets = inScope(deeper);
-  const options = { game: melee ? 'Melee' : undefined, eventsA: myEvents && inScopeEvents(myEvents), eventsB: inScopeEvents(events) };
+  const theirSets = scope.sets(deeper);
+  const options = { game: melee ? 'Melee' : undefined, eventsA: myEvents && scope.events(myEvents), eventsB: scope.events(events) };
   const { odds, profiles: full } = await oddsWithSlippi(player, opponent, mySets, theirSets, options, ranked, allMelee(melee, theirs, characters));
   const report = embeds.scoutReport(player, opponent, {
-    mine: mySets, theirs: theirSets, characterSets: inScopeCharacters(characterSets), events: inScopeEvents(events), odds, players: state.players, melee, filters,
+    mine: mySets,
+    theirs: theirSets,
+    characterSets: scope.characters(characterSets),
+    events: scope.events(events),
+    odds,
+    players: state.players,
+    melee,
+    filters: scope.filters,
   });
   return sendEmbeds(interaction, embeds.withSlippi(report, [player, opponent], full ?? profiles, { odds: Boolean(odds), slippi: Boolean(odds?.slippi) }));
 }
 
 async function headToHead(interaction) {
-  const filters = filterOptions(interaction);
-  if (filters.error) return replyEphemeral(interaction, filters.error);
-  const players = await pair(interaction);
-  if (!players) return;
-  const [player, opponent] = players;
-
-  // pair only has to defer itself when it looked a link up
-  if (!interaction.deferred) await interaction.deferReply();
-  return headToHeadReport(interaction, { player, opponent, ...reportOptions(interaction), ...filters });
+  const picked = await matchup(interaction);
+  if (picked) return headToHeadReport(interaction, { ...picked, ...reportOptions(interaction) });
 }
 
 async function headToHeadReport(interaction, { player: a, opponent: b, verbose, melee, since, venue, sinceText }) {
-  const only = onlyMelee(melee);
-  const filters = { since, venue };
-  const inScope = (list) => scopeSets(filters)(only(list));
-  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
+  const scope = scoped({ melee, since, venue });
   const ranked = slippiLookup([a, b], melee);
   // meetings for the record, histories and events for one line of /predict odds
   const [sets, historyA, historyB, eventsA, eventsB] = await withCountdown(interaction, `Finding ${escapeMarkdown(a.tag)} and ${escapeMarkdown(b.tag)}'s meetings and odds`,
@@ -206,18 +231,16 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
       setHistory(a.playerId), setHistory(b.playerId),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
-  const shown = inScope(sets);
-  // every meeting in scope, so the odds go by the same record the card shows. the odds pick their
-  // own game out of these, so since and venue narrow them but melee doesn't
-  const inScopeOdds = (list) => scopeSets(filters)(list ?? []);
-  const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: shown };
+  const shown = scope.sets(sets);
+  // every meeting in scope, so the odds go by the same record the card shows
+  const options = { game: melee ? 'Melee' : undefined, eventsA: scope.events(eventsA), eventsB: scope.events(eventsB), meetings: shown };
   const { odds, profiles } = melee
-    ? await oddsWithSlippi(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options, ranked, true)
-    : { odds: predictOdds(a, b, inScopeOdds(historyA), inScopeOdds(historyB), options), profiles: null };
+    ? await oddsWithSlippi(a, b, scope.anyGame(historyA), scope.anyGame(historyB), options, ranked, true)
+    : { odds: predictOdds(a, b, scope.anyGame(historyA), scope.anyGame(historyB), options), profiles: null };
   // never having played, the full report would say the same thing. the odds stay one line in both,
   // run /predict for the reasoning behind them. a button press gets no second press
   const buttons = buttonRow(!verbose && shown.length && !interaction.isButton?.() && fullReport('h2h', { player: a, opponent: b, melee, since: sinceText, venue }));
-  const cards = embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - only(sets).length, odds, filters });
+  const cards = embeds.headToHead(a, b, shown, { verbose, melee, otherGames: sets.length - scope.only(sets).length, odds, filters: scope.filters });
   return sendEmbeds(interaction, embeds.withSlippi(cards, [a, b], profiles, { odds: Boolean(odds), slippi: Boolean(odds?.slippi) }), buttons);
 }
 
@@ -232,23 +255,23 @@ async function stats(interaction) {
 }
 
 async function statsReport(interaction, { player, verbose, melee, since, venue, sinceText }) {
-  const only = onlyMelee(melee);
-  const filters = { since, venue };
-  const inScope = (list) => scopeSets(filters)(only(list));
-  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
+  const scope = scoped({ melee, since, venue });
   const ranked = slippiLookup([player], melee);
   const { standings, sets } = await statsHistory(player.playerId, { videogameId: melee ? startgg.MELEE : undefined, since, venue });
   const profiles = await ranked(allMelee(melee, standings, sets));
-  const [recent] = embeds.withSlippi([embeds.stats(player, inScopeEvents(standings), inScope(sets), { melee, filters })], [player], profiles);
+  const placings = scope.events(standings);
+  const played = scope.sets(sets);
+  const [recent] = embeds.withSlippi([embeds.stats(player, placings, played, { melee, filters: scope.filters })], [player], profiles);
   if (!verbose) {
     // nothing recent on start.gg means nothing older either
-    const more = inScopeEvents(standings).length || inScope(sets).length ? buttonRow(fullReport('stats', { player, melee, since: sinceText, venue })) : [];
+    const more = placings.length || played.length ? buttonRow(fullReport('stats', { player, melee, since: sinceText, venue })) : [];
     return sendEmbeds(interaction, [recent], more);
   }
   // show the recent card while the lifetime report loads
   const [events, history] = await withCountdown(interaction, 'Lifetime report on its way',
     Promise.all([eventHistory(player.userId), lifetimeHistory(player.playerId)]), [recent]);
-  return sendEmbeds(interaction, embeds.withSlippi(embeds.lifetimeStats(player, inScopeEvents(events), inScope(history), state.players, { melee, filters }), [player], profiles));
+  const lifetime = embeds.lifetimeStats(player, scope.events(events), scope.sets(history), state.players, { melee, filters: scope.filters });
+  return sendEmbeds(interaction, embeds.withSlippi(lifetime, [player], profiles));
 }
 
 async function doubles(interaction) {
@@ -358,52 +381,35 @@ function noOdds(a, b, historyA, historyB, melee, filters = {}, hintA = historyA,
 
 // verbose explains the same odds instead of changing them
 async function predict(interaction) {
-  const filters = filterOptions(interaction);
-  if (filters.error) return replyEphemeral(interaction, filters.error);
-  const players = await pair(interaction);
-  if (!players) return;
-  const [player, opponent] = players;
-
-  // pair only has to defer itself when it looked a link up
-  if (!interaction.deferred) await interaction.deferReply();
-  return predictReport(interaction, { player, opponent, ...reportOptions(interaction), ...filters });
+  const picked = await matchup(interaction);
+  if (picked) return predictReport(interaction, { ...picked, ...reportOptions(interaction) });
 }
 
 // the full breakdown lives here, so /predict stays short. same odds, more detail
 async function predictExplained(interaction) {
-  const filters = filterOptions(interaction);
-  if (filters.error) return replyEphemeral(interaction, filters.error);
-  const players = await pair(interaction);
-  if (!players) return;
-  const [player, opponent] = players;
-
-  if (!interaction.deferred) await interaction.deferReply();
-  return predictExplainedReport(interaction, { player, opponent, melee: flag(interaction, 'melee'), ...filters });
+  const picked = await matchup(interaction);
+  if (picked) return predictExplainedReport(interaction, { ...picked, melee: flag(interaction, 'melee') });
 }
 
 // meetings go back past the histories, usually in one request, so head-to-head matches /h2h.
 // events say how big each bracket was, which helps seeding count. null when the lookup
 // failed, and the odds still work without events. doing is the countdown line
 async function oddsFor(interaction, a, b, { melee, since, venue, doing }) {
-  const only = onlyMelee(melee);
-  const filters = { since, venue };
-  const inScope = (list) => scopeSets(filters)(only(list));
-  const inScopeEvents = (list) => scopeEntries(filters)(only(list));
+  const scope = scoped({ melee, since, venue });
   const ranked = slippiLookup([a, b], melee);
   const [historyA, historyB, meetings, eventsA, eventsB] = await withCountdown(interaction, doing,
     Promise.all([
       setHistory(a.playerId), setHistory(b.playerId), h2hHistory(a.playerId, b.playerId).catch(() => []),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
-  // the odds and the no-odds wording pick their own game out of these, so since and venue
-  // narrow them but melee doesn't
-  const scopedA = scopeSets(filters)(historyA ?? []);
-  const scopedB = scopeSets(filters)(historyB ?? []);
-  const options = { game: melee ? 'Melee' : undefined, eventsA: inScopeEvents(eventsA), eventsB: inScopeEvents(eventsB), meetings: inScope(meetings) };
+  // the no-odds wording picks its own game out of these too
+  const scopedA = scope.anyGame(historyA);
+  const scopedB = scope.anyGame(historyB);
+  const options = { game: melee ? 'Melee' : undefined, eventsA: scope.events(eventsA), eventsB: scope.events(eventsB), meetings: scope.sets(meetings) };
   const found = melee
     ? await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, true)
     : { odds: predictOdds(a, b, scopedA, scopedB, options), profiles: null };
-  return { ...found, filters, scopedA, scopedB, historyA, historyB };
+  return { ...found, filters: scope.filters, scopedA, scopedB, historyA, historyB };
 }
 
 // nothing to predict with: says why, with their slippi ranks when they have them

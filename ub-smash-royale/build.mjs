@@ -1,6 +1,6 @@
-// Builds ub-smash-royale/ viewer. Shared builder: series/shared/site.mjs, config: series/configs.mjs.
-// Two views of the same page: index.html counts the off-week club nights,
-// on-weeks-only.html drops them. Winners and matchups are numbered-only in both.
+// builds this folder's page. the builder is series/shared/site.mjs and the page settings are in series/configs.mjs.
+// two views: index.html counts the off-week club nights and on-weeks-only.html leaves them out. winners
+// and matchups only ever count the numbered nights
 import { buildSite } from '../series/shared/site.mjs';
 buildSite('ub-smash-royale');
 buildSite('ub-smash-royale', { countOffweeks: false, htmlFile: 'on-weeks-only.html', writeFiles: false });

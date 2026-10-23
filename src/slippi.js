@@ -8,11 +8,11 @@ import { ApiError } from './errors.js';
 const API_URL = 'https://internal.slippi.gg/graphql';
 
 // nobody publishes a limit. community leaderboards keep to one a second, so this does too
-let REQUEST_GAP_MS = 1000;
+let requestGap = 1000;
 
 // tests that mock slippi.gg set this to 0. the real gap is covered by keeping it 1000 everywhere else
 export function setRequestGap(ms) {
-  REQUEST_GAP_MS = ms;
+  requestGap = ms;
 }
 // players per request, as aliases
 const PER_REQUEST = 20;
@@ -101,7 +101,7 @@ function sendNext() {
     timer = null;
     const next = commandQueue.shift() ?? backgroundQueue.shift();
     if (!next) return;
-    nextSlot = Date.now() + REQUEST_GAP_MS;
+    nextSlot = Date.now() + requestGap;
     next();
     sendNext();
   }, Math.max(0, nextSlot - Date.now()));
@@ -165,7 +165,13 @@ function toProfile(user) {
     // newest first
     seasons: (user.rankedNetplayProfileHistory ?? [])
       .filter((past) => past.season?.status === 'COMPLETED')
-      .map((past) => ({ name: past.season.name, rating: past.ratingOrdinal, wins: past.wins ?? 0, losses: past.losses ?? 0, endedAt: past.season.endedAt }))
+      .map((past) => ({
+        name: past.season.name,
+        rating: past.ratingOrdinal,
+        wins: past.wins ?? 0,
+        losses: past.losses ?? 0,
+        endedAt: past.season.endedAt,
+      }))
       .sort((a, b) => String(b.endedAt).localeCompare(String(a.endedAt))),
   };
 }

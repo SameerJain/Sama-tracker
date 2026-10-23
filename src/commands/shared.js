@@ -1,4 +1,7 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, DiscordAPIError, HTTPError, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, escapeMarkdown } from 'discord.js';
+import {
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, DiscordAPIError, HTTPError, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes,
+  escapeMarkdown,
+} from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
@@ -76,8 +79,9 @@ function linkedPlayer(discordId) {
 // both were checked against start.gg, so nobody can pass as someone else
 function isSelf(interaction, player) {
   if (!player || player === 'all') return false;
+  if (player.discordId === interaction.user.id) return true;
   const me = linkedPlayer(interaction.user.id);
-  return (Boolean(me) && String(me.userId) === String(player.userId)) || player.discordId === interaction.user.id;
+  return me ? String(me.userId) === String(player.userId) : false;
 }
 
 // what to tell someone whose command threw, naming whose fault it was. the details stay in the logs, since
@@ -86,6 +90,9 @@ function failureMessage(err) {
   if (err instanceof ApiError) {
     const { source, status } = err;
     if (source === 'start.gg' && startgg.badToken(err)) return 'start.gg turned down the bot\'s API token, so nothing from start.gg works until whoever runs the bot makes a new one.';
+    // the whole site, not one slow request. says so plainly, so nobody keeps retrying or blames the bot
+    const down = source === 'start.gg' && (status === null || status >= 500) && startgg.startggDownSince();
+    if (down) return `start.gg has been down since <t:${down}:R>, so anything that needs it can't run right now. The bot is fine and picks back up on its own once start.gg answers. \`/status\` shows if it's still down.`;
     if (status === 429) return `${source} is limiting how fast the bot can ask right now. Try again in a minute.`;
     if (status === null) return `${source} didn't answer in time. Try again in a minute.`;
     if (status >= 500) return `${source} is having trouble right now. Try again in a few minutes.`;
@@ -138,7 +145,13 @@ async function sendLate(interaction, messages, components) {
   const [first, ...rest] = messages;
   const { id } = interaction.user;
   try {
-    await interaction.channel.send({ content: `<@${id}> here's your ${commandLabel(interaction)}.`, embeds: first.batch, components, files: first.files, allowedMentions: { users: [id] } });
+    await interaction.channel.send({
+      content: `<@${id}> here's your ${commandLabel(interaction)}.`,
+      embeds: first.batch,
+      components,
+      files: first.files,
+      allowedMentions: { users: [id] },
+    });
   } catch (err) {
     console.error(`late ${commandLabel(interaction)} couldn't be posted as a new message:`, err.message);
     return false;
@@ -202,13 +215,15 @@ async function sendEmbeds(interaction, list, components = [], files = []) {
   // the downloads can take longer than the 3 seconds discord gives a reply
   if (!interaction.deferred && !interaction.replied && batches.flat().some((card) => startggPictures(card).length)) await interaction.deferReply();
   const outgoing = await withPictures(interaction, batches, files);
-  if (await sendLate(interaction, outgoing, components)) return;
-  for (const [i, { batch, files: uploads }] of outgoing.entries()) {
-    if (i > 0) await interaction.followUp({ embeds: batch, files: uploads, allowedMentions: { parse: [] }, ...(isEphemeral(interaction) && { flags: MessageFlags.Ephemeral }) });
-    // null clears a countdown from withCountdown
-    else if (interaction.deferred) await interaction.editReply({ content: null, embeds: batch, components, files: uploads, allowedMentions: { parse: [] } });
-    else await interaction.reply({ embeds: batch, components, files: uploads, allowedMentions: { parse: [] } });
-  }
+  if (!outgoing.length || await sendLate(interaction, outgoing, components)) return;
+  const [first, ...rest] = outgoing;
+  const answer = { embeds: first.batch, components, files: first.files, allowedMentions: { parse: [] } };
+  // null clears a countdown from withCountdown
+  if (interaction.deferred) await interaction.editReply({ content: null, ...answer });
+  else await interaction.reply(answer);
+  const followUp = { allowedMentions: { parse: [] } };
+  if (isEphemeral(interaction)) followUp.flags = MessageFlags.Ephemeral;
+  for (const { batch, files: uploads } of rest) await interaction.followUp({ embeds: batch, files: uploads, ...followUp });
 }
 
 // a button that runs a report again. discord keeps nothing but its id, so that holds everything:
@@ -388,12 +403,16 @@ function profileSlug(input) {
   return input.match(/user\/([\w-]+)/)?.[1] ?? input;
 }
 
+// the player behind a typed profile link or ID, with the text as typed, backticks out so it can go in a code span
+async function typedPlayer(input) {
+  const text = input.trim();
+  return { text, shown: text.replaceAll('`', ''), player: await startgg.getPlayer(profileSlug(text)) };
+}
+
 // the player behind a typed link or ID, for handlers that deferred first. null and a reply when
 // start.gg has nobody for it. whose is just for the wording, "use their/your profile link"
 async function findPlayer(interaction, input, whose = 'their') {
-  const text = input.trim();
-  const shown = text.replaceAll('`', '');
-  const player = await startgg.getPlayer(profileSlug(text));
+  const { shown, player } = await typedPlayer(input);
   if (!player) await interaction.editReply({ content: `Couldn't find a start.gg player for \`${shown}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`, allowedMentions: { parse: [] } });
   return player;
 }
@@ -401,12 +420,10 @@ async function findPlayer(interaction, input, whose = 'their') {
 // whoever a matchup option got that isn't tracked or linked: a start.gg profile link or ID. called
 // after deferReply, so a miss drops the thinking reply and answers ephemeral instead. null when nobody
 async function fetchPlayer(interaction, input) {
-  const text = input.trim();
-  const shown = text.replaceAll('`', '');
-  const player = await startgg.getPlayer(profileSlug(text));
+  const { text, shown, player } = await typedPlayer(input);
   if (!player) {
-    const near = didYouMean(Object.values(pickable()), text);
-    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${shown}\`.${near || ' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.'}`);
+    const near = didYouMean(Object.values(pickable()), text) || ' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.';
+    await replyEphemeralAfterDefer(interaction, `Couldn't find a start.gg player for \`${shown}\`.${near}`);
   }
   return player;
 }
@@ -423,7 +440,8 @@ async function replyEphemeralAfterDefer(interaction, content) {
 const flag = (interaction, name) => interaction.options.getBoolean(name) ?? false;
 
 export {
-  pickable, readChoice, linkedPlayer, isSelf, failureMessage, lookup, readPlayer, readTracked, sendEmbeds, withCountdown, replyNoPlayer, replyNotTracked, replyEphemeral, replyEphemeralAfterDefer, findPlayer, fetchPlayer, flag,
-  reportButton, fullReport, h2hButton, buttonRow, readButton, parseSince, playerBySlug, recentPicks, rememberPick, nameMatches, didYouMean,
-  commandLabel, roughly, LATE_SECONDS,
+  pickable, readChoice, readPlayer, readTracked, linkedPlayer, isSelf, lookup, nameMatches, didYouMean, recentPicks, rememberPick,
+  findPlayer, fetchPlayer, playerBySlug, flag, parseSince,
+  sendEmbeds, withCountdown, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, replyNotTracked, failureMessage,
+  reportButton, fullReport, h2hButton, buttonRow, readButton, commandLabel, roughly, LATE_SECONDS,
 };

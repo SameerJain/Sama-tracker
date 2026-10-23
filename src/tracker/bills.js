@@ -2,7 +2,9 @@ import * as bills from '../bills.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { messageEnabled } from '../message-settings.js';
-import { channel, secondsNow, health, BILLS_BASELINE_HOURS, BILLS_GAMEDAY_MINUTES, BILLS_PREGAME_HOURS, BILLS_POSTGAME_HOURS, HOUR } from './shared.js';
+import {
+  currentChannel, secondsNow, health, BILLS_BASELINE_HOURS, BILLS_GAMEDAY_MINUTES, BILLS_PREGAME_HOURS, BILLS_POSTGAME_HOURS, HOUR,
+} from './shared.js';
 
 // 15 minutes from an hour before kickoff until 8 hours after, daily otherwise.
 // a live game keeps its kickoff as the next date until it's final, so the tight
@@ -17,12 +19,11 @@ export function billsDelay(nextDate, now = secondsNow()) {
 // Bills finals, one request for the schedule and one per new final for quarters
 // and yards. off by default, and anything final while it was off stays skipped.
 // returns when to check again so the loop stays daily except near kickoff
-export async function postBillsResults(postChannel = channel) {
+export async function postBillsResults(postChannel = currentChannel()) {
   const checkedAt = secondsNow();
   try {
     const { finals, nextDate } = await bills.getScheduleState();
     finals.sort((a, b) => a.date - b.date);
-    state.billsPosted ??= [];
     for (const game of finals) {
       if (state.billsPosted.includes(game.id)) continue;
       if (messageEnabled('bills', game.date)) {
@@ -37,7 +38,7 @@ export async function postBillsResults(postChannel = channel) {
       state.billsPosted.push(game.id);
       save();
     }
-    state.billsPosted = (state.billsPosted ?? []).slice(-50);
+    state.billsPosted = state.billsPosted.slice(-50);
     health.billsCheck = checkedAt;
     health.billsError = null;
     save();

@@ -3,7 +3,9 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { messageEnabled } from '../message-settings.js';
 import { linkedPlayer } from '../commands/shared.js';
-import { channel, secondsNow, postRefs, editPost, mentionable, mentions, CALL_WATCH_MINUTES, UNCALLED_STATES } from './shared.js';
+import {
+  currentChannel, secondsNow, postRefs, editPost, named, mentionable, mentions, trackedLive, eventsOf, CALL_WATCH_MINUTES, UNCALLED_STATES,
+} from './shared.js';
 import { h2hRow, rememberButton } from './buttons.js';
 
 // everyone with /notify calls on, as the start.gg account commands know them by: their /link, or the tracked
@@ -17,18 +19,17 @@ function callers() {
   return found;
 }
 
-export async function postMatchCalls(postChannel = channel) {
+export async function postMatchCalls(postChannel = currentChannel()) {
   try {
     const players = callers();
-    if (!players.length) return;
     const playerIds = new Set(players.map((player) => player.playerId));
-    for (const set of await startgg.getCalledSets([...playerIds])) {
+    for (const set of players.length ? await startgg.getCalledSets([...playerIds]) : []) {
       // both sides can have pings on, still one message for the set.
       // doubles sides hold two player ids each, so all four land in the same message
       const inSet = players.filter((player) => set.sides.some((side) => side.playerIds.includes(player.playerId)));
       if (!inSet.length) continue;
       const discordIds = [...new Set(inSet.map((player) => player.discordId).filter(mentionable))];
-      if ((state.called ??= []).includes(set.id)) {
+      if (state.called.includes(set.id)) {
         const watched = state.callPosts.find((each) => each.setId === set.id);
         const newIds = watched ? discordIds.filter((id) => !watched.discordIds.includes(id)) : [];
         if (newIds.length) {
@@ -45,11 +46,32 @@ export async function postMatchCalls(postChannel = channel) {
       state.called.push(set.id);
       save();
     }
+    // a tracked tournament with match calls on posts every called set, whoever played, even when
+    // nobody in it has /notify calls on. sets already posted above keep their pings
+    for (const tournament of trackedLive('calls').filter((each) => each.tracked.calls === true)) {
+      let sets = [];
+      try {
+        const eventIds = [...new Set(eventsOf(tournament).map((entry) => entry.eventId).filter(Boolean))];
+        if (eventIds.length) sets = await startgg.getCalledEventSets(eventIds);
+      } catch (err) {
+        console.error(`checking match calls at ${named(tournament)} failed:`, err.message);
+        continue;
+      }
+      for (const set of sets.sort((a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0))) {
+        if (state.called.includes(set.id)) continue;
+        if (messageEnabled('calls', set.updatedAt)) {
+          const { sent, text } = await sendMatchCall(set, [], [], postChannel);
+          watchCall(sent, set, [], text);
+        }
+        state.called.push(set.id);
+        save();
+      }
+    }
   } catch (err) {
     console.error('checking match calls failed:', err.message);
   }
 
-  state.called = (state.called ?? []).slice(-200);
+  state.called = state.called.slice(-200);
   save();
 }
 
@@ -68,7 +90,7 @@ async function sendMatchCall(set, inSet, discordIds, postChannel) {
 }
 
 // saved so followCalls can find the call again. a called set was last updated when it got called.
-// text is the ping as it went out, so the uncalled edit and the still-up warning match it
+// text is the ping as it went out, so the uncalled edit crosses out the same words
 function watchCall(message, set, discordIds, text) {
   if (!message?.id || !/^\d+$/.test(set.id)) return;
   const [ref] = postRefs([message]);
@@ -79,9 +101,8 @@ function watchCall(message, set, discordIds, text) {
 
 // recent match calls in one request. a call usually means go now, so there's no wait
 // before it goes out like stream alerts have. instead one whose set goes back to waiting gets edited to say
-// it was uncalled, and the next call pings again. one still called when the warning comes due pings the
-// it was uncalled. started, finished and deleted sets stop being watched
-export async function followCalls(postChannel = channel) {
+// it was uncalled, and the next call pings again. started, finished and deleted sets stop being watched
+export async function followCalls(postChannel = currentChannel()) {
   const now = secondsNow();
   const before = state.callPosts.length;
   state.callPosts = state.callPosts.filter((each) => each.calledAt > now - CALL_WATCH_MINUTES * 60);
@@ -104,7 +125,8 @@ export async function followCalls(postChannel = channel) {
       state.called = state.called.filter((id) => id !== each.setId);
       // an edit never pings, the mentions just stay so they can see it was theirs
       const struck = each.text ?? `You're up`;
-      const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~${struck}~~ Uncalled by the TO, wait for the next call` : 'Uncalled by the TO, wait for the next call';
+      const uncalled = 'Uncalled by the TO, wait for the next call';
+      const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~${struck}~~ ${uncalled}` : uncalled;
       await editPost(postChannel, each, { content, allowedMentions: { parse: [] } });
       state.callPosts = state.callPosts.filter((other) => other !== each);
     }

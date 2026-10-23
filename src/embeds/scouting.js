@@ -3,7 +3,10 @@ import { singles, startggUrl } from '../startgg.js';
 import { characterUsageByGame, leans } from '../characters.js';
 import { lifetimeStats } from './stats.js';
 import { chancePercent, commonOpponentLines } from './players.js';
-import { colors, FOOTER, baseEmbed, withLines, count, gameName, recordOf, section, bold, scoreText, setLink, vodLink, filterLine, closeLine, seedLine, sweepLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine } from './shared.js';
+import {
+  colors, FOOTER, baseEmbed, withLines, count, gameName, recordOf, section, bold, scoreText, setLink, vodLink, filterLine, closeLine,
+  seedLine, sweepLine, GRAND_FINALS, CHARACTERS_SHOWN, GAMES_SHOWN, LEANS_SHOWN, DAY, winLoss, characterRank, meetingLine,
+} from './shared.js';
 
 // /scout's form line per game, and how many sets it lists
 const RECENT_SETS = 20;

@@ -297,7 +297,7 @@ test('reg_warn does not ping once registration closed, or for bots', async () =>
   assert.deepEqual(bot.calls.map(([kind]) => kind), ['reply']);
 });
 
-test('/t-o tournament add tracks the tournament with everything on and its reminders set, tracking nobody', async () => {
+test('/t-o tournament add tracks the tournament with everything on but match calls and its reminders set, tracking nobody', async () => {
   state.players = {};
   state.tournaments = {};
   // the reminder's own send is covered elsewhere, here it would post to no channel
@@ -308,7 +308,7 @@ test('/t-o tournament add tracks the tournament with everything on and its remin
   assert.deepEqual(state.players, {});
   const tracked = state.tournaments[5];
   assert.equal(tracked.name, 'Local');
-  assert.deepEqual({ ...tracked.tracked, at: undefined }, { by: 'manual', at: undefined, sets: true, stream: true, top8: true, reminders: true });
+  assert.deepEqual({ ...tracked.tracked, at: undefined }, { by: 'manual', at: undefined, sets: true, stream: true, top8: true, reminders: true, calls: false });
   // sets from before it was tracked stay out of its thread
   assert.ok(tracked.lastCheck >= now);
   // closes in an hour, so the last call is all that's left

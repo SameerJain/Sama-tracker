@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EmbedBuilder } from 'discord.js';
-import { crewPlayer, tracked, event, node, result } from './fixtures.js';
+import { mockApi, crewPlayer, tracked, event, node, result } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-features-sets-'));
 process.env.STATE_DIR = directory;
@@ -18,10 +18,6 @@ const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
-
-function mockApi(respond) {
-  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
-}
 
 test('every message gets a picture, the bot avatar on its first card when nothing in it has one', () => {
   const avatar = 'https://cdn.discordapp.com/avatars/bot/avatar.png';
@@ -72,23 +68,23 @@ test('set result cards put the winner on the left with a W and the loser on the 
 
   const win = card('w', [10, 'Active', 2], [99, 'Opponent', 3], true, [3, 0]);
   assert.equal(win.title, 'Set result · W · Active 3-0 Opponent · L');
-  assert.equal(win.color, colors.win);
+  assert.equal(win.color, colors.setDefault);
 
   // a tracked player losing to someone untracked: the winner still goes first, the card stays theirs
   const loss = card('l', [10, 'Active', 2], [99, 'Opponent', 3], false, [1, 3]);
   assert.equal(loss.title, 'Set result · W · Opponent 3-1 Active · L');
-  assert.equal(loss.color, colors.win);
+  assert.equal(loss.color, colors.setDefault);
   assert.equal(loss.author, undefined);
   assert.equal(loss.fields.find((field) => field.name === 'Characters').value, 'Opponent: Wario\nActive: Pac-Man');
   assert.doesNotMatch(loss.description, /Major upset/);
 
-  // nobody tracked, from a tracked tournament, and two tracked players fighting are green too
+  // nobody tracked, from a tracked tournament, and two tracked players fighting are blue too
   const stranger = card('s', [98, 'Visitor', 1], [99, 'Guest', 2], true, [2, 1]);
-  assert.equal(stranger.color, colors.win);
+  assert.equal(stranger.color, colors.setDefault);
   const both = { ...players, 2: { userId: 2, playerId: 99, tag: 'Opponent', slug: 'user/opponent' } };
   const clashSet = result('c', 100, [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 0]);
   const clash = embeds.setResult({ ...clashSet, event: { ...clashSet.event, name: 'Singles' }, sides: clashSet.sides.map((side) => ({ ...side, characters: [] })) }, both).data;
-  assert.equal(clash.color, colors.win);
+  assert.equal(clash.color, colors.setDefault);
 
   // seed 17 over seed 2 is a major upset whoever won it. seed 9 over seed 2 is short of it
   const upset = card('u', [10, 'Active', 2], [99, 'Opponent', 17], false, [1, 2]);
@@ -99,7 +95,7 @@ test('set result cards put the winner on the left with a W and the loser on the 
   assert.doesNotMatch(card('d', [10, 'Active', 2], [99, 'Opponent', 17], false, [-1, 0]).description, /Major upset/);
 });
 
-test('set_colors paints set result cards green for a win, red for a loss, gold for crew vs crew', async () => {
+test('set_colors paints set result cards green for a win, red for a loss, gold for crew vs crew, blue otherwise', async () => {
   const { colors } = await import('../src/embeds/shared.js');
   const players = { 1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active' } };
   const card = (id, me, them, won, score, list = players) => {
@@ -110,7 +106,7 @@ test('set_colors paints set result cards green for a win, red for a loss, gold f
   assert.equal(card('w', [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 1]).color, colors.win);
   assert.equal(card('l', [10, 'Active', 2], [99, 'Opponent', 3], false, [1, 3]).color, colors.loss);
   // nobody tracked, from a tracked tournament
-  assert.equal(card('s', [98, 'Visitor', 1], [99, 'Guest', 2], true, [2, 1]).color, colors.brand);
+  assert.equal(card('s', [98, 'Visitor', 1], [99, 'Guest', 2], true, [2, 1]).color, colors.setDefault);
   const both = { ...players, 2: { userId: 2, playerId: 99, tag: 'Opponent', slug: 'user/opponent' } };
   assert.equal(card('c', [10, 'Active', 2], [99, 'Opponent', 3], true, [2, 0], both).color, colors.clash);
   // a corrected card keeps its colors
@@ -645,6 +641,49 @@ test('match call pings put all four doubles players in one message', async () =>
   await tracker.postMatchCalls(channel);
   assert.equal(sent.length, 2);
   state.callPings = [];
+});
+
+test('a tracked tournament with calls on posts every called set, even with nobody to ping', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  let nextId = 0;
+  const channel = { send: async (payload) => { sent.push(payload); return { id: `m${++nextId}`, channelId: 'c1' }; } };
+  state.messages = {};
+  state.players = {};
+  state.links = {};
+  state.callPings = [];
+  state.called = [];
+  state.callPosts = [];
+  state.tournaments = {
+    7: {
+      id: 7, name: 'Weekly', slug: 'tournament/weekly', startAt: now - 3600, endAt: now + 3600, entries: [],
+      events: [{ id: 70, name: 'Singles', slug: 'tournament/weekly/event/singles', state: 'ACTIVE' }],
+      tracked: { by: 'manual', at: now - 3600, sets: true, stream: true, calls: true, top8: true, reminders: true },
+    },
+  };
+  const called = { ...node('801', null), state: 6, updatedAt: now - 60, stream: null };
+  mockApi(({ query }) => {
+    if (query.includes('event(id:')) return { e70: { sets: { pageInfo: { totalPages: 1 }, nodes: [called] } } };
+    return assert.fail(`unexpected start.gg query: ${query.slice(0, 80)}`);
+  });
+  await tracker.postMatchCalls(channel);
+  assert.equal(sent.length, 1);
+  // no ping, just the card
+  assert.equal(sent[0].content, undefined);
+  assert.match(sent[0].embeds[0].data.title, /Match call · /);
+  assert.ok(state.called.includes('801'));
+
+  // a second check sends nothing new
+  await tracker.postMatchCalls(channel);
+  assert.equal(sent.length, 1);
+
+  // with calls off the tournament isn't asked about, so nothing posts
+  state.called = [];
+  state.tournaments[7].tracked.calls = false;
+  await tracker.postMatchCalls(channel);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(state.called, []);
+  state.tournaments = {};
 });
 
 test('match calls and stream alerts lose their Head to head button once the set is over', async () => {

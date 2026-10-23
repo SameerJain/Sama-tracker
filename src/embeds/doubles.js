@@ -73,7 +73,10 @@ function doublesUpsetLine(result, player) {
 const teamKey = (side) => (side.playerIds.length && side.playerIds.every(Boolean) ? side.playerIds.map(String).sort().join('+') : side.name);
 
 function card(player, label, melee = false) {
-  const embed = baseEmbed(colors.brand).setAuthor({ name: melee ? `Melee ${label[0].toLowerCase()}${label.slice(1)}` : label }).setTitle(escapeMarkdown(player.tag)).setURL(startggUrl(player.slug));
+  const embed = baseEmbed(colors.brand)
+    .setAuthor({ name: melee ? `Melee ${label[0].toLowerCase()}${label.slice(1)}` : label })
+    .setTitle(escapeMarkdown(player.tag))
+    .setURL(startggUrl(player.slug));
   if (player.image) embed.setThumbnail(player.image);
   return embed;
 }

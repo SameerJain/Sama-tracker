@@ -2,19 +2,23 @@ import { hostname } from 'node:os';
 import { HTTPError, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
-import { state } from '../store.js';
+import { forGuild, guildLocal, isMultiGuild, state } from '../store.js';
 import { deployedAt, health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
 import { trackAdd, trackRemove, trackCleanup, link, unlink, profile, upcoming, recent, run } from './players.js';
-import { progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED } from './stats.js';
+import {
+  progress, scout, headToHead, stats, doubles, characters, predict, predictExplained, memberHeadToHead, memberScout, reports, NOT_LINKED,
+} from './stats.js';
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
-import { configureMessages, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
+import { configureMessages, setupPosts, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
-import { pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag } from './shared.js';
+import {
+  pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag,
+} from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
@@ -36,16 +40,26 @@ function commandName(interaction) {
   return [interaction.commandName, group, subcommand].filter(Boolean).join(' ');
 }
 
+// multi-server builds run each interaction inside its server's state, see store.js. single-server builds,
+// DMs and the test fakes, which have no guildId, read the root
+function inGuild(interaction, run) {
+  const id = isMultiGuild() && interaction.guildId;
+  if (!id) return run();
+  forGuild(id);
+  return guildLocal.run(id, run);
+}
+
 const handlers = new Map([
   ['help', (interaction) => sendEmbeds(interaction, embeds.help(flag(interaction, 'verbose')))],
   ['messages', configureMessages],
+  ['setup', setupPosts],
   ['data', (interaction) => sendEmbeds(interaction, embeds.dataPages())],
   ['socials', (interaction) => sendEmbeds(interaction, embeds.socials(state.socials))],
   ['socials_edit add', socialsAdd],
   ['socials_edit remove', socialsRemove],
   ['track add', trackAdd],
   ['track remove', trackRemove],
-  ['track list', (interaction) => sendEmbeds(interaction, embeds.trackedList(state.players, Object.keys(pickable()).length - Object.keys(state.players).length, state.tournaments))],
+  ['track list', trackList],
   ['track posts', trackPosts],
   ['t-o cleanup', trackCleanup],
   ['t-o role add', toAdd],
@@ -90,7 +104,7 @@ const handlers = new Map([
 ]);
 
 export async function handleCommand(interaction) {
-  return handlers.get(commandName(interaction))?.(interaction);
+  return inGuild(interaction, () => handlers.get(commandName(interaction))?.(interaction));
 }
 
 // a Full report press swapped twice at once shares the first lookup instead of asking
@@ -117,8 +131,8 @@ async function deferButtonOrRetry(interaction, action) {
     return true;
   } catch (err) {
     // already answered, so the press is still alive
-    if (err?.code === RESTJSONErrorCodes.InteractionHasAlreadyBeenAcknowledged) return true;
-    if (err?.code === RESTJSONErrorCodes.UnknownInteraction || err instanceof HTTPError) {
+    if (err.code === RESTJSONErrorCodes.InteractionHasAlreadyBeenAcknowledged) return true;
+    if (err.code === RESTJSONErrorCodes.UnknownInteraction || err instanceof HTTPError) {
       await retryExpiredButton(interaction);
       return false;
     }
@@ -131,7 +145,7 @@ async function deferButtonOrRetry(interaction, action) {
 // is already dead
 async function retryExpiredButton(interaction) {
   const { action, command } = readButton(interaction.customId);
-  const ephemeral = Boolean(interaction.message?.flags?.has?.(MessageFlags.Ephemeral));
+  const ephemeral = interaction.message.flags.has(MessageFlags.Ephemeral);
   const toChannel = action !== 'private' && !ephemeral && interaction.channel?.send ? interaction.channel : null;
   let target = null;
   if (toChannel) {
@@ -154,11 +168,7 @@ async function retryExpiredButton(interaction) {
     return;
   }
   // the dead press can't grey out its own buttons, so take them off directly
-  if (action === 'more' && toChannel) {
-    try {
-      await interaction.message?.edit?.({ components: disabled(interaction.message) });
-    } catch {}
-  }
+  if (action === 'more' && toChannel) await interaction.message.edit({ components: disabled(interaction.message) }).catch(() => {});
   const relay = expiredRelay(interaction, target);
   try {
     await answerButton(relay);
@@ -167,9 +177,7 @@ async function retryExpiredButton(interaction) {
     }
   } catch (err) {
     console.error(`/${command} button retry failed:`, err);
-    try {
-      await target.channel.send({ content: failureMessage(err), allowedMentions: { parse: [] } });
-    } catch {}
+    await target.channel.send({ content: failureMessage(err), allowedMentions: { parse: [] } }).catch(() => {});
   }
 }
 
@@ -239,28 +247,25 @@ async function answerButton(interaction) {
 // another report, and private does too but only for whoever pressed it, so buttons on the automatic posts
 // don't fill the channel. head-to-head buttons run the short report with no second press. the button
 // only has profile slugs or player ids, so the players get looked up again
-export async function handleButton(interaction) {
+export function handleButton(interaction) {
+  return inGuild(interaction, () => pressButton(interaction));
+}
+
+async function pressButton(interaction) {
   // Are you sure and Undo answer by changing the message they're on, see confirm.js
   if (isChoice(interaction.customId)) return handleChoice(interaction);
   const { action } = readButton(interaction.customId);
-  if (action !== 'more') {
-    if (!await deferButtonOrRetry(interaction, action)) return;
-    return answerButton(interaction);
-  }
-  // no message to swap, so there's nothing to share
+  const press = async () => {
+    if (await deferButtonOrRetry(interaction, action)) return answerButton(interaction);
+  };
+  // only a Full report swaps the message it's on, so only that can be pressed twice before it's done
   const messageId = interaction.message?.id;
-  if (!messageId) {
-    if (!await deferButtonOrRetry(interaction, action)) return;
-    return answerButton(interaction);
-  }
+  if (action !== 'more' || !messageId) return press();
   const key = `${interaction.customId} ${messageId}`;
   const running = inflightButtons.get(key);
   if (running) return sameReport(interaction, running, key);
   // set before the first wait, so a second press in the meantime sees it
-  const done = (async () => {
-    if (!await deferButtonOrRetry(interaction, action)) return;
-    return answerButton(interaction);
-  })();
+  const done = press();
   inflightButtons.set(key, done);
   try {
     return await done;
@@ -276,9 +281,11 @@ async function sameReport(interaction, running, key) {
   try {
     await deferButton(interaction, 'more');
   } catch (err) {
-    if (err?.code === RESTJSONErrorCodes.InteractionHasAlreadyBeenAcknowledged) {} // press still alive, carry on
-    // the first press owns delivery, so a dead waiter just watches the message
-    else return console.error(`/${readButton(interaction.customId).command} button waiter couldn't answer:`, err.message);
+    // already acknowledged is still alive. anything else is dead, and the first press owns delivery anyway
+    if (err.code !== RESTJSONErrorCodes.InteractionHasAlreadyBeenAcknowledged) {
+      console.error(`/${readButton(interaction.customId).command} button waiter couldn't answer:`, err.message);
+      return;
+    }
   }
   await interaction.followUp({ content: 'Start.gg is already working on that one. The full report swaps in when it\'s done.', flags: MessageFlags.Ephemeral });
   if (await running.then(() => true, () => false)) return;
@@ -310,7 +317,11 @@ export async function buttonFailed(interaction, content) {
   return interaction.followUp({ content, flags: MessageFlags.Ephemeral });
 }
 
-export async function handleAutocomplete(interaction) {
+export function handleAutocomplete(interaction) {
+  return inGuild(interaction, () => autocomplete(interaction));
+}
+
+async function autocomplete(interaction) {
   const focused = interaction.options.getFocused();
   const typed = focused.toLowerCase();
   const name = commandName(interaction);
@@ -353,6 +364,11 @@ export async function handleAutocomplete(interaction) {
   await interaction.respond(choices.slice(0, 25));
 }
 
+function trackList(interaction) {
+  const linkedOnly = Object.keys(pickable()).length - Object.keys(state.players).length;
+  return sendEmbeds(interaction, embeds.trackedList(state.players, linkedOnly, state.tournaments));
+}
+
 function status(interaction) {
   const tournaments = Object.values(state.tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted);
   const info = {
@@ -366,6 +382,7 @@ function status(interaction) {
     slippi: Object.keys(state.slippi).length,
     tournaments: tournaments.length,
     queued: startgg.queueLength(),
+    startggDownSince: startgg.startggDownSince(),
   };
   return interaction.reply({ embeds: [embeds.status(info)], allowedMentions: { parse: [] } });
 }

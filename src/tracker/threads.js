@@ -2,11 +2,13 @@ import { PermissionFlagsBits, RESTJSONErrorCodes, ThreadAutoArchiveDuration } fr
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { messageSettings } from '../message-settings.js';
-import { channel, health, secondsNow, endTime, trackedFor, THREAD_KEPT_DAYS, THREAD_PERMISSIONS, DAY, RUNS_LATE_HOURS, HOUR } from './shared.js';
+import {
+  currentChannel, health, secondsNow, endTime, trackedFor, THREAD_KEPT_DAYS, THREAD_PERMISSIONS, DAY, RUNS_LATE_HOURS, HOUR,
+} from './shared.js';
 
 // the thread permissions the bot is missing in the channel, or null when it can't have threads at all,
 // like a voice channel's chat
-export function missingThreadPermissions(postChannel = channel) {
+export function missingThreadPermissions(postChannel = currentChannel()) {
   if (!postChannel?.threads || postChannel.isThread?.()) return null;
   const has = postChannel.permissionsFor(postChannel.client.user);
   return Object.keys(THREAD_PERMISSIONS).filter((name) => !has?.has(PermissionFlagsBits[name])).map((name) => THREAD_PERMISSIONS[name]);
@@ -52,8 +54,7 @@ async function pinThreadCard(card, tournament) {
 async function unpinThreadRef(postChannel, ref) {
   try {
     const { messages } = await postChannel.client.channels.fetch(ref.channelId ?? postChannel.id);
-    if (messages.unpin) await messages.unpin(ref.messageId);
-    else (await messages.fetch(ref.messageId)).unpin();
+    await messages.unpin(ref.messageId);
     return true;
   } catch (err) {
     if ([RESTJSONErrorCodes.UnknownMessage, RESTJSONErrorCodes.UnknownChannel].includes(err.code)) return true;
@@ -99,25 +100,25 @@ async function tournamentThread(event, byEvent, postChannel) {
     }
   }
   state.threads = Object.fromEntries(Object.entries(state.threads).filter(([, each]) => each.at > now - THREAD_KEPT_DAYS * DAY));
-  const entry = { id: thread.id, at: now };
-  if (card?.id) {
-    entry.channelId = card.channelId ?? postChannel.id;
-    entry.messageId = card.id;
-    entry.pinned = await pinThreadCard(card, tournament);
-  }
-  state.threads[slug] = entry;
+  state.threads[slug] = {
+    id: thread.id,
+    at: now,
+    channelId: card.channelId ?? postChannel.id,
+    messageId: card.id,
+    pinned: await pinThreadCard(card, tournament),
+  };
   save();
   return thread;
 }
 
 // pinned tournament and event starters whose tournament or event is over get unpinned. over means past the end plus time
 // for locals running late, or placements already posted for a TO with a far-out end date
-export async function unpinFinishedThreads(postChannel = channel) {
+export async function unpinFinishedThreads(postChannel = currentChannel()) {
   if (!postChannel?.client) return;
   const now = secondsNow();
   let changed = false;
   for (const [slug, entry] of Object.entries(state.threads)) {
-    if (!entry?.pinned || !entry.messageId) continue;
+    if (!entry.pinned || !entry.messageId) continue;
     if (entry.at <= now - THREAD_KEPT_DAYS * DAY) {
       try {
         await unpinThreadRef(postChannel, entry);
@@ -149,13 +150,14 @@ export async function unpinFinishedThreads(postChannel = channel) {
 // a tournament going away takes its pins off first, so deleted and unpublished ones don't stay pinned.
 // that covers its event threads too, since unpinFinishedThreads skips tournaments that are gone
 export async function unpinTournamentThread(postChannel, tournament) {
-  if (!(postChannel ?? channel)?.client) return;
+  const channel = postChannel ?? currentChannel();
+  if (!channel?.client) return;
   const prefix = `${tournament.slug}/event/`;
   for (const [slug, entry] of Object.entries(state.threads)) {
     if (slug !== tournament.slug && !slug.startsWith(prefix)) continue;
-    if (!entry?.pinned || !entry.messageId) continue;
+    if (!entry.pinned || !entry.messageId) continue;
     try {
-      await unpinThreadRef(postChannel ?? channel, entry);
+      await unpinThreadRef(channel, entry);
     } catch (err) {
       console.error(`unpinning the thread starter for ${tournament.name} failed:`, err.message);
       continue;

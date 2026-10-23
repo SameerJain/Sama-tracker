@@ -1,4 +1,4 @@
-# Monday Night SmashBall @ Heart of the Game — Ultimate stats
+# Monday Night SmashBall @ Heart of the Game: Ultimate stats
 
 View: open `index.html` in a browser (double-click). No server, no build, no internet needed.
 Charts are static SVGs in `images/`, raw numbers in `data/` (JSON + CSV).
@@ -15,26 +15,26 @@ Charts are static SVGs in `images/`, raw numbers in `data/` (JSON + CSV).
   reported characters, 85 distinct characters. Plus a Melee top-10 from 57 events.
 - Winners merged by start.gg player id across alias/sponsor changes.
   Events-entered ranking from full entrant lists (436 distinct players).
-- Page also has seasonality (average attendance by month of year), a character
-  matchup matrix (every character and pair in the games with both
-  characters reported, toggling to the
-  full Smash Ultimate roster; Random Character left out as not a character),
-  loyalty tiers and
-  an attendance histogram, first-time/second-time
-  and further return rates, a cumulative distinct-players growth curve with
-  newcomers per year, and a Buffalo overall card for players in both series.
+- Page also has rivalries from every singles set (a checkbox narrows them
+  to sets with characters reported), top-4 consistency and recent form, favourites and
+  upsets, year-over-year retention, seasonality, character
+  usage with 95% ranges, character matchups, loyalty tiers, return rates,
+  cumulative player growth and a Buffalo card for players in both series.
 
 ## Data files
 
-- `data/tournaments.json/.csv` — all 182 tournaments + Ultimate winner
-- `data/standings-ultimate.json` — top 4 of each Ultimate event
-- `data/winners.json/.csv` — wins/podiums per player, signature character
-- `data/characters.json/.csv` — games + game-wins per character
-- `data/matchups.json/.csv` — character vs character game records (every pair with a reported game)
-- `data/seasonality.json/.csv` — tournaments and average attendance by month of year
-- `data/retention.json/.csv` — loyalty tiers, histogram, return rates, newcomers by year, cumulative players
-- `data/cross-series.json/.csv` — players entered in both series, combined events and wins
-- `data/charts-data.json` — arrays backing the charts
+- `data/tournaments.json/.csv`: all 182 tournaments + Ultimate winner
+- `data/standings-ultimate.json`: top 4 of each Ultimate event
+- `data/winners.json/.csv`: wins/podiums per player, signature character
+- `data/characters.json/.csv`: games + game-wins per character
+- `data/matchups.json/.csv`: character vs character game records (every pair with a reported game)
+- `data/head-to-head.json/.csv`: player rivalries from every completed singles set, with games won from reported set scores
+- `data/podium-rates.json/.csv`: top-4 and title rates over nights entered
+- `data/favourites.json`: favourites, upsets, first-time champions and title spread
+- `data/seasonality.json/.csv`: tournaments and average attendance by month of year
+- `data/retention.json/.csv`: loyalty tiers, histogram, return rates, newcomers by year, cumulative players
+- `data/cross-series.json/.csv`: players entered in both series, combined events and wins
+- `data/charts-data.json`: arrays backing the charts
 
 ## Rebuild
 

@@ -41,7 +41,7 @@ async function makeRole(guild) {
 // a member from an interaction has its roles as a cache, a raw one as a list of ids
 function hasRole(member, role) {
   const roles = member?.roles;
-  return Boolean(roles?.cache?.has?.(role.id) ?? (Array.isArray(roles) && roles.includes(role.id)));
+  return Array.isArray(roles) ? roles.includes(role.id) : Boolean(roles?.cache?.has(role.id));
 }
 
 function remember(discordId) {

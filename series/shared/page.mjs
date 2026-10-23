@@ -1,37 +1,207 @@
-// Shared page shell for series viewers: CSS, layout, cards, tables, client JS.
-// One code path for every series so a feature added once ships everywhere.
+// the page shell every series shares: css, cards, tables and the browser js
 export const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 export const dstr = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
 export const trunc = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 export const csv = (rows) => rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
 export const pill = (cls, text) => `<span class="pill ${cls}">${esc(text)}</span>`;
 
-export const CSS = `:root{--bg:#fff;--fg:#222;--line:#ddd;--head:#f2f2f2;--headhov:#e2e2e2;--card:#fff}body.dark{--bg:#16181d;--fg:#e6e6e8;--line:#3a3f47;--head:#22262e;--headhov:#2c313a;--card:#1b1f26}body{font-family:system-ui,sans-serif;max-width:1100px;margin:0 auto;padding:16px;color:var(--fg);background:var(--bg)}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}th{background:var(--head)}th:hover{background:var(--headhov)}img{max-width:none;display:block}body.dark .scroll svg,body.dark .scroll img{filter:invert(0.88) hue-rotate(180deg)}.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:16px 0;overflow:hidden}small{color:#888}.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.toggles{font-size:13px;margin:6px 0}.toggles label{margin-right:12px;white-space:nowrap}.weektoggle{font-size:14px;margin:8px 0}.weektoggle a{margin-right:8px}nav{font-size:14px;margin:8px 0;display:flex;flex-wrap:wrap;column-gap:12px}nav a{margin-right:12px}.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;color:#fff;white-space:nowrap}.pill.u{background:#4c78a8}.pill.m{background:#2ca02a}.pill.r{background:#8c564b}.pill.s{background:#9467bd}#toolbar{position:fixed;top:10px;left:10px;z-index:70;display:flex;gap:6px}#toolbar button{font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);cursor:pointer}body.nav-hidden nav{display:none}rect.clickable:hover{opacity:.7}circle.dot:hover{r:6;fill:#e45756}#attended.hide-few tr[data-events="1"],#attended.hide-few tr[data-events="2"]{display:none!important}.matrix table{font-size:11px}.matrix th,.matrix td{padding:2px 4px}.matrix table tr>th:first-child{position:sticky;left:0;z-index:2}.matrix table tr:first-child th{position:sticky;top:0;z-index:1}.matrix table tr:first-child th:first-child{z-index:3}#linetip{position:fixed;z-index:80;pointer-events:none;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;line-height:1.5;display:none;box-shadow:0 2px 8px rgba(0,0,0,.25);white-space:pre-line}.matrix td{cursor:pointer}.matrix .hl-line{box-shadow:inset 0 0 0 100px rgba(255,196,0,.30)}.matrix td.hl-cell{box-shadow:inset 0 0 0 100px rgba(255,160,0,.55);outline:3px solid #e65100;outline-offset:-3px;font-weight:700}@media(min-width:641px){body{box-sizing:border-box;max-width:1308px;padding-left:208px}body.nav-hidden{padding-left:16px}#toolbar{left:max(10px,calc(50% - 646px))}nav.side{flex-direction:column;position:fixed;left:max(8px,calc(50% - 646px));top:110px;width:150px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}nav.side a{display:block;margin:0 0 8px}}@media(max-width:640px){body{padding:44px 8px 8px}h1{font-size:22px}table{font-size:12px}th,td{padding:3px 6px}.card{padding:8px;margin:12px 0}}`;
+export const CSS = [
+  ':root{--bg:#fff;--fg:#222;--line:#ddd;--head:#f2f2f2;--headhov:#e2e2e2;--card:#fff}',
+  'body.dark{--bg:#16181d;--fg:#e6e6e8;--line:#3a3f47;--head:#22262e;--headhov:#2c313a;--card:#1b1f26}',
+  'body{font-family:system-ui,sans-serif;max-width:1100px;margin:0 auto;padding:16px;color:var(--fg);background:var(--bg)}',
+  'table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}',
+  'th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}',
+  'th{background:var(--head)}',
+  'th:hover{background:var(--headhov)}',
+  'img{max-width:none;display:block}',
+  'body.dark .scroll svg,body.dark .scroll img{filter:invert(0.88) hue-rotate(180deg)}',
+  '.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:16px 0;overflow:hidden}',
+  'small{color:#888}',
+  '.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}',
+  '.toggles{font-size:13px;margin:6px 0}',
+  '.toggles label{margin-right:12px;white-space:nowrap}',
+  '.weektoggle{font-size:14px;margin:8px 0}',
+  '.weektoggle a{margin-right:8px}',
+  'nav{font-size:14px;margin:8px 0;display:flex;flex-wrap:wrap;column-gap:12px}',
+  'nav a{margin-right:12px}',
+  '.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;color:#fff;white-space:nowrap}',
+  '.pill.u{background:#4c78a8}',
+  '.pill.m{background:#2ca02a}',
+  '.pill.r{background:#8c564b}',
+  '.pill.s{background:#9467bd}',
+  '#toolbar{position:fixed;top:10px;left:10px;z-index:70;display:flex;gap:6px}',
+  '#toolbar button{font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);cursor:pointer}',
+  'body.nav-hidden nav{display:none}',
+  'rect.clickable:hover{opacity:.7}',
+  'circle.dot:hover{r:6;fill:#e45756}',
+  '#attended.hide-few tr[data-events="1"],#attended.hide-few tr[data-events="2"]{display:none!important}',
+  '.matrix table{font-size:11px}',
+  '.matrix th,.matrix td{padding:2px 4px}',
+  '.matrix table tr>th:first-child{position:sticky;left:0;z-index:2}',
+  '.matrix table tr:first-child th{position:sticky;top:0;z-index:1}',
+  '.matrix table tr:first-child th:first-child{z-index:3}',
+  '#linetip{position:fixed;z-index:80;pointer-events:none;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;line-height:1.5;display:none;box-shadow:0 2px 8px rgba(0,0,0,.25);white-space:pre-line}',
+  '.matrix td{cursor:pointer}',
+  '.matrix .hl-line{box-shadow:inset 0 0 0 100px rgba(255,196,0,.30)}',
+  '.matrix td.hl-cell{box-shadow:inset 0 0 0 100px rgba(255,160,0,.55);outline:3px solid #e65100;outline-offset:-3px;font-weight:700}',
+  '@media(min-width:641px){',
+  'body{box-sizing:border-box;max-width:1308px;padding-left:208px}',
+  'body.nav-hidden{padding-left:16px}',
+  '#toolbar{left:max(10px,calc(50% - 646px))}',
+  'nav.side{flex-direction:column;position:fixed;left:max(8px,calc(50% - 646px));top:110px;width:150px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}',
+  'nav.side a{display:block;margin:0 0 8px}',
+  '}',
+  '@media(max-width:640px){',
+  'body{padding:44px 8px 8px}',
+  'h1{font-size:22px}',
+  'table{font-size:12px}',
+  'th,td{padding:3px 6px}',
+  '.card{padding:8px;margin:12px 0}',
+  '}',
+].join('');
 
 export function card(id, title, bodyHtml, accent) {
   return `<div class="card"${id ? ` id="${id}"` : ''}${accent ? ` style="border-top:4px solid ${accent}"` : ''}>${title ? `<h2>${title}</h2>` : ''}${bodyHtml}</div>`;
 }
-export function scrollTable(headersHtml, rowsHtml, full) {
-  return `<div class="scroll"><table${full ? ' data-full="1"' : ''}><tr>${headersHtml}</tr>${rowsHtml}</table></div>`;
+// a header's class carries to its whole column on phones: <th class="lo">
+// hides the column under 640px, <th class="tx"> is a name column that wraps
+// and breaks a long tag if it must, and <th class="wr"> wraps at spaces
+// only. the rest stay on one line, so dates and scores never break
+export function scrollTable(headersHtml, rowsHtml, full, attrs = '') {
+  const heads = headersHtml.match(/<th\b[^>]*>/g) ?? [];
+  const cols = heads.flatMap((th, i) => {
+    const cls = (th.match(/class="([^"]*)"/)?.[1] ?? '').split(/\s+/);
+    return ['lo', 'tx', 'wr'].filter((k) => cls.includes(k)).map((k) => `${k}-${i + 1}`);
+  });
+  let a = attrs;
+  if (cols.length) a = /class="/.test(a) ? a.replace('class="', `class="${cols.join(' ')} `) : `${a} class="${cols.join(' ')}"`.trim();
+  return `<div class="scroll"><table${full ? ' data-full="1"' : ''}${a ? ' ' + a : ''}><tr>${headersHtml}</tr>${rowsHtml}</table></div>`;
+}
+// the column rules scrollTable's classes point at, for up to 16 columns
+const nthRule = (cls, rule) => Array.from({ length: 16 }, (_, i) => `.${cls}-${i + 1} tr>:nth-child(${i + 1})`).join(',') + `{${rule}}`;
+
+// every viewer links every other viewer, generated from the registry so a new
+// series only needs its series.json entry (plus its url) to join the switcher
+export function seriesSwitcher(current, registry, hub) {
+  const links = Object.entries(registry).map(([slug, reg]) => {
+    const label = esc(reg.short ?? reg.name ?? slug);
+    if (slug === current) return `<span class="pill u">${label}</span>`;
+    return `<a class="series-link" href="${esc(reg.url || `../${reg.outDir}/index.html`)}">${label}</a>`;
+  });
+  if (hub) {
+    const label = esc(hub.short ?? hub.title ?? 'Hub');
+    const href = hub.url || (hub.outDir ? `../${hub.outDir}/index.html` : null);
+    if (href && current !== '__hub__') links.push(`<a class="series-link hub-link" href="${esc(href)}">${label}</a>`);
+    else if (href) links.push(`<span class="pill s">${label}</span>`);
+  }
+  return `<p class="series-switch">More: ${links.join(' · ')}</p>`;
 }
 
-export const MODAL_HTML = `<div id="winmodal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50"><div style="background:var(--card);color:var(--fg);width:min(520px,92vw);margin:8vh auto;padding:16px;border-radius:10px;max-height:76vh;overflow:auto"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="winmodal-title" style="margin:0"></h3><button id="winmodal-x" aria-label="close" style="font-size:16px;padding:2px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);cursor:pointer">✕</button></div><div id="winmodal-list" style="margin-top:8px"></div></div></div>`;
+// a live search box above a big table. the table needs the matching id
+export function filterInput(id, tableId, placeholder) {
+  return `<p class="filterrow"><input class="tablefilter" id="${id}" data-table="${tableId}" type="search" placeholder="${esc(placeholder)}" aria-label="${esc(placeholder)}"></p>`;
+}
 
-// click-popup script for one page's WININFO map. clicking a bar or dot reads out
-// its X and Y values first, then the WININFO list when the point has one: links
-// for tournaments, or plain items for names with nowhere to link to.
-// Modal div must stay outside any script block.
+export const pageFooter = (built, rangeText) =>
+  `<footer class="pagefoot">Built ${esc(built)} · ${esc(rangeText)} · raw numbers in <code>data/</code> (JSON + CSV)</footer>`;
+
+// on top of the base css: the switcher, footer, search boxes and the phone rules. on a phone the line
+// charts swap to a compact svg and low-value columns drop. the matchup matrix is the one thing left
+// to scroll sideways
+export const CSS_EXTRA = [
+  '.series-switch{font-size:14px;margin:2px 0 0}',
+  '.hub-link{font-weight:bold}',
+  'footer.pagefoot{font-size:12px;color:#888;margin:24px 0 8px}',
+  '.filterrow{margin:6px 0}',
+  '.tablefilter{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);width:min(320px,100%)}',
+  '.scroll svg{max-width:100%;height:auto;display:block}',
+  '.switches{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}',
+  '.switches .seg{margin:0}',
+  '.seg-toggle{font:inherit;font-size:13px;padding:6px 14px;border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--fg);cursor:pointer}',
+  '.seg-toggle.on{background:#f28e2b;border-color:#f28e2b;color:#fff;font-weight:600}',
+  '.seg{display:inline-flex;border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:6px 0}',
+  '.seg button{font:inherit;font-size:13px;padding:6px 14px;border:0;background:var(--card);color:var(--fg);cursor:pointer}',
+  '.seg button+button{border-left:1px solid var(--line)}',
+  '.seg button.on{background:#f28e2b;color:#fff;font-weight:600}',
+  '.bars{font-size:12px;margin:4px 0 12px}',
+  '.bar{display:grid;grid-template-columns:var(--lw) minmax(0,1fr);align-items:center;column-gap:8px;margin:0 0 5px}',
+  '.bar-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  '.bar-t{display:flex;align-items:center;gap:6px;min-width:0}',
+  '.bar-f{display:block;flex:none;height:18px;min-width:2px;border-radius:3px;cursor:pointer}',
+  '.bar-f:hover{opacity:.7}',
+  '.bar-v{white-space:nowrap}',
+  '.chart-narrow{display:none}',
+  '.nw{white-space:nowrap}',
+  'tr.few td{color:#888}',
+  '.stat{font-size:15px}',
+  '.picker{font:inherit;font-size:14px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);max-width:100%}',
+].join('')
+  + '@media (max-width:640px){' + [
+    'body{padding:10px}',
+    'h1{font-size:22px;margin:8px 0 4px}',
+    '.card h2{font-size:18px}',
+    '.card h3{font-size:16px}',
+    '#toolbar{position:static;display:flex;gap:6px;margin:0 0 4px}',
+    'nav.side{display:flex;gap:4px;overflow-x:auto;padding-bottom:6px}',
+    'nav.side a{white-space:nowrap}',
+    '.card{padding:10px;margin:12px 0}',
+    'table{font-size:12px}',
+    'th,td{padding:3px 6px}',
+    'th{white-space:normal}',
+    '.matrix table th{white-space:nowrap}',
+    '.wrap2 td:nth-child(2){white-space:normal;min-width:100px;overflow-wrap:anywhere}',
+    '.matrix table{font-size:10px}',
+    '.tablefilter,.picker{font-size:16px}',
+    '.bar{grid-template-columns:minmax(0,min(var(--lw),38%)) minmax(0,1fr)}',
+    '.chart-wide{display:none}',
+    '.chart-narrow{display:block}',
+  ].join('')
+  + nthRule('lo', 'display:none') + nthRule('tx', 'white-space:normal;overflow-wrap:anywhere;min-width:7em') + nthRule('wr', 'white-space:normal') + '}';
+
+export const MODAL_HTML = '<div id="winmodal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50">'
+  + '<div style="background:var(--card);color:var(--fg);width:min(520px,92vw);margin:8vh auto;padding:16px;border-radius:10px;max-height:76vh;overflow:auto">'
+  + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 id="winmodal-title" style="margin:0"></h3>'
+  + '<button id="winmodal-x" aria-label="close" style="font-size:16px;padding:2px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);cursor:pointer">✕</button></div>'
+  + '<div id="winmodal-list" style="margin-top:8px"></div></div></div>';
+
+// the click popup for a page's WININFO map: a bar or dot's X and Y, then its list, tournament links
+// or plain names. the modal div has to stay outside any script block
 export function clientModal(winInfo) {
   return `<script>const WININFO = ${JSON.stringify(winInfo).replace(/<\//g, '<\\/')};
-document.querySelectorAll('rect.clickable, circle.dot').forEach((r) => { r.onclick = () => { const info = WININFO[r.dataset.k]; const x = r.dataset.x, y = r.dataset.y; if (!info && x === undefined && y === undefined) return; document.getElementById('winmodal-title').textContent = info ? info.title : (r.dataset.name || x || ''); const list = document.getElementById('winmodal-list'); list.innerHTML = ''; if (x !== undefined || y !== undefined) { const xy = document.createElement('div'); xy.style.padding = '3px 0'; xy.textContent = 'X: ' + (x ?? '') + ' \\u00b7 Y: ' + (y ?? ''); list.appendChild(xy); } if (r.dataset.name && (x !== undefined || y !== undefined) && !info) { const nm = document.createElement('div'); nm.style.padding = '3px 0'; nm.textContent = r.dataset.name; list.appendChild(nm); } if (info && info.links) list.insertAdjacentHTML('beforeend', info.links.map((l) => '<div style="padding:3px 0"><a href="' + l.u + '">' + l.n + '</a> <small>' + l.d + '</small></div>').join('')); if (info && info.items) list.insertAdjacentHTML('beforeend', info.items.map((t) => '<div style="padding:3px 0">' + t + '</div>').join('')); document.getElementById('winmodal').style.display = 'block'; document.body.style.overflow = 'hidden'; }; });
+document.querySelectorAll('.clickable, circle.dot').forEach((r) => {
+  r.onclick = () => {
+    const info = WININFO[r.dataset.k];
+    const x = r.dataset.x, y = r.dataset.y;
+    const hasXY = x !== undefined || y !== undefined;
+    if (!info && !hasXY) return;
+    document.getElementById('winmodal-title').textContent = info ? info.title : (r.dataset.name || x || '');
+    const list = document.getElementById('winmodal-list');
+    list.innerHTML = '';
+    const line = (text) => {
+      const div = document.createElement('div');
+      div.style.padding = '3px 0';
+      div.textContent = text;
+      list.appendChild(div);
+    };
+    if (hasXY) line('X: ' + (x ?? '') + ' \\u00b7 Y: ' + (y ?? ''));
+    if (r.dataset.name && hasXY && !info) line(r.dataset.name);
+    if (info && info.links) list.insertAdjacentHTML('beforeend', info.links.map((l) => '<div style="padding:3px 0"><a href="' + l.u + '">' + l.n + '</a> <small>' + l.d + '</small></div>').join(''));
+    if (info && info.items) list.insertAdjacentHTML('beforeend', info.items.map((t) => '<div style="padding:3px 0">' + t + '</div>').join(''));
+    document.getElementById('winmodal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  };
+});
 document.getElementById('winmodal-x').onclick = () => { document.getElementById('winmodal').style.display = 'none'; document.body.style.overflow = ''; };
 document.getElementById('winmodal').onclick = (e) => { if (e.target.id === 'winmodal') { e.target.style.display = 'none'; document.body.style.overflow = ''; } };</script>`;
 }
 
-// client JS, shared by every page: sortable tables, chart toggles, dark mode,
-// sidebar toggle, show all/less, win popups. No backticks inside (emitted into a template literal).
+// the browser js every page shares. no backticks in it, since it goes out inside a template literal.
+// a cell's data-v, when it has one, sorts in place of its text, for cells
+// like "57% 4/7" or a 13–13 record. makeSortable is global so a table built
+// later in the browser (the matchup picker) can sort too
 export const CLIENT_JS_SORT = `
-document.querySelectorAll('table').forEach((t) => {
+const sortVal = (c) => (c.dataset.v !== undefined ? c.dataset.v : c.textContent.trim());
+function makeSortable(t) {
   if (!t.rows.length) return;
   const head = t.rows[0];
   [...head.cells].forEach((th, i) => {
@@ -42,9 +212,9 @@ document.querySelectorAll('table').forEach((t) => {
       head.parentNode.querySelectorAll('th').forEach((h) => delete h.dataset.dir);
       th.dataset.dir = String(dir);
       const rows = [...t.rows].slice(1);
-      const num = rows.every((r) => { const v = r.cells[i].textContent.trim(); return v === '' || /^-?[0-9.,%]+$/.test(v); });
+      const num = rows.every((r) => { const v = sortVal(r.cells[i]); return v === '' || /^-?[0-9.,%]+$/.test(v); });
       rows.sort((a, b) => {
-        const x = a.cells[i].textContent.trim(), y = b.cells[i].textContent.trim();
+        const x = sortVal(a.cells[i]), y = sortVal(b.cells[i]);
         if (!num) return x.localeCompare(y) * dir;
         const nx = x === '' ? -Infinity : parseFloat(x.replace(/,/g, ''));
         const ny = y === '' ? -Infinity : parseFloat(y.replace(/,/g, ''));
@@ -54,7 +224,8 @@ document.querySelectorAll('table').forEach((t) => {
       if (t._apply) t._apply();
     };
   });
-});`;
+}
+document.querySelectorAll('table').forEach(makeSortable);`;
 
 export const CLIENT_JS_UI = `
 // chart layer toggles
@@ -76,11 +247,8 @@ document.addEventListener('click', (e) => {
   for (const c of td.parentNode.cells) c.classList.add('hl-line');
   td.classList.add('hl-cell');
 });
-// line hover: the tooltip snaps onto the line. it only appears when the
-// mouse is right on a line, a marker lands on the nearest point of that
-// line, and the box beside it reads out that point's X (date) and Y (the
-// line's own value there), not the mouse's. the svg carries its own axis
-// scale, so a pixel goes back to data values for any of the chart lines
+// line hover: the tooltip only shows with the mouse right on a line. it snaps to the nearest point
+// and reads out that point's date and value, using the axis scale the svg carries
 const SNAP_PX = 6;
 const lineTip = document.createElement('div');
 lineTip.id = 'linetip';
@@ -188,6 +356,18 @@ document.querySelectorAll('input[name="yearview"]').forEach((r) => {
   r.onchange = () => {
     document.querySelectorAll('[data-yearview]').forEach((el) => { el.style.display = el.dataset.yearview === r.value ? '' : 'none'; });
   };
+});
+// searchable tables: an input.tablefilter narrows another table's rows live.
+// clearing it hands back to that table's own show-all/less state, if it has one.
+// the table is looked up on every input, since a view switch can point the box at another one
+document.querySelectorAll('input.tablefilter').forEach((box) => {
+  box.addEventListener('input', () => {
+    const t = document.getElementById(box.dataset.table);
+    if (!t) return;
+    const q = box.value.trim().toLowerCase();
+    if (!q && t._apply) { t._apply(); return; }
+    [...t.rows].slice(1).forEach((r) => { r.style.display = (!q || r.textContent.toLowerCase().includes(q)) ? '' : 'none'; });
+  });
 });
 // attended card: hide players with only 1-2 events (swap to the shorter 3+ chart, hide table rows)
 const fewToggle = document.getElementById('fewtoggle');

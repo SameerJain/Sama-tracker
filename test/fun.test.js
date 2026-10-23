@@ -465,6 +465,14 @@ test('the smash commands go in release order with project+ sixth, and each one\'
   assert.deepEqual(Object.keys(funCommands), ['64', 'melee', 'brawl', 'sm4sh', 'ult', 'pplus', 'bills']);
 });
 
+test('brawl posts carry their own strip, not the results and top 8 yellow', async () => {
+  const { fun } = await import('../src/embeds/system.js');
+  const { colors } = await import('../src/embeds/shared.js');
+  const card = fun('brawl', 'line', { text: 'post', screenshot: { name: 'Wiki', page: 'https://example.com' }, image: { name: 'pic.jpg' } });
+  assert.equal(card.data.color, colors.brawl);
+  assert.notEqual(colors.brawl, colors.results);
+});
+
 // the same value for every Math.random call. under 1/3 a post uses only the game's points,
 // under 2/3 it tries a video first, and above that an article first. under 1/4 haiku makes up the style
 async function postWith(t, random, options) {

@@ -3,7 +3,10 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { messageEnabled, setResultColors } from '../message-settings.js';
 import { MAJOR_UPSET, scoreText, upsetFactor } from '../embeds/shared.js';
-import { channel, secondsNow, health, post, postRefs, editPost, trackedLive, eventsOf, resultsOn, CATCH_UP_HOURS, RESULT_WATCH_MINUTES, HOUR } from './shared.js';
+import {
+  currentChannel, secondsNow, health, post, postRefs, editPost, named, trackedLive, eventsOf, resultsOn, CATCH_UP_HOURS,
+  RESULT_WATCH_MINUTES, HOUR,
+} from './shared.js';
 import { tournamentPosts } from './threads.js';
 
 // singles only, DQs left out, the same major upsets as set result cards. the winner has to be tracked,
@@ -33,7 +36,7 @@ function recordNotableUpset(set) {
   tournament.notableUpsets = tournament.notableUpsets.sort((x, y) => y.factor - x.factor).slice(0, 10);
 }
 
-export async function postNewSets(postChannel = channel) {
+export async function postNewSets(postChannel = currentChannel()) {
   const players = Object.values(state.players);
   const playerIds = players.map((player) => player.playerId);
   // only players with results on get asked about, by playerId to when /track posts turned them on
@@ -65,7 +68,7 @@ export async function postNewSets(postChannel = channel) {
         }
         checked.push(tournament);
       } catch (err) {
-        console.error(`checking sets at ${tournament.name ?? tournament.id} failed:`, err.message);
+        console.error(`checking sets at ${named(tournament)} failed:`, err.message);
       }
     }
 
@@ -87,11 +90,11 @@ export async function postNewSets(postChannel = channel) {
 
       // every set at a tracked tournament. otherwise one finished before /track posts turned results on for
       // everyone tracked in it stays out of the channel. it still counts as posted so the next check doesn't look at it again
-      const showing = covered.has(set.id) || set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
-      if (showing && messageEnabled('sets', set.completedAt)) {
+      const resultsWereOn = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
+      if ((covered.has(set.id) || resultsWereOn) && messageEnabled('sets', set.completedAt)) {
         // no head to head button, the set's over
-        const sent = await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([embeds.setResult(set, state.players, { setColors: setResultColors() })]) });
-        watchResult(sent, set);
+        const card = embeds.setResult(set, state.players, { setColors: setResultColors() });
+        watchResult(await tournamentPosts(set, postChannel).send({ embeds: embeds.withImage([card]) }), set);
       }
       state.posted.push(set.id);
       if (dqed) state.dqs.push(dqed.id);
@@ -124,7 +127,7 @@ function watchResult(message, set) {
 
 // set results from the last hour whose winner or score the TO changed get the corrected card, and ones the TO
 // reset or deleted get marked. one small request covers all of them, and only a changed set is asked for in full
-export async function fixCorrectedResults(postChannel = channel) {
+export async function fixCorrectedResults(postChannel = currentChannel()) {
   const now = secondsNow();
   const before = state.resultPosts.length;
   state.resultPosts = state.resultPosts.filter((each) => each.at > now - RESULT_WATCH_MINUTES * 60);
@@ -148,7 +151,8 @@ export async function fixCorrectedResults(postChannel = channel) {
         const set = sets.get(each.setId);
         // reset again between the two requests, the next check sorts it out
         if (set?.state !== 3) continue;
-        kept = await editPost(postChannel, each, { embeds: embeds.withImage([embeds.correctedResult(set, state.players, { setColors: setResultColors() })]) });
+        const card = embeds.correctedResult(set, state.players, { setColors: setResultColors() });
+        kept = await editPost(postChannel, each, { embeds: embeds.withImage([card]) });
         Object.assign(each, { outcome: startgg.outcomeOf(set), reset: false });
       } else if (outcomes.get(each.setId)?.state !== 3 && !each.reset) {
         // start.gg doesn't have the result anymore, so the card stays as it was with the result marked

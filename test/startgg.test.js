@@ -2,20 +2,11 @@ import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
 import { getActivePlayers, getCharacterSets, getEventHistory, getEventSets, getHeadToHead, getSetHistory, getStats, queueLength } from '../src/startgg.js';
 import { predict } from '../src/predict.js';
+import { settle } from './fixtures.js';
 
 const originalFetch = globalThis.fetch;
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
 after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; });
-
-async function settle(promise) {
-  let done = false;
-  promise.finally(() => { done = true; }).catch(() => {});
-  while (!done) {
-    mock.timers.tick(100);
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  return promise;
-}
 
 function reply(data) {
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ data }) });

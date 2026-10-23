@@ -3,6 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { mockApi as answerWith } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-players-'));
 process.env.STATE_DIR = directory;
@@ -21,7 +22,7 @@ after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: t
 function mockApi(respond) {
   // a new fake answers everything again, including links that missed before
   forgetMisses();
-  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
+  answerWith(respond);
 }
 
 // background checks a command kicks off, so they don't reach the next test's fake
@@ -650,8 +651,8 @@ test('/track list only notes what differs from a new player, then lists tracked 
 
   assert.equal(tournaments.data.title, 'Tracked tournaments · 2');
   const [first, second] = tournaments.data.description.split('\n');
-  assert.equal(first, `[Local](https://www.start.gg/tournament/local) · <t:${now + 3600}:d>`);
-  assert.equal(second, `[Weekly](https://www.start.gg/tournament/weekly) · <t:${now + 86400}:d> · top 8s off`);
+  assert.equal(first, `[Local](https://www.start.gg/tournament/local) · <t:${now + 3600}:d> · match calls off`);
+  assert.equal(second, `[Weekly](https://www.start.gg/tournament/weekly) · <t:${now + 86400}:d> · match calls off · top 8s off`);
 });
 
 test('autocomplete puts recent picks first and matches names loosely', async () => {

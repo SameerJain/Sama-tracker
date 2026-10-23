@@ -1,88 +1,173 @@
 import fs from 'node:fs';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
-// where state.json lives. STATE_DIR works anywhere; Railway sets its own when a volume is
-// attached, and anything else is wiped on redeploy, so the fallback is only for local runs
+// where state.json lives. STATE_DIR works anywhere, Railway sets its own when a volume is attached,
+// and anything else is wiped on redeploy, so the fallback is only for local runs. one file holds every
+// server: state.guilds[guildId] is that server's track list, settings and posts
 export const stateDir = process.env.STATE_DIR ?? process.env.RAILWAY_VOLUME_MOUNT_PATH ?? 'data';
 const FILE = `${stateDir}/state.json`;
 
-// players are keyed by start.gg user id. posted/streamed/called/dqs are ids already announced.
-// regPings, streamPings and callPings are discord ids that turned on /notify registration, streams or calls. regDmPings and startDmPings are the 1-hour
-// DM versions for registration and the start.
-// toRole is the TO role: { id, members, seeded }, id being the discord role, members the discord ids the bot has seen with it, for /t-o role list,
-// and seeded whether the first TO got it.
-// tournaments are keyed by id: the ones tracked players are in, and tracked ones. tracked: { by, at, sets, stream, top8, reminders } says it's tracked,
-// by being 'manual', or 'admin' from before the TO role, and the rest its /t-o tournament posts switches. schedule is the TO's custom
-// reminder times in hours before registration closes, most first, when it's not the default. reminder: { deadline, next } is its reg reminder progress, next being the
-// index into that schedule. dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for. events are all its events from start.gg. notableUpsets are tracked players' major upset wins saved while sets posted, for the results card. crew is the registered server members who aren't tracked,
-// keyed by user id as { userId, slug, tag }, so cards can name them. lastCheck is when its sets were last checked, the way it is on a player.
-// links are start.gg accounts keyed by the discord id that ran /link. socials are { name, url } in the order they were added.
-// accounts are start.gg user ids keyed by the discord id connected to them, from tournament participant lists.
-// messages holds the /messages switches and recap schedule. weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
-// deploy is the railway deployment that last started: { id, at, message? }, with at the first time it started
-// and message the first line of RAILWAY_GIT_COMMIT_MESSAGE, for the bot update post. no commit id
-// slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from the last check and
-// userId when the code came from that start.gg player's netplay registrations. slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back.
-// threads are the threads from /messages threads, keyed by tournament slug, or event slug for one per event: { id, at }, with at when it was started.
-// each thread also saves its channel card as { channelId, messageId, pinned }, pinned saying if the pin worked, so it comes off once the tournament or event is over.
-// recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete
-// buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }, with at when it was sent
-// resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, outcome being startgg.outcomeOf when it was last shown.
-// callPosts are match calls still watched for the set going back to waiting: { setId, channelId, messageId, calledAt, discordIds, text }.
-// text is the You're up ping as it went out, so an uncalled edit matches it
+// which guild's data the current command or background check is using. tests run outside it
+export const guildLocal = new AsyncLocalStorage();
+export const guildId = () => guildLocal.getStore() ?? null;
+
+// multi-server mode is opt-in. unset means the original single-server build: GUILD_ID and
+// CHANNEL_ID are required, commands register to that one server, and everything reads the
+// root state. MULTI_GUILD=true serves every server it's invited to, each with its own
+// guild entry picked by /setup
+export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
+
+// what's in state, server by server:
+//
+// players are tracked players keyed by start.gg user id. links are start.gg accounts keyed by the discord id that
+// ran /link. accounts are start.gg user ids keyed by the discord id connected to them, from participant lists.
+// posted, streamed, called and dqs are set and entrant ids already announced.
+// regPings, streamPings and callPings are discord ids with /notify registration, streams or calls on. regDmPings and
+// startDmPings are the same for the 1-hour DMs before registration closes and before the start.
+// toRole is the TO role: { id, members, seeded }. id is the discord role, members the discord ids the bot has seen
+// with it, for /t-o role list, and seeded whether the first TO got it.
+//
+// tournaments are keyed by id: the ones tracked players are in, and tracked ones.
+//   tracked: { by, at, sets, stream, top8, reminders, calls, schedule } says it's tracked. by is 'manual', or 'admin'
+//   from before the TO role, and the rest are its /t-o tournament posts switches. schedule is the TO's own reminder
+//   times in hours before registration closes, most first, left out for the default.
+//   reminder: { deadline, next } is its reg reminder progress, next being the index into that schedule.
+//   dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for.
+//   events are all its events from start.gg. notableUpsets are tracked players' big upset wins, saved as their sets
+//   posted, for the results card. crew is the registered server members who aren't tracked, keyed by user id as
+//   { userId, slug, tag }, so cards can name them. lastCheck is when its sets were last checked, like a player's.
+//   projected: { at, checkedAt, results, top8 } means placements went out projected, each list being the
+//   { channelId, messageId } posts to edit once they're final. an empty top8 list with top8Posted unset means nothing
+//   was reported yet, and the final goes out as a new message once every event is finished.
+//   top8Posted means its top 8 went out or was switched off, and top8Failed that it's being retried hourly for 3 days.
+//
+// socials are { name, url } in the order they were added. messages holds the /messages switches and recap schedule,
+// and weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
+// slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from
+// the last check. userId is set when the code came from that start.gg player's netplay registrations, and discordId
+// when someone who isn't a TO typed it in as theirs. lastSeason is { at, characters, global, regional } from the last
+// check before their profile turned over to a new season, for the wrap-up.
+// slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back, and
+// slippiWrapped the names of the seasons that got a wrap-up, so each goes out once.
+// threads are the threads from /messages threads, keyed by tournament slug, or event slug for one per event:
+// { id, at, channelId, messageId, pinned }. the last three are its card in the channel, pinned saying if the pin
+// worked, so it comes off once the tournament or event is over.
+// recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete.
+// buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }.
+// resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, with
+// outcome being startgg.outcomeOf when it was last shown.
+// callPosts are match calls still watched for going back to waiting: { setId, channelId, messageId, calledAt,
+// discordIds, text }, text being the You're up ping as it went out, so an uncalled edit matches it.
 // streamPinged is who already got pinged for a live streamed set: { setId, discordIds }.
-// a tournament with projected: { at, checkedAt, results, top8 } had placements go out projected, each list being the { channelId, messageId } posts to edit once they're final.
-// an empty top8 list with top8Posted unset means nothing was reported yet, and the final goes out as a new message once every event is finished.
-// a tournament with top8Posted sent or consumed its top 8, and one with top8Failed is having it retried hourly for 3 days by the fail-safe.
-// regWarned are /reg_warn pings: { tournamentId, discordId, at }, so the same person isn't warned twice for a tournament
-// matchmaking is the discord role id of each game's matchmaking role, keyed ult and melee, so a role renamed in server settings still counts.
-// matchmakingChannels is the discord channel id each game's searches post in, keyed ult and melee. left out
-// means wherever the command ran.
-// matchmakingExpiry are timed roles from /matchmaking_role duration, keyed by discord id and game as
-// `discordId:game` to unix seconds when the role comes off, so a restart doesn't cancel them.
-// matchmakingThreads are { id, at } for threads the bot deletes 24 hours after /matchmaking_search made them.
-// discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, from /t-o tournament event, /t-o tournament add
-// with add_event or /messages events, so every path lands on the same one: { eventId, slug, startAt, synced, gone }. synced is start.gg's side
-// as of the last sync, null until one ran, and gone means a mod deleted it, it started or start.gg deleted the tournament, so it's left alone
-// slippi watchlist entries a non-TO added by typed code have discordId, whoever claimed it as theirs
-// funQueue are the prefetched fun and bills posts still waiting to be served, keyed by command name,
-// so a restart serves them instead of discarding paid-for Claude posts. each entry is the post without
-// its image bytes, which get downloaded again on restore. billsMeta is the bills rotation across restarts:
-// { lastImage, kinds }, so the no-repeat and even photo/gif rotation survive one too
-const empty = {
-  players: {}, tournaments: {}, posted: [], streamed: [], called: [], dqs: [], regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
+// regWarned are /reg_warn pings: { tournamentId, discordId, at }, so nobody is warned twice for a tournament.
+// billsPosted are the ESPN ids of Bills finals already posted.
+// matchmaking is each game's matchmaking role id, keyed ult and melee, so a role renamed in server settings still
+// counts. matchmakingChannels is the channel id each game's searches post in, left out for wherever the command ran.
+// matchmakingExpiry is when timed roles from /matchmaking_role duration come off, in unix seconds keyed
+// `discordId:game`, so a restart doesn't cancel them. matchmakingThreads are { id, at } for threads the bot deletes
+// 24 hours after /matchmaking_search made them.
+// discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, so
+// /t-o tournament event, /t-o tournament add add_event and /messages events all land on the same one:
+// { eventId, slug, startAt, synced, gone }. synced is start.gg's side as of the last sync, null until one ran, and gone
+// means a mod deleted it, it started or start.gg deleted the tournament, so it's left alone.
+//
+// and once per bot, in GLOBAL_KEYS below:
+//
+// deploy is the railway deployment that last started: { id, at, message }, at being the first time it started and
+// message the first line of RAILWAY_GIT_COMMIT_MESSAGE when there was one, for the bot update post. no commit id.
+// funQueue are the prefetched fun and bills posts still waiting, keyed by command name, so a restart serves them
+// instead of throwing away paid-for Claude posts. each is saved without its image bytes, which get downloaded again.
+// billsMeta is { lastImage, kinds }, so the bills no-repeat and even photo/gif rotation survive a restart too.
+const emptyGuild = {
+  channelId: null,
+  players: {}, links: {}, accounts: {},
+  posted: [], streamed: [], called: [], dqs: [],
+  regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
   toRole: { id: null, members: [], seeded: false },
-  links: {}, socials: [], accounts: {}, messages: {}, weeklyRecap: null, deploy: null, slippi: {}, slippiSkipped: [], threads: {}, recentPicks: {}, buttons: [],
-   resultPosts: [], callPosts: [], streamPinged: [], regWarned: [], billsPosted: [], matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
-   funQueue: {}, billsMeta: {},
+  tournaments: {},
+  socials: [], messages: {}, weeklyRecap: null,
+  slippi: {}, slippiSkipped: [], slippiWrapped: [],
+  threads: {}, recentPicks: {}, buttons: [], resultPosts: [], callPosts: [], streamPinged: [], regWarned: [], billsPosted: [],
+  matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
+};
+
+// the root also keeps a copy of every guild key so old state files and tests keep working, and live servers
+// read their guild's copy through the state proxy below. deploy is one per bot. the fun queues and the bills
+// rotation are one per bot too: posts get made ahead at startup, outside any server, so a per-server copy
+// would save them where no command reads them
+const GLOBAL_KEYS = new Set(['deploy', 'guilds', 'funQueue', 'billsMeta']);
+const empty = {
+  ...structuredClone(emptyGuild),
+  deploy: null, guilds: {}, funQueue: {}, billsMeta: {},
 };
 
 function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// a valid file with the wrong shape shouldn't stick: one bad key falls back
-// to its default instead of crashing whoever reads it later
-export function cleanState(parsed) {
-  if (!isPlainObject(parsed)) return structuredClone(empty);
-  const out = { ...structuredClone(empty), ...parsed };
-  for (const [key, fallback] of Object.entries(empty)) {
-    const value = out[key];
-    if (value === undefined) {
-      out[key] = structuredClone(fallback);
-      continue;
-    }
-    if (Array.isArray(fallback)) {
-      if (!Array.isArray(value)) out[key] = structuredClone(fallback);
-      continue;
-    }
-    if (isPlainObject(fallback)) {
-      if (!isPlainObject(value)) out[key] = structuredClone(fallback);
-      continue;
-    }
-    // null defaults like weeklyRecap and deploy are null or an object
-    if (fallback === null && value !== null && !isPlainObject(value)) out[key] = null;
+function sameShape(value, fallback) {
+  if (Array.isArray(fallback)) return Array.isArray(value);
+  if (isPlainObject(fallback)) return isPlainObject(value);
+  // null defaults like weeklyRecap and deploy are null or an object
+  if (fallback === null) return value === null || isPlainObject(value);
+  return true;
+}
+
+// a valid file with the wrong shape shouldn't stick: one bad key falls back to its default instead of
+// crashing whoever reads it later
+function withDefaults(parsed, defaults) {
+  if (!isPlainObject(parsed)) return structuredClone(defaults);
+  const out = { ...structuredClone(defaults), ...parsed };
+  for (const [key, fallback] of Object.entries(defaults)) {
+    if (out[key] === undefined || !sameShape(out[key], fallback)) out[key] = structuredClone(fallback);
   }
   return out;
+}
+
+export function cleanState(parsed) {
+  const out = withDefaults(parsed, empty);
+  for (const [id, guild] of Object.entries(out.guilds)) {
+    out.guilds[id] = withDefaults(guild, emptyGuild);
+    // a server saved before these were one per bot had its own copy, which nothing reads now
+    for (const key of GLOBAL_KEYS) delete out.guilds[id][key];
+  }
+  return out;
+}
+
+// the stored data for one server, made on first use. channelId is where its posts go,
+// set by /setup (or the old CHANNEL_ID for the migrated server)
+export function forGuild(id) {
+  if (!id) return null;
+  raw.guilds[id] ??= structuredClone(emptyGuild);
+  return raw.guilds[id];
+}
+
+export function guildIds() {
+  return Object.keys(raw.guilds);
+}
+
+// where a server's automatic posts go. single-server builds always use CHANNEL_ID. multi-server builds use
+// /setup's pick, and the server migrated from GUILD_ID falls back to CHANNEL_ID until it runs /setup
+export function postsChannelId(id = guildId()) {
+  if (!isMultiGuild()) return process.env.CHANNEL_ID ?? null;
+  if (!id) return null;
+  return forGuild(id).channelId ?? (id === process.env.GUILD_ID ? process.env.CHANNEL_ID ?? null : null);
+}
+
+// copy the old single-server root into that server's entry once, so nobody loses their
+// track list. runs at startup for GUILD_ID/CHANNEL_ID, then those env vars are just fallback
+export function migrateLegacyToGuild(id, channelId = null) {
+  if (!id) return null;
+  const guild = forGuild(id);
+  const hasData = Object.keys(guild.players).length || Object.keys(guild.tournaments).length;
+  if (!hasData) {
+    for (const key of Object.keys(emptyGuild)) {
+      if (key === 'channelId') continue;
+      guild[key] = structuredClone(raw[key] ?? emptyGuild[key]);
+    }
+  }
+  if (!guild.channelId && channelId) guild.channelId = channelId;
+  return guild;
 }
 
 function load() {
@@ -102,7 +187,42 @@ function load() {
   }
 }
 
-export const state = load();
+const raw = load();
+
+// the server's own copy when a per-server key gets read inside guildLocal.run(), otherwise null
+function guildFor(key) {
+  const id = guildLocal.getStore();
+  if (!id || typeof key !== 'string' || GLOBAL_KEYS.has(key) || !Object.hasOwn(emptyGuild, key)) return null;
+  return forGuild(id);
+}
+
+// live code reads state.players etc, which routes to the current guild's copy inside
+// guildLocal.run(), and to the root otherwise, which single-server builds, tests and DMs use
+export const state = new Proxy(raw, {
+  get(target, key, receiver) {
+    const guild = guildFor(key);
+    return guild ? guild[key] : Reflect.get(target, key, receiver);
+  },
+  set(target, key, value) {
+    (guildFor(key) ?? target)[key] = value;
+    return true;
+  },
+  deleteProperty(target, key) {
+    delete (guildFor(key) ?? target)[key];
+    return true;
+  },
+  has(target, key) {
+    return key in (guildFor(key) ?? target);
+  },
+  getOwnPropertyDescriptor(target, key) {
+    const guild = guildFor(key);
+    if (!guild) return Object.getOwnPropertyDescriptor(target, key);
+    return Object.getOwnPropertyDescriptor(guild, key) ?? { configurable: true, enumerable: true, value: undefined, writable: true };
+  },
+  ownKeys(target) {
+    return Reflect.ownKeys(target);
+  },
+});
 
 // saves so far, for /status
 export let saveCount = 0;
@@ -110,10 +230,11 @@ let backedUpAt = 0;
 // a backup every hour at most, so a corrupt main file falls back to something recent
 const BACKUP_HOURS = 1;
 
-// write + fsync + rename so a crash can't leave it half written. 0600 so ids in it aren't world readable
+// write + fsync + rename so a crash can't leave it half written. 0600 so ids in it aren't world readable.
+// stringifies the raw file, not the guild-scoped proxy, so saving inside one server keeps the others
 export function save() {
   fs.mkdirSync(stateDir, { recursive: true });
-  const text = JSON.stringify(state, null, 2);
+  const text = JSON.stringify(raw, null, 2);
   fs.writeFileSync(`${FILE}.tmp`, text, { mode: 0o600 });
   // best effort: windows temp files refuse this, the rename below is the real safety
   try {
@@ -131,5 +252,27 @@ export function save() {
   if (Date.now() - backedUpAt > BACKUP_HOURS * 60 * 60 * 1000) {
     backedUpAt = Date.now();
     fs.writeFileSync(`${FILE}.bak`, text, { mode: 0o600 });
+  }
+}
+
+// a tiny file rewritten every minute while the bot is up, so the next start knows how long it was off.
+// state.json only saves when something changed, so it can't say that
+const HEARTBEAT = `${stateDir}/heartbeat`;
+
+export function readHeartbeat() {
+  try {
+    const at = Number(fs.readFileSync(HEARTBEAT, 'utf8'));
+    return Number.isInteger(at) && at > 0 ? at : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeHeartbeat(at) {
+  try {
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(HEARTBEAT, String(at));
+  } catch (err) {
+    console.error(`couldn't write the heartbeat (${err.message})`);
   }
 }

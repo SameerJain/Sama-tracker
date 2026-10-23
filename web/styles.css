@@ -1,0 +1,35 @@
+/* Samatracker: same plain look as the series pages, nothing fancy. */
+:root{--bg:#fff;--fg:#222;--line:#ddd;--head:#f2f2f2;--card:#fff}
+body.dark{--bg:#16181d;--fg:#e6e6e8;--line:#3a3f47;--head:#22262e;--card:#1b1f26}
+body{font-family:system-ui,sans-serif;max-width:900px;margin:0 auto;padding:16px;color:var(--fg);background:var(--bg)}
+table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
+th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}
+th{background:var(--head)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:16px 0;overflow:hidden}
+.banner{border-left:4px solid #f28e2b}
+small{color:#888}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.series-switch{font-size:14px;margin:2px 0 0}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;color:#fff;white-space:nowrap}
+.pill.u{background:#4c78a8}.pill.s{background:#9467bd}
+.biglinks{display:flex;gap:8px;flex-wrap:wrap}
+.biglink{display:inline-block;padding:10px 16px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--fg);font-weight:bold}
+.biglink:hover{background:var(--head)}
+.tablefilter{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);width:min(320px,100%)}
+button{font-size:13px;padding:5px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);cursor:pointer}
+button:hover{background:var(--head)}
+#toolbar{display:flex;gap:6px;margin:0 0 4px}
+footer.pagefoot{font-size:12px;color:#888;margin:24px 0 8px}
+.watch-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--line)}
+.hitbtn{margin:2px 4px 2px 0}
+#player button,#h2h-picks button{margin:2px 4px 2px 0}
+.rank{font-weight:bold}
+@media (max-width:640px){
+  body{padding:10px}
+  h1{font-size:22px;margin:8px 0 4px}
+  .card{padding:10px;margin:12px 0}
+  table{font-size:12px}
+  th,td{padding:3px 6px}
+  #recent-tbl td:nth-child(2){white-space:normal;min-width:120px;overflow-wrap:anywhere}
+  .tablefilter{font-size:16px}
+}

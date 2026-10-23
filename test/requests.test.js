@@ -1,6 +1,7 @@
 // the start.gg request line: the rate limit, commands taking turns, 429s, retries and background order
 import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
+import { settle } from './fixtures.js';
 
 // start.gg requests go out 800ms apart, a fake clock gets through minutes of them right away
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
@@ -9,16 +10,6 @@ const originalFetch = globalThis.fetch;
 after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; });
 
 // moves the fake clock until it settles
-async function settle(promise) {
-  let done = false;
-  promise.finally(() => { done = true; }).catch(() => {});
-  while (!done) {
-    mock.timers.tick(100);
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  return promise;
-}
-
 const okFetch = () => {
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) });
 };

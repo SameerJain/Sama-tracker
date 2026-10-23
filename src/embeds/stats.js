@@ -1,12 +1,15 @@
 import { escapeMarkdown } from 'discord.js';
 import { singles, startggUrl } from '../startgg.js';
 import { characterUsage } from '../characters.js';
-import { colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, MAJOR_UPSET, count, winLoss, recordOf, gameName, gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, vodLink, filterLine, filtersOn, scoreText, sparkline, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal } from './shared.js';
+import {
+  colors, FOOTER, baseEmbed, split, withLines, percent, topText, step, upsetFactor, MAJOR_UPSET, count, winLoss, recordOf, gameName,
+  gameCount, closeLine, seedLine, sweepLine, streaks, section, bold, shortRecord, playerLink, setLink, vodLink, filterLine, filtersOn,
+  scoreText, sparkline, GAMES_SHOWN, LEANS_SHOWN, OPPONENTS_SHOWN, DAY, ordinal, medal,
+} from './shared.js';
 
+// events on the short and lifetime cards, and upsets on each
 const RECENT_EVENTS = 4;
-
 const LIFETIME_EVENTS = 5;
-
 const UPSETS_SHOWN = 3;
 
 // /progress verbose, opponents played in both periods

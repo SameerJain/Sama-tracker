@@ -1,9 +1,15 @@
+import { ActivityType } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
-import { state, save } from '../store.js';
+import {
+  forGuild, guildIds, guildLocal, isMultiGuild, migrateLegacyToGuild, postsChannelId, readHeartbeat, writeHeartbeat, state, save,
+} from '../store.js';
 import { syncDiscordEvents } from '../discord-events.js';
 import { checkMatchmakingExpiry } from '../commands/matchmaking.js';
-import { channel, setChannel, secondsNow, health, queued, SET_CHECK_MINUTES, TOURNAMENT_CHECK_MINUTES, PROFILE_CHECK_HOURS, SLIPPI_CHECK_MINUTES, PRUNE_CHECK_DAYS, PRUNE_AFTER_DAYS, EVENT_SYNC_MINUTES, BILLS_BASELINE_HOURS, CATCH_UP_HOURS, HOUR, DAY } from './shared.js';
+import {
+  currentChannel, inChannel, setChannel, secondsNow, health, queued, OUTAGE_MINUTES, HEARTBEAT_SECONDS, SET_CHECK_MINUTES, TOURNAMENT_CHECK_MINUTES,
+  PROFILE_CHECK_HOURS, SLIPPI_CHECK_MINUTES, PRUNE_CHECK_DAYS, PRUNE_AFTER_DAYS, EVENT_SYNC_MINUTES, BILLS_BASELINE_HOURS, CATCH_UP_HOURS, HOUR, DAY,
+} from './shared.js';
 import { updateTournaments } from './tournaments.js';
 import { postNewSets, fixCorrectedResults } from './sets.js';
 import { postStreamAlerts } from './streams.js';
@@ -31,31 +37,131 @@ export function deployedAt(env = process.env) {
   return env.RAILWAY_DEPLOYMENT_ID && state.deploy?.id === env.RAILWAY_DEPLOYMENT_ID ? state.deploy.at : null;
 }
 
-// a new railway deployment going live, once. the id is already saved, so a restart won't repeat it
-export async function postDeployUpdate(postChannel = channel, deploy = state.deploy) {
-  if (!deploy) return;
+// how long the bot was off before this start, by the heartbeat, when that's long enough that people noticed.
+// null for a normal restart or redeploy, and on the very first start
+export function lastOutage(now = secondsNow()) {
+  const at = readHeartbeat();
+  return at && now - at >= OUTAGE_MINUTES * 60 ? { from: at, to: now } : null;
+}
+
+// what goes out when the bot starts: the bot update for a new deployment, with the outage on the same card
+// when there was one, or a back online card for an outage alone. single-server builds pass their channel,
+// multi-server ones post in every server's
+export async function postStartNotice({ deploy = null, outage = null }, postChannel = null) {
+  const card = deploy ? embeds.deployUpdate(deploy, outage, CATCH_UP_HOURS) : outage && embeds.backOnline(outage, CATCH_UP_HOURS);
+  if (!card) return;
+  const what = deploy ? 'the bot update' : 'the back online notice';
+  const send = async (target, where = '') => {
+    try {
+      await target.send({ embeds: embeds.withImage([card]), allowedMentions: { parse: [] } });
+    } catch (err) {
+      console.error(`posting ${what} failed${where}:`, err.message);
+    }
+  };
+  if (postChannel) return send(postChannel);
+  await eachGuild((id, channel) => send(channel, ` in ${id}`));
+}
+
+// the bot's discord status says when start.gg is down, so someone whose command failed can see it's not just
+// them. checked every 30 seconds, and only sent to discord when it changes
+const PRESENCE_SECONDS = 30;
+let shownDown = false;
+
+export function outagePresence(downSince) {
+  if (!downSince) return { status: 'online', activities: [] };
+  return { status: 'idle', activities: [{ type: ActivityType.Custom, name: 'start.gg is down', state: 'start.gg is down, lookups wait until it\'s back' }] };
+}
+
+export function updatePresence(client, downSince = startgg.startggDownSince()) {
+  const down = Boolean(downSince);
+  if (down === shownDown || !client?.user) return;
+  shownDown = down;
   try {
-    await postChannel.send({ embeds: embeds.withImage([embeds.deployUpdate(deploy)]), allowedMentions: { parse: [] } });
+    client.user.setPresence(outagePresence(downSince));
   } catch (err) {
-    console.error('posting the bot update failed:', err.message);
+    console.error('changing the bot\'s status failed:', err.message);
   }
 }
 
-export function startTracking(postChannel) {
-  setChannel(postChannel);
-  const deployed = recordDeploy();
+// every repeating check and the bills timer, so a shutdown stops them all instead of leaving them running
+const intervals = [];
+let billsTimeout = null;
+let stopping = false;
 
-  // lastCheck only moves while it's running, so the oldest one is when it went down.
-  // Infinity with nobody tracked
+// the heartbeat and the status, for both kinds of start. the outage gets read before the first heartbeat
+// replaces it
+function watchUptime(client) {
   const now = secondsNow();
-  const lastCheck = Math.min(...Object.values(state.players).map((player) => player.lastCheck));
-  if (lastCheck < now - 2 * SET_CHECK_MINUTES * 60) {
-    health.downSince = lastCheck;
-    if (lastCheck < now - CATCH_UP_HOURS * HOUR) health.skippedBefore = now - CATCH_UP_HOURS * HOUR;
+  const outage = lastOutage(now);
+  writeHeartbeat(now);
+  shownDown = false;
+  intervals.push(
+    setInterval(() => writeHeartbeat(secondsNow()), HEARTBEAT_SECONDS * 1000),
+    setInterval(() => updatePresence(client), PRESENCE_SECONDS * 1000),
+  );
+  return outage;
+}
+
+// one server's posts go in its own channel, set by /setup. the old GUILD_ID/CHANNEL_ID
+// pair migrates into that server's entry, so the first multi-server boot keeps posting there.
+// a cached channel only counts while it's still the saved one, so /setup takes effect on the next check
+let botClient = null;
+const channelCache = new Map();
+
+export async function guildChannel(guildId) {
+  const id = postsChannelId(guildId);
+  if (!id) return null;
+  const cached = channelCache.get(guildId);
+  if (cached?.id === id) return cached;
+  try {
+    const found = await botClient?.channels.fetch(id);
+    if (!found?.isTextBased()) return null;
+    channelCache.set(guildId, found);
+    return found;
+  } catch {
+    return null;
   }
+}
+
+// for tests, which hand it a fake client instead of a logged in one
+export function setBotClient(client) {
+  botClient = client;
+}
+
+// multi-server only: every server's checks run in one pass, in its own guild entry, with its
+// own channel. single-server builds run the same checks once on the root, with CHANNEL_ID.
+// one run at a time (see queued below) so nothing posts twice
+export async function eachGuild(fn) {
+  const ids = new Set([...guildIds(), ...(botClient?.guilds?.cache.keys() ?? [])]);
+  for (const id of ids) {
+    forGuild(id);
+    const postChannel = await guildChannel(id);
+    if (!postChannel) continue;
+    try {
+      await guildLocal.run(id, () => inChannel(postChannel, () => fn(id, postChannel)));
+    } catch (err) {
+      console.error(`background check failed in ${id}:`, err.message);
+    }
+  }
+}
+
+function runScoped(fn) {
+  return isMultiGuild() ? eachGuild(fn) : fn();
+}
+
+// stops the loops started below, for a shutdown. in-flight checks finish on their own
+export function stopTracking() {
+  stopping = true;
+  for (const id of intervals.splice(0)) clearInterval(id);
+  if (billsTimeout) clearTimeout(billsTimeout);
+  channelCache.clear();
+}
+
+// fills in what older state files were saved without. runs on the root, or inside each server
+function migrateSaved() {
   // saved from before userIds existed
   for (const tournament of Object.values(state.tournaments)) {
-    tournament.userIds ??= [...new Set(tournament.entries.map((entry) => entry.userId))];
+    tournament.userIds ??= [...new Set((tournament.entries ?? []).map((entry) => entry.userId))];
   }
   // saved from before trackedAt existed. lastSetAt means they played while tracked, so it
   // counts as the start. otherwise now, so nobody gets pruned for time before this was kept
@@ -63,33 +169,70 @@ export function startTracking(postChannel) {
     player.trackedAt ??= player.lastSetAt ?? secondsNow();
   }
   migrateTracking();
-  save();
-  // a new railway deployment posts once, before the checks start their own posts
-  if (deployed) postDeployUpdate(postChannel, deployed).catch(console.error);
+}
 
-  checkTournaments();
-  checkSets();
-  checkProfiles();
-  checkRegReminders();
-  checkDmReminders();
-  checkWeeklyRecap();
-  checkSlippiCodes();
-  checkSlippiRanks();
+const lastChecks = () => Object.values(state.players).map((player) => player.lastCheck).filter(Boolean);
+
+// lastCheck only moves while the set check runs, so the oldest one is when the bot went down. the heartbeat
+// knows better when there is one
+function noteDowntime(oldest, outage, now) {
+  if (oldest < now - 2 * SET_CHECK_MINUTES * 60) {
+    health.downSince = oldest;
+    if (oldest < now - CATCH_UP_HOURS * HOUR) health.skippedBefore = now - CATCH_UP_HOURS * HOUR;
+  }
+  if (outage) health.downSince = outage.from;
+}
+
+// every check once now, in this order, then every so many seconds. the bills have their own loop below
+function startChecks() {
+  const checks = [
+    [checkTournaments, TOURNAMENT_CHECK_MINUTES * 60],
+    [checkSets, SET_CHECK_MINUTES * 60],
+    [checkProfiles, PROFILE_CHECK_HOURS * HOUR],
+    [checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60],
+    [checkDmReminders, TOURNAMENT_CHECK_MINUTES * 60],
+    [checkWeeklyRecap, 60],
+    [checkSlippiCodes, PROFILE_CHECK_HOURS * HOUR],
+    [checkSlippiRanks, SLIPPI_CHECK_MINUTES * 60],
+    [checkPrune, PRUNE_CHECK_DAYS * DAY],
+    [checkDiscordEvents, EVENT_SYNC_MINUTES * 60],
+    [checkMatchmaking, 60],
+  ];
+  for (const [check] of checks) check();
   loopBills();
-  checkPrune();
-  checkDiscordEvents();
-  checkMatchmaking();
-  setInterval(checkDiscordEvents, EVENT_SYNC_MINUTES * 60 * 1000);
-  setInterval(checkTournaments, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
-  setInterval(checkRegReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
-  setInterval(checkDmReminders, TOURNAMENT_CHECK_MINUTES * 60 * 1000);
-  setInterval(checkSets, SET_CHECK_MINUTES * 60 * 1000);
-  setInterval(checkProfiles, PROFILE_CHECK_HOURS * HOUR * 1000);
-  setInterval(checkSlippiCodes, PROFILE_CHECK_HOURS * HOUR * 1000);
-  setInterval(checkSlippiRanks, SLIPPI_CHECK_MINUTES * 60 * 1000);
-  setInterval(checkPrune, PRUNE_CHECK_DAYS * DAY * 1000);
-  setInterval(checkWeeklyRecap, 60 * 1000);
-  setInterval(checkMatchmaking, 60 * 1000);
+  intervals.push(...checks.map(([check, seconds]) => setInterval(check, seconds * 1000)));
+}
+
+// single-server builds post in CHANNEL_ID with everything on the root state. multi-server builds post in
+// each server's /setup channel
+export function startTracking(client, singleChannel = null) {
+  stopping = false;
+  const now = secondsNow();
+  const checked = [];
+  if (isMultiGuild()) {
+    botClient = client;
+    // old single-server installs keep their track list: the root becomes that server's entry
+    if (process.env.GUILD_ID) migrateLegacyToGuild(process.env.GUILD_ID, process.env.CHANNEL_ID);
+    for (const guild of client?.guilds.cache.values() ?? []) forGuild(guild.id);
+    for (const id of guildIds()) {
+      guildLocal.run(id, () => {
+        migrateSaved();
+        checked.push(...lastChecks());
+      });
+    }
+  } else {
+    setChannel(singleChannel);
+    migrateSaved();
+  }
+  // the root, for single-server builds and a multi-server one that has no servers yet
+  if (!checked.length) checked.push(...lastChecks());
+  const deployed = recordDeploy();
+  const outage = watchUptime(client ?? singleChannel?.client);
+  noteDowntime(checked.length ? Math.min(...checked) : Infinity, outage, now);
+  save();
+  // a new railway deployment or an outage posts once, before the checks start their own posts
+  postStartNotice({ deploy: deployed, outage }, isMultiGuild() ? null : singleChannel).catch(console.error);
+  startChecks();
 }
 
 // saved from before tournaments could be tracked. a reg reminder becomes a tracked tournament with reminders
@@ -104,6 +247,7 @@ export function migrateTracking(now = secondsNow()) {
   delete state.messages.callsWarn;
   delete state.messages.callsDq;
   for (const tournament of Object.values(state.tournaments)) {
+    if (tournament.tracked) tournament.tracked.calls ??= false;
     if (!tournament.discordEventId) continue;
     state.discordEvents[tournament.id] ??= { eventId: tournament.discordEventId, slug: tournament.slug, startAt: tournament.startAt, synced: null };
     delete tournament.discordEventId;
@@ -117,9 +261,10 @@ export function migrateTracking(now = secondsNow()) {
   }
   delete state.regReminders;
 
-  const pinging = state.messages?.calls === true;
+  const pinging = state.messages.calls === true;
   for (const player of Object.values(state.players)) {
-    if (player.callPings === true && pinging && player.discordId && !state.callPings.includes(player.discordId)) state.callPings.push(player.discordId);
+    const keeps = player.callPings === true && pinging && player.discordId;
+    if (keeps && !state.callPings.includes(player.discordId)) state.callPings.push(player.discordId);
     delete player.callPings;
   }
 }
@@ -131,11 +276,12 @@ export function newTracked(player) {
   return { ...player, lastCheck: secondsNow(), trackedAt: secondsNow(), streamAlerts: false, setResults: false };
 }
 
-// /t-o tournament add, or a reminder from before tournaments were tracked. everything it posts starts on and
-// /t-o tournament posts turns parts off. its sets are looked at from now on, so tracking one partway through
-// doesn't flood its thread with what already happened. reminder fills in at the next reminder check
+// /t-o tournament add, or a reminder from before tournaments were tracked. everything it posts starts on
+// but match calls, which a TO turns on with /t-o tournament posts for the whole bracket. /t-o tournament posts
+// turns parts off. its sets are looked at from now on, so tracking one partway through doesn't flood its thread
+// with what already happened. reminder fills in at the next reminder check
 export function trackTournament(tournament, by, now = secondsNow()) {
-  tournament.tracked = { by, at: now, sets: true, stream: true, top8: true, reminders: true };
+  tournament.tracked = { by, at: now, sets: true, stream: true, top8: true, reminders: true, calls: false };
   tournament.reminder ??= {};
   tournament.lastCheck = now;
   // looked at on the next check even when it's far off, for its events and crew
@@ -188,37 +334,44 @@ export async function pruneInactive(now = secondsNow()) {
   return pruned;
 }
 
-const checkSets = queued(async () => {
+// each runs on the root, or once per server in multi-server builds. the arrow functions keep eachGuild's
+// arguments away from the ones that take a time
+const checkSets = queued(() => runScoped(async () => {
   await postNewSets();
   await fixCorrectedResults();
   await postStreamAlerts();
   await postMatchCalls();
   await followCalls();
   await clearFinishedButtons();
-});
-export const checkTournaments = queued(updateTournaments);
-const checkProfiles = queued(updateProfiles);
-export const checkRegReminders = queued(postRegReminders);
-export const checkDmReminders = queued(postDmReminders);
-const checkWeeklyRecap = queued(postWeeklyRecap);
-const checkSlippiCodes = queued(findSlippiCodes);
-const checkSlippiRanks = queued(postRankChanges);
-const checkPrune = queued(pruneInactive);
-const checkDiscordEvents = queued(() => syncDiscordEvents(channel?.guild));
+}));
+export const checkTournaments = queued(() => runScoped(() => updateTournaments()));
+const checkProfiles = queued(() => runScoped(() => updateProfiles()));
+export const checkRegReminders = queued(() => runScoped(() => postRegReminders()));
+export const checkDmReminders = queued(() => runScoped(() => postDmReminders()));
+const checkWeeklyRecap = queued(() => runScoped(() => postWeeklyRecap()));
+const checkSlippiCodes = queued(() => runScoped(() => findSlippiCodes()));
+const checkSlippiRanks = queued(() => runScoped(() => postRankChanges()));
+const checkPrune = queued(() => runScoped(() => pruneInactive()));
+const checkDiscordEvents = queued(() => runScoped(() => syncDiscordEvents(currentChannel()?.guild)));
 // discord only, no start.gg, but queued keeps one run at a time like the rest
-const checkMatchmaking = queued(() => checkMatchmakingExpiry(channel?.guild));
+const checkMatchmaking = queued(() => runScoped(() => checkMatchmakingExpiry(currentChannel()?.guild)));
 
-// Bills runs on its own loop below since game day polls tighter than the baseline
+// Bills runs on its own loop since game day polls tighter than the baseline. each server's results say when
+// to look next, and the soonest wins. stopping skips the next round, so a shutdown doesn't leave a timer running
 let billsRunning = false;
 async function loopBills() {
   let delay = BILLS_BASELINE_HOURS * HOUR * 1000;
   if (!billsRunning) {
     billsRunning = true;
     try {
-      delay = await postBillsResults();
+      const delays = [];
+      await runScoped(async () => delays.push(await postBillsResults()));
+      if (delays.length) delay = Math.min(...delays);
     } finally {
       billsRunning = false;
     }
   }
-  setTimeout(loopBills, delay);
+  if (stopping) return;
+  if (billsTimeout) clearTimeout(billsTimeout);
+  billsTimeout = setTimeout(loopBills, delay);
 }

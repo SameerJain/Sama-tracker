@@ -137,23 +137,21 @@ async function regWarn(interaction) {
   const participants = await startgg.getParticipants(tournament.id);
   rememberAccounts(participants);
   const name = escapeMarkdown(interaction.options.getMember('user')?.displayName ?? user.displayName);
-  if (participants.some((participant) => participant.discordId === user.id)) {
-    return interaction.editReply({ content: `Already registered.\n-# ${name} · ${escapeMarkdown(tournament.name)}`, allowedMentions: { parse: [] } });
-  }
+  const title = escapeMarkdown(tournament.name);
+  const say = (content) => interaction.editReply({ content, allowedMentions: { parse: [] } });
+  if (participants.some((participant) => participant.discordId === user.id)) return say(`Already registered.\n-# ${name} · ${title}`);
   const deadline = regDeadline(tournament);
-  if (deadline <= secondsNow()) return interaction.editReply({ content: `Registration for ${escapeMarkdown(tournament.name)} already closed.`, allowedMentions: { parse: [] } });
-  if (!tournament.isRegistrationOpen) return interaction.editReply({ content: `Registration for ${escapeMarkdown(tournament.name)} isn't open right now.`, allowedMentions: { parse: [] } });
+  if (deadline <= secondsNow()) return say(`Registration for ${title} already closed.`);
+  if (!tournament.isRegistrationOpen) return say(`Registration for ${title} isn't open right now.`);
   // not on a hidden list means nothing, so no warning
-  if (startgg.attendeesHidden(tournament, participants)) {
-    return interaction.editReply({ content: `start.gg hides who's registered for ${escapeMarkdown(tournament.name)}, so there's no telling if they are. No warning sent.`, allowedMentions: { parse: [] } });
-  }
+  if (startgg.attendeesHidden(tournament, participants)) return say(`start.gg hides who's registered for ${title}, so there's no telling if they are. No warning sent.`);
   // two people warning the same person about the same tournament is one too many. checked last, with nothing
   // awaited before it's saved, so two at once can't both get through
   const now = secondsNow();
   state.regWarned = state.regWarned.filter((each) => each.at > now - REG_WARN_COOLDOWN_HOURS * 60 * 60);
   const earlier = state.regWarned.find((each) => String(each.tournamentId) === String(tournament.id) && each.discordId === user.id);
   if (earlier) {
-    return replyEphemeralAfterDefer(interaction, `${name} was already warned about ${escapeMarkdown(tournament.name)} <t:${earlier.at}:R>. They can be warned again <t:${earlier.at + REG_WARN_COOLDOWN_HOURS * 60 * 60}:R>.`);
+    return replyEphemeralAfterDefer(interaction, `${name} was already warned about ${title} <t:${earlier.at}:R>. They can be warned again <t:${earlier.at + REG_WARN_COOLDOWN_HOURS * 60 * 60}:R>.`);
   }
   state.regWarned = [...state.regWarned, { tournamentId: tournament.id, discordId: user.id, at: now }].slice(-200);
   save();

@@ -1,6 +1,8 @@
 {
   "monday-night-smashball": {
     "name": "Monday Night SmashBall",
+    "short": "MNSB",
+    "url": "https://monday-night-smashball.vercel.app",
     "researchDir": "research_notes/monday-night-smashball",
     "outDir": "monday-night-smashball",
     "build": "monday-night-smashball/build.mjs",
@@ -44,6 +46,8 @@
   },
   "ub-smash-royale": {
     "name": "UB Smash Royale",
+    "short": "Royale",
+    "url": "https://ub-smash-royale.vercel.app",
     "researchDir": "research_notes/ub-smash-royale",
     "outDir": "ub-smash-royale",
     "build": "ub-smash-royale/build.mjs",

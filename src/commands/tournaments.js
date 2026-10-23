@@ -1,6 +1,6 @@
 import { escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
-import { state, save } from '../store.js';
+import { postsChannelId, state, save } from '../store.js';
 import { ensureDiscordEvent } from '../discord-events.js';
 import {
   MAX_REMINDER_HOURS, MAX_REMINDERS, REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, missingThreadPermissions, nextRegReminder, regDeadline,
@@ -15,7 +15,7 @@ import { tournamentNotFound, tournamentSlug } from './registration.js';
 const HOUR = 60 * 60;
 
 // /t-o tournament posts switches, named the way the replies list them
-const POSTS = { sets: 'Every set', stream: 'Stream alerts', top8: 'Top 8s', reminders: 'Reg reminders' };
+const POSTS = { sets: 'Every set', stream: 'Stream alerts', calls: 'Match calls', top8: 'Top 8s', reminders: 'Reg reminders' };
 
 // 7 days, 3 days, 1 day and 6 hours
 function inWords(hours) {
@@ -24,7 +24,7 @@ function inWords(hours) {
 
 // custom reminder times before registration closes, like 7d,3d,1d,6h. bare numbers mean hours.
 // null when left out, { error } when it doesn't parse, otherwise hours before the deadline, most first
-export function parseSchedule(input) {
+function parseSchedule(input) {
   if (!input) return null;
   const hours = [];
   for (const part of input.split(/[\s,]+/).filter(Boolean)) {
@@ -48,21 +48,24 @@ function trackedPick(interaction) {
     ?? lookup(Object.fromEntries(tracked.map((tournament) => [String(tournament.id), tournament])), value, 'name');
 }
 
-// what a tracked tournament posts, on one line. a custom reminder schedule shows with it
+// what a tracked tournament posts, on one line. a custom reminder schedule shows with it.
+// match calls start off, so a tournament tracked before they existed reads as off too
 function postsText(tournament) {
   const lines = Object.entries(POSTS).map(([name, label]) => {
     if (name === 'reminders' && tournament.tracked[name] !== false && tournament.tracked.schedule) {
       return `**${label}:** on (${shortSchedule(tournament.tracked.schedule)})`;
     }
-    return `**${label}:** ${tournament.tracked[name] === false ? 'off' : 'on'}`;
+    const on = name === 'calls' ? tournament.tracked[name] === true : tournament.tracked[name] !== false;
+    return `**${label}:** ${on ? 'on' : 'off'}`;
   });
   return lines.join(' · ');
 }
 
 // every set and stream alert goes in its thread, so say when that can't happen yet
 function threadWarning(interaction) {
-  const channelId = process.env.CHANNEL_ID;
-  const postChannel = interaction.client?.channels?.cache?.get(channelId);
+  // the posts channel, not wherever this ran. a multi-server build with no /setup yet has none
+  const channelId = postsChannelId();
+  const postChannel = channelId && interaction.client?.channels?.cache?.get(channelId);
   if (!postChannel) return null;
   const missing = missingThreadPermissions(postChannel);
   if (!missing) return `Threads can't be started in <#${channelId}>, so its sets and stream alerts post there instead.`;
@@ -78,15 +81,18 @@ function trackLines(interaction, found, reminders, schedule, now = secondsNow())
 
   const { id, slug, startAt, endAt, city, addrState, venueName, venueAddress, isOnline } = found;
   const images = (found.images ?? []).filter((image) => image.type === 'profile').map(({ url }) => ({ url }));
-  const tournament = state.tournaments[id] ??= { id, name: found.name, slug, startAt, endAt, city, addrState, venueName, venueAddress, isOnline, images, entries: [], userIds: [] };
+  const tournament = state.tournaments[id] ??= {
+    id, name: found.name, slug, startAt, endAt, city, addrState, venueName, venueAddress, isOnline, images, entries: [], userIds: [],
+  };
   trackTournament(tournament, 'manual', now);
   tournament.tracked.reminders = reminders;
   if (schedule) tournament.tracked.schedule = schedule;
 
   const lines = [`Tracking ${name}. Every set and stream alert from it posts in its own thread, then results and each event's top 8 once the bracket is finished.`];
   const deadline = regDeadline(found);
-  const next = nextRegReminder(deadline, schedule ?? REG_REMINDER_HOURS);
-  const firstAt = deadline - (schedule ?? REG_REMINDER_HOURS)[next] * HOUR;
+  const hours = schedule ?? REG_REMINDER_HOURS;
+  const next = nextRegReminder(deadline, hours);
+  const firstAt = deadline - hours[next] * HOUR;
   // further out it might just not be open yet
   const open = deadline > now && (firstAt > now || found.isRegistrationOpen);
   if (open) tournament.reminder = { deadline, next };
@@ -94,12 +100,12 @@ function trackLines(interaction, found, reminders, schedule, now = secondsNow())
   else if (!open) lines.push('Registration is closed, so no reg reminders.');
   else if (firstAt <= now) lines.push(`Registration ends <t:${deadline}:R>, sending the last call now.`);
   else {
-    const when = new Intl.ListFormat('en').format((schedule ?? REG_REMINDER_HOURS).slice(next).map(inWords));
+    const when = new Intl.ListFormat('en').format(hours.slice(next).map(inWords));
     lines.push(`Everyone with \`/notify registration\` on gets pinged ${when} before registration ends, starting <t:${firstAt}:R>.`);
   }
   const warning = threadWarning(interaction);
   if (warning) lines.push(warning);
-  lines.push('-# `/t-o tournament posts` turns any of it off');
+  lines.push('-# `/t-o tournament posts` turns any of it off, or posts every called set with `calls:on`');
   return lines;
 }
 
@@ -139,7 +145,8 @@ function tournamentRemove(interaction) {
   if (!isTO(interaction)) return notTO(interaction, 'stop tracking tournaments');
   const tournament = trackedPick(interaction);
   if (!tournament) return replyEphemeral(interaction, 'That tournament isn\'t tracked. `/track list` shows the ones that are.');
-  return askFirst(interaction, 'untrack_tournament', tournament.id, `Stop tracking ${escapeMarkdown(tournament.name)}? Its sets, stream alerts, top 8s and reg reminders stop.`, 'Stop tracking');
+  const calls = tournament.tracked.calls === true ? 'match calls, ' : '';
+  return askFirst(interaction, 'untrack_tournament', tournament.id, `Stop tracking ${escapeMarkdown(tournament.name)}? Its sets, stream alerts, ${calls}top 8s and reg reminders stop.`, 'Stop tracking');
 }
 
 confirmable('untrack_tournament', {
@@ -188,16 +195,12 @@ function tournamentPosts(interaction) {
 
   const { tracked } = tournament;
   if (changes.sets && tracked.sets === false) tournament.lastCheck = secondsNow();
-  if (changes.reminders && tracked.reminders === false) {
+  if ((changes.reminders && tracked.reminders === false) || schedule || resetting) {
     tournament.reminder ??= {};
     delete tournament.reminder.next;
   }
-  if (schedule || resetting) {
-    if (schedule) tracked.schedule = schedule;
-    else delete tracked.schedule;
-    tournament.reminder ??= {};
-    delete tournament.reminder.next;
-  }
+  if (schedule) tracked.schedule = schedule;
+  else if (resetting) delete tracked.schedule;
   Object.assign(tracked, changes);
   save();
   const lines = [`**${name}**`, postsText(tournament)];
@@ -233,4 +236,4 @@ async function tournamentEvent(interaction) {
   await interaction.editReply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
-export { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent };
+export { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, parseSchedule };

@@ -3,6 +3,7 @@ import test, { after, mock } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { settle } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-countdown-'));
 process.env.STATE_DIR = directory;
@@ -17,16 +18,6 @@ const originalFetch = globalThis.fetch;
 after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
 
 // moves the fake clock until it settles
-async function settle(promise) {
-  let done = false;
-  promise.finally(() => { done = true; }).catch(() => {});
-  while (!done) {
-    mock.timers.tick(100);
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  return promise;
-}
-
 test('progress counts the command\'s own requests and a turn for each one another command still has', async () => {
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { currentUser: { id: 1 } } }) });
   const ask = (n) => Promise.all(Array.from({ length: n }, () => startgg.checkToken()));

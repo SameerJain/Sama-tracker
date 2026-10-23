@@ -1,26 +1,39 @@
 import { EmbedBuilder, embedLength, escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
 
+// each color means one thing, so pick a card's by what it is. the four outcome colors are what /messages set_colors
+// paints set results with, so no other tournament or reminder card uses them or anything close: a match call in red
+// read as a loss. slippi and the games keep their own colors, which their cards' badges and art make plain
 export const colors = {
-  brand: 0x5b21b6,
-  thread: 0x2563eb,
+  // outcomes: set results and the Bills final. clash is two tracked players meeting, and /h2h, /predict and
+  // /scout's matchup card, which are the same two players facing off
   win: 0x22c55e,
   loss: 0xef4444,
-  clash: 0xf59e0b, // tracked vs tracked
-  results: 0xfacc15,
+  clash: 0xf59e0b,
+  setDefault: 0x0891b2, // set results with colors off, or when nobody tracked played
+  reset: 0x6b7280, // a result the TO took back
+  // lookups, plus tournament info before it starts: roll calls, /registered, /upcoming
+  brand: 0x5b21b6,
+  // during a tournament: match calls, /run, and /bracket, /stream_link and /upcoming once it's started. stream
+  // alerts keep twitch's purple next to it
+  live: 0xc026d3,
   stream: 0x9146ff,
-  live: 0xe11d48,
+  // reminders, getting more urgent: the early reg reminders and the start DM, then the last call, its DM and /reg_warn
+  regEarly: 0xf97316,
+  reg: 0xc2410c,
+  // how it went: placements, top 8s and the weekly recap
+  results: 0xfacc15,
+  thread: 0x2563eb, // the cards that head /messages threads threads
+  system: 0xec4899, // status and bot updates, never feature cards
+  slippi: 0x21ba45, // slippi.gg's green, for slippi cards without a rank. rank cards take the rank's color
+  // each game's own color, for its fun command and its matchmaking pings
   sm4sh: 0x00a2e8,
   melee: 0x6a5acd,
   ult: 0xe60012,
   64: 0x009e49,
-  brawl: 0xc9a227,
+  brawl: 0x92400e, // dark bronze, so it never reads as the results yellow
   pplus: 0x14b8a6,
   bills: 0x00338d,
-  reg: 0xdc2626,
-  regEarly: 0xf59e0b,
-  reset: 0x6b7280, // a result the TO took back
-  system: 0xec4899, // status and bot updates, never feature cards
 };
 
 // double elim placements: 1, 2, 3, 4, 5, 7, 9, 13, 17, 25...
@@ -30,12 +43,10 @@ for (let n = 2; n <= 4096; n *= 2) PLACEMENTS.push(n + 1, n * 1.5 + 1);
 // index into PLACEMENTS, so seed 9 and 9th place are both 6
 export const step = (n) => PLACEMENTS.findLastIndex((place) => place <= n);
 
+// how many of each a card lists
 export const CHARACTERS_SHOWN = 5;
-
 export const OPPONENTS_SHOWN = 8;
-
 export const GAMES_SHOWN = 6;
-
 export const LEANS_SHOWN = 3;
 
 export const DAY = 24 * 60 * 60;
@@ -126,11 +137,12 @@ export function setLink(set) {
 // whether a report was run with a since date or venue filter on
 export const filtersOn = ({ since, venue } = {}) => Boolean(since || venue);
 
-// what a filtered report says about since and venue. '' when neither is on, so unfiltered
-// reports read exactly the way they did
-export function filterNote({ since, venue } = {}) {
-  const parts = [...(venue ? [`${venue} only`] : []), ...(since ? [`since <t:${since}:D>`] : [])];
-  return parts.length ? parts.join(' · ') : '';
+// what a filtered report says about since and venue, '' when neither is on
+function filterNote({ since, venue } = {}) {
+  const parts = [];
+  if (venue) parts.push(`${venue} only`);
+  if (since) parts.push(`since <t:${since}:D>`);
+  return parts.join(' · ');
 }
 
 // the note as its own small line, or nothing when neither filter is on
@@ -276,8 +288,9 @@ export function streaks(played) {
     best = Math.max(best, win);
     worst = Math.max(worst, loss);
   }
-  const ended = played.findIndex((result) => result.won !== played[0]?.won);
-  return { now: played.length ? (ended === -1 ? played.length : ended) : 0, nowWon: played[0]?.won ?? false, best, worst };
+  // the whole list when it never broke, which is 0 for no sets
+  const ended = played.findIndex((result) => result.won !== played[0].won);
+  return { now: ended === -1 ? played.length : ended, nowWon: played[0]?.won ?? false, best, worst };
 }
 
 // W 2-1 · Winners Final · Tournament · VOD · date, with the VOD only when the TO added one

@@ -3,7 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { crewPlayer, tracked, event, node } from './fixtures.js';
+import { mockApi, crewPlayer, tracked, event, node } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-features-tournaments-'));
 process.env.STATE_DIR = directory;
@@ -16,10 +16,6 @@ const startgg = await import('../src/startgg.js');
 startgg.setRequestGap(0);
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
-
-function mockApi(respond) {
-  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
-}
 
 test('tournament roll calls and placements disable mentions', async () => {
   const now = Math.floor(Date.now() / 1000);

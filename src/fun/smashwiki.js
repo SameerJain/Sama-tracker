@@ -31,10 +31,15 @@ async function everyPage(params, read) {
 }
 
 export function fetchScreenshots(category) {
-  return everyPage({ generator: 'categorymembers', gcmtitle: `Category:${category}`, gcmtype: 'file', gcmlimit: '500', prop: 'imageinfo', iiprop: 'url' }, ({ pages = [] }) => pages
+  const params = { generator: 'categorymembers', gcmtitle: `Category:${category}`, gcmtype: 'file', gcmlimit: '500', prop: 'imageinfo', iiprop: 'url' };
+  return everyPage(params, ({ pages = [] }) => pages
     .filter((page) => page.imageinfo?.[0])
-    // "File:Animal_Crossing_Stage_SSB4.jpg" -> "Animal Crossing Stage SSB4"
-    .map((page) => ({ name: page.title.replace(/^File:/, '').replace(/\.\w+$/, '').replaceAll('_', ' '), url: page.imageinfo[0].url, page: page.imageinfo[0].descriptionurl })));
+    .map((page) => ({
+      // "File:Animal_Crossing_Stage_SSB4.jpg" -> "Animal Crossing Stage SSB4"
+      name: page.title.replace(/^File:/, '').replace(/\.\w+$/, '').replaceAll('_', ' '),
+      url: page.imageinfo[0].url,
+      page: page.imageinfo[0].descriptionurl,
+    })));
 }
 
 // a patch's notes are a template like "Template:UpdateList (SSBU)/13.0.1". the ones with a fighter
@@ -43,7 +48,8 @@ const PATCH = /^Template:UpdateList[^/]*\/(\d+(?:\.\d+)+)$/;
 
 // articles and patch notes, not files, subcategories or disambiguation pages
 export async function categoryPages(category) {
-  const titles = await everyPage({ list: 'categorymembers', cmtitle: `Category:${category}`, cmtype: 'page', cmlimit: '500' }, ({ categorymembers = [] }) => categorymembers.map((page) => page.title));
+  const params = { list: 'categorymembers', cmtitle: `Category:${category}`, cmtype: 'page', cmlimit: '500' };
+  const titles = await everyPage(params, ({ categorymembers = [] }) => categorymembers.map((page) => page.title));
   return titles.filter((title) => (title.startsWith('Template:') ? PATCH.test(title) : !title.endsWith('(disambiguation)')));
 }
 

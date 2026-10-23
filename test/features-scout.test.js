@@ -3,7 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { crewPlayer, event, node, result, DAY, periodsFor as makePeriods, playedThisWeek, runPlayer, runTournament, runIn, descriptions } from './fixtures.js';
+import { mockApi, crewPlayer, event, node, result, DAY, periodsFor as makePeriods, playedThisWeek, runPlayer, runTournament, runIn, descriptions } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-features-scout-'));
 process.env.STATE_DIR = directory;
@@ -18,10 +18,6 @@ const { postWeeklyRecap } = await import('../src/tracker.js');
 const { periodSummary } = await import('../src/reports.js');
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
-
-function mockApi(respond) {
-  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
-}
 
 // newest first, 30 days each like /progress, through the reports under test
 const periodsFor = (player, sets, events, until, length = 2) => makePeriods(periodSummary, player, sets, events, until, length);
@@ -105,6 +101,27 @@ test('scout takes a tracked player pick, with no start.gg link lookup', async ()
   const cards = reply.embeds.map((e) => e.toJSON());
   assert.match(cards[0].title, /Scouting Target/);
   assert.match(cards.map((card) => card.description).join('\n'), /### You vs Target\n\*\*Ultimate:\*\* 1-0/);
+});
+
+test('Scout them from the Apps menu shows their characters like /scout does', async () => {
+  // the menu has no since option, which once filtered out every character set
+  state.players = { 1: { ...crewPlayer, discordId: 'allowed' }, 2: { userId: 2, playerId: 99, tag: 'Target', slug: 'user/target', discordId: 'target-discord' } };
+  const set = node('scout-menu', 150);
+  mockApi(({ query }) => {
+    if (query.includes('authorizations')) return { u1: { player: { gamerTag: 'Active' }, authorizations: [{ externalId: 'allowed' }] } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes: [{ ...set,
+      games: [{ winnerId: 10, selections: [{ entrant: { id: 99 }, character: { name: 'Fox' } }] }],
+    }] } } };
+  });
+  let reply;
+  const interaction = {
+    commandName: 'Scout them', user: { id: 'allowed' },
+    targetUser: { id: 'target-discord', bot: false, displayName: 'Target' }, targetMember: { displayName: 'Target' },
+    options: { getSubcommand: () => null },
+    deferReply: async () => { interaction.deferred = true; }, editReply: async (result) => { reply = result; },
+  };
+  await handleCommand(interaction);
+  assert.match(reply.embeds.map((e) => e.toJSON().description).join('\n'), /Fox/);
 });
 
 test('scout quick shows toughest opponents without the caller, and worst matchups by game', async () => {

@@ -1,6 +1,7 @@
 import { ApplicationCommandOptionType as Option, ApplicationCommandType, ChannelType, PermissionFlagsBits } from 'discord.js';
 import * as startgg from '../startgg.js';
 import { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS } from '../message-settings.js';
+import { isMultiGuild } from '../store.js';
 import { funCommands } from '../fun/index.js';
 
 // /characters game choices. left out, it goes with whichever has more reported
@@ -63,26 +64,38 @@ function venueOption() {
   };
 }
 
-export const commands = [
+const commands = [
   {
     name: 'help', description: 'Short command list, verbose:True for the full one with details',
     options: [verboseOption('Every command with the details, instead of the short list')],
   },
   {
-    name: 'messages', description: 'Show or change automatic posts, threads, set result colors and the weekly recap schedule',
+    name: 'messages', description: 'Show or change posts, threads, event length, colors and the recap',
     options: [
       ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
-      { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green for a win, red for a loss, gold for crew vs crew' },
+      { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green win, red loss, gold crew vs crew, blue otherwise' },
       {
         type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
         choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
       },
+      { type: Option.Integer, name: 'event_length', description: 'Discord event hours when start.gg has no end time, 2 to 12', min_value: 2, max_value: 12 },
       { type: Option.Integer, name: 'recap_day', description: 'Day of the weekly recap', choices: WEEKDAYS.map((name, value) => ({ name, value })) },
       { type: Option.String, name: 'recap_time', description: 'Weekly recap time in 24-hour HH:MM, like 21:00' },
       { type: Option.String, name: 'timezone', description: 'Recap timezone, like America/New_York or Europe/London' },
     ],
   },
-  { name: 'data', description: 'Links to the Monday Night SmashBall and UB Smash Royale data pages' },
+  { name: 'data', description: 'Samatracker and both series data pages' },
+  // multi-server only: single-server builds post in CHANNEL_ID, so there's nothing to pick. no
+  // default_member_permissions, like /messages, since discord would hide it from TOs without Manage Server
+  ...(isMultiGuild() ? [{
+    name: 'setup', description: 'Show or set the channel automatic posts go in for this server',
+    options: [
+      {
+        type: Option.Channel, name: 'channel', description: 'Channel for set results, roll calls, reminders and recaps',
+        channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
+      },
+    ],
+  }] : []),
   // two commands since one with subcommands can't be run on its own, and permissions are per command
   { name: 'socials', description: 'Streams and social links saved for this server' },
   {
@@ -138,38 +151,38 @@ export const commands = [
   },
   {
     name: 't-o',
-    description: 'T.O. tools for roles, tournament tracking and track-list cleanup',
+    description: 'TO tools for roles, tournament tracking and track-list cleanup',
     options: [
       {
         type: Option.SubcommandGroup,
         name: 'role',
-        description: 'T.O. role members',
+        description: 'TO role members',
         options: [
           {
             type: Option.Subcommand,
             name: 'add',
-            description: 'Give someone the T.O. role. T.O.s only',
+            description: 'Give someone the TO role. TOs only',
             options: [{ type: Option.User, name: 'user', description: 'Server member', required: true }],
           },
           {
             type: Option.Subcommand,
             name: 'set',
-            description: 'Use an existing server role as the T.O. role. Needs Manage Server',
-            options: [{ type: Option.Role, name: 'role', description: 'Existing role to use for T.O. privileges', required: true }],
+            description: 'Use an existing server role as the TO role. Needs Manage Server',
+            options: [{ type: Option.Role, name: 'role', description: 'Existing role to use for TO privileges', required: true }],
           },
           {
             type: Option.Subcommand,
             name: 'remove',
-            description: 'Take the T.O. role off someone, or yourself. T.O.s only',
-            options: [{ type: Option.User, name: 'user', description: 'A T.O.', required: true }],
+            description: 'Take the TO role off someone, or yourself. TOs only',
+            options: [{ type: Option.User, name: 'user', description: 'A TO', required: true }],
           },
-          { type: Option.Subcommand, name: 'list', description: 'Who the T.O.s are' },
+          { type: Option.Subcommand, name: 'list', description: 'Who the TOs are' },
         ],
       },
       {
         type: Option.SubcommandGroup,
         name: 'tournament',
-        description: 'T.O. tournament tools',
+        description: 'TO tournament tools',
         options: [
           {
             type: Option.Subcommand,
@@ -196,6 +209,7 @@ export const commands = [
               { type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true },
               switchOption('sets', 'Every finished set, whoever played'),
               switchOption('stream', 'Every set on stream or up next in the stream queue'),
+              switchOption('calls', 'Every called set, whoever played, even with no pings on'),
               switchOption('top8', 'Each event\'s top 8 once the bracket is finished'),
               switchOption('reminders', 'Reg reminders for people with /notify registration on'),
               { type: Option.String, name: 'schedule', description: 'Custom reminder times, like 7d,3d,1d,6h. default goes back to the usual four' },
@@ -212,7 +226,7 @@ export const commands = [
       {
         type: Option.Subcommand,
         name: 'cleanup',
-        description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. T.O.s only',
+        description: 'Untrack players whose start.gg Discord isn\'t in this server. Asks first. TOs only',
         options: [{ type: Option.Boolean, name: 'no_discord', description: 'Also untrack players with no Discord connected on start.gg' }],
       },
     ],
@@ -358,7 +372,7 @@ export const commands = [
   },
   {
     name: 'slippi',
-    description: 'Slippi ranked: a watchlist with rank change posts, rank cards and a leaderboard',
+    description: 'Slippi ranked: a watchlist with rank change and season wrap-up posts, rank cards and a leaderboard',
     options: [
       {
         type: Option.Subcommand,
@@ -407,4 +421,4 @@ export const commands = [
   { type: ApplicationCommandType.User, name: MEMBER_SCOUT },
 ];
 
-export { PICKABLE_GAMES, MEMBER_H2H, MEMBER_SCOUT, MATCHMAKING };
+export { commands, PICKABLE_GAMES, MEMBER_H2H, MEMBER_SCOUT, MATCHMAKING };

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attendanceFlow, attendanceHistogram, attendanceRanking, cumulativePlayers, crossSeries, histogramBuckets, loyaltyTier, loyaltyTiers, matchupMatrix, returnRates, seasonality, ULTIMATE_ROSTER } from '../series/shared/compute.mjs';
-import { growthLine, line } from '../series/shared/charts.mjs';
-import { clientModal, CLIENT_JS_UI, CLIENT_JS_SORT } from '../series/shared/page.mjs';
+import { attendanceFlow, attendanceHistogram, attendanceRanking, bestWithoutTitle, charUsers, cumulativePlayers, crossSeries, favourites, headToHead, headToHeadSets, histogramBuckets, loyaltyTier, loyaltyTiers, matchupMatrix, periodRetention, podiumRates, returnRates, seasonality, titleSpread, ULTIMATE_ROSTER, wilson, winnersFromStandings } from '../series/shared/compute.mjs';
+import { growthLine, hbars, line } from '../series/shared/charts.mjs';
+import { clientModal, CLIENT_JS_UI, CLIENT_JS_SORT, CSS_EXTRA, filterInput, pageFooter, scrollTable, seriesSwitcher } from '../series/shared/page.mjs';
+import { unifyPlayers } from '../web/build.mjs';
 
 const row = (eventId, startAt, ids) => ({
   eventId, tournamentId: eventId, startAt, entrants: ids.map((id) => ({ name: 'P' + id, players: [{ id, tag: 'P' + id }] })),
@@ -184,13 +185,13 @@ test('only games with both characters reported enter the matrix', () => {
 
 test('click popups can list plain names, not just tournament links', () => {
   const script = clientModal({
-    'h:0': { title: 'Players with 1 event (2)', items: ['Ann — 1 event', 'Bo — 1 event'] },
-    'p1:1': { title: 'Ann — 1 1st place', links: [{ n: 'Tourney', d: '2024-01-01', u: 'https://www.start.gg/tournament/x' }] },
+    'h:0': { title: 'Players with 1 event (2)', items: ['Ann · 1 event', 'Bo · 1 event'] },
+    'p1:1': { title: 'Ann · 1 1st place', links: [{ n: 'Tourney', d: '2024-01-01', u: 'https://www.start.gg/tournament/x' }] },
   });
   // the names ride along in the popup data, and the popup renders items as
   // plain rows while links stay links (an entry has one or the other)
   assert.match(script, /Players with 1 event \(2\)/);
-  assert.match(script, /Ann — 1 event/);
+  assert.match(script, /Ann · 1 event/);
   assert.match(script, /info\.items/);
   assert.match(script, /info\.links/);
 });
@@ -236,6 +237,137 @@ test('the full roster is the 86 Ultimate selections, start.gg spellings, no Rand
   for (const name of ['Toon Link', 'Min Min', 'Rosalina', 'Simon Belmont', 'Mr. Game & Watch', 'Pyra & Mythra']) assert.ok(ULTIMATE_ROSTER.includes(name), name);
 });
 
+test('best without title ranks winless players by podiums', () => {
+  const rows = [
+    { tournamentId: 1, startAt: 100, standings: [{ placement: 2, name: 'Bo', players: [{ id: 2, tag: 'Bo' }] }, { placement: 1, name: 'Ann', players: [{ id: 1, tag: 'Ann' }] }] },
+    { tournamentId: 2, startAt: 200, standings: [{ placement: 1, name: 'Ann', players: [{ id: 1, tag: 'Ann' }] }, { placement: 3, name: 'Bo', players: [{ id: 2, tag: 'Bo' }] }, { placement: 4, name: 'Cy', players: [{ id: 3, tag: 'Cy' }] }] },
+  ];
+  const chasing = bestWithoutTitle(winnersFromStandings(rows), 10);
+  assert.deepEqual(chasing.map((w) => w.tag), ['Bo', 'Cy']);
+  assert.ok(chasing.every((w) => w.wins === 0));
+  assert.equal(bestWithoutTitle(winnersFromStandings(rows), 1).length, 1);
+});
+
+test('new player analysis computes rivalries, podium rates and character samples', () => {
+  const games = [
+    { setId: 1, startAt: 100, wChar: 'Fox', lChar: 'Mario', wPlayers: [{ id: 1, tag: 'Ann' }], lPlayers: [{ id: 2, tag: 'Bo' }] },
+    { setId: 1, startAt: 100, wChar: 'Fox', lChar: 'Mario', wPlayers: [{ id: 1, tag: 'Ann' }], lPlayers: [{ id: 2, tag: 'Bo' }] },
+    { setId: 2, startAt: 200, wChar: 'Mario', lChar: 'Fox', wPlayers: [{ id: 2, tag: 'Bo' }], lPlayers: [{ id: 1, tag: 'Ann' }] },
+  ];
+  assert.deepEqual(charUsers(games), { Fox: 1, Mario: 1 });
+  assert.deepEqual(headToHead(games).map((p) => [p.a.tag, p.b.tag, p.aSets, p.bSets, p.aGames, p.bGames]), [['Ann', 'Bo', 1, 1, 2, 1]]);
+  const standings = [
+    { eventId: 1, startAt: 100, standings: [{ placement: 1, name: 'Ann', players: [{ id: 1, tag: 'Ann' }] }, { placement: 2, name: 'Bo', players: [{ id: 2, tag: 'Bo' }] }] },
+    { eventId: 2, startAt: 200, standings: [{ placement: 1, name: 'Bo', players: [{ id: 2, tag: 'Bo' }] }] },
+  ];
+  const rates = podiumRates(standings, [row(1, 100, [1, 2]), row(2, 200, [1, 2, 3])]);
+  assert.deepEqual(rates.map((p) => [p.tag, p.entered, p.top4, p.wins]), [['P2', 2, 2, 1], ['P1', 2, 1, 1], ['P3', 1, 0, 0]]);
+  const interval = wilson(3, 3);
+  assert.ok(interval.low < 1 && interval.high === 1);
+});
+
+test('all-set rivalries count every singles set once, games from scores, and leave DQs and doubles out', () => {
+  const ann = { id: 1, tag: 'Ann' }, bo = { id: 2, tag: 'Bo' };
+  const sets = [
+    { id: 'a', startAt: 100, wPlayers: [ann], lPlayers: [bo], wScore: 2, lScore: 0 },
+    { id: 'b', startAt: 200, wPlayers: [bo], lPlayers: [ann], wScore: 3, lScore: 2 },
+    // a set with no score reported still counts as a set, with no games
+    { id: 'c', startAt: 250, wPlayers: [ann], lPlayers: [bo], wScore: null, lScore: null },
+    { id: 'd', startAt: 300, wPlayers: [ann], lPlayers: [bo], wScore: 0, lScore: -1, dq: true },
+    { id: 'e', startAt: 400, wPlayers: [{ id: 1 }, { id: 3 }], lPlayers: [bo], wScore: 2, lScore: 1 },
+    // the newest tag either one played under is the one shown
+    { id: 'f', startAt: 500, wPlayers: [{ id: 2, tag: 'Bo2' }], lPlayers: [{ id: 3, tag: 'Cy' }], wScore: 2, lScore: 1 },
+    { id: 'g', startAt: 50, wPlayers: [{ id: 3, tag: 'OldCy' }], lPlayers: [{ id: 2, tag: 'OldBo' }], wScore: 2, lScore: 1 },
+  ];
+  const pairs = headToHeadSets(sets);
+  assert.deepEqual(pairs.map((p) => [p.a.tag, p.b.tag, p.sets, p.aSets, p.bSets, p.aGames, p.bGames, p.scoredSets, p.first, p.last]), [
+    ['Ann', 'Bo', 3, 2, 1, 4, 3, 2, 100, 250],
+    // level on sets and games, so it goes by tag
+    ['Bo2', 'Cy', 2, 1, 1, 3, 3, 2, 50, 500],
+  ]);
+});
+
+test('set results read the winner, loser and each side\'s games from a start.gg set', async () => {
+  const { setResults } = await import('../series/shared/scrape.mjs');
+  const slot = (entrant, score) => ({ entrant: { id: entrant, participants: [{ player: { id: entrant * 10, gamerTag: 'P' + entrant } }] }, standing: { stats: { score: { value: score } } } });
+  const sets = setResults([
+    { id: 1, winnerId: 2, slots: [slot(1, 1), slot(2, 3)] },
+    { id: 2, winnerId: 1, slots: [slot(1, null), slot(2, null)] },
+    { id: 3, winnerId: 1, slots: [slot(1, 0), slot(2, -1)] },
+    // a set start.gg sends without a winner can't count
+    { id: 4, winnerId: null, slots: [slot(1, 2), slot(2, 0)] },
+  ]);
+  assert.deepEqual(sets.map((s) => [s.id, s.wPlayers[0].tag, s.lPlayers[0].tag, s.wScore, s.lScore, s.dq]), [
+    ['1', 'P2', 'P1', 3, 1, false],
+    ['2', 'P1', 'P2', null, null, false],
+    ['3', 'P1', 'P2', 0, -1, true],
+  ]);
+});
+
+test('retention, churn and favourites follow nights in date order', () => {
+  const rows = [row(1, 100, [1, 2]), row(2, 200, [1, 3]), row(3, 300, [3])];
+  const retention = periodRetention(rows, (r) => r.startAt, (at) => Math.floor(at / 100));
+  assert.deepEqual(retention.map((r) => [r.period, r.active, r.new, r.retained, r.back, r.lapsed]), [[1, 2, 2, 0, 0, 0], [2, 2, 1, 1, 0, 1], [3, 1, 0, 1, 0, 1]]);
+
+  const standings = [
+    { eventId: 1, tournamentId: 1, startAt: 100, standings: [{ placement: 1, name: 'Ann', players: [{ id: 1, tag: 'Ann' }] }] },
+    { eventId: 2, tournamentId: 2, startAt: 200, standings: [{ placement: 1, name: 'Bo', players: [{ id: 2, tag: 'Bo' }] }, { placement: 2, name: 'Ann', players: [{ id: 1, tag: 'Ann' }] }] },
+    { eventId: 3, tournamentId: 3, startAt: 300, standings: [{ placement: 1, name: 'Ann', players: [{ id: 1, tag: 'Ann' }] }] },
+  ];
+  const results = favourites(standings, rows);
+  assert.deepEqual(results.map((r) => r.outcome), ['open', 'upset', 'favourite']);
+  assert.deepEqual(titleSpread(results, () => 2026).map((r) => [r.nights, r.champions, r.firstTitles, r.favourite, r.upset]), [[3, 2, 2, 1, 1]]);
+});
+
+test('series switcher links every other viewer plus the hub, generically', () => {
+  const reg = {
+    a: { name: 'Aye', short: 'A', url: 'https://a.example', outDir: 'a' },
+    b: { name: 'Bee', outDir: 'b' },
+  };
+  const html = seriesSwitcher('a', reg, { title: 'Hub', short: 'Hub', url: '', outDir: 'web' });
+  assert.ok(html.includes('<span class="pill u">A</span>'), 'current series is a pill, not a link');
+  assert.ok(!html.includes('https://a.example'), 'current series is not linked');
+  assert.ok(html.includes('../b/index.html'), 'a series with no url falls back to a relative link');
+  assert.ok(html.includes('../web/index.html'), 'an undeployed hub falls back to a relative link');
+  assert.ok(seriesSwitcher('b', reg, { short: 'Hub', url: 'https://hub.example' }).includes('https://hub.example'), 'a deployed hub links straight at it');
+  assert.ok(seriesSwitcher('__hub__', reg, { short: 'Hub', url: 'https://hub.example' }).includes('<span class="pill s">Hub</span>'), 'the hub marks itself current');
+});
+
+test('charts carry a viewBox so small screens scale them instead of scrolling', () => {
+  assert.match(hbars([{ label: 'Ann', value: 3 }]), /viewBox="0 0 640/);
+  const svg = line([
+    { startAt: 100, attendees: 10, name: 'One', date: '1970-01-01' },
+    { startAt: 200, attendees: 30, name: 'Two', date: '1970-01-01' },
+  ]).svg;
+  assert.match(svg, /viewBox="0 0 900 260/);
+  assert.match(growthLine([{ startAt: 100, total: 2, newPlayers: 2 }]), /viewBox="0 0 900 240/);
+});
+
+test('page extras: mobile rules, table search and footer', () => {
+  assert.match(CSS_EXTRA, /\.scroll svg/);
+  assert.match(CSS_EXTRA, /max-width:640px/);
+  assert.match(CSS_EXTRA, /\.tablefilter/);
+  assert.match(CLIENT_JS_UI, /input\.tablefilter/);
+  assert.match(filterInput('q', 'tbl', 'Search players…'), /data-table="tbl"/);
+  const foot = pageFooter('2026-01-01', '2 tournaments, 2024-01-01 → 2024-01-08');
+  assert.ok(foot.includes('Built 2026-01-01') && foot.includes('2024-01-01 → 2024-01-08'));
+  const table = scrollTable('<th class="tx">Player</th><th class="lo">Old detail</th><th class="wr">Result</th>', '<tr><td>Ann</td><td>x</td><td>2 - 1</td></tr>');
+  assert.match(table, /class="tx-1 lo-2 wr-3"/);
+});
+
+test('web hub unifies players across series by id', () => {
+  const data = [
+    { slug: 'a', entered: [{ id: '1', tag: 'Ann', events: 5, names: ['Ann'] }], winners: [{ id: '1', tag: 'Ann!', wins: 2, podiums: 3, names: ['Ann!'] }] },
+    { slug: 'b', entered: [{ id: '1', tag: 'Ann', events: 3, names: ['Ann'] }, { id: 'name:X', tag: 'X', events: 9, names: ['X'] }], winners: [] },
+  ];
+  const all = unifyPlayers(data);
+  assert.equal(all.length, 1);
+  assert.equal(all[0].totalEvents, 8);
+  assert.equal(all[0].totalWins, 2);
+  assert.equal(all[0].tag, 'Ann!');
+  assert.deepEqual(all[0].per, { a: { events: 5, wins: 2, podiums: 3 }, b: { events: 3, wins: 0, podiums: 0 } });
+});
+
 test('cross-series merges only players entered in every series, by player id', () => {
   const series = [
     { slug: 'a', entered: [{ id: '1', tag: 'Ann', events: 10 }, { id: '2', tag: 'Bo', events: 3 }, { id: 'name:X', tag: 'X', events: 9 }], winners: [{ id: '1', tag: 'Ann', wins: 2, podiums: 5 }] },
@@ -248,4 +380,57 @@ test('cross-series merges only players entered in every series, by player id', (
   assert.equal(both[0].totalWins, 3);
   assert.equal(both[0].totalPodiums, 8);
   assert.deepEqual(both[0].per, { a: { events: 10, wins: 2, podiums: 5 }, b: { events: 4, wins: 1, podiums: 3 } });
+});
+
+test('the built rivalries views each pair their headline with their own table, all sets first', async () => {
+  const { readFileSync } = await import('node:fs');
+  // royale counts off weeks, so it gets the off-weeks layer. its on-weeks view and MNSB don't
+  const pages = { 'monday-night-smashball/index.html': false, 'ub-smash-royale/index.html': true, 'ub-smash-royale/on-weeks-only.html': false };
+  for (const [page, layered] of Object.entries(pages)) {
+    const html = readFileSync(page, 'utf8');
+    const card = html.slice(html.indexOf('id="rivals"'), html.indexOf('</script>', html.indexOf('id="rivals-switch"')));
+    // all sets is the one pressed and shown when the page loads, with the off-weeks layer off
+    assert.match(card, /<button type="button" class="on" data-view="all" aria-pressed="true">All sets<\/button>/, page);
+    assert.equal(/id="rivals-off" aria-pressed="false">Include off weeks</.test(card), layered, page);
+    const views = JSON.parse(card.match(/const V=(\{.*?\}),w=document/)[1]);
+    assert.deepEqual(Object.keys(views), layered ? ['all', 'sample', 'all-off', 'sample-off'] : ['all', 'sample'], page);
+    assert.match(card, /<div id="rivals-view-all">/, page);
+    for (const key of Object.keys(views).slice(1)) assert.match(card, new RegExp(`<div id="rivals-view-${key}" style="display:none">`), page);
+    // the headline of the view showing at load is the all-sets one
+    assert.equal(card.match(/id="rivals-count">(\d+)</)[1], String(views.all.count), page);
+    for (const [key, view] of Object.entries(views)) {
+      // each view's most played line is its own table's first row, and its count is that table's rows
+      const body = card.slice(card.indexOf(`id="${view.table}"`));
+      const tableHtml = body.slice(0, body.indexOf('</table>'));
+      assert.equal(view.top.match(/<b>([^<]+)<\/b>/)[1], tableHtml.match(/<tr><td>1<\/td><td>([^<]+)<\/td>/)[1], `${page} ${key}`);
+      assert.equal((tableHtml.match(/<tr><td>\d+<\/td>/g) ?? []).length, view.count, `${page} ${key}`);
+    }
+    // off weeks only ever add sets
+    if (layered) assert.ok(views['all-off'].count >= views.all.count && /off-week singles brackets/.test(views['all-off'].note), page);
+  }
+  // the search box follows whichever table the view points it at
+  assert.match(CLIENT_JS_UI, /box\.addEventListener\('input', \(\) => \{\s*const t = document\.getElementById\(box\.dataset\.table\)/);
+});
+
+test('built pages rank biggest upsets biggest first and leave out the lapsed regulars list', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const page of ['monday-night-smashball/index.html', 'ub-smash-royale/index.html', 'ub-smash-royale/on-weeks-only.html']) {
+    const html = readFileSync(page, 'utf8');
+    assert.doesNotMatch(html, /haven't been back|lapsed-tbl/, page);
+    const table = html.slice(html.indexOf('<h3>Biggest upsets</h3>'));
+    const rows = [...table.slice(0, table.indexOf('</table>')).matchAll(/<tr><td>(\d+)<\/td><td>[^<]*<\/td><td>.*?<\/td><td>.*?<\/td><td>(\d+)<\/td>/g)];
+    assert.ok(rows.length > 0 && rows.length <= 10, page);
+    assert.deepEqual(rows.map((r) => Number(r[1])), rows.map((_, i) => i + 1), page);
+    const behind = rows.map((r) => Number(r[2]));
+    assert.deepEqual(behind, [...behind].sort((a, b) => b - a), page);
+  }
+});
+
+test('only an off-week night\'s real singles bracket joins the off-weeks layer', async () => {
+  const { OFFWEEK_SINGLES_RE } = await import('../series/shared/scrape.mjs');
+  for (const name of ['Ultimate Singles', 'Off Week Singles', 'Smash Ultimate']) assert.ok(OFFWEEK_SINGLES_RE.test(name), name);
+  // the brackets those nights ran for fun, plus redemption and doubles, stay out
+  for (const name of ['Redemption Bracket', 'Ultimate Randoms', 'Items 1v1', 'Squad Strike', 'SQUAD STRIKE', "Juan's Stupid Rules", 'Home Stage Advantage', 'Anything Goes', 'Heroes vs Villains', 'Ultimate Doubles', 'DOUBLES', 'Randittos']) {
+    assert.ok(!OFFWEEK_SINGLES_RE.test(name), name);
+  }
 });

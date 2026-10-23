@@ -3,6 +3,7 @@ import test, { after, mock } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { settle } from './fixtures.js';
 
 // the history cache every set and character lookup goes through, by way of the commands that use it
 const directory = mkdtempSync(join(tmpdir(), 'sama-history-'));
@@ -17,16 +18,6 @@ const { setHistory, h2hHistory, statsHistory } = await import('../src/commands/h
 const startgg = await import('../src/startgg.js');
 const originalFetch = globalThis.fetch;
 after(() => { mock.timers.reset(); globalThis.fetch = originalFetch; rmSync(directory, { recursive: true, force: true }); });
-
-async function settle(promise) {
-  let done = false;
-  promise.finally(() => { done = true; }).catch(() => {});
-  while (!done) {
-    mock.timers.tick(100);
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  return promise;
-}
 
 // a start.gg where player id has pages[id] pages of history, a set each against player 5 or opponentId. fail says which
 // requests start.gg turns down, with a 400 since a 5xx gets retried. asked lists 'sets 99 3' for the set history page 3

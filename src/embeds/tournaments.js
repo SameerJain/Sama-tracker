@@ -121,7 +121,7 @@ export function setResult(set, players, { setColors = false } = {}) {
   // no author, the title already names both sides. the thumbnail still falls back to the tracked player's picture
   const player = (bWon ? trackedB : trackedA) ?? (bWon ? trackedA : trackedB);
 
-  const embed = setEmbed(set, setColors ? resultColor(trackedA, trackedB, bWon) : colors.win, player, { author: false })
+  const embed = setEmbed(set, setColors ? resultColor(trackedA, trackedB, bWon) : colors.setDefault, player, { author: false })
     .setTitle(`Set result · W · ${escapeMarkdown(winner.name)} ${scoreText(winner, loser)} ${escapeMarkdown(loser.name)} · L`)
     .setURL(setUrl(set))
     .setTimestamp(set.completedAt * 1000);
@@ -144,9 +144,9 @@ export function setResult(set, players, { setColors = false } = {}) {
 }
 
 // green when someone tracked won, red when they lost, gold when two tracked players met,
-// purple when nobody tracked played
+// blue when nobody tracked played
 function resultColor(trackedA, trackedB, bWon) {
-  if (!trackedA && !trackedB) return colors.brand;
+  if (!trackedA && !trackedB) return colors.setDefault;
   if (trackedA && trackedB) return colors.clash;
   return (bWon ? trackedB : trackedA) ? colors.win : colors.loss;
 }
@@ -176,6 +176,16 @@ export function rollCall(tournament, players, streams = []) {
     .setTitle(`Tournament roll call · ${escapeMarkdown(tournament.name)}`.slice(0, 256)), lines);
 }
 
+// a big picture so a reminder stands out: the banner with the logo beside it, or the logo alone
+function withBanner(embed, tournament) {
+  const image = (type) => tournament.images?.find((each) => each.type === type)?.url;
+  const banner = image('banner');
+  const logo = image('profile');
+  if (banner ?? logo) embed.setImage(banner ?? logo);
+  if (banner && logo) embed.setThumbnail(logo);
+  return embed;
+}
+
 export function regReminder(tournament, deadline, lastCall) {
   const register = startggUrl(`${tournament.slug}/register`);
   const closesFirst = deadline < tournament.startAt;
@@ -193,14 +203,7 @@ export function regReminder(tournament, deadline, lastCall) {
     .setTitle(`Registration reminder · ${escapeMarkdown(tournament.name)}`.slice(0, 256))
     .setURL(register)
     .setDescription(lines.join('\n'));
-
-  // a big picture so it stands out, the logo if there's no banner
-  const image = (type) => tournament.images?.find((each) => each.type === type)?.url;
-  const banner = image('banner');
-  const logo = image('profile');
-  if (banner ?? logo) embed.setImage(banner ?? logo);
-  if (banner && logo) embed.setThumbnail(logo);
-  return embed;
+  return withBanner(embed, tournament);
 }
 
 // DM 1 hour before the start, with the same picture, link and location as the reg reminder
@@ -212,19 +215,13 @@ export function startReminder(tournament) {
   lines.push('', `**[Tournament page on start.gg](${page})**`);
   if (tournament.isRegistrationOpen !== false) lines.push(`**[Register on start.gg](${register})**`);
 
-  const embed = baseEmbed(colors.live)
+  // a reminder like the reg ones, not a live card. it hasn't started yet
+  const embed = baseEmbed(colors.regEarly)
     .setAuthor({ name: 'Tournament starts soon' })
     .setTitle(`Starts soon · ${escapeMarkdown(tournament.name)}`.slice(0, 256))
     .setURL(page)
     .setDescription(lines.join('\n'));
-
-  // a big picture so it stands out, the logo if there's no banner
-  const image = (type) => tournament.images?.find((each) => each.type === type)?.url;
-  const banner = image('banner');
-  const logo = image('profile');
-  if (banner ?? logo) embed.setImage(banner ?? logo);
-  if (banner && logo) embed.setThumbnail(logo);
-  return embed;
+  return withBanner(embed, tournament);
 }
 
 const WARNINGS = [
@@ -389,27 +386,26 @@ function placementText(entry) {
 // a tournament needs to list, for the empty answer
 export function upcoming(tournaments, players, who, { minimum = 0 } = {}) {
   if (!tournaments.length) {
-    const description = minimum > 1
-      ? (who === 'everyone'
-        ? `No upcoming tournament has ${minimum} or more of the crew registered yet.`
-        : `${escapeMarkdown(who)} has no upcoming tournament with ${minimum} or more of the crew registered yet.`)
-      : `${who === 'everyone' ? 'Nobody is' : `${escapeMarkdown(who)} isn't`} registered for anything yet.`;
+    const everyone = who === 'everyone';
+    let description = `${everyone ? 'Nobody is' : `${escapeMarkdown(who)} isn't`} registered for anything yet.`;
+    if (minimum > 1 && everyone) description = `No upcoming tournament has ${minimum} or more of the crew registered yet.`;
+    if (minimum > 1 && !everyone) description = `${escapeMarkdown(who)} has no upcoming tournament with ${minimum} or more of the crew registered yet.`;
     return [baseEmbed(colors.brand).setTitle(`Upcoming · ${escapeMarkdown(who)}`).setDescription(description)];
   }
 
   const now = Math.floor(Date.now() / 1000);
   const more = tournaments.length > 10 ? ` · next 10 of ${tournaments.length}` : '';
   return tournaments.slice(0, 10).map((tournament) => {
-    if (tournament.startAt <= now) return upcomingCard(tournament, players, `Live · ${who}${more}`, colors.live);
-    return upcomingCard(tournament, players, `Upcoming · ${who}${more}`, colors.brand);
+    const live = tournament.startAt <= now;
+    return upcomingCard(tournament, players, `${live ? 'Live' : 'Upcoming'} · ${who}${more}`, live ? colors.live : colors.brand);
   });
 }
 
 function upcomingCard(tournament, players, label, color) {
   const eventsByUser = new Map();
-  for (const entry of tournament.entries) {
-    if (!eventsByUser.has(entry.userId)) eventsByUser.set(entry.userId, []);
-    eventsByUser.get(entry.userId).push(entry.event);
+  for (const { userId, event } of tournament.entries) {
+    if (!eventsByUser.has(userId)) eventsByUser.set(userId, []);
+    eventsByUser.get(userId).push(event);
   }
 
   const lines = [
@@ -440,7 +436,8 @@ function runStatus(player, { entry, sets }) {
   const played = sets.filter((set) => set.state === 3 && set.winnerId)
     .sort((a, b) => a.completedAt - b.completedAt).map((set) => fromSide(set, player.playerId)).filter(Boolean);
   const finished = entry.done || entry.final || entry.dq;
-  const pending = finished ? [] : sets.filter((set) => UP_NEXT.includes(set.state)).sort((a, b) => UP_NEXT.indexOf(a.state) - UP_NEXT.indexOf(b.state));
+  const soonest = (a, b) => UP_NEXT.indexOf(a.state) - UP_NEXT.indexOf(b.state);
+  const pending = finished ? [] : sets.filter((set) => UP_NEXT.includes(set.state)).sort(soonest);
   const next = pending.map((set) => fromSide(set, player.playerId)).find(Boolean);
   let rank = UP_NEXT.length;
   if (next) rank = UP_NEXT.indexOf(next.set.state);
@@ -461,7 +458,8 @@ function nextText({ set, them }, now) {
 
 function statusText({ entry, finished }) {
   if (entry.dq) return 'Disqualified';
-  if (finished) return entry.placement ? `Finished ${medal(entry.placement)}${ordinal(entry.placement)}${entry.entrants ? ` of ${entry.entrants}` : ''}` : 'Finished, placement pending';
+  if (finished && !entry.placement) return 'Finished, placement pending';
+  if (finished) return `Finished ${medal(entry.placement)}${ordinal(entry.placement)}${entry.entrants ? ` of ${entry.entrants}` : ''}`;
   if (!entry.started) return 'Hasn\'t started yet';
   return 'Still in the bracket';
 }

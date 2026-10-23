@@ -4,9 +4,34 @@ import { inTurn } from './commands/turns.js';
 import { failureMessage } from './commands/shared.js';
 import { seedFirstTO } from './commands/to.js';
 import { badToken, checkToken } from './startgg.js';
-import { missingThreadPermissions, startTracking } from './tracker.js';
+import { missingThreadPermissions, startTracking, stopTracking } from './tracker.js';
 import { messageSettings } from './message-settings.js';
 import { setFallbackImage } from './embeds/index.js';
+import { setHealthReady, startHealth, stopHealth } from './health.js';
+import { forGuild, guildLocal, isMultiGuild, migrateLegacyToGuild, postsChannelId, save } from './store.js';
+
+// answered until the bot is logged in and tracking, so railway only switches
+// traffic to a new deploy once it can post. set in service settings as the healthcheck path
+startHealth();
+
+// a deploy going away saves first and stops its loops, so a restart can't leave
+// half-written state or repeat a post. railway sends SIGTERM, ctrl-C sends SIGINT
+let stopping = false;
+async function shutdown(signal, client) {
+  if (stopping) return;
+  stopping = true;
+  console.log(`got ${signal}, saving and signing off`);
+  setHealthReady(false);
+  stopTracking();
+  try {
+    save();
+  } catch (err) {
+    console.error(`couldn't save state on shutdown (${err.message})`);
+  }
+  await stopHealth().catch((err) => console.error(`couldn't close the health server (${err.message})`));
+  await client.destroy();
+  process.exit(0);
+}
 
 // commands that ask start.gg this much get a line in the logs, so a slow one shows what it spent its time on
 const LOGGED_REQUESTS = 20;
@@ -16,8 +41,15 @@ function quit(message) {
   process.exit(1);
 }
 
-for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN', 'GUILD_ID', 'CHANNEL_ID']) {
+for (const name of ['DISCORD_TOKEN', 'STARTGG_TOKEN']) {
   if (!process.env[name]) quit(`${name} isn't set, put it in .env or the host's environment variables`);
+}
+// single-server builds need to know which server and channel are theirs. multi-server builds
+// (MULTI_GUILD=true) leave both out and each server picks its posts channel with /setup
+if (!isMultiGuild()) {
+  for (const name of ['GUILD_ID', 'CHANNEL_ID']) {
+    if (!process.env[name]) quit(`${name} isn't set, put it in .env or the host's environment variables`);
+  }
 }
 
 // a token start.gg turns down never works, so that stops here. start.gg being down or slow at boot doesn't, since
@@ -36,49 +68,121 @@ const client = new Client({
   presence: { activities: [{ name: 'playing melee', type: ActivityType.Custom }] },
 });
 
-client.once(Events.ClientReady, async () => {
-  const guild = await client.guilds.fetch(process.env.GUILD_ID).catch((err) => {
-    if (NOT_THERE.includes(err.code)) quit(`bot isn't in server ${process.env.GUILD_ID}, check GUILD_ID or invite it`);
-    quit(`couldn't load server ${process.env.GUILD_ID} from Discord (${err.message})`);
-  });
-
-  // replaces whatever was registered before, so old commands go away
-  await guild.commands.set(commands).catch((err) => {
+// replaces whatever was registered before, so old commands go away
+async function registerCommands(manager) {
+  await manager.set(commands).catch((err) => {
     if (err.code === RESTJSONErrorCodes.MissingAccess) quit('couldn\'t register the commands, re-invite the bot with the applications.commands scope');
     // usually a command in definitions.js breaking one of discord's limits, which the message names
     quit(`couldn't register the commands (${err.message})`);
   });
+}
+
+// what the bot can't post in the channel at all without
+function missingPosting(postChannel) {
+  const needed = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks];
+  return postChannel.permissionsFor(client.user)?.missing(needed) ?? [];
+}
+
+// not worth quitting over: cards without an uploaded picture still post, and thread posts go in the channel
+// until it's fixed. threadsOn is the server's /messages threads
+function warnPosting(postChannel, where, threadsOn) {
+  if (!postChannel.permissionsFor(client.user)?.has(PermissionFlagsBits.AttachFiles)) {
+    console.error(`missing Attach Files in ${where}, so messages that upload character art, rank badges or the Slippi logo will fail`);
+  }
+  const threads = missingThreadPermissions(postChannel);
+  if (threadsOn && threads?.length !== 0) {
+    console.error(`threads are on but can't be started in ${where}${threads ? `, missing ${threads.join(' and ')}` : ''}`);
+  }
+}
+
+// before anything posts, so a message with no picture of its own gets the bot's. then the checks start and
+// railway's health check passes
+function goLive(singleChannel) {
+  setFallbackImage(client.user.displayAvatarURL({ extension: 'png', size: 256 }));
+  process.once('SIGTERM', () => shutdown('SIGTERM', client).catch(console.error));
+  process.once('SIGINT', () => shutdown('SIGINT', client).catch(console.error));
+  startTracking(client, singleChannel);
+  setHealthReady(true);
+}
+
+// every server the bot is in, each posting in the channel /setup picked there
+async function bootMulti() {
+  // one registration for every server. global commands can take up to an hour to show up
+  // on a server that just invited the bot, which is why /setup says to wait a little
+  await client.application.fetch().catch(() => null);
+  await registerCommands(client.application.commands);
+
+  if (process.env.GUILD_ID) migrateLegacyToGuild(process.env.GUILD_ID, process.env.CHANNEL_ID);
+  const guilds = [...client.guilds.cache.values()];
+  for (const guild of guilds) forGuild(guild.id);
+  if (!guilds.length) console.error('bot isn\'t in any server yet, invite it with the invite link in the README, then run /setup there');
+
+  for (const guild of guilds) {
+    const channelId = postsChannelId(guild.id);
+    const postChannel = channelId && await client.channels.fetch(channelId).catch((err) => {
+      if (!NOT_THERE.includes(err.code)) console.error(`couldn't load posts channel for ${guild.name} (${err.message})`);
+      return null;
+    });
+    if (!postChannel) {
+      console.error(`no posts channel set in ${guild.name}, run /setup channel:#channel there`);
+      continue;
+    }
+    if (!postChannel.isTextBased()) {
+      console.error(`can't see a text channel for ${guild.name}, run /setup channel:#channel there`);
+      continue;
+    }
+    const where = `#${postChannel.name} (${guild.name})`;
+    const missing = missingPosting(postChannel);
+    if (missing.length) {
+      console.error(`missing permissions in ${where}: ${missing.join(', ')}`);
+      continue;
+    }
+    console.log(`posting in ${where}`);
+    warnPosting(postChannel, where, guildLocal.run(guild.id, () => messageSettings().threads !== 'off'));
+  }
+
+  goLive();
+  // in the background, it asks start.gg who the first TO is, per server
+  for (const guild of guilds) {
+    guildLocal.run(guild.id, () => seedFirstTO(guild)).catch(console.error);
+  }
+}
+
+// one server and one channel, both from the env
+async function bootSingle() {
+  const guild = await client.guilds.fetch(process.env.GUILD_ID).catch((err) => {
+    if (NOT_THERE.includes(err.code)) quit(`bot isn't in server ${process.env.GUILD_ID}, check GUILD_ID or invite it`);
+    quit(`couldn't load server ${process.env.GUILD_ID} from Discord (${err.message})`);
+  });
+  await registerCommands(guild.commands);
 
   const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch((err) => {
     if (NOT_THERE.includes(err.code)) return null;
     quit(`couldn't load channel ${process.env.CHANNEL_ID} from Discord (${err.message})`);
   });
   if (!channel?.isTextBased()) quit(`can't see a text channel with id ${process.env.CHANNEL_ID}, check CHANNEL_ID`);
-
-  const missing = channel.permissionsFor(client.user).missing([
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.EmbedLinks,
-  ]);
+  const missing = missingPosting(channel);
   if (missing.length) quit(`missing permissions in #${channel.name}: ${missing.join(', ')}`);
 
   console.log(`logged in as ${client.user.tag}, posting in #${channel.name}`);
-  // not worth quitting over either, cards without an uploaded picture still post
-  if (!channel.permissionsFor(client.user).has(PermissionFlagsBits.AttachFiles)) {
-    console.error(`missing Attach Files in #${channel.name}, so messages that upload character art, rank badges or the Slippi logo will fail`);
-  }
-  // not worth quitting over, those posts go in the channel until it's fixed
-  const threadsMissing = missingThreadPermissions(channel);
-  if (messageSettings().threads !== 'off' && threadsMissing?.length !== 0) {
-    console.error(`threads are on but can't be started in #${channel.name}${threadsMissing ? `, missing ${threadsMissing.join(' and ')}` : ''}`);
-  }
-
-  // before anything posts, so a message with no picture of its own gets this one
-  setFallbackImage(client.user.displayAvatarURL({ extension: 'png', size: 256 }));
-  startTracking(channel);
+  warnPosting(channel, `#${channel.name}`, messageSettings().threads !== 'off');
+  goLive(channel);
   // in the background, it asks start.gg who the first TO is
   seedFirstTO(guild);
-});
+}
+
+client.once(Events.ClientReady, () => (isMultiGuild() ? bootMulti() : bootSingle()));
+
+// multi-server only: a server that invites the bot later gets its own empty entry. global
+// commands can take up to an hour to appear there, and /setup picks its posts channel
+if (isMultiGuild()) {
+  client.on(Events.GuildCreate, async (guild) => {
+    forGuild(guild.id);
+    save();
+    console.log(`joined ${guild.name}, run /setup channel:#channel there`);
+    guildLocal.run(guild.id, () => seedFirstTO(guild)).catch(console.error);
+  });
+}
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isAutocomplete()) {
@@ -98,7 +202,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } finally {
         const { sent, limited } = progress();
         if (sent >= LOGGED_REQUESTS) {
-          console.log(`${described(interaction)}: ${sent} start.gg requests in ${Math.round((Date.now() - started) / 1000)}s${limited ? `, rate limited ${limited} times` : ''}`);
+          const seconds = Math.round((Date.now() - started) / 1000);
+          console.log(`${described(interaction)}: ${sent} start.gg requests in ${seconds}s${limited ? `, rate limited ${limited} times` : ''}`);
         }
       }
     });
@@ -107,14 +212,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // detail stays in the logs. users get a plain line saying whether start.gg, slippi, discord or the bot
     // itself went wrong, since the raw text would otherwise land in the channel on a public deferred reply
     const message = failureMessage(err);
+    const quiet = { content: message, allowedMentions: { parse: [] } };
     if (button) {
       await buttonFailed(interaction, message).catch(console.error);
     } else if (interaction.replied) {
-      await interaction.followUp({ content: message, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }).catch(console.error);
+      await interaction.followUp({ ...quiet, flags: MessageFlags.Ephemeral }).catch(console.error);
     } else if (interaction.deferred) {
-      await interaction.editReply({ content: message, allowedMentions: { parse: [] } }).catch(console.error);
+      await interaction.editReply(quiet).catch(console.error);
     } else {
-      await interaction.reply({ content: message, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }).catch(console.error);
+      await interaction.reply({ ...quiet, flags: MessageFlags.Ephemeral }).catch(console.error);
     }
   }
 });

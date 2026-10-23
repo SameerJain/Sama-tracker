@@ -3,6 +3,7 @@ import test, { after } from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { mockApi as answerWith } from './fixtures.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-dm-'));
 process.env.STATE_DIR = directory;
@@ -19,7 +20,7 @@ after(() => { globalThis.fetch = originalFetch; rmSync(directory, { recursive: t
 
 function mockApi(respond) {
   forgetMisses();
-  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
+  answerWith(respond);
 }
 
 // a fake post channel whose client DMs into sent instead of discord. inServer lists

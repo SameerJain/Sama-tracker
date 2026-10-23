@@ -1,4 +1,4 @@
-# UB Smash Royale — stats
+# UB Smash Royale stats
 
 View: open `index.html` in a browser (double-click). No server, no build, no internet needed.
 Charts are static SVGs in `images/`, raw numbers in `data/` (JSON + CSV).
@@ -17,31 +17,33 @@ Charts are static SVGs in `images/`, raw numbers in `data/` (JSON + CSV).
 - Events-entered ranking from full Ultimate entrant lists plus the off-week
   brackets, one entry per player per night (331 distinct players).
 - Redemption bracket ranked separately (31 events).
-- Page also has seasonality (average attendance by month of year), a character
-  matchup matrix (every character and pair in the games with both
-  characters reported, toggling to the
-  full Smash Ultimate roster; Random Character left out as not a character),
-  loyalty tiers and
-  an attendance histogram, first-time/second-time
-  and further return rates, a cumulative distinct-players growth curve with
-  newcomers per year, and a Buffalo overall card for players in both series.
+- Page also has rivalries from every singles set (a switch narrows them
+  to sets with characters reported, and an Include off weeks toggle adds the
+  off-week nights' singles brackets on top of either), top-4 consistency and
+  recent form, favourites and upsets, school-year retention, seasonality, character usage
+  with 95% ranges, character matchups, loyalty tiers, return rates, cumulative
+  player growth and a Buffalo card for players in both series.
 
 ## Data files
 
-- `data/tournaments.json/.csv` — all 78 tournaments + winners
-- `data/standings.json` — top 4 of each event (Ultimate, Redemption, Melee)
-- `data/winners.json/.csv` — wins/podiums per player
-- `data/matchups.json/.csv` — character vs character game records (every pair with a reported game)
-- `data/seasonality.json/.csv` — tournaments and average attendance by month of year
-- `data/retention.json/.csv` — loyalty tiers, histogram, return rates, newcomers by year, cumulative players
-- `data/cross-series.json/.csv` — players entered in both series, combined events and wins
-- `data/charts-data.json` — arrays backing the charts
+- `data/tournaments.json/.csv`: all 78 tournaments + winners
+- `data/standings.json`: top 4 of each event (Ultimate, Redemption, Melee)
+- `data/winners.json/.csv`: wins/podiums per player
+- `data/matchups.json/.csv`: character vs character game records (every pair with a reported game)
+- `data/head-to-head.json/.csv`: player rivalries from every completed singles set, with games won from reported set scores
+- `data/podium-rates.json/.csv`: top-4 and title rates over nights entered
+- `data/favourites.json`: favourites, upsets, first-time champions and title spread
+- `data/seasonality.json/.csv`: tournaments and average attendance by month of year
+- `data/retention.json/.csv`: loyalty tiers, histogram, return rates, newcomers by year, cumulative players
+- `data/cross-series.json/.csv`: players entered in both series, combined events and wins
+- `data/charts-data.json`: arrays backing the charts
 
 ## Rebuild
 
 Research scrape lives in `../research_notes/ub-smash-royale/`
 (`royale-all.json`, `tournaments-events.json`, `standings.json`,
-`attendance-offweek.json`, `offweek-tournaments.json`).
+`attendance-offweek.json`, `offweek-tournaments.json`, and
+`offweek-chars-by-event.jsonl` for the off-week singles sets).
 To regenerate this folder:
 
 ```sh

@@ -1,16 +1,28 @@
 import { GuildScheduledEventEntityType, GuildScheduledEventPrivacyLevel, GuildScheduledEventStatus, PermissionFlagsBits } from 'discord.js';
 import { getRegistrationById, startggUrl } from './startgg.js';
 import { state, save } from './store.js';
-import { messageSettings } from './message-settings.js';
+import { BIG_EVENT_ATTENDEES, BIG_EVENT_BRACKETS, BIG_EVENT_HOURS, messageSettings } from './message-settings.js';
 import { venueText } from './embeds/shared.js';
 
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
-// how long an event runs when start.gg has no end time for it
-const DEFAULT_LENGTH_HOURS = 6;
 // a saved event is forgotten this long after its tournament started. discord events have to start in the
 // future, so by then nothing would make it again anyway
 const EVENT_KEPT_DAYS = 7;
+
+// a major or regional, going by its size. past this an evening can't hold it
+function looksBig(found) {
+  return (found.numAttendees ?? 0) >= BIG_EVENT_ATTENDEES || (found.events ?? []).length >= BIG_EVENT_BRACKETS;
+}
+
+// how long an event runs when start.gg has no end time for it. usually the server's tuned
+// length, but a major or regional gets pushed to a full day. that only ever pushes back,
+// it never pulls a tuned length in
+function defaultLengthHours(found) {
+  if (looksBig(found)) return Math.max(messageSettings().eventLength, BIG_EVENT_HOURS);
+  return messageSettings().eventLength;
+}
+
 const NO_PERMISSION = 'I need Manage Events permission to make Discord events.';
 
 const secondsNow = () => Math.floor(Date.now() / 1000);
@@ -73,12 +85,13 @@ async function coverImage(tournament) {
 }
 
 // what a discord event shows for a tournament from getRegistration. discord requires an end time on
-// external events, and start.gg doesn't always have one, so that falls back to 6 hours
+// external events, and start.gg doesn't always have one, so that falls back to the server's tuned
+// length, or a full day for a major or regional
 function eventFields(found) {
   return {
     name: found.name.slice(0, 100),
     scheduledStartTime: new Date(found.startAt * 1000),
-    scheduledEndTime: new Date((found.endAt > found.startAt ? found.endAt : found.startAt + DEFAULT_LENGTH_HOURS * HOUR) * 1000),
+    scheduledEndTime: new Date((found.endAt > found.startAt ? found.endAt : found.startAt + defaultLengthHours(found) * HOUR) * 1000),
     description: eventDescription(found),
     entityMetadata: { location: eventLocation(found) },
   };
@@ -86,7 +99,10 @@ function eventFields(found) {
 
 // start.gg's side of an event as of the last make or sync. the sync only edits when this changes, so an edit a
 // mod made in discord stays until the TO changes something on start.gg
-const syncKey = (fields, cover) => JSON.stringify([fields.name, +fields.scheduledStartTime, +fields.scheduledEndTime, fields.description, fields.entityMetadata.location, cover ?? null]);
+function syncKey(fields, cover) {
+  const { name, scheduledStartTime, scheduledEndTime, description, entityMetadata } = fields;
+  return JSON.stringify([name, +scheduledStartTime, +scheduledEndTime, description, entityMetadata.location, cover ?? null]);
+}
 
 // synced null means the event may not match start.gg yet, and the next sync puts start.gg's details on it
 function remember(found, eventId, synced) {
@@ -96,8 +112,9 @@ function remember(found, eventId, synced) {
 // why the bot can't make events in this server, or null when it can
 export function cantMakeEvents(guild) {
   if (!guild?.scheduledEvents?.create) return 'Couldn\'t make a Discord event here.';
+  // the bot's own member isn't always cached, and then discord says no on the create instead
   const permissions = guild.members?.me?.permissions;
-  if (permissions?.has && !permissions.has(PermissionFlagsBits.ManageEvents) && !permissions.has(PermissionFlagsBits.CreateEvents)) return NO_PERMISSION;
+  if (permissions && !permissions.has(PermissionFlagsBits.ManageEvents) && !permissions.has(PermissionFlagsBits.CreateEvents)) return NO_PERMISSION;
   return null;
 }
 
@@ -114,7 +131,7 @@ export async function ensureDiscordEvent(found, guild) {
   const link = startggUrl(found.slug);
 
   try {
-    const existing = [...((await guild.scheduledEvents.fetch())?.values?.() ?? [])];
+    const existing = [...(await guild.scheduledEvents.fetch()).values()];
     const made = existing.find((event) => String(event.id) === String(saved?.eventId))
       ?? existing.find((event) => event.description?.split('\n').includes(link));
     if (made) {
@@ -127,14 +144,11 @@ export async function ensureDiscordEvent(found, guild) {
 
   const fields = eventFields(found);
   const cover = await coverImage(found);
+  const options = { ...fields, privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly, entityType: GuildScheduledEventEntityType.External };
+  if (cover.image) options.image = cover.image;
   let created;
   try {
-    created = await guild.scheduledEvents.create({
-      ...fields,
-      ...(cover.image ? { image: cover.image } : {}),
-      privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
-      entityType: GuildScheduledEventEntityType.External,
-    });
+    created = await guild.scheduledEvents.create(options);
   } catch (err) {
     if (err.code === 50013) return { error: NO_PERMISSION };
     throw err;

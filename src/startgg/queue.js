@@ -23,7 +23,7 @@ const fromCommand = new AsyncLocalStorage();
 // one queue per command, in here while it has requests waiting
 const commandQueues = [];
 const background = [];
-let REQUEST_GAP_MS = 800;
+let requestGap = 800;
 let nextSlot = 0;
 let timer;
 let dispatched = 0;
@@ -31,7 +31,7 @@ let dispatched = 0;
 // tests run through hundreds of queued requests, so commands.test.js sets this to 0.
 // the rate limit itself is still covered by requests.test.js and queue.test.js on the real gap
 export function setRequestGap(ms) {
-  REQUEST_GAP_MS = ms;
+  requestGap = ms;
 }
 
 // a command's queue also counts what it sent and how often start.gg said to slow down. wait, when given,
@@ -51,7 +51,7 @@ export function commandProgress() {
   return () => {
     if (!queue || queue === background) return { sent: 0, waiting: 0, limited: 0, seconds: 0 };
     const slots = commandQueues.reduce((sum, other) => sum + (other === queue ? 0 : Math.min(other.length, queue.length)), queue.length);
-    const seconds = queue.length ? Math.max(0, nextSlot - Date.now()) / 1000 + (slots * REQUEST_GAP_MS) / 1000 : 0;
+    const seconds = queue.length ? Math.max(0, nextSlot - Date.now()) / 1000 + (slots * requestGap) / 1000 : 0;
     return { sent: queue.sent, waiting: queue.length, limited: queue.limited, seconds };
   };
 }
@@ -78,7 +78,7 @@ function sendNext() {
     // commands go ahead, but every 10th slot goes to the background checks when
     // they have something waiting, so a busy night can't starve match calls
     dispatched++;
-    const queue = (dispatched % 10 === 0 && background.length ? background : commandQueues.shift() ?? background);
+    const queue = dispatched % 10 === 0 && background.length ? background : commandQueues.shift() ?? background;
     const next = queue.shift();
     if (!next) return;
     // back of the line for its next one
@@ -86,14 +86,59 @@ function sendNext() {
       queue.sent++;
       if (queue.length) commandQueues.push(queue);
     }
-    nextSlot = Date.now() + REQUEST_GAP_MS;
+    nextSlot = Date.now() + requestGap;
     next();
     sendNext();
   }, Math.max(0, nextSlot - Date.now()));
 }
 
+// start.gg counts as down once nothing has come back but timeouts and 5xx errors for this long, at least
+// DOWN_AFTER_FAILURES times. commands then hear so right away instead of each waiting out its retries, about
+// 90 seconds. background checks keep asking, and so does one command a minute, so the first answer ends it
+const DOWN_AFTER_MS = 2 * 60 * 1000;
+const DOWN_AFTER_FAILURES = 3;
+const PROBE_EVERY_MS = 60 * 1000;
+let failingSince = null;
+let failures = 0;
+let lastProbe = 0;
+
+function failed() {
+  failingSince ??= Date.now();
+  failures++;
+}
+
+function answered() {
+  failingSince = null;
+  failures = 0;
+}
+
+// unix seconds start.gg has been down since, or null while it's answering
+export function startggDownSince(now = Date.now()) {
+  if (!failingSince || failures < DOWN_AFTER_FAILURES || now - failingSince < DOWN_AFTER_MS) return null;
+  return Math.floor(failingSince / 1000);
+}
+
+// for tests
+export function resetOutage() {
+  answered();
+  lastProbe = 0;
+}
+
+// a command's request while start.gg is down fails without waiting, except one a minute that goes through to
+// see if it's back. background checks and anything outside a command always go through
+function skipWhileDown() {
+  const queue = fromCommand.getStore();
+  if (!queue || queue === background || !startggDownSince()) return false;
+  if (Date.now() - lastProbe >= PROBE_EVERY_MS) {
+    lastProbe = Date.now();
+    return false;
+  }
+  return true;
+}
+
 // variables can be a function, which gets called once it's this request's turn
 export async function query(text, variables, retries = 2) {
+  if (skipWhileDown()) throw new ApiError('start.gg', 'start.gg is down, so this wasn\'t sent');
   await takeTurn();
 
   let res;
@@ -108,10 +153,13 @@ export async function query(text, variables, retries = 2) {
       signal: AbortSignal.timeout(30_000),
     });
   } catch (err) {
+    failed();
     // a slow request can time out even when start.gg is fine, so those retry within the same budget
     if (retries > 0) return query(text, variables, retries - 1);
     throw new ApiError('start.gg', `start.gg didn't respond (${err.message})`);
   }
+  if (res.status >= 500) failed();
+  else answered();
   // still got limited, probably another copy running on the same token. everything waits
   if (res.status === 429 && retries > 0) {
     const queue = fromCommand.getStore();
@@ -171,14 +219,21 @@ export function miss(key) {
 // for tests, which change who's registered between cases
 export const forgetMisses = () => missedCache.clear();
 
-// a bunch of lookups per request, aliased by id. start.gg's 1000 object limit counts what comes back
-// and most checks come back empty, so groups start big and get split in half when they go over
 // ids go straight into the query text, so only numeric start.gg ids get through
 export function cleanId(id) {
   const text = String(id);
   if (!/^\d+$/.test(text)) throw new Error('bad start.gg id');
   return text;
 }
+
+// one field per id for a lookupMany query, named by prefix and id so the reply reads back by id,
+// like p123: player(id: 123) { ... }
+export function aliases(group, prefix, field, body) {
+  return group.map((id) => `${prefix}${cleanId(id)}: ${field}(id: ${cleanId(id)}) { ${body} }`).join('\n');
+}
+
+// a bunch of lookups per request, aliased by id. start.gg's 1000 object limit counts what comes back
+// and most checks come back empty, so groups start big and get split in half when they go over
 export async function lookupMany(ids, toQuery, variables, size = 20) {
   const results = await Promise.all(chunk(ids, size).map((group) => lookupGroup(group, toQuery, variables)));
   return Object.assign({}, ...results);
@@ -205,4 +260,10 @@ export const badToken = (err) => err instanceof ApiError && err.source === 'star
 // { totalPages, nodes } out of a paginated start.gg connection, which is null if what it's on is gone
 export function connectionPage(connection) {
   return { totalPages: connection?.pageInfo?.totalPages ?? 0, nodes: connection?.nodes ?? [] };
+}
+
+// a getPage for fitPage: the query with page and perPage added to its variables, and pick finding the
+// connection in the reply
+export function pagesOf(text, variables, pick) {
+  return async (page, perPage) => connectionPage(pick(await query(text, { ...variables, page, perPage })));
 }

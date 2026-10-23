@@ -1,10 +1,12 @@
 import { escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
+import { isMultiGuild } from '../store.js';
+import { HUB } from '../../series/configs.mjs';
 import { colors, FOOTER, baseEmbed, shortSchedule, withLines, withSections, playerLink, count } from './shared.js';
 
 // /t-o tournament posts switches a tracked tournament can have off, named for the list.
 // a custom reminder schedule shows with it, so TOs can see which tournaments don't use the default
-const TOURNAMENT_POSTS = { sets: 'sets off', stream: 'stream alerts off', top8: 'top 8s off', reminders: 'reg reminders off' };
+const TOURNAMENT_POSTS = { sets: 'sets off', stream: 'stream alerts off', calls: 'match calls off', top8: 'top 8s off', reminders: 'reg reminders off' };
 
 // tracked players, then tracked tournaments that aren't over. linked is how many people linked their own start.gg without being tracked
 export function trackedList(players, linked = 0, tournaments = {}) {
@@ -23,7 +25,9 @@ export function trackedList(players, linked = 0, tournaments = {}) {
   const tracked = Object.values(tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted)
     .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
   const tournamentLines = tracked.map((tournament) => {
-    const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => tournament.tracked[name] === false).map(([, note]) => note);
+    // match calls start off, so a tournament tracked before they existed reads as off too
+    const off = (name) => (name === 'calls' ? tournament.tracked.calls !== true : tournament.tracked[name] === false);
+    const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => off(name)).map(([, note]) => note);
     if (tournament.tracked.reminders !== false && Array.isArray(tournament.tracked.schedule)) {
       notes.push(`reminders ${shortSchedule(tournament.tracked.schedule)}`);
     }
@@ -31,7 +35,7 @@ export function trackedList(players, linked = 0, tournaments = {}) {
     return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
   });
   if (!tracked.length) tournamentLines.push('None yet. A TO can track one with `/t-o tournament add`.');
-  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders. TOs change that with `/t-o tournament posts`');
+  tournamentLines.push('', '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders and match calls with `calls:on`. TOs change that with `/t-o tournament posts`');
   return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(`Tracked tournaments · ${tracked.length}`), tournamentLines)];
 }
 
@@ -42,7 +46,7 @@ export function toList(tos, role) {
   const lines = role
     ? (tos.length ? tos.map((id) => `<@${id}>`) : ['Nobody the bot has seen yet.'])
     : ['There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role, or `/t-o role set` uses one already in the server.'];
-    lines.push('', '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
+  lines.push('', '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. TOs add and remove each other with `/t-o role add` and `/t-o role remove`');
   if (role) lines.push(`-# Someone handed the ${escapeMarkdown(role)} role in server settings shows up here once they use a command`);
   return embed.setDescription(lines.join('\n'));
 }
@@ -64,9 +68,10 @@ function socialLink(url) {
   return site ? `[${site}](${url})` : url;
 }
 
-// /data: the two series data pages, hosted on Vercel
+// /data: the series data pages on Vercel, plus the web hub once it's deployed (HUB.url in series/configs.mjs)
 export function dataPages() {
   const lines = [
+    ...(HUB.url ? [`**Samatracker** · [Player lookup, recent results and Slippi ranks](${HUB.url})`] : []),
     '**Monday Night SmashBall** · [Data analysis](https://monday-night-smashball.vercel.app)',
     '**UB Smash Royale** · [Data analysis](https://ub-smash-royale.vercel.app)',
     '',
@@ -104,6 +109,7 @@ export function status(info) {
   }
   if (info.threadError) lines.push(`**Threads:** last post went in the channel (${escapeMarkdown(info.threadError)})`);
   if (info.queued) lines.push(`**Waiting on start.gg:** ${count(info.queued, 'request')}`);
+  if (info.startggDownSince) lines.push(`**start.gg:** not answering since <t:${info.startggDownSince}:R>. Commands that need it say so right away until it's back`);
   if (info.downSince) lines.push(`-# Was down from <t:${info.downSince}:f> until it started`);
   if (info.skippedBefore) lines.push(`-# Sets from then until <t:${info.skippedBefore}:f> didn't get posted`);
   lines.push('-# [GitHub](https://github.com/SameerJain/Sama-tracker)');
@@ -111,11 +117,37 @@ export function status(info) {
   return baseEmbed(colors.system).setTitle('Status').setThumbnail(info.avatar).setDescription(lines.join('\n'));
 }
 
-// a new railway deployment going live, with when it deployed and the commit message. no commit id
-export function deployUpdate(deploy) {
+// how long the bot was off, in words
+function downFor(seconds) {
+  if (seconds < 90 * 60) return `about ${count(Math.max(1, Math.round(seconds / 60)), 'minute')}`;
+  if (seconds < 48 * 60 * 60) return `about ${count(Math.round(seconds / 3600), 'hour')}`;
+  return `about ${count(Math.round(seconds / 86400), 'day')}`;
+}
+
+// what people need to know after an outage: when, that their commands never got through, and what catches up.
+// outage is { from, to } in unix seconds, catchUpHours how far back missed set results still post
+function outageLines({ from, to }, catchUpHours) {
+  return [
+    `**Down:** <t:${from}:f> to <t:${to}:f>, ${downFor(to - from)}`,
+    'Commands sent then got Discord\'s "The application did not respond" and never reached the bot, so send them again.',
+    to - from <= catchUpHours * 60 * 60
+      ? 'Set results from while it was down are posting now.'
+      : `Set results from the last ${count(catchUpHours, 'hour')} are posting now, and older ones are skipped.`,
+  ];
+}
+
+// a new railway deployment going live, with when it deployed and the commit message. no commit id.
+// one that came after an outage says so too, instead of a second card
+export function deployUpdate(deploy, outage = null, catchUpHours = 3) {
   const lines = [`**Latest version deployed:** <t:${deploy.at}:R>`];
   if (deploy.message) lines.push(escapeMarkdown(deploy.message));
+  if (outage) lines.push('', ...outageLines(outage, catchUpHours));
   return baseEmbed(colors.system).setTitle('Bot updated').setDescription(lines.join('\n'));
+}
+
+// the bot starting again after being off long enough that people noticed, with no new version to explain it
+export function backOnline(outage, catchUpHours = 3) {
+  return baseEmbed(colors.system).setTitle('Back online').setDescription(outageLines(outage, catchUpHours).join('\n'));
 }
 
 // a /matchmaking_search ping. a mention in a card never pings, so this one is just a name to click
@@ -147,6 +179,7 @@ function shortHelp() {
     '**Start here**',
     '`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up',
     '`/track add` post your placements here. TOs can add anyone',
+    ...(isMultiGuild() ? ['`/setup channel:#channel` pick where automatic posts go (Manage Server or TOs). Then `/messages` controls what posts'] : []),
     '`/notify` pings for match calls, streams, reg reminders and 1-hour DMs',
     '`/help verbose:True` the full list with the details',
     '',
@@ -164,7 +197,7 @@ function shortHelp() {
     '**Tournaments**',
     '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered',
     '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks',
-    '`/data` Monday Night SmashBall and UB Smash Royale data pages',
+    '`/data` Samatracker and both series data pages',
     '`/messages` automatic posts and threads, for TOs or Manage Server · `/status` uptime and last checks',
     '`/matchmaking_role game:` get game pings · `/matchmaking_search game:` find games · `/matchmaking_channel` where searches go',
     '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun',
@@ -181,12 +214,13 @@ export function help(verbose = false) {
     [
       '**General**',
       '`/help` this list',
-      '`/status` uptime, when the latest version was deployed, and the last start.gg and Slippi checks',
+      '`/status` uptime, when the latest version was deployed, the last start.gg and Slippi checks, and whether start.gg is down',
+      ...(isMultiGuild() ? ['`/setup` show or set the channel automatic posts go in for this server. Anyone can look, Manage Server or TOs change it, and it checks the bot can post there'] : []),
       '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member',
-      '`/data` links to the Monday Night SmashBall and UB Smash Royale data pages: every tournament\'s attendance, winners, most events entered and characters',
+      '`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, most events entered and characters',
       '`/socials` saved streams and social links',
       '`/socials_edit` add or remove those links. Manage Server by default',
-      '`/messages` automatic posts on or off, threads, set result colors and the recap schedule. T.O.s or Manage Server',
+      '`/messages` automatic posts on or off, threads, event length, set result colors and the recap schedule. TOs or Manage Server',
     ],
     [
       '**Tracking players**',
@@ -194,7 +228,7 @@ export function help(verbose = false) {
       '`/track remove` stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back with their settings for a minute',
       '`/track list` everyone tracked, and the tracked tournaments',
       '`/track posts` your set results and stream alerts on or off. TOs can change anyone\'s, or everyone\'s with `player:all`, which asks first. Anyone can look',
-      '`/t-o cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. T.O.s only',
+      '`/t-o cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. TOs only',
       '`/upcoming` tracked tournaments, and any other with 3 or more of the crew. `player:` checks one person, live from start.gg when linked but not tracked',
       '`/recent` latest sets',
       '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them',
@@ -203,9 +237,9 @@ export function help(verbose = false) {
     ],
     [
       '**TOs**',
-      '`/t-o role add` give someone the TO role. T.O.s only',
+      '`/t-o role add` give someone the TO role. TOs only',
       '`/t-o role set` use an existing server role for TO privileges. Needs Manage Server',
-      '`/t-o role remove` take the TO role off someone. Refuses to remove the last known T.O. T.O.s only',
+      '`/t-o role remove` take the TO role off someone. Refuses to remove the last known TO. TOs only',
       '`/t-o role list` who the TOs are',
       '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one',
     ],
@@ -257,13 +291,13 @@ export function help(verbose = false) {
       '**Tournaments**',
       '`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event',
       '`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute',
-      '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, top 8s and reg reminders on or off. `schedule:` changes the reminder times, `default` goes back to the usual four',
+      '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, match calls, top 8s and reg reminders on or off. `schedule:` changes the reminder times, `default` goes back to the usual four',
       '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event',
       '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours',
       '`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end',
       '`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min',
       '`/t-o tournament event` make a Discord event from a start.gg link, without tracking it. Its streams go in the description',
-      '-# `/t-o tournament` is T.O.s only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time, end time, cover photo, place and streams, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map',
+      '-# `/t-o tournament` is TOs only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time, end time, cover photo, place and streams, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map',
     ],
     [
       '**Fun**',
@@ -279,18 +313,19 @@ export function help(verbose = false) {
     ],
     [
       '**Posted here automatically**',
-      '**Set results.** Every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked. `/messages set_colors` colors them green for a win, red for a loss, gold for crew vs crew and purple when nobody tracked played',
+      '**Set results.** Every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked. `/messages set_colors` colors them green for a win, red for a loss, gold for crew vs crew and blue when nobody tracked played',
       '**Stream alerts.** Sets on stream or up next in the stream queue for 30 seconds, at tracked tournaments and for tracked players with stream alerts on, pinging whoever is playing with `/notify streams` on',
-      '**Match call pings.** Called sets, pinging whoever has `/notify calls` on with You\'re up and the station when start.gg has one, all four in one message for doubles. A call the TO takes back gets crossed out, and one not started 5 minutes in pings them again',
+      '**Match call pings.** Called sets, pinging whoever has `/notify calls` on with You\'re up and the station when start.gg has one, all four in one message for doubles. A tracked tournament with `calls:on` posts every called set even with nobody to ping. A call the TO takes back gets crossed out, and calling it again pings again',
       '**Tournament roll calls.** An hour before a tournament with 3+ of the crew, with the streams from its start.gg page. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server',
       '**Tournament placements.** Where the crew placed, with the top 8 when every event finishes at a tracked tournament, even if top 8 posts are off. Otherwise 12 hours after it ends. Projected placements get edited once start.gg has them final',
       '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished',
       '**Registration reminders.** Tracked tournaments 7 days, 3 days and a day out, then a last call 6 hours before, pinging the Reg Reminders role, unless a TO sets custom times with `schedule:`. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start, both only while you\'re in this server. When registration closes within an hour of the start there\'s one DM, the start one',
       '**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/messages events` turns it on',
-      '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg',
+      '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg. When a season ends, a wrap-up with the final ranks, biggest climbers and most played characters',
       '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/messages bills` turns it on',
       '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/messages` changes it',
       '**Bot updates.** A new version going live on Railway, with when it deployed and the commit message',
+      '**Back online.** After the bot was off 10 minutes or more, for how long and that commands sent then need sending again. While start.gg is down, commands say so right away and the bot\'s status shows it',
       '-# Tracked tournaments post their set results and stream alerts in a thread. `/messages threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here',
     ],
   ];

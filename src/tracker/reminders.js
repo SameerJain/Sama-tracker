@@ -3,25 +3,20 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { REG_ROLE, messageEnabled } from '../message-settings.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
-import { channel, secondsNow, sendPinging, posting, regDeadline, reminderSchedule, nextRegReminder, mentionable, HOUR, DM_HOURS_BEFORE, DM_LOOKAHEAD_HOURS } from './shared.js';
+import {
+  currentChannel, secondsNow, sendPinging, posting, named, regDeadline, reminderSchedule, nextRegReminder, mentionable, HOUR, DM_HOURS_BEFORE,
+  DM_LOOKAHEAD_HOURS,
+} from './shared.js';
 
 // the Reg Reminders role in this server, by name since /notify looks it up that way. null when
 // the channel has no guild, like in tests
 function regRole(postChannel) {
-  try {
-    const cache = postChannel?.guild?.roles?.cache;
-    if (!cache) return null;
-    if (typeof cache.find === 'function') return cache.find((each) => each?.name === REG_ROLE) ?? null;
-    for (const each of cache.values()) if (each?.name === REG_ROLE) return each;
-    return null;
-  } catch {
-    return null;
-  }
+  return postChannel?.guild?.roles.cache.find((role) => role.name === REG_ROLE) ?? null;
 }
 
 // reminders for tracked tournaments with reminders on, pinging the Reg Reminders role. everyone
 // with it gets pinged, even when start.gg already has them registered. reg DMs still skip them
-export async function postRegReminders(postChannel = channel) {
+export async function postRegReminders(postChannel = currentChannel()) {
   for (const tournament of Object.values(state.tournaments)) {
     const { reminder } = tournament;
     if (!posting(tournament, 'reminders') || !reminder) continue;
@@ -65,7 +60,7 @@ export async function postRegReminders(postChannel = channel) {
       }
       reminder.next = due + 1;
     } catch (err) {
-      console.error(`reg reminder for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`reg reminder for ${named(tournament)} failed:`, err.message);
     }
   }
   save();
@@ -75,7 +70,7 @@ export async function postRegReminders(postChannel = channel) {
 // decides. reg DMs skip anyone registered. when registration closes within an hour of the start there's one DM,
 // the start one, since it carries the register link too. each goes once per close time and start time, so a
 // TO moving one sends it again for the new time
-export async function postDmReminders(postChannel = channel) {
+export async function postDmReminders(postChannel = currentChannel()) {
   const client = postChannel?.client;
   if (!client || (!state.regDmPings.length && !state.startDmPings.length)) return;
 
@@ -102,7 +97,7 @@ export async function postDmReminders(postChannel = channel) {
       latest = await startgg.getRegistration(tournament.slug);
       if (!latest) continue;
     } catch (err) {
-      console.error(`DM reminders for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`DM reminders for ${named(tournament)} failed:`, err.message);
       continue;
     }
     const deadline = regDeadline(latest);
@@ -121,21 +116,23 @@ export async function postDmReminders(postChannel = channel) {
           rememberAccounts(participants);
           const registered = new Set(participants.map((participant) => participant.discordId));
           const embed = embeds.regReminder(latest, deadline, true);
-          for (const discordId of state.regDmPings.filter((id) => !registered.has(id) && mentionable(id) && memberOnly(id))) await dmUser(client, discordId, embed);
+          const unregistered = state.regDmPings.filter((id) => !registered.has(id) && mentionable(id) && memberOnly(id));
+          for (const discordId of unregistered) await dmUser(client, discordId, embed);
         }
       }
     } catch (err) {
-      console.error(`registration DMs for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`registration DMs for ${named(tournament)} failed:`, err.message);
     }
 
     try {
       if (state.startDmPings.length && tournament.dmStartSentFor !== startAt && dmDue(startAt)) {
         tournament.dmStartSentFor = startAt;
         const embed = embeds.startReminder(latest);
-        for (const discordId of state.startDmPings.filter((id) => mentionable(id) && memberOnly(id))) await dmUser(client, discordId, embed);
+        const going = state.startDmPings.filter((id) => mentionable(id) && memberOnly(id));
+        for (const discordId of going) await dmUser(client, discordId, embed);
       }
     } catch (err) {
-      console.error(`start DMs for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`start DMs for ${named(tournament)} failed:`, err.message);
     }
   }
   save();

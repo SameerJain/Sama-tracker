@@ -4,13 +4,16 @@ import { state, save } from '../store.js';
 import { messageEnabled } from '../message-settings.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
 import { cantMakeEvents, ensureDiscordEvent } from '../discord-events.js';
-import { channel, secondsNow, health, post, postRefs, editPost, posting, crewOf, crewIds, endTime, overAt, eventsOf, shouldForgetTournament, ROLL_CALL_MIN_PLAYERS, ROLL_CALL_HOURS_BEFORE, RESULTS_WAIT_HOURS, TOP8_RETRY_HOURS, FAR_OFF_CHECK_HOURS, TOURNAMENT_FORGOTTEN_DAYS, PROJECTED_KEPT_DAYS, HOUR, DAY } from './shared.js';
+import {
+  currentChannel, secondsNow, health, post, postRefs, editPost, posting, named, crewOf, crewIds, endTime, overAt, eventsOf, shouldForgetTournament,
+  ROLL_CALL_MIN_PLAYERS, ROLL_CALL_HOURS_BEFORE, RESULTS_WAIT_HOURS, TOP8_RETRY_HOURS, FAR_OFF_CHECK_HOURS, PROJECTED_KEPT_DAYS, HOUR, DAY,
+} from './shared.js';
 import { unpinFinishedThreads, unpinTournamentThread } from './threads.js';
 
 // with /messages events on, each upcoming tracked tournament gets a discord event, once. state.discordEvents keeps
 // it either way, so an event a mod deleted stays deleted. no due time like the posts, since turning it on is
 // asking for events at the tournaments already coming up
-export async function makeTournamentEvents(guild = channel?.guild) {
+export async function makeTournamentEvents(guild = currentChannel()?.guild) {
   if (!messageEnabled('events')) return;
   const waiting = Object.values(state.tournaments)
     .filter((tournament) => tournament.tracked && !state.discordEvents[tournament.id] && tournament.startAt > secondsNow());
@@ -22,9 +25,9 @@ export async function makeTournamentEvents(guild = channel?.guild) {
       const found = await startgg.getRegistrationById(tournament.id);
       if (!found || !(found.startAt > secondsNow())) continue;
       const { error } = await ensureDiscordEvent(found, guild);
-      if (error) console.error(`discord event for ${tournament.name ?? tournament.id}: ${error}`);
+      if (error) console.error(`discord event for ${named(tournament)}: ${error}`);
     } catch (err) {
-      console.error(`discord event for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`discord event for ${named(tournament)} failed:`, err.message);
     }
   }
   save();
@@ -34,7 +37,7 @@ export async function makeTournamentEvents(guild = channel?.guild) {
 // server. the ones who aren't tracked get saved with their tag so the roll call and placements can name them.
 // tracked players it finds go in userIds, in case their own upcoming list missed it. a hidden list, or start.gg or
 // discord failing, keeps whoever it had
-export async function refreshCrew(tournament, guild = channel?.guild) {
+export async function refreshCrew(tournament, guild = currentChannel()?.guild) {
   try {
     const participants = await startgg.getParticipants(tournament.id);
     rememberAccounts(participants);
@@ -51,8 +54,14 @@ export async function refreshCrew(tournament, guild = channel?.guild) {
     }
     tournament.crew = crew;
   } catch (err) {
-    console.error(`finding the crew at ${tournament.name ?? tournament.id} failed:`, err.message);
+    console.error(`finding the crew at ${named(tournament)} failed:`, err.message);
   }
+}
+
+// done with it: its thread card comes down and it's dropped
+async function forget(tournament) {
+  await unpinTournamentThread(currentChannel(), tournament);
+  delete state.tournaments[tournament.id];
 }
 
 export async function updateTournaments() {
@@ -80,23 +89,19 @@ export async function updateTournaments() {
     if (tournament.resultsPosted) {
       // keep it a week, otherwise it gets re-added and the results post again
       if (secondsNow() > endTime(tournament) + 7 * DAY) {
-        await unpinTournamentThread(channel, tournament);
-        delete state.tournaments[tournament.id];
-      } else {
-        if (tournament.projected) {
-          await correctPlacements(tournament)
-            .catch((err) => console.error(`correcting placements for ${tournament.name ?? tournament.id} failed:`, err.message));
-        }
-        if (tournament.top8Failed) {
-          await verifyTopEight(tournament)
-            .catch((err) => console.error(`verifying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message));
-        }
+        await forget(tournament);
+        continue;
+      }
+      if (tournament.projected) {
+        await correctPlacements(tournament).catch((err) => console.error(`correcting placements for ${named(tournament)} failed:`, err.message));
+      }
+      if (tournament.top8Failed) {
+        await verifyTopEight(tournament).catch((err) => console.error(`verifying the top 8 for ${named(tournament)} failed:`, err.message));
       }
       continue;
     }
     if (shouldForgetTournament(tournament)) {
-      await unpinTournamentThread(channel, tournament);
-      delete state.tournaments[tournament.id];
+      await forget(tournament);
       continue;
     }
     const farOff = tournament.startAt - secondsNow() > DAY;
@@ -111,20 +116,19 @@ export async function updateTournaments() {
       const latest = await startgg.getTournament(tournament.id, crewIds(tournament));
       // deleted or unpublished
       if (!latest) {
-        await unpinTournamentThread(channel, tournament);
-        delete state.tournaments[tournament.id];
+        await forget(tournament);
         continue;
       }
       Object.assign(tournament, latest, { checkedAt: secondsNow() });
       await postRollCall(tournament);
     } catch (err) {
-      console.error(`updating ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`updating ${named(tournament)} failed:`, err.message);
     }
     // even if the lookup failed, so a tournament start.gg keeps erroring on still gets results from the last good check
     try {
       await postResults(tournament);
     } catch (err) {
-      console.error(`posting results for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`posting results for ${named(tournament)} failed:`, err.message);
     }
   }
 
@@ -133,7 +137,7 @@ export async function updateTournaments() {
   save();
 }
 
-export async function postRollCall(tournament, postChannel = channel) {
+export async function postRollCall(tournament, postChannel = currentChannel()) {
   if (tournament.rollCallPosted) return;
 
   const dueAt = tournament.startAt - ROLL_CALL_HOURS_BEFORE * HOUR;
@@ -145,18 +149,40 @@ export async function postRollCall(tournament, postChannel = channel) {
 
   if (messageEnabled('rollcall', dueAt)) {
     // the streams on its start.gg page, since the roll call is when people start looking for them. failing leaves them out
-    const streams = tournament.id
-      ? await startgg.getTournamentStreams([tournament.id]).then((found) => found.get(String(tournament.id)) ?? []).catch((err) => {
-        console.error(`streams for ${tournament.name ?? tournament.id}'s roll call failed:`, err.message);
-        return [];
-      })
-      : [];
+    let streams = [];
+    if (tournament.id) {
+      try {
+        streams = (await startgg.getTournamentStreams([tournament.id])).get(String(tournament.id)) ?? [];
+      } catch (err) {
+        console.error(`streams for ${named(tournament)}'s roll call failed:`, err.message);
+      }
+    }
     await post(embeds.rollCall(tournament, crewOf(tournament), streams), 'rollcall', dueAt, postChannel);
   }
   tournament.rollCallPosted = true;
 }
 
-export async function postResults(tournament, postChannel = channel) {
+// the placements, unless results are switched off. the messages that went out, to edit if they were projected
+async function postPlacements(tournament, entries, dueAt, postChannel) {
+  if (!messageEnabled('results', dueAt)) return [];
+  return post(embeds.results({ ...tournament, entries }, crewOf(tournament)), 'results', dueAt, postChannel);
+}
+
+// a top 8 discord fails on gets marked for verifyTopEight to retry hourly. the messages that went out
+async function sendTopEight(tournament, events, dueAt, postChannel, now) {
+  try {
+    const sent = await post(embeds.topEight(tournament, events), 'top8', dueAt, postChannel);
+    tournament.top8Posted = true;
+    return sent;
+  } catch (err) {
+    console.error(`posting the top 8 for ${named(tournament)} failed:`, err.message);
+    tournament.top8Failed = true;
+    tournament.top8FailedAt ??= now;
+    return [];
+  }
+}
+
+export async function postResults(tournament, postChannel = currentChannel()) {
   if (tournament.resultsPosted) return;
   const now = secondsNow();
   if (now < tournament.startAt) return;
@@ -165,7 +191,7 @@ export async function postResults(tournament, postChannel = channel) {
   if (scope.length && scope.every((entry) => entry.done)) tournament.doneAt ??= now;
   // tracked tournaments post results and top 8 together as soon as every event is finished
   const topEightOn = posting(tournament, 'top8');
-  if (tournament.tracked && !tournament.resultsPosted && await postFinishedResults(tournament, postChannel, now, topEightOn)) return;
+  if (tournament.tracked && await postFinishedResults(tournament, postChannel, now, topEightOn)) return;
 
   const waited = now - overAt(tournament);
   if (waited < RESULTS_WAIT_HOURS * HOUR) return;
@@ -184,33 +210,26 @@ export async function postResults(tournament, postChannel = channel) {
       events = await topEightEvents(scope.filter((entry) => entry.started));
     } catch (err) {
       if (now < dueAt + TOP8_RETRY_HOURS * HOUR) throw err;
-      console.error(`top 8 for ${tournament.name ?? tournament.id} failed, posting placements without it:`, err.message);
+      console.error(`top 8 for ${named(tournament)} failed, posting placements without it:`, err.message);
     }
   }
-  const results = messageEnabled('results', dueAt) ? await post(embeds.results({ ...tournament, entries }, crewOf(tournament)), 'results', dueAt, postChannel) : [];
+  const results = await postPlacements(tournament, entries, dueAt, postChannel);
   // marked before the top 8 goes, so discord failing on it can't post the placements again
   tournament.resultsPosted = true;
   let topEight = [];
   if (!tournament.top8Posted && events.length) {
-    const sentTopEight = await post(embeds.topEight(tournament, events), 'top8', dueAt, postChannel).catch((err) => {
-      console.error(`posting the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
-      return null;
-    });
-    if (sentTopEight) {
-      topEight = sentTopEight;
-      tournament.top8Posted = true;
-    } else {
-      // the fail-safe retries this hourly, see verifyTopEight
-      tournament.top8Failed = true;
-      tournament.top8FailedAt ??= now;
-    }
+    topEight = await sendTopEight(tournament, events, dueAt, postChannel, now);
   } else if (!tournament.top8Posted && (!topEightOn || !messageEnabled('top8', dueAt))) {
     // switched off, or not tracked, counts as posted, so the fail-safe doesn't replay it
     tournament.top8Posted = true;
   }
   // projected ones get edited once start.gg has them final, see correctPlacements.
   // a top 8 with nothing reported yet saves with nothing to edit, so the final still goes out
-  const projected = { at: now, results: allIn ? [] : postRefs(results), top8: events.every((event) => event.done) ? [] : postRefs(topEight) };
+  const projected = {
+    at: now,
+    results: allIn ? [] : postRefs(results),
+    top8: events.every((event) => event.done) ? [] : postRefs(topEight),
+  };
   if (projected.results.length || projected.top8.length || !tournament.top8Posted) tournament.projected = projected;
 }
 
@@ -222,36 +241,24 @@ async function postFinishedResults(tournament, postChannel, now, topEightOn) {
   if (!started.length || !started.every((entry) => entry.done)) return false;
   // one that hasn't started might still run, like doubles after singles, so it waits for those until the end time
   if (started.length < scope.length && now <= endTime(tournament)) return false;
-  const sendTopEight = topEightOn && messageEnabled('top8', now);
+  const withTopEight = topEightOn && messageEnabled('top8', now);
   let events = [];
-  if (sendTopEight) {
+  if (withTopEight) {
     try {
       events = await fetchDoneTopEight(started);
     } catch (err) {
-      console.error(`early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+      console.error(`early top 8 for ${named(tournament)} failed:`, err.message);
       return false;
     }
     if (!events) return false;
   }
 
   const entries = tournament.entries.filter((entry) => entry.started);
-  const results = messageEnabled('results', now) ? await post(embeds.results({ ...tournament, entries }, crewOf(tournament)), 'results', now, postChannel) : [];
+  const results = await postPlacements(tournament, entries, now, postChannel);
   tournament.resultsPosted = true;
-
-  if (sendTopEight) {
-    const sent = await post(embeds.topEight(tournament, events), 'top8', now, postChannel).catch((err) => {
-      console.error(`posting the early top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
-      return null;
-    });
-    if (sent) tournament.top8Posted = true;
-    else {
-      tournament.top8Failed = true;
-      tournament.top8FailedAt ??= now;
-    }
-  } else {
-    // switched off counts as posted, so turning it back on doesn't replay it
-    tournament.top8Posted = true;
-  }
+  // switched off counts as posted, so turning it back on doesn't replay it
+  if (withTopEight) await sendTopEight(tournament, events, now, postChannel, now);
+  else tournament.top8Posted = true;
 
   const projectedResults = entries.every(placed) ? [] : postRefs(results);
   if (projectedResults.length || !tournament.top8Posted) tournament.projected = { at: now, results: projectedResults, top8: [] };
@@ -270,39 +277,35 @@ async function fetchDoneTopEight(entries) {
   return events;
 }
 
+function stopRetrying(tournament) {
+  delete tournament.top8Failed;
+  delete tournament.top8FailedAt;
+  delete tournament.top8CheckedAt;
+}
+
 // fail-safe: a top 8 that failed to send gets retried hourly for 3 days, then gives up.
 // only tournaments the new code marked with top8Failed come here, so ones from before the
 // flag existed never get a second top 8. true once it went out or there's nothing to retry
-export async function verifyTopEight(tournament, postChannel = channel, now = secondsNow()) {
+export async function verifyTopEight(tournament, postChannel = currentChannel(), now = secondsNow()) {
   if (tournament.top8Posted || !tournament.top8Failed) return true;
   if (now - (tournament.top8CheckedAt ?? 0) < HOUR) return false;
   tournament.top8CheckedAt = now;
   if (now > (tournament.top8FailedAt ?? now) + PROJECTED_KEPT_DAYS * DAY) {
-    delete tournament.top8Failed;
-    delete tournament.top8FailedAt;
-    delete tournament.top8CheckedAt;
+    stopRetrying(tournament);
     return false;
   }
   // switched off since it failed: keep the marker so it retries if switched back on
   if (!messageEnabled('top8')) return false;
-  let events;
   try {
-    events = await fetchDoneTopEight(eventsOf(tournament));
-  } catch (err) {
-    console.error(`retrying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
-    return false;
-  }
-  if (!events) return false;
-  try {
+    const events = await fetchDoneTopEight(eventsOf(tournament));
+    if (!events) return false;
     await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
   } catch (err) {
-    console.error(`retrying the top 8 for ${tournament.name ?? tournament.id} failed:`, err.message);
+    console.error(`retrying the top 8 for ${named(tournament)} failed:`, err.message);
     return false;
   }
   tournament.top8Posted = true;
-  delete tournament.top8Failed;
-  delete tournament.top8FailedAt;
-  delete tournament.top8CheckedAt;
+  stopRetrying(tournament);
   return true;
 }
 
@@ -312,7 +315,7 @@ const placed = (entry) => Boolean(entry.placement && (entry.done || entry.final)
 // placements that went out projected because the TO stopped reporting get edited once start.gg has every
 // one final, looked at hourly for 3 days. the top 8 the same, once its events are finished. a top 8
 // with nothing reported at 12 hours goes out as a new message instead, since there's nothing to edit
-export async function correctPlacements(tournament, postChannel = channel) {
+export async function correctPlacements(tournament, postChannel = currentChannel()) {
   const { projected } = tournament;
   const now = secondsNow();
   if (now > projected.at + PROJECTED_KEPT_DAYS * DAY) {
@@ -327,7 +330,8 @@ export async function correctPlacements(tournament, postChannel = channel) {
     const entries = latest?.entries.filter((entry) => entry.started) ?? [];
     if (entries.length && entries.every(placed)) {
       tournament.entries = latest.entries;
-      await editPosts(postChannel, projected.results, embeds.results({ ...tournament, entries }, crewOf(tournament)), 'results', 'Final placements, the ones above were projected');
+      const final = embeds.results({ ...tournament, entries }, crewOf(tournament));
+      await editPosts(postChannel, projected.results, final, 'results', 'Final placements, the ones above were projected');
       projected.results = [];
     }
   }

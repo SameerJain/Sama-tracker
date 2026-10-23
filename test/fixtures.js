@@ -1,5 +1,24 @@
-// shared pure-data fixtures for the features-*.test.js split.
-// no src imports here: data and pure functions only.
+import { mock } from 'node:test';
+
+// data and small helpers several test files share. nothing from src/ here, since a test file has to set
+// STATE_DIR before src/ loads
+
+// a fake start.gg. respond gets the request body, { query, variables }, and returns the reply's data
+function mockApi(respond) {
+  globalThis.fetch = async (_url, options) => ({ ok: true, json: async () => ({ data: respond(JSON.parse(options.body)) }) });
+}
+
+// ticks the mocked timers until promise settles, then hands it back
+async function settle(promise) {
+  let done = false;
+  promise.finally(() => { done = true; }).catch(() => {});
+  while (!done) {
+    mock.timers.tick(100);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  return promise;
+}
+
 const crewPlayer = { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active' };
 // a tournament tracked by hand with everything on, the way /t-o tournament add leaves it
 const tracked = { by: 'manual', at: 0, sets: true, stream: true, top8: true, reminders: true };
@@ -47,4 +66,4 @@ const descriptions = cards => cards.map(e => e.data.description).join('\n');
 const playedThisWeek = (query, playerIds) => Object.fromEntries([...query.matchAll(/p(\d+): player/g)]
   .map(([, id]) => [`p${id}`, { sets: { nodes: playerIds.includes(Number(id)) ? [{ id: 1 }] : [] } }]));
 
-export { crewPlayer, tracked, event, node, result, DAY, periodsFor, runPlayer, runTournament, runIn, descriptions, playedThisWeek };
+export { mockApi, settle, crewPlayer, tracked, event, node, result, DAY, periodsFor, runPlayer, runTournament, runIn, descriptions, playedThisWeek };

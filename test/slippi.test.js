@@ -23,7 +23,7 @@ let users = {};
 let codesOnStartgg = {};
 let startggRequests = 0;
 
-function user({ uid, code, rating, updates = 20, wins = 10, losses = 5, season = 5, regional = null }) {
+function user({ uid, code, rating, updates = 20, wins = 10, losses = 5, season = 5, regional = null, history = [] }) {
   return {
     fbUid: uid, displayName: code.split('#')[0], connectCode: { code },
     rankedNetplayProfile: {
@@ -31,9 +31,12 @@ function user({ uid, code, rating, updates = 20, wins = 10, losses = 5, season =
       dailyGlobalPlacement: null, dailyRegionalPlacement: regional, continent: 'EUROPE',
       characters: [{ character: 'CAPTAIN_FALCON', gameCount: 4 }, { character: 'FOX', gameCount: 9 }],
     },
-    rankedNetplayProfileHistory: [],
+    rankedNetplayProfileHistory: history,
   };
 }
+
+// a finished season the way slippi's history has it
+const past = (name, rating, wins, losses, endedAt) => ({ ratingOrdinal: rating, wins, losses, season: { name, status: 'COMPLETED', endedAt } });
 
 globalThis.fetch = async (url, options) => {
   // character art
@@ -76,7 +79,7 @@ beforeEach(() => {
   users = {};
   codesOnStartgg = {};
   startggRequests = 0;
-  Object.assign(state, { slippi: {}, slippiSkipped: [], players: {}, links: {}, messages: {} });
+  Object.assign(state, { slippi: {}, slippiSkipped: [], slippiWrapped: [], players: {}, links: {}, messages: {} });
 });
 
 test('connect codes are read the way people type and paste them', () => {
@@ -143,6 +146,61 @@ test('placing out of pending posts, a new season starting everyone over does not
   users.c = user({ uid: 'c', code: 'CCC#3', rating: 2010, updates: 6 });
   await postRankChanges(posts);
   assert.match(JSON.stringify(posts.sent[1].embeds), /CCC placed into Diamond 1/);
+});
+
+test('a finished season gets one wrap-up with final ranks, climbers and what the watchlist played', async () => {
+  const endedAt = new Date(Date.now() - 3600 * 1000).toISOString();
+  const lastYear = new Date(Date.now() - 90 * 86400 * 1000).toISOString();
+  state.players = { 1: { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew' } };
+  // already playing the new season, so its characters from before the reset are the ones that count
+  watching('a', 'AAA#1', 'Diamond 1', 2040);
+  Object.assign(state.slippi.a, { userId: 1, characters: [{ name: 'Marth', games: 120 }] });
+  users.a = user({ uid: 'a', code: 'AAA#1', rating: 1200, updates: 2, season: 6, history: [past('Season 5', 2050, 30, 10, endedAt), past('Season 4', 1900, 20, 20, lastYear)] });
+  // hasn't played since, so still on last season's profile, and dropped from the season before
+  watching('b', 'BBB#2', 'Gold 2', 1600);
+  users.b = user({ uid: 'b', code: 'BBB#2', rating: 1600, updates: 35, history: [past('Season 5', 1600, 20, 15, endedAt), past('Season 4', 1700, 10, 10, lastYear)] });
+  // too few sets to rank, but what they played still counts
+  watching('c', 'CCC#3', 'Pending', 1100);
+  users.c = user({ uid: 'c', code: 'CCC#3', rating: 1100, updates: 3, history: [past('Season 5', 1100, 2, 1, endedAt)] });
+
+  const posts = channel();
+  await postRankChanges(posts);
+  assert.equal(posts.sent.length, 1);
+  const [wrap] = posts.sent;
+  const text = JSON.stringify(wrap.embeds);
+  assert.match(text, /"title":"Slippi Season 5 wrap-up"/);
+  assert.match(wrap.embeds[0].data.description, /^\*\*Final ranks\*\*\n1\\\. \[Crew\]\(https:\/\/slippi\.gg\/user\/AAA-1\) · \*\*Diamond 1\*\* · 2050\.0 · 30-10 · Marth\n2\\\. \[BBB\]\(https:\/\/slippi\.gg\/user\/BBB-2\) · \*\*Gold 2\*\* · 1600\.0 · 20-15 · Fox\n\n/);
+  assert.doesNotMatch(text, /CCC/);
+  assert.match(wrap.embeds[0].data.description, /\*\*Biggest climbers\*\*\n\[Crew\].* · 1900\.0 to 2050\.0 \(\+150\.0\) since Season 4\n/);
+  assert.doesNotMatch(wrap.embeds[0].data.description, /BBB.*since Season 4/);
+  assert.match(wrap.embeds[0].data.description, /\*\*Most played:\*\* Marth 120 games · Fox 18 games · Captain Falcon 8 games/);
+  assert.match(text, /"thumbnail":\{"url":"attachment:\/\/rank-diamond-1\.png"\}/);
+  assert.deepEqual(wrap.files.map((file) => file.name), ['rank-diamond-1.png']);
+  assert.deepEqual(wrap.allowedMentions, { parse: [] });
+  assert.deepEqual(state.slippiWrapped, ['Season 5']);
+
+  await postRankChanges(posts);
+  assert.equal(posts.sent.length, 1, 'a season wraps up once');
+});
+
+test('no wrap-up for an old season, or one that ended while the slippi switch was off', async () => {
+  const longAgo = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+  watching('a', 'AAA#1', 'Gold 2', 1600);
+  users.a = user({ uid: 'a', code: 'AAA#1', rating: 1600, history: [past('Season 4', 1600, 20, 15, longAgo)] });
+  const posts = channel();
+  await postRankChanges(posts);
+  assert.equal(posts.sent.length, 0);
+  assert.deepEqual(state.slippiWrapped, []);
+
+  state.messages = { slippi: false };
+  users.a = user({ uid: 'a', code: 'AAA#1', rating: 1600, history: [past('Season 5', 1600, 20, 15, new Date().toISOString())] });
+  await postRankChanges(posts);
+  assert.equal(posts.sent.length, 0);
+  // seen, so turning it back on doesn't post it late
+  assert.deepEqual(state.slippiWrapped, ['Season 5']);
+  state.messages = {};
+  await postRankChanges(posts);
+  assert.equal(posts.sent.length, 0);
 });
 
 test('a code change keeps the same watchlist entry, and the slippi switch skips changes while off', async () => {
