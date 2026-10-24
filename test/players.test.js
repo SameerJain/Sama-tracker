@@ -102,13 +102,32 @@ test('stats asks start.gg for Melee standings only when the game option is enabl
   assert.deepEqual(requests.map(({ videogameId }) => videogameId), [1, undefined]);
 });
 
-test('nobody linked, or an untracked pick, says what to do instead', async () => {
+test('nobody linked says to link, and a name nobody tracks gets looked up on start.gg instead of refused', async () => {
   state.players = { 1: crew };
   state.links = {};
   const unlinked = await run('stats', 'stranger');
   assert.ok(unlinked.flags);
   assert.match(unlinked.content, /\/link/);
-  assert.match((await run('stats', 'stranger', { player: 'Someone' })).content, /Only tracked or linked players.*\/track add.*\/link/);
+  mockApi(() => ({ user: null }));
+  const missed = await run('stats', 'stranger', { player: 'Crw' });
+  assert.ok(missed.flags, 'only whoever ran it sees the miss');
+  assert.match(missed.content, /^Couldn't find a start\.gg player for `Crw`\. Did you mean \*\*Crew\*\*\?/);
+});
+
+test('every stat command takes a pasted start.gg profile link for someone nobody tracks', async () => {
+  state.players = { 1: crew };
+  state.links = {};
+  mockApi(({ query }) => (query.includes('user(slug:')
+    ? { user: { id: 50, slug: 'user/abc123', images: [], player: { id: 500, gamerTag: 'Stranger' }, authorizations: [] } }
+    : noStats()));
+  for (const name of ['stats', 'doubles', 'progress', 'run']) {
+    const reply = await run(name, 'crew-discord', { player: 'start.gg/user/abc123' });
+    assert.match(JSON.stringify(reply), /Stranger/, name);
+    await settle();
+  }
+  // nobody got tracked or linked by it
+  assert.deepEqual(Object.keys(state.players), ['1']);
+  assert.deepEqual(state.links, {});
 });
 
 test('matchup commands wait for every validation reply before finishing', async () => {
@@ -625,8 +644,8 @@ test('/track list only notes what differs from a new player, then lists tracked 
     3: { userId: 3, playerId: 30, tag: 'Quiet', slug: 'user/quiet', setResults: true, streamAlerts: false },
     4: { userId: 4, playerId: 40, tag: 'Streamer', slug: 'user/streamer', setResults: false, streamAlerts: true },
   }, 0, {
-    5: { id: 5, name: 'Weekly', slug: 'tournament/weekly', startAt: now + 86400, tracked: { by: 'admin', sets: true, stream: true, top8: false, reminders: true } },
-    6: { id: 6, name: 'Local', slug: 'tournament/local', startAt: now + 3600, tracked: { by: 'manual', sets: true, stream: true, top8: true, reminders: true } },
+    5: { id: 5, name: 'Weekly', slug: 'tournament/weekly', startAt: now + 86400, tracked: { by: 'admin', at: 0, posts: { top8: false, calls: false } } },
+    6: { id: 6, name: 'Local', slug: 'tournament/local', startAt: now + 3600, tracked: { by: 'manual', at: 0, posts: { calls: true } } },
     // the crew's, not tracked, and one that's over
     7: { id: 7, name: 'Major', slug: 'tournament/major', startAt: now },
     8: { id: 8, name: 'Done', slug: 'tournament/done', startAt: now - 86400, resultsPosted: true, tracked: { by: 'manual' } },
@@ -644,7 +663,7 @@ test('/track list only notes what differs from a new player, then lists tracked 
 
   assert.equal(tournaments.data.title, 'Tracked tournaments · 2');
   const [first, second] = tournaments.data.description.split('\n');
-  assert.equal(first, `[Local](https://www.start.gg/tournament/local) · <t:${now + 3600}:d> · match calls off`);
+  assert.equal(first, `[Local](https://www.start.gg/tournament/local) · <t:${now + 3600}:d>`);
   assert.equal(second, `[Weekly](https://www.start.gg/tournament/weekly) · <t:${now + 86400}:d> · match calls off · top 8s off`);
 });
 
@@ -690,9 +709,13 @@ test('autocomplete explains an empty list instead of showing nothing', async () 
   };
   state.players = {};
   state.links = {};
-  assert.deepEqual(await choicesFor('Leo'), [{ name: 'Nobody is tracked yet, /track add someone first', value: 'Leo' }]);
+  // a stat command looks up anyone by a pasted start.gg link, so what's typed is offered as one
+  assert.deepEqual(await choicesFor('start.gg/user/abc123'), [{ name: 'Look up start.gg/user/abc123 on start.gg', value: 'start.gg/user/abc123' }]);
+  assert.deepEqual(await choicesFor(''), [{ name: 'Nobody is tracked yet. Paste a start.gg profile link to look anyone up', value: 'nobody' }]);
+  assert.deepEqual(await choicesFor('Leo', 'profile'), [{ name: 'Nobody is tracked yet, /track add someone first', value: 'Leo' }]);
   state.players = { 1: crew };
-  assert.deepEqual(await choicesFor('Leo'), [{ name: 'Nobody tracked or linked matches "Leo", /track add them first', value: 'Leo' }]);
+  assert.deepEqual(await choicesFor('Leo', 'h2h'), [{ name: 'Look up Leo on start.gg', value: 'Leo' }]);
+  assert.deepEqual(await choicesFor('Leo', 'profile'), [{ name: 'Nobody tracked or linked matches "Leo", /track add them first', value: 'Leo' }]);
   assert.deepEqual(await choicesFor('cr'), [{ name: 'Crew', value: '1' }]);
 
   // linked people come after the tracked ones, marked, and only where they can be picked

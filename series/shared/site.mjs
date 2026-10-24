@@ -8,7 +8,7 @@ import {
   winnersFromStandings, streaksFromStandings, attendanceRanking, charStats, mostUsedChars, bestWithoutTitle, validateSeries,
   loyaltyTier, loyaltyTiers, attendanceHistogram, attendanceFlow, returnRates, matchupMatrix, cumulativePlayers, crossSeries,
   seasonality, ULTIMATE_ROSTER, wilson, charUsers, headToHead, headToHeadSets, hasTop4, podiumRates, podiumTrend,
-  periodRetention, favourites, titleSpread,
+  periodRetention, favourites, titleSpread, nightsAttended,
 } from './compute.mjs';
 import { count, ordinal } from '../../src/format.js';
 import { CSS, CSS_EXTRA, esc, dstr, trunc, csv, pill, card, scrollTable, seriesSwitcher, filterInput, pageFooter, CLIENT_JS_SORT, CLIENT_JS_UI, MODAL_HTML, clientModal } from './page.mjs';
@@ -61,7 +61,10 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   const allStandings = readJson('standings.json', []).filter((s) => countOffweeks || !allOffweekIds.has(s.tournamentId));
   const ultStandings = allStandings.filter((s) => MAIN_RE.test(s.eventName));
   const offweekRows = countOffweeks ? readJson('attendance-offweek.json', []) : [];
-  const attendanceRows = [...readJson('attendance-ultimate.json', []), ...offweekRows];
+  // the bracket lists, for what people did in an ultimate bracket: podium rates, favourites and the data checks
+  const bracketRows = [...readJson('attendance-ultimate.json', []), ...offweekRows];
+  // who came each night, melee included, for attendance, loyalty, newcomers and retention
+  const attendanceRows = nightsAttended(bracketRows, readJson('attendance-melee.json', []));
   let charRows = [];
   try {
     charRows = readFileSync(path.join(SRC, 'chars-by-event.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.game === 'Ultimate' && r.games);
@@ -162,12 +165,12 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   // top-4 rates over the main events each player entered, overall, by
   // period and over the last 10 nights
   const MIN_NIGHTS = 10;
-  const rates4 = podiumRates(ultStandings, attendanceRows);
+  const rates4 = podiumRates(ultStandings, bracketRows);
   const rates4ById = Object.fromEntries(rates4.map((p) => [p.id, p]));
-  const trend = podiumTrend(ultStandings, attendanceRows, periodOf);
+  const trend = podiumTrend(ultStandings, bracketRows, periodOf);
   const lastNights = ultStandings.filter(hasTop4).sort((a, b) => a.startAt - b.startAt).slice(-10);
-  const form = podiumRates(lastNights, attendanceRows).filter((p) => p.top4 > 0).sort((a, b) => b.top4 - a.top4 || b.wins - a.wins || a.entered - b.entered);
-  const favResults = favourites(ultStandings, attendanceRows);
+  const form = podiumRates(lastNights, bracketRows).filter((p) => p.top4 > 0).sort((a, b) => b.top4 - a.top4 || b.wins - a.wins || a.entered - b.entered);
+  const favResults = favourites(ultStandings, bracketRows);
   const spread = titleSpread(favResults, periodOf);
   const startAtOfRow = (r) => startAtByTournament.get(r.tournamentId) ?? 0;
   const retention = periodRetention(attendanceRows, startAtOfRow, periodOf);
@@ -184,7 +187,7 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
     if (otherSlug === slug) continue;
     const otherDir = path.join(ROOT, otherReg.researchDir);
     const otherRead = (f, fb) => { try { return JSON.parse(readFileSync(path.join(otherDir, f), 'utf8')); } catch { return fb; } };
-    const otherAttendance = [...otherRead('attendance-ultimate.json', []), ...otherRead('attendance-offweek.json', [])];
+    const otherAttendance = nightsAttended([...otherRead('attendance-ultimate.json', []), ...otherRead('attendance-offweek.json', [])], otherRead('attendance-melee.json', []));
     const otherWinners = winnersFromStandings(otherRead('standings.json', []).filter((s) => MAIN_RE.test(s.eventName)));
     seriesData.push({ slug: otherSlug, entered: attendanceRanking(otherAttendance), winners: otherWinners });
   }
@@ -533,7 +536,7 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
     + `${filterInput('winners-q', 'winners-tbl', 'Search players…')}${scrollTable('<th>#</th><th class="tx">Player</th><th>1st</th><th>2nd</th><th>3rd</th><th>4th</th><th class="wr">Most used character</th><th class="lo">Aliases</th>', wrows, false, 'id="winners-tbl"')}`, '#4c78a8'));
 
   // consistency and form: top-4 rates over nights entered
-  const listedEvents = new Set(attendanceRows.map((r) => r.eventId));
+  const listedEvents = new Set(bracketRows.map((r) => r.eventId));
   const ratedNights = ultStandings.filter((s) => listedEvents.has(s.eventId) && hasTop4(s)).length;
   const rateCell = (f) => `<td data-v="${(f ?? 0).toFixed(4)}">${pct0(f)}</td>`;
   const steady = rates4.filter((p) => p.entered >= MIN_NIGHTS && p.top4 > 0);
@@ -663,13 +666,13 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
   const aliasText = (p) => esc((p.names ?? [p.tag]).slice(0, 3).join(' / ')) + ((p.names ?? []).length > 3 ? '…' : '');
   const enteredTbl = enteredList.map((p, i) => `<tr data-events="${p.events}"><td>${i + 1}</td><td>${esc(p.tag)}</td><td>${p.events}</td>`
     + `<td>${esc(loyaltyTier(p.events)?.label ?? '')}</td><td>${p.ultWins}</td><td>${aliasText(p)}</td></tr>`).join('\n');
-  const enteredFrom = offweekRows.length ? 'Ultimate Singles + off-week brackets' : 'Ultimate Singles';
-  add('attended', 'Attendance', card('attended', `Most events entered (${enteredFrom}, ${attendanceRows.length} events with entrant lists)`,
-    '<p><small>Click a bar to see its player (X) and events entered (Y), and every tournament they entered.</small></p>'
-    + '<p><label><input type="checkbox" id="fewtoggle"> hide players with 1–2 events</label></p>'
+  const enteredFrom = offweekRows.length ? 'Ultimate and Melee events + off-week brackets' : 'Ultimate and Melee events';
+  add('attended', 'Attendance', card('attended', `Most nights attended (${enteredFrom}, ${attendanceRows.length} nights with entrant lists)`,
+    '<p><small>Click a bar to see its player (X) and nights attended (Y), and every tournament they came to. Playing Ultimate and Melee the same night counts once.</small></p>'
+    + '<p><label><input type="checkbox" id="fewtoggle"> hide players with 1–2 nights</label></p>'
     + `<div class="scroll" id="attp-all">${attPChart}</div><div class="scroll" id="attp-regular" style="display:none">${attPChartRegular}</div>`
     + filterInput('attended-q', 'attended-tbl', 'Search players…')
-    + scrollTable('<th>#</th><th class="tx">Player</th><th>Events entered</th><th>Tier</th><th>Ult wins</th><th class="lo">Aliases</th>', enteredTbl, false, 'id="attended-tbl"')));
+    + scrollTable('<th>#</th><th class="tx">Player</th><th>Nights</th><th>Tier</th><th>Ult wins</th><th class="lo">Aliases</th>', enteredTbl, false, 'id="attended-tbl"')));
   if (enteredList.length) {
     const tierRange = (t) => t.max == null ? t.min + '+' : t.min === t.max ? String(t.min) : t.min + '–' + t.max;
     const tierTbl = tiers.map((t) => `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${t.color}"></span> ${esc(t.label)}</td><td>${tierRange(t)}</td><td>${t.players}</td><td>${pct1(t.pctPlayers)}</td><td>${t.entries}</td><td>${pct1(t.pctEntries)}</td></tr>`).join('\n');
@@ -687,7 +690,7 @@ export function buildSite(slug, { countOffweeks = true, htmlFile = 'index.html',
       + '<h3>Cumulative unique players</h3><p><small>Click a dot to see its date (X) and distinct players ever (Y). Only goes up: each edition adds its first-timers.</small></p>'
       + `<div class="scroll">${lineCharts(growthChart, growthChartNarrow)}</div>`
       + `<h3>Newcomers per year</h3><p><small>First-time players per year. Click a bar to see its year (X) and newcomers (Y).</small></p><div class="scroll">${newcomersChart}</div>`
-      + '<h3>Attendance histogram, by loyalty tier</h3><p><small>Players by events entered, coloured by tier. Click a bar to see everyone in that bracket.</small></p>'
+      + '<h3>Attendance histogram, by loyalty tier</h3><p><small>Players by nights attended, coloured by tier. Click a bar to see everyone in that bracket.</small></p>'
       + `<div class="scroll">${histChart}</div>`
       + scrollTable('<th class="tx">Tier</th><th>Events</th><th>Players</th><th>% of players</th><th class="lo">Entries</th><th>% of entries</th>', tierTbl)
       + '<h3>Return rates</h3><p><small>Conversion is the share of the previous row that reached this one: the 2nd-event row\'s conversion is the second-time rate, '
@@ -921,7 +924,7 @@ ${clientModal(winInfo)}
   writeRetrying(path.join(OUT, htmlFile), html);
   writeOut(`${OUT}/README.md`, cfg.readme({ n, numbered: numberedTournaments.length, offweeks: offweekTournaments.length, top: { ...top }, ultEvents: ultStandings.length, meleeEvents: meleeStandings.length, redemptionEvents: redStandings.length, totalSets, totalGames, charCount: charList.length, enteredCount: enteredList.length }));
 
-  const checks = validateSeries({ standings: allStandings, attendanceRows, tournaments, entrantsOf, mainEventRe: MAIN_RE });
+  const checks = validateSeries({ standings: allStandings, attendanceRows: bracketRows, tournaments, entrantsOf, mainEventRe: MAIN_RE });
   if (checks.length) { console.log(`DATA CHECKS (${checks.length}):`); for (const c of checks.slice(0, 30)) console.log(' -', c); }
   else console.log('data checks clean');
   console.log('viewer built:', OUT);

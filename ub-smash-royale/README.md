@@ -14,9 +14,9 @@ Charts are static SVGs in `images/`, raw numbers in `data/` (JSON + CSV).
   (`on-weeks-only.html`); winners and matchups are on weeks only in both.
 - Largest: Smash Royale #1 - UB Smash Club, 65 attendees, 2023-09-06.
 - Winners merged by start.gg player id across alias/sponsor changes.
-- Events-entered ranking from full Ultimate entrant lists plus the off-week
-  brackets, one entry per player per night (331 distinct players).
-- Redemption bracket ranked separately (31 events).
+- Nights-attended ranking from full Ultimate and Melee entrant lists plus the
+  off-week brackets, one per player per night (351 distinct players).
+- Redemption bracket ranked separately (32 events).
 - Page also has rivalries from every singles set (a switch narrows them
   to sets with characters reported, and an Include off weeks toggle adds the
   off-week nights' singles brackets on top of either), top-4 consistency and

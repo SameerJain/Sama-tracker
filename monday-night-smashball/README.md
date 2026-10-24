@@ -14,7 +14,8 @@ Charts are static SVGs in `images/`, raw numbers in `data/` (JSON + CSV).
 - Ultimate only: 181 Ultimate Singles events, 8,242 sets, 4,364 games with
   reported characters, 85 distinct characters. Plus a Melee top-10 from 57 events.
 - Winners merged by start.gg player id across alias/sponsor changes.
-  Events-entered ranking from full entrant lists (436 distinct players).
+  Nights-attended ranking from full Ultimate and Melee entrant lists, one per player per night
+  (489 distinct players).
 - Page also has rivalries from every singles set (a checkbox narrows them
   to sets with characters reported), top-4 consistency and recent form, favourites and
   upsets, year-over-year retention, seasonality, character

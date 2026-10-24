@@ -134,7 +134,7 @@ test('saved reg reminders become tracked tournaments, and match call pings move 
   tracker.migrateTracking(now);
 
   assert.equal(state.regReminders, undefined);
-  assert.deepEqual(state.tournaments[5].tracked, { by: 'manual', at: now, sets: true, stream: true, top8: true, reminders: true, calls: false });
+  assert.deepEqual(state.tournaments[5].tracked, { by: 'manual', at: now, posts: {} });
   assert.deepEqual(state.tournaments[5].reminder, { deadline: now + 3600, next: 2 });
   // its sets are looked at from now on, and the next tournament check fills in the rest
   assert.equal(state.tournaments[5].lastCheck, now);
@@ -164,7 +164,7 @@ test('reg reminders come from tracked tournaments with reminders on', async () =
   const now = Math.floor(Date.now() / 1000);
   state.messages = {};
   state.regPings = ['fan'];
-  const reminding = (reminders) => ({ id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, entries: [], tracked: { ...tracked, reminders }, reminder: {} });
+  const reminding = (reminders) => ({ id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, entries: [], tracked: { ...tracked, posts: { registration: reminders } }, reminder: {} });
   state.tournaments = { 1: reminding(false), 2: { ...reminding(true), id: 2, tracked: undefined } };
   const asked = [];
   mockApi(({ query }) => {
@@ -178,7 +178,7 @@ test('reg reminders come from tracked tournaments with reminders on', async () =
   await tracker.postRegReminders(channel);
   assert.deepEqual(asked, []);
 
-  state.tournaments[1].tracked.reminders = true;
+  state.tournaments[1].tracked.posts.registration = true;
   await tracker.postRegReminders(channel);
   assert.deepEqual(asked, ['registration', 'participants']);
   assert.equal(sent.length, 1);

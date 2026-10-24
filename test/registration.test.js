@@ -303,19 +303,19 @@ test('/t-o tournament add tracks the tournament with everything on but match cal
   // the reminder's own send is covered elsewhere, here it would post to no channel
   state.messages = { registration: false };
   mockStartgg();
-  const run = interaction('t-o', { tournament: 'start.gg/tournament/local' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
+  const run = interaction('t-o', { tournament: 'start.gg/tournament/local', registration: 'on' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(run);
   assert.deepEqual(state.players, {});
   const tracked = state.tournaments[5];
   assert.equal(tracked.name, 'Local');
-  assert.deepEqual({ ...tracked.tracked, at: undefined }, { by: 'manual', at: undefined, sets: true, stream: true, top8: true, reminders: true, calls: false });
+  assert.deepEqual({ ...tracked.tracked, at: undefined }, { by: 'manual', at: undefined, posts: { registration: true }, onAt: { registration: tracked.tracked.onAt.registration } });
   // sets from before it was tracked stay out of its thread
   assert.ok(tracked.lastCheck >= now);
   // closes in an hour, so the last call is all that's left
   assert.equal(tracked.reminder.deadline, now + 3600);
   assert.ok(tracked.reminder.next >= 3);
   const edit = run.calls.find(([kind]) => kind === 'edit');
-  assert.match(edit[1].content, /^Tracking Local\. Every set and stream alert from it posts in its own thread.*\nRegistration ends <t:\d+:R>, sending the last call now\./);
+  assert.match(edit[1].content, /^Tracking Local\.\n\*\*Set results:\*\* on \(default\)[^]*\*\*Reg reminders:\*\* on[^]*\nRegistration ends <t:\d+:R>, sending the last call now\./);
   assert.deepEqual(edit[1].allowedMentions, { parse: [] });
 
   // a second time just says so
@@ -328,14 +328,14 @@ test('/t-o tournament add with reminders off or registration closed still tracks
   state.tournaments = {};
   state.messages = { registration: false };
   mockStartgg();
-  const off = interaction('t-o', { tournament: 'local', reminders: 'off' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
+  const off = interaction('t-o', { tournament: 'local', registration: 'off' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(off);
-  assert.equal(state.tournaments[5].tracked.reminders, false);
+  assert.equal(state.tournaments[5].tracked.posts.registration, false);
   assert.match(off.calls.find(([kind]) => kind === 'edit')[1].content, /\nNo reg reminders\./);
 
   state.tournaments = {};
   mockStartgg(now - 60);
-  const closed = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
+  const closed = interaction('t-o', { tournament: 'local', registration: 'on' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(closed);
   assert.ok(state.tournaments[5].tracked);
   assert.match(closed.calls.find(([kind]) => kind === 'edit')[1].content, /Registration is closed, so no reg reminders\./);
@@ -345,7 +345,7 @@ test('/t-o tournament add takes a custom reminder schedule, and rejects a bad on
   state.tournaments = {};
   state.messages = { registration: false };
   mockStartgg();
-  const run = interaction('t-o', { tournament: 'start.gg/tournament/local', schedule: '7d, 12h' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
+  const run = interaction('t-o', { tournament: 'start.gg/tournament/local', schedule: '7d, 12h', registration: 'on' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(run);
   assert.deepEqual(state.tournaments[5].tracked.schedule, [168, 12]);
   // closes in an hour, so only the last call is left and it goes now
@@ -361,20 +361,20 @@ test('/t-o tournament add takes a custom reminder schedule, and rejects a bad on
 });
 
 test('/t-o tournament posts sets, shows and clears a custom reminder schedule', async () => {
-  state.tournaments = { 5: { id: 5, name: 'Local', slug: 'tournament/local', startAt: now + 86400, tracked: { by: 'manual', reminders: true }, reminder: { deadline: now + 3600, next: 3 } } };
+  state.tournaments = { 5: { id: 5, name: 'Local', slug: 'tournament/local', startAt: now + 86400, tracked: { by: 'manual', at: 0, posts: { registration: true } }, reminder: { deadline: now + 3600, next: 3 } } };
   const run = interaction('t-o', { tournament: 'local', schedule: '2d,6h' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' });
   await handleCommand(run);
   assert.deepEqual(state.tournaments[5].tracked.schedule, [48, 6]);
   // the new schedule starts from its next one still to come
   assert.equal(state.tournaments[5].reminder.next, undefined);
   const [, reply] = run.calls.at(-1);
-  assert.match(reply.content, /\*\*Reg reminders:\*\* on \(2d, 6h\)/);
+  assert.match(reply.content, /\*\*Reg reminders:\*\* on · reminders 2d, 6h/);
   assert.match(reply.content, /Reg reminders go out 2 days and 6 hours before registration ends/);
 
   // with nothing to change it says what's on, schedule included
   const status = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' });
   await handleCommand(status);
-  assert.match(status.calls.at(-1)[1].content, /\*\*Reg reminders:\*\* on \(2d, 6h\)/);
+  assert.match(status.calls.at(-1)[1].content, /\*\*Reg reminders:\*\* on · reminders 2d, 6h/);
 
   const reset = interaction('t-o', { tournament: 'local', schedule: 'default' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' });
   await handleCommand(reset);

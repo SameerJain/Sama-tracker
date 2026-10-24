@@ -1,10 +1,10 @@
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
-import { messageEnabled, setResultColors } from '../message-settings.js';
+import { postsOn, setResultColors } from '../message-settings.js';
 import { MAJOR_UPSET, scoreText, upsetFactor } from '../embeds/shared.js';
 import {
-  currentChannel, secondsNow, health, post, postRefs, editPost, named, trackedLive, eventsOf, resultsOn, CATCH_UP_HOURS,
+  currentChannel, secondsNow, health, post, postRefs, editPost, named, trackedLive, trackedFor, eventsOf, resultsOn, CATCH_UP_HOURS,
   RESULT_WATCH_MINUTES, HOUR,
 } from './shared.js';
 import { tournamentPosts } from './threads.js';
@@ -91,7 +91,7 @@ export async function postNewSets(postChannel = currentChannel()) {
       // every set at a tracked tournament. otherwise one finished before /track posts turned results on for
       // everyone tracked in it stays out of the channel. it still counts as posted so the next check doesn't look at it again
       const resultsWereOn = set.sides.some((side) => side.playerIds.some((id) => set.completedAt >= (showingSince.get(id) ?? Infinity)));
-      if ((covered.has(set.id) || resultsWereOn) && messageEnabled('sets', set.completedAt)) {
+      if ((covered.has(set.id) || resultsWereOn) && postsOn('sets', trackedFor(set), set.completedAt)) {
         // no head to head button, the set's over
         try {
           const card = embeds.setResult(set, state.players, { setColors: setResultColors() });

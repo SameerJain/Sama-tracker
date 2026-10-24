@@ -37,10 +37,20 @@ export async function searchTournaments({ state = 'NY', after, before, perPage =
   return [...byId.values()].sort((a, b) => a.startAt - b.startAt);
 }
 
-const EVENTS_Q = `query ($id: ID!) { tournament(id: $id) { events { id name slug numEntrants videogame { id displayName } } } }`;
+const EVENT_FIELDS = 'id name slug numEntrants videogame { id displayName }';
+const EVENTS_Q = `query ($id: ID!) { tournament(id: $id) { events { ${EVENT_FIELDS} } } }`;
 export async function getEvents(tournamentId) {
   const data = await ask(EVENTS_Q, { id: tournamentId });
   return data?.tournament?.events ?? [];
+}
+
+// one tournament as start.gg has it now, with its events. the scan can save a night before registration closes,
+// so the recheck asks again for its counts and events. null once start.gg doesn't have it
+const TOURNAMENT_Q = `query ($id: ID!) { tournament(id: $id) {
+  id name slug city addrState venueName venueAddress numAttendees startAt endAt isOnline events { ${EVENT_FIELDS} } } }`;
+export async function getTournament(tournamentId) {
+  const data = await ask(TOURNAMENT_Q, { id: tournamentId });
+  return data?.tournament ?? null;
 }
 
 const STANDINGS_Q = `query ($id: ID!) { event(id: $id) {

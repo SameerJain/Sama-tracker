@@ -2,10 +2,10 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { t } from '../i18n.js';
 import { state, save } from '../store.js';
-import { messageEnabled } from '../message-settings.js';
+import { postsOn } from '../message-settings.js';
 import { linkedPlayer } from '../commands/shared.js';
 import {
-  currentChannel, secondsNow, postRefs, editPost, named, mentionable, mentions, trackedLive, eventsOf, CALL_WATCH_MINUTES, UNCALLED_STATES,
+  currentChannel, secondsNow, postRefs, editPost, named, mentionable, mentions, trackedLive, trackedFor, eventsOf, CALL_WATCH_MINUTES, UNCALLED_STATES,
 } from './shared.js';
 import { h2hRow, rememberButton } from './buttons.js';
 
@@ -33,36 +33,35 @@ export async function postMatchCalls(postChannel = currentChannel()) {
       if (state.called.includes(set.id)) {
         const watched = state.callPosts.find((each) => each.setId === set.id);
         const newIds = watched ? discordIds.filter((id) => !watched.discordIds.includes(id)) : [];
-        if (newIds.length) {
-          if (messageEnabled('calls', set.updatedAt)) {
-            try {
-              await sendMatchCall(set, inSet, newIds, postChannel);
-            } catch (err) {
-              // one bad send leaves this set for the next check but still calls the rest
-              console.error(`posting a match call for ${set.id} failed:`, err.message);
-              continue;
-            }
+        // off, they aren't consumed: a set still called when calls come back on gets its ping then
+        if (newIds.length && postsOn('calls', trackedFor(set))) {
+          try {
+            await sendMatchCall(set, inSet, newIds, postChannel);
+          } catch (err) {
+            // one bad send leaves this set for the next check but still calls the rest
+            console.error(`posting a match call for ${set.id} failed:`, err.message);
+            continue;
           }
           watched.discordIds.push(...newIds);
           save();
         }
         continue;
       }
-      if (messageEnabled('calls', set.updatedAt)) {
-        try {
-          const { sent, text } = await sendMatchCall(set, inSet, discordIds, postChannel);
-          watchCall(sent, set, discordIds, text);
-        } catch (err) {
-          console.error(`posting a match call for ${set.id} failed:`, err.message);
-          continue;
-        }
+      // off isn't consumed, so a set still called when calls come back on posts then
+      if (!postsOn('calls', trackedFor(set))) continue;
+      try {
+        const { sent, text } = await sendMatchCall(set, inSet, discordIds, postChannel);
+        watchCall(sent, set, discordIds, text);
+      } catch (err) {
+        console.error(`posting a match call for ${set.id} failed:`, err.message);
+        continue;
       }
       state.called.push(set.id);
       save();
     }
     // a tracked tournament with match calls on posts every called set, whoever played, even when
     // nobody in it has /notify calls on. sets already posted above keep their pings
-    for (const tournament of trackedLive('calls').filter((each) => each.tracked.calls === true)) {
+    for (const tournament of trackedLive('calls')) {
       let sets = [];
       try {
         const eventIds = [...new Set(eventsOf(tournament).map((entry) => entry.eventId).filter(Boolean))];
@@ -73,14 +72,13 @@ export async function postMatchCalls(postChannel = currentChannel()) {
       }
       for (const set of sets.sort((a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0))) {
         if (state.called.includes(set.id)) continue;
-        if (messageEnabled('calls', set.updatedAt)) {
-          try {
-            const { sent, text } = await sendMatchCall(set, [], [], postChannel);
-            watchCall(sent, set, [], text);
-          } catch (err) {
-            console.error(`posting a match call for ${set.id} failed:`, err.message);
-            continue;
-          }
+        if (!postsOn('calls', tournament)) continue;
+        try {
+          const { sent, text } = await sendMatchCall(set, [], [], postChannel);
+          watchCall(sent, set, [], text);
+        } catch (err) {
+          console.error(`posting a match call for ${set.id} failed:`, err.message);
+          continue;
         }
         state.called.push(set.id);
         save();

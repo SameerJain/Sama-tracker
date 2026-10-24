@@ -1,12 +1,13 @@
 // fills in what the series scrapes are missing: set results for events scraped before those were saved,
-// nights saved empty because the scan found them early, and each off-week night's singles bracket.
+// nights saved empty because the scan found them early, each off-week night's singles bracket, and every
+// night's melee entrants, since melee players count toward attendance.
 // usage: node --env-file=.env series/backfill-sets.mjs [slug]
 // it skips what's done, so it's fine to rerun. requests go 1.5s apart, slower than the refresh, since
 // the deployed bot shares the token's 80 a minute
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getCharGames, getSetResults, OFFWEEK_SINGLES_RE } from './shared/scrape.mjs';
+import { getCharGames, getEntrants, getEvents, getSetResults, OFFWEEK_SINGLES_RE } from './shared/scrape.mjs';
 import { setRequestGap } from '../src/startgg/queue.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -26,8 +27,8 @@ const readJson = (file, fallback) => (fs.existsSync(file) ? JSON.parse(fs.readFi
 const day = (row) => new Date(row.startAt * 1000).toISOString().slice(0, 10);
 
 // windows refuses to rename over a file another process has open, like a build reading it, so that waits a bit
-async function save(file, rows) {
-  fs.writeFileSync(`${file}.tmp`, rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+async function writeFile(file, text) {
+  fs.writeFileSync(`${file}.tmp`, text);
   for (let tries = 1; ; tries++) {
     try {
       fs.renameSync(`${file}.tmp`, file);
@@ -38,6 +39,10 @@ async function save(file, rows) {
     }
   }
 }
+
+const save = (file, rows) => writeFile(file, rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+// the same layout the refresh writes its json in
+const saveJson = (file, value) => writeFile(file, JSON.stringify(value, null, 2));
 
 async function backfill(slug) {
   const file = path.join(ROOT, REG[slug].researchDir, 'chars-by-event.jsonl');
@@ -94,10 +99,51 @@ async function backfillOffweeks(slug) {
   if (fetched) await save(file, rows.sort((a, b) => a.startAt - b.startAt || a.eventId - b.eventId));
 }
 
+// melee entrants for attendance. main nights have their events saved, so it's every melee event without a list
+// yet. off weeks don't, so each gets asked about once, then marked with meleeCheckedAt. both skip what's done
+async function backfillMelee(slug) {
+  const dir = path.join(ROOT, REG[slug].researchDir);
+  const file = path.join(dir, 'attendance-melee.json');
+  const rows = readJson(file, []);
+  const have = new Set(rows.map((row) => row.eventId));
+  const isMelee = (e) => e.videogame?.id === 1 && (e.numEntrants ?? 0) > 0 && !have.has(e.id);
+  const add = async (t, e) => {
+    rows.push({ eventId: e.id, tournamentId: t.id, entrants: await getEntrants(e.id) });
+    have.add(e.id);
+    console.log(`[${slug}] melee ${day(t)} ${t.name} · ${e.name}: ${rows.at(-1).entrants.length} entrants`);
+  };
+
+  const mains = readJson(path.join(dir, 'tournaments-events.json'), []).flatMap((t) => (t.events ?? []).filter(isMelee).map((e) => ({ t, e })));
+  const offFile = path.join(dir, 'attendance-offweek.json');
+  const offRows = readJson(offFile, []);
+  const offNights = new Map(readJson(path.join(dir, 'offweek-tournaments.json'), []).map((t) => [t.id, t]));
+  const unchecked = offRows.filter((row) => !row.meleeCheckedAt && offNights.has(row.tournamentId));
+  console.log(`[${slug}] ${mains.length} melee events on main nights need entrants, ${unchecked.length} off weeks to check for melee`);
+
+  for (const [i, { t, e }] of mains.entries()) {
+    await add(t, e);
+    if ((i + 1) % SAVE_EVERY === 0) await saveJson(file, rows);
+  }
+  for (const [i, row] of unchecked.entries()) {
+    const t = offNights.get(row.tournamentId);
+    for (const e of (await getEvents(t.id)).filter(isMelee)) await add(t, e);
+    row.meleeCheckedAt = Math.floor(Date.now() / 1000);
+    if ((i + 1) % SAVE_EVERY === 0) {
+      await saveJson(file, rows);
+      await saveJson(offFile, offRows);
+    }
+  }
+  if (mains.length || unchecked.length) {
+    await saveJson(file, rows);
+    await saveJson(offFile, offRows);
+  }
+}
+
 const only = process.argv[2];
 for (const slug of Object.keys(REG)) {
   if (only && slug !== only) continue;
   await backfill(slug);
   await backfillOffweeks(slug);
+  await backfillMelee(slug);
 }
 console.log('backfill done');

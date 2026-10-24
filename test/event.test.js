@@ -265,13 +265,13 @@ test('an event for an already tracked tournament keeps its switches and saves th
   state.tournaments = {
     6: {
       ...soon, entries: [], userIds: [], lastCheck,
-      tracked: { by: 'manual', at: lastCheck, sets: true, stream: true, top8: true, reminders: false },
+      tracked: { by: 'manual', at: lastCheck, posts: { registration: false } },
     },
   };
   const run = interaction({ tournament: 'start.gg/tournament/soon' });
   await handleCommand(run);
   const tournament = state.tournaments[6];
-  assert.equal(tournament.tracked.reminders, false);
+  assert.equal(tournament.tracked.posts.registration, false);
   assert.equal(tournament.lastCheck, lastCheck);
   assert.equal(state.discordEvents[6].eventId, 'event-1');
   assert.match(edited(run).content, /^Made a Discord event for Soon/);
@@ -315,7 +315,7 @@ test('/t-o tournament event then add_event lands on the same event, and only the
 
 // /settings posts events, for tracked tournaments. 6 was tracked for a tournament admin before the TO role
 function trackedTournaments() {
-  const tracked = (by) => ({ by, at: now, sets: true, stream: true, top8: true, reminders: true });
+  const tracked = (by) => ({ by, at: now, posts: {} });
   state.discordEvents = { 11: { eventId: 'event-old', slug: 'tournament/has-one', startAt: soon.startAt, synced: null } };
   return {
     6: { ...soon, entries: [], userIds: [], tracked: tracked('admin'), reminder: {} },

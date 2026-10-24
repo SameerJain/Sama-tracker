@@ -391,12 +391,12 @@ test('/track posts for everyone off and /tournament remove ask first, and /track
   assert.equal(already.calls[0][1].components, undefined);
 
   // Undo puts back its switches and reminder progress
-  const switches = { by: 'manual', at: now, sets: true, stream: true, top8: true, reminders: true };
+  const switches = { by: 'manual', at: now, posts: {} };
   state.tournaments = { 6: { id: 6, slug: 'tournament/soon', name: 'Soon', entries: [], userIds: [], tracked: switches, reminder: { next: 1 } } };
   const remove = command('t-o', { group: 'tournament', subcommand: 'remove', values: { tournament: 'soon' } });
   await handleCommand(remove);
   const question = remove.calls[0][1];
-  assert.equal(question.content, 'Stop tracking Soon? Its sets, stream alerts, top 8s and reg reminders stop.');
+  assert.equal(question.content, 'Stop tracking Soon? Everything it posts stops.');
   assert.equal((await press(question, 'Cancel')).calls[0][1].content, 'Still tracking Soon.');
   assert.ok(state.tournaments[6].tracked);
   const stopped = (await press(question, 'Stop tracking')).calls[0][1];

@@ -454,7 +454,7 @@ test('missingThreadPermissions names what the channel lacks', () => {
 const trackedLocal = (more = {}) => ({
   id: 5, name: 'Local', slug: 'tournament/local', startAt: now() - 3600, endAt: now() + 3600, entries: [], userIds: [],
   events: [{ id: 601, name: 'Singles', slug: 'tournament/local/event/singles', state: 'ACTIVE', numEntrants: 32 }],
-  tracked: { by: 'manual', at: now(), sets: true, stream: true, top8: true, reminders: true }, lastCheck: now() - 120, ...more,
+  tracked: { by: 'manual', at: now(), posts: {} }, lastCheck: now() - 120, ...more,
 });
 // a set between two people nobody tracks. a score of -1 is a DQ
 const strangers = (id, at, inTournament, scores = [2, 1]) => ({
@@ -502,8 +502,8 @@ test('a tracked tournament posts every finished set in its thread even with thre
   await tracker.postNewSets(channel);
   assert.equal(thread.sent.length, 2);
 
-  // switched off for the tournament, the crew's sets still post where /settings posts threads says
-  state.tournaments[5].tracked.sets = false;
+  // switched off for the tournament, its sets post nothing, /track posts players' included
+  state.tournaments[5].tracked.posts.sets = false;
   asked.length = 0;
   sets = [node('t4', now() - 5, local)];
   globalThis.fetch = async () => {
@@ -512,8 +512,8 @@ test('a tracked tournament posts every finished set in its thread even with thre
   };
   await tracker.postNewSets(channel);
   assert.deepEqual(asked, ['players']);
-  // still tracked, so it still goes in the tournament's thread
-  assert.equal(thread.sent.length, 3);
+  assert.equal(thread.sent.length, 2);
+  assert.ok(state.posted.includes('t4'));
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { sets: { nodes: sets } } } }) });
 });
 
@@ -538,14 +538,14 @@ test('a tracked tournament announces everything in its stream queue, with nobody
   assert.match(thread.sent[0].embeds[0].data.title, /^Stream alert · /);
 
   // switched off for the tournament, its queue isn't asked about
-  state.tournaments[5].tracked.stream = false;
+  state.tournaments[5].tracked.posts.streams = false;
   state.streamed = [];
   asked.length = 0;
   await tracker.postStreamAlerts(channel, 0);
   assert.deepEqual(asked, []);
 
   // turning it back on mid-tournament catches a set still on stream
-  state.tournaments[5].tracked.stream = true;
+  state.tournaments[5].tracked.posts.streams = true;
   await tracker.postStreamAlerts(channel, 0);
   assert.deepEqual(asked, ['queue', 'queue']);
   assert.equal(thread.sent.length, 2);

@@ -2,7 +2,7 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { t } from '../i18n.js';
 import { state, save } from '../store.js';
-import { REG_ROLE, messageEnabled } from '../message-settings.js';
+import { REG_ROLE, postsOn } from '../message-settings.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
 import {
   currentChannel, secondsNow, sendPinging, posting, named, regDeadline, reminderSchedule, nextRegReminder, mentionable, HOUR, DM_HOURS_BEFORE,
@@ -20,7 +20,7 @@ function regRole(postChannel) {
 export async function postRegReminders(postChannel = currentChannel()) {
   for (const tournament of Object.values(state.tournaments)) {
     const { reminder } = tournament;
-    if (!posting(tournament, 'reminders') || !reminder) continue;
+    if (!posting(tournament, 'registration') || !reminder) continue;
     const schedule = reminderSchedule(tournament);
     // past the last call, or started, means none are left
     if (reminder.next >= schedule.length || secondsNow() > tournament.startAt) continue;
@@ -42,7 +42,7 @@ export async function postRegReminders(postChannel = currentChannel()) {
 
       // not open means it filled up, or for the early ones that it hasn't opened yet
       const dueAt = deadline - schedule[due] * HOUR;
-      if (latest.isRegistrationOpen && messageEnabled('registration', dueAt)) {
+      if (latest.isRegistrationOpen && postsOn('registration', tournament, dueAt)) {
         // still remembered for /profile, but the ping goes to the role so registered members get it too
         const participants = await startgg.getParticipants(latest.id);
         rememberAccounts(participants);
@@ -54,7 +54,7 @@ export async function postRegReminders(postChannel = currentChannel()) {
         } else if (!role) {
           const registered = new Set(participants.map((participant) => participant.discordId));
           const ping = state.regPings.filter((id) => !registered.has(id));
-          await sendPinging(postChannel, 'registration', ping, text, card);
+          await sendPinging(postChannel, () => postsOn('registration', tournament), ping, text, card);
         } else {
           await postChannel.send({ embeds: embeds.withImage([card]), allowedMentions: { parse: [] } });
         }
@@ -80,7 +80,7 @@ export async function postDmReminders(postChannel = currentChannel()) {
   if (!client || !guild || (!state.regDmPings.length && !state.startDmPings.length)) return;
 
   for (const tournament of Object.values(state.tournaments)) {
-    if (!posting(tournament, 'reminders') || !dmSoon(tournament)) continue;
+    if (!posting(tournament, 'registration') || !dmSoon(tournament)) continue;
     let latest;
     try {
       // TOs move the close time and the start, so the DM goes off the latest

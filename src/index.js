@@ -1,5 +1,5 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes } from 'discord.js';
-import { buttonFailed, commands, handleAutocomplete, handleButton, handleCommand } from './commands/index.js';
+import { buttonFailed, handleAutocomplete, handleButton, handleCommand, registeredCommands } from './commands/index.js';
 import { inTurn } from './commands/turns.js';
 import { failureMessage } from './commands/shared.js';
 import { seedFirstTO } from './commands/to.js';
@@ -9,7 +9,6 @@ import { messageSettings } from './message-settings.js';
 import { setFallbackImage } from './embeds/index.js';
 import { setHealthReady, startHealth, stopHealth } from './health.js';
 import { forGuild, guildLocal, isMultiGuild, migrateLegacyToGuild, postsChannelId, save } from './store.js';
-import { commandsFor, language } from './i18n.js';
 
 // answered until the bot is logged in and tracking, so railway only switches
 // traffic to a new deploy once it can post. set in service settings as the healthcheck path
@@ -71,8 +70,7 @@ const client = new Client({
 
 // replaces whatever was registered before, so old commands go away
 async function registerCommands(manager) {
-  const registered = commandsFor(commands, isMultiGuild() ? 'en' : language());
-  await manager.set(registered).catch((err) => {
+  await manager.set(registeredCommands()).catch((err) => {
     if (err.code === RESTJSONErrorCodes.MissingAccess) quit('couldn\'t register the commands, re-invite the bot with the applications.commands scope');
     // usually a command in definitions.js breaking one of discord's limits, which the message names
     quit(`couldn't register the commands (${err.message})`);

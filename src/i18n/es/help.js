@@ -45,14 +45,14 @@ export default {
     '`/status` tiempo encendido, cuándo se publicó la última versión, las últimas revisiones de start.gg y Slippi, y si start.gg está caído',
   '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member':
     '`/profile` el perfil de start.gg de alguien, si el bot ya vio su cuenta. `player:` un jugador seguido o vinculado, `user:` un miembro del servidor',
-  '`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, most events entered and characters':
-    '`/data` enlaces a Samatracker y a las páginas de datos de ambas series: asistencia de cada torneo, ganadores, quién entró a más eventos y personajes',
+  '`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, who came to the most nights and characters':
+    '`/data` enlaces a Samatracker y a las páginas de datos de ambas series: asistencia de cada torneo, ganadores, quién vino a más noches y personajes',
   '`/socials` saved streams and social links': '`/socials` streams y redes guardados',
   '`/socials_edit` add or remove those links. Manage Server by default':
     '`/socials_edit` agrega o quita esos enlaces. Por defecto, con Gestionar servidor',
   '**TO settings**': '**Ajustes de TO**',
-  '`/t-o settings` automatic posts, threads, set result colors, Discord event length, weekly recap schedule and language':
-    '`/t-o settings` publicaciones automáticas, hilos, colores de resultados, duración de eventos de Discord, horario del resumen semanal e idioma',
+  '`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule and language':
+    '`/t-o settings` publicaciones automáticas, que también son el valor por defecto de todos los torneos, hilos, colores de resultados, duración de eventos de Discord, horario del resumen semanal e idioma',
   '`channel:` picks where automatic posts go and checks the bot can post there':
     '`channel:` elige dónde van las publicaciones automáticas y revisa que el bot pueda publicar ahí',
   '-# Leave every option blank to see the current settings. Only TOs can change them':
@@ -138,12 +138,12 @@ export default {
   '`/slippi leaderboard` everyone on the watchlist, best rank first': '`/slippi leaderboard` todos en la lista de Slippi, el mejor rango primero',
   '-# Cards show the rank badge and their most played character. Tracked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it':
     '-# Las tarjetas muestran la insignia de rango y el personaje más jugado. Los jugadores seguidos se agregan solos en cuanto su código aparece en una inscripción de netplay en start.gg. Los rangos salen de slippi.gg, que no tiene API pública, así que esto puede fallar si Slippi la cambia',
-  '`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event':
-    '`/t-o tournament add` sigue un torneo: cada set, avisos de stream y top 8 en su hilo, más los recordatorios de inscripción. `schedule:` pone horarios de recordatorio propios, `add_event:on` también crea un evento de Discord',
+  '`/t-o tournament add` track a tournament. What it posts follows `/t-o settings`, and `registration:` sets reg reminders and 1-hour DMs for it alone. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event':
+    '`/t-o tournament add` sigue un torneo. Lo que publica sigue a `/t-o settings`, y `registration:` fija solo para él los recordatorios de inscripción y los DMs 1 hora antes. `schedule:` pone horarios de recordatorio propios, `add_event:on` también crea un evento de Discord',
   '`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute':
     '`/t-o tournament remove` deja de seguir uno. Pregunta primero, y luego Deshacer lo devuelve durante un minuto',
-  '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, match calls, top 8s and reg reminders on or off. `schedule:` changes the reminder times, `default` goes back to the usual four':
-    '`/t-o tournament posts` enciende o apaga los sets, avisos de stream, llamados de partida, top 8 y recordatorios de inscripción de un torneo seguido. `schedule:` cambia los horarios de recordatorio, `default` vuelve a los cuatro de siempre',
+  '`/t-o tournament posts` one tracked tournament\'s sets, streams, calls, next opponents, top 8s and registration on or off. `default` follows `/t-o settings` again. `schedule:` changes the reminder times, `schedule:default` goes back to the usual four':
+    '`/t-o tournament posts` enciende o apaga los sets, streams, llamados, próximos rivales, top 8 e inscripción de un torneo seguido. `default` vuelve a seguir a `/t-o settings`. `schedule:` cambia los horarios de recordatorio, `schedule:default` vuelve a los cuatro de siempre',
   '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event':
     '`/registered` quién de aquí está inscrito, por nombre para que nadie reciba ping. `by_event:True` lo agrupa por evento',
   '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours':

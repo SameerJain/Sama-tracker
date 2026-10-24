@@ -23,7 +23,11 @@ export default {
   '<@{0}> here\'s your {1}.': '<@{0}> aquí tienes tu {1}.',
   'Full report': 'Informe completo',
   'H2H vs {0}': 'H2H vs {0}',
-  '**{0}:** {1} ({2})': '**{0}:** {1} ({2})',
+  '**{0}:** {1} · reminders {2}': '**{0}:** {1} · recordatorios {2}',
+  'on (default)': 'sí (por defecto)',
+  'off (default)': 'no (por defecto)',
+  '-# default follows /t-o settings, which every tournament without its own setting goes by':
+    '-# por defecto sigue /t-o settings, que rige a todo torneo sin ajuste propio',
   'Couldn\'t read `{0}` as a date. Use YYYY-MM-DD, like 2026-01-01.': 'No pude leer `{0}` como fecha. Usa AAAA-MM-DD, como 2026-01-01.',
   '**{0}** · {1} of {2} start.gg requests done, about {3} left\n-# start.gg allows 80 requests a minute, so the first look takes a while. Asking again in the next few hours is quick':
     '**{0}** · {1} de {2} consultas a start.gg listas, faltan unos {3}\n-# start.gg permite 80 consultas por minuto, así que la primera vez tarda. Volver a preguntar en las próximas horas es rápido',
@@ -148,7 +152,6 @@ export default {
     'No pude leer `{0}` como hora de recordatorio. Usa horas o días, como 7d,3d,1d,6h.',
   'Reminders run 1 hour to 30 days out, up to {0} of them, like 7d,3d,1d,6h.':
     'Los recordatorios van de 1 hora a 30 días antes, hasta {0}, como 7d,3d,1d,6h.',
-  'Every set': 'Cada set',
   'Match calls': 'Llamados de partida',
   'Reg reminders': 'Recordatorios de inscripción',
   ' · ': ' · ',
@@ -156,24 +159,18 @@ export default {
     'No se pueden abrir hilos en <#{0}>, así que sus sets y avisos de stream se publican ahí directamente.',
   'I need {0} in <#{1}> to start its thread. Until then its sets and stream alerts post there instead.':
     'Necesito {0} en <#{1}> para abrir su hilo. Hasta entonces, sus sets y avisos de stream se publican ahí directamente.',
-  'Tracking {0}. Every set and stream alert from it posts in its own thread, then results and each event\'s top 8 once the bracket is finished.':
-    'Sigo {0}. Cada set y aviso de stream se publica en su propio hilo, y luego los resultados y el top 8 de cada evento cuando termine el bracket.',
+  'Tracking {0}.': 'Sigo {0}.',
   'No reg reminders.': 'Sin recordatorios de inscripción.',
   'Registration is closed, so no reg reminders.': 'La inscripción está cerrada, así que no hay recordatorios.',
   'Registration ends <t:{0}:R>, sending the last call now.': 'La inscripción cierra <t:{0}:R>, mando el último aviso ahora.',
   'Everyone with `/notify registration` on gets pinged {0} before registration ends, starting <t:{1}:R>.':
     'Quienes tengan `/notify registration` activado reciben un ping {0} antes de que cierre la inscripción, empezando <t:{1}:R>.',
-  '-# `/t-o tournament posts` turns any of it off, or posts every called set with `calls:on`':
-    '-# `/t-o tournament posts` apaga cualquiera de estos, o publica cada set llamado con `calls:on`',
   'track tournaments': 'seguir torneos',
   '{0} is already over.': '{0} ya terminó.',
   '{0} is already tracked. `/t-o tournament posts` changes what it posts.': 'Ya sigo {0}. `/t-o tournament posts` cambia lo que publica.',
   'stop tracking tournaments': 'dejar de seguir torneos',
   'That tournament isn\'t tracked. `/track list` shows the ones that are.': 'No sigo ese torneo. `/track list` muestra los que sí.',
-  'Stop tracking {0}? Its sets, stream alerts, match calls, top 8s and reg reminders stop.':
-    '¿Dejar de seguir {0}? Se detienen sus sets, avisos de stream, llamados de partida, top 8 y recordatorios de inscripción.',
-  'Stop tracking {0}? Its sets, stream alerts, top 8s and reg reminders stop.':
-    '¿Dejar de seguir {0}? Se detienen sus sets, avisos de stream, top 8 y recordatorios de inscripción.',
+  'Stop tracking {0}? Everything it posts stops.': '¿Dejar de seguir {0}? Todo lo que publica se detiene.',
   'It isn\'t tracked anymore.': 'Ya no lo sigo.',
   // the same replies about a tournament, which takes no personal "a"
   '[tournament] Already tracking {0}.': 'Ya sigo {0}.',

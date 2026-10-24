@@ -200,8 +200,8 @@ export default {
   'top 8s off': 'top 8 desactivados',
   'reminders {0}': 'recordatorios {0}',
   'None yet. A TO can track one with `/t-o tournament add`.': 'Ninguno todavía. Un TO puede seguir uno con `/t-o tournament add`.',
-  '-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders and match calls with `calls:on`. TOs change that with `/t-o tournament posts`':
-    '-# Cada set, aviso de stream y top 8 de estos torneos se publica en su propio hilo, más los recordatorios de inscripción y los llamados de partida con `calls:on`. Los TOs lo cambian con `/t-o tournament posts`',
+  '-# Each follows /t-o settings until a TO changes it with `/t-o tournament posts`. Only what is off shows here':
+    '-# Cada tipo sigue /t-o settings hasta que un TO lo cambia con `/t-o tournament posts`. Aquí solo se ve lo que está apagado',
   'Tracked tournaments · {0}': 'Torneos seguidos · {0}',
   'TOs · {0}': 'TOs · {0}',
   'Nobody the bot has seen yet.': 'Todavía nadie que el bot haya visto.',
@@ -217,8 +217,8 @@ export default {
     '**Monday Night SmashBall** · [Análisis de datos](https://monday-night-smashball.vercel.app)',
   '**UB Smash Royale** · [Data analysis](https://ub-smash-royale.vercel.app)':
     '**UB Smash Royale** · [Análisis de datos](https://ub-smash-royale.vercel.app)',
-  '-# Every tournament in each series: attendance over time, biggest crowds, winners, most events entered and characters reported on start.gg':
-    '-# Cada torneo de cada serie: asistencia con el tiempo, las fechas más llenas, ganadores, quién entró a más eventos y los personajes reportados en start.gg',
+  '-# Every tournament in each series: attendance over time, biggest crowds, winners, who came to the most nights, Ultimate or Melee, and characters reported on start.gg':
+    '-# Cada torneo de cada serie: asistencia con el tiempo, las fechas más llenas, ganadores, quién vino a más noches, de Ultimate o Melee, y los personajes reportados en start.gg',
   'Data pages': 'Páginas de datos',
   Socials: 'Redes',
   'Nothing yet. Add a link with `/socials_edit add`.': 'Nada todavía. Agrega un enlace con `/socials_edit add`.',

@@ -2,7 +2,7 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { t } from '../i18n.js';
 import { state, save } from '../store.js';
-import { messageEnabled } from '../message-settings.js';
+import { messageEnabled, postsOn } from '../message-settings.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
 import { cantMakeEvents, ensureDiscordEvent } from '../discord-events.js';
 import {
@@ -172,7 +172,7 @@ async function postPlacements(tournament, entries, dueAt, postChannel) {
 // a top 8 discord fails on gets marked for verifyTopEight to retry hourly. the messages that went out
 async function sendTopEight(tournament, events, dueAt, postChannel, now) {
   try {
-    const sent = await post(embeds.topEight(tournament, events), 'top8', dueAt, postChannel);
+    const sent = await post(embeds.topEight(tournament, events), 'top8', dueAt, postChannel, tournament);
     tournament.top8Posted = true;
     return sent;
   } catch (err) {
@@ -206,7 +206,7 @@ export async function postResults(tournament, postChannel = currentChannel()) {
   // fetched before anything posts, so a start.gg error retries both next hour instead of repeating placements.
   // skipped when the top 8 already went out early
   let events = [];
-  if (!tournament.top8Posted && topEightOn && messageEnabled('top8', dueAt)) {
+  if (!tournament.top8Posted && topEightOn && postsOn('top8', tournament, dueAt)) {
     try {
       events = await topEightEvents(scope.filter((entry) => entry.started));
     } catch (err) {
@@ -220,7 +220,7 @@ export async function postResults(tournament, postChannel = currentChannel()) {
   let topEight = [];
   if (!tournament.top8Posted && events.length) {
     topEight = await sendTopEight(tournament, events, dueAt, postChannel, now);
-  } else if (!tournament.top8Posted && (!topEightOn || !messageEnabled('top8', dueAt))) {
+  } else if (!tournament.top8Posted && (!topEightOn || !postsOn('top8', tournament, dueAt))) {
     // switched off, or not tracked, counts as posted, so the fail-safe doesn't replay it
     tournament.top8Posted = true;
   }
@@ -242,7 +242,7 @@ async function postFinishedResults(tournament, postChannel, now, topEightOn) {
   if (!started.length || !started.every((entry) => entry.done)) return false;
   // one that hasn't started might still run, like doubles after singles, so it waits for those until the end time
   if (started.length < scope.length && now <= endTime(tournament)) return false;
-  const withTopEight = topEightOn && messageEnabled('top8', now);
+  const withTopEight = topEightOn && postsOn('top8', tournament, now);
   let events = [];
   if (withTopEight) {
     try {
@@ -296,11 +296,11 @@ export async function verifyTopEight(tournament, postChannel = currentChannel(),
     return false;
   }
   // switched off since it failed: keep the marker so it retries if switched back on
-  if (!messageEnabled('top8')) return false;
+  if (!(posting(tournament, 'top8') && postsOn('top8', tournament))) return false;
   try {
     const events = await fetchDoneTopEight(eventsOf(tournament));
     if (!events) return false;
-    await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
+    await post(embeds.topEight(tournament, events), 'top8', now, postChannel, tournament);
   } catch (err) {
     console.error(`retrying the top 8 for ${named(tournament)} failed:`, err.message);
     return false;
@@ -332,22 +332,22 @@ export async function correctPlacements(tournament, postChannel = currentChannel
     if (entries.length && entries.every(placed)) {
       tournament.entries = latest.entries;
       const final = embeds.results({ ...tournament, entries }, crewOf(tournament));
-      await editPosts(postChannel, projected.results, final, 'results', t('Final placements, the ones above were projected'));
+      await editPosts(postChannel, projected.results, final, 'results', t('Final placements, the ones above were projected'), tournament);
       projected.results = [];
     }
   }
   if (projected.top8.length) {
     const events = await topEightEvents(eventsOf(tournament).filter((entry) => entry.started));
     if (events.length && events.every((event) => event.done)) {
-      await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', t('Final top 8, the one above was projected'));
+      await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', t('Final top 8, the one above was projected'), tournament);
       projected.top8 = [];
     }
-  } else if (!tournament.top8Posted && posting(tournament, 'top8') && messageEnabled('top8')) {
+  } else if (!tournament.top8Posted && posting(tournament, 'top8') && postsOn('top8', tournament)) {
     // nothing went out at 12 hours, so the final goes out as a new message once it's reported.
     // switched off waits for it to come back on instead of replaying later
     const events = await fetchDoneTopEight(eventsOf(tournament));
     if (events) {
-      await post(embeds.topEight(tournament, events), 'top8', now, postChannel);
+      await post(embeds.topEight(tournament, events), 'top8', now, postChannel, tournament);
       tournament.top8Posted = true;
     }
   }
@@ -356,14 +356,14 @@ export async function correctPlacements(tournament, postChannel = currentChannel
 
 // the final version goes over the projected one. one that no longer splits into the same number of
 // messages can't, so it goes out on its own under a line saying what it is
-async function editPosts(postChannel, refs, list, type, label) {
+async function editPosts(postChannel, refs, list, type, label, tournament) {
   const batches = embeds.messages(list);
   if (batches.length === refs.length) {
     for (const [i, ref] of refs.entries()) await editPost(postChannel, ref, { embeds: batches[i] });
     return;
   }
   for (const [i, batch] of batches.entries()) {
-    if (messageEnabled(type)) await postChannel.send({ content: i ? undefined : label, embeds: batch, allowedMentions: { parse: [] } });
+    if (postsOn(type, tournament)) await postChannel.send({ content: i ? undefined : label, embeds: batch, allowedMentions: { parse: [] } });
   }
 }
 

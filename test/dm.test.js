@@ -53,7 +53,7 @@ function dmChannel(sent, inServer = 'everyone', fetchFails = false) {
   return channel;
 }
 
-const tracked = { by: 'manual', at: 0, sets: true, stream: true, top8: true, reminders: true };
+const tracked = { by: 'manual', at: 0, posts: {} };
 const images = [
   { type: 'banner', url: 'https://images.example/banner.png' },
   { type: 'profile', url: 'https://images.example/logo.png' },
@@ -231,7 +231,7 @@ test('only /notify and the tournament reminders switch decide, not /settings', a
   };
   // tournament reminders off: nothing asked, nothing sent
   state.tournaments = {
-    1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, entries: [], userIds: [], tracked: { ...tracked, reminders: false }, reminder: {} },
+    1: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 1800, entries: [], userIds: [], tracked: { ...tracked, posts: { registration: false } }, reminder: {} },
   };
   let asked = 0;
   mockApi(() => { asked++; return latest; });
@@ -241,7 +241,7 @@ test('only /notify and the tournament reminders switch decide, not /settings', a
   assert.equal(off.length, 0);
 
   // the server's registration and roll call posts being off doesn't stop anyone's own DMs
-  state.tournaments[1].tracked.reminders = true;
+  state.tournaments[1].tracked.posts.registration = true;
   state.messages = { registration: false, rollcall: false };
   const sent = [];
   await tracker.postDmReminders(dmChannel(sent));

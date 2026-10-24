@@ -3,9 +3,9 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { t } from '../i18n.js';
 import { state, save } from '../store.js';
-import { messageEnabled } from '../message-settings.js';
+import { postsOn } from '../message-settings.js';
 import { linkedPlayer } from '../commands/shared.js';
-import { currentChannel, secondsNow, sendPinging, posting, alertsOn, endTime, RUNS_LATE_HOURS, HOUR } from './shared.js';
+import { currentChannel, secondsNow, sendPinging, posting, trackedFor, alertsOn, endTime, RUNS_LATE_HOURS, HOUR } from './shared.js';
 import { tournamentPosts } from './threads.js';
 import { h2hRow, rememberButton } from './buttons.js';
 
@@ -15,7 +15,7 @@ async function streamedNow() {
   const found = new Map();
   try {
     const playerIds = Object.values(state.players).filter(alertsOn).map((player) => player.playerId);
-    for (const set of await startgg.getStreamedSets(playerIds)) found.set(set.id, set);
+    for (const set of await startgg.getStreamedSets(playerIds)) if (postsOn('streams', trackedFor(set))) found.set(set.id, set);
   } catch (err) {
     console.error('checking streams failed:', err.message);
   }
@@ -24,10 +24,10 @@ async function streamedNow() {
   // announces everything on its stream, the rest only sets with someone who has alerts on
   for (const tournament of liveTournaments()) {
     try {
-      const everyone = posting(tournament, 'stream');
+      const everyone = posting(tournament, 'streams');
       for (const queue of await startgg.getStreamQueues(tournament.id)) {
         for (const set of setsToAnnounce(queue.sets)) {
-          if (everyone || hasPlayerWithAlerts(set)) found.set(set.id, set);
+          if (everyone || (hasPlayerWithAlerts(set) && postsOn('streams', trackedFor(set)))) found.set(set.id, set);
         }
       }
     } catch (err) {
@@ -43,7 +43,7 @@ const STREAM_CONFIRM_MS = 30_000;
 // the card in the set's thread, pinging ids, with its head to head button saved to come off later
 async function announce(set, ids, postChannel) {
   const components = h2hRow(set);
-  const sent = await sendPinging(tournamentPosts(set, postChannel), 'streams', ids, t('on stream'), embeds.onStream(set, state.players), components);
+  const sent = await sendPinging(tournamentPosts(set, postChannel), () => postsOn('streams', trackedFor(set)), ids, t('on stream'), embeds.onStream(set, state.players), components);
   rememberButton(sent, set, components);
 }
 
@@ -60,7 +60,7 @@ export async function postStreamAlerts(postChannel = currentChannel(), confirmAf
     }
     const newIds = ids.filter((id) => !pinged.discordIds.includes(id));
     if (!newIds.length) continue;
-    if (messageEnabled('streams', wentLiveAt(set))) {
+    if (postsOn('streams', trackedFor(set))) {
       try {
         await announce(set, newIds, postChannel);
       } catch (err) {
@@ -83,7 +83,7 @@ export async function postStreamAlerts(postChannel = currentChannel(), confirmAf
       // taken off stream or moved to another one. the next check looks again once it settles
       if (!set || set.stream.streamName !== stream.streamName || state.streamed.includes(id)) continue;
       // only whoever is playing and has /notify streams on
-      if (messageEnabled('streams', wentLiveAt(set))) {
+      if (postsOn('streams', trackedFor(set))) {
         const ids = streamPingIds(set);
         try {
           await announce(set, ids, postChannel);
@@ -115,12 +115,6 @@ function streamPingIds(set) {
   return [...new Set(ids)];
 }
 
-// a called or started set was last updated around when it went live. one only waiting
-// at the front of a queue was last touched when it got queued, so it has no time to go by
-function wentLiveAt(set) {
-  return set.state === 1 ? undefined : set.updatedAt;
-}
-
 // queueSets is in queue order, front first
 function setsToAnnounce(queueSets) {
   const unfinished = queueSets.filter((set) => set.state !== 3);
@@ -135,7 +129,7 @@ function liveTournaments() {
     // doneAt means every event they're in has finished, or every event at a tracked one
     if (tournament.resultsPosted || tournament.doneAt || !(tournament.startAt <= now)) return false;
     if (now > endTime(tournament) + RUNS_LATE_HOURS * HOUR) return false;
-    return posting(tournament, 'stream') || (tournament.entries ?? []).some((entry) => alertsOn(state.players[entry.userId]));
+    return posting(tournament, 'streams') || (tournament.entries ?? []).some((entry) => alertsOn(state.players[entry.userId]));
   });
 }
 

@@ -1,12 +1,14 @@
 import { escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
 import { isMultiGuild } from '../store.js';
+import { postsOn } from '../message-settings.js';
 import { colors, FOOTER, baseEmbed, shortSchedule, withLines, withSections, playerLink, count, t } from './shared.js';
 
-// /t-o tournament posts switches a tracked tournament can have off, named for the list.
+// kinds a tracked tournament can have off, named for the list. each follows /t-o settings until a TO overrides it.
 // a custom reminder schedule shows with it, so TOs can see which tournaments don't use the default
-const TOURNAMENT_POSTS = {
-  sets: () => t('sets off'), stream: () => t('stream alerts off'), calls: () => t('match calls off'), top8: () => t('top 8s off'), reminders: () => t('reg reminders off'),
+const TOURNAMENT_OFF = {
+  sets: () => t('sets off'), streams: () => t('stream alerts off'), calls: () => t('match calls off'), next: () => t('next opponents off'),
+  top8: () => t('top 8s off'), registration: () => t('reg reminders off'),
 };
 
 // tracked players, then tracked tournaments that aren't over. linked is how many people linked their own start.gg without being tracked
@@ -26,17 +28,15 @@ export function trackedList(players, linked = 0, tournaments = {}) {
   const tracked = Object.values(tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted)
     .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
   const tournamentLines = tracked.map((tournament) => {
-    // match calls start off, so a tournament tracked before they existed reads as off too
-    const off = (name) => (name === 'calls' ? tournament.tracked.calls !== true : tournament.tracked[name] === false);
-    const notes = Object.entries(TOURNAMENT_POSTS).filter(([name]) => off(name)).map(([, note]) => note());
-    if (tournament.tracked.reminders !== false && Array.isArray(tournament.tracked.schedule)) {
+    const notes = Object.entries(TOURNAMENT_OFF).filter(([name]) => !postsOn(name, tournament)).map(([, note]) => note());
+    if (postsOn('registration', tournament) && Array.isArray(tournament.tracked.schedule)) {
       notes.push(t`reminders ${shortSchedule(tournament.tracked.schedule)}`);
     }
     const when = tournament.startAt ? ` · <t:${tournament.startAt}:d>` : '';
     return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
   });
   if (!tracked.length) tournamentLines.push(t('None yet. A TO can track one with `/t-o tournament add`.'));
-  tournamentLines.push('', t('-# Every set, stream alert and top 8 from these posts in its own thread, plus reg reminders and match calls with `calls:on`. TOs change that with `/t-o tournament posts`'));
+  tournamentLines.push('', t('-# Each follows /t-o settings until a TO changes it with `/t-o tournament posts`. Only what is off shows here'));
   return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(t`Tracked tournaments · ${tracked.length}`), tournamentLines)];
 }
 
@@ -77,7 +77,7 @@ export function dataPages() {
     t('**Monday Night SmashBall** · [Data analysis](https://monday-night-smashball.vercel.app)'),
     t('**UB Smash Royale** · [Data analysis](https://ub-smash-royale.vercel.app)'),
     '',
-    t('-# Every tournament in each series: attendance over time, biggest crowds, winners, most events entered and characters reported on start.gg'),
+    t('-# Every tournament in each series: attendance over time, biggest crowds, winners, who came to the most nights, Ultimate or Melee, and characters reported on start.gg'),
   ];
   return [baseEmbed(colors.brand).setTitle(t('Data pages')).setDescription(lines.join('\n'))];
 }
@@ -218,13 +218,13 @@ export function help(verbose = false) {
       t('`/help` this list'),
       t('`/status` uptime, when the latest version was deployed, the last start.gg and Slippi checks, and whether start.gg is down'),
       t('`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member'),
-      t('`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, most events entered and characters'),
+      t('`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, who came to the most nights and characters'),
       t('`/socials` saved streams and social links'),
       t('`/socials_edit` add or remove those links. Manage Server by default'),
     ],
     [
       t('**TO settings**'),
-      t('`/t-o settings` automatic posts, threads, set result colors, Discord event length, weekly recap schedule and language'),
+      t('`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule and language'),
       ...(isMultiGuild() ? [t('`channel:` picks where automatic posts go and checks the bot can post there')] : []),
       t('-# Leave every option blank to see the current settings. Only TOs can change them'),
     ],
@@ -294,9 +294,9 @@ export function help(verbose = false) {
     ],
     [
       t('**Tournaments**'),
-      t('`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event'),
+      t('`/t-o tournament add` track a tournament. What it posts follows `/t-o settings`, and `registration:` sets reg reminders and 1-hour DMs for it alone. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event'),
       t('`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute'),
-      t('`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, match calls, top 8s and reg reminders on or off. `schedule:` changes the reminder times, `default` goes back to the usual four'),
+      t('`/t-o tournament posts` one tracked tournament\'s sets, streams, calls, next opponents, top 8s and registration on or off. `default` follows `/t-o settings` again. `schedule:` changes the reminder times, `schedule:default` goes back to the usual four'),
       t('`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event'),
       t('`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours'),
       t('`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end'),

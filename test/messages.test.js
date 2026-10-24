@@ -11,7 +11,8 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleCommand } = await import('../src/commands/index.js');
-const { postWeeklyRecap } = await import('../src/tracker.js');
+const { postWeeklyRecap, postMatchCalls } = await import('../src/tracker.js');
+const { mockApi } = await import('./fixtures.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 
 async function configure(values = {}, allowed = true, guild = undefined, user = 'manager') {
@@ -31,7 +32,7 @@ test('all server settings are options on one /t-o settings command', () => {
   const to = commands.find(c => c.name === 't-o');
   const command = to.options.find(o => o.name === 'settings');
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
+    ['sets', 'streams', 'calls', 'next', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
   assert.ok(['day', 'time', 'timezone', 'language'].every(name => command.options.some(o => o.name === name)));
   assert.equal(command.options.find(o => o.name === 'timezone').autocomplete, true);
   // three modes, picked by name
@@ -211,7 +212,7 @@ test('re-enabling categories saves cutoffs even if no muted poll happened', asyn
   assert.ok(state.messages.enabledAt.registration > 0);
 });
 
-test('only Bills finals and Discord events start off server-wide, and turning match calls back on skips what came due', async () => {
+test('only Bills finals and Discord events start off server-wide, and turning match calls back on posts a call still up', async () => {
   const { messageEnabled, messageSettings } = await import('../src/message-settings.js');
   state.messages = {};
   assert.equal(messageSettings().calls, true);
@@ -228,6 +229,32 @@ test('only Bills finals and Discord events start off server-wide, and turning ma
   assert.ok(state.messages.enabledAt?.calls > 0);
   assert.equal(messageEnabled('calls', state.messages.enabledAt.calls - 60), false);
   assert.equal(messageEnabled('calls', state.messages.enabledAt.calls), true);
+  // sets keep their skip, and a call has no due time: one still called when calls come back on posts
+  state.messages = { sets: true, enabledAt: { sets: 1000 } };
+  assert.equal(messageEnabled('sets', 999), false);
+
+  const now = Math.floor(Date.now() / 1000);
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+  state.messages = { calls: false };
+  state.players = { 1: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active', discordId: 'crew-discord' } };
+  state.callPings = ['crew-discord'];
+  state.called = [];
+  state.callPosts = [];
+  state.tournaments = {};
+  const called = { id: 'still-called', state: 6, updatedAt: now - 600, completedAt: null, winnerId: null, fullRoundText: 'Winners round 1',
+    event: { name: 'Singles', slug: 'tournament/local/event/singles', videogame: { displayName: 'Ultimate' }, tournament: { name: 'Local', slug: 'tournament/local' } },
+    slots: [10, 99].map((id, i) => ({ entrant: { id, name: i ? 'Opponent' : 'Active', initialSeedNum: i + 1, participants: [{ player: { id } }] }, standing: { stats: { score: { value: null } } } })) };
+  const startgg = await import('../src/startgg.js');
+  startgg.setRequestGap(0);
+  mockApi(() => ({ p10: { sets: { nodes: [called] } } }));
+  await postMatchCalls(channel);
+  assert.equal(sent.length, 0);
+  await configure({ calls: true });
+  await postMatchCalls(channel);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].embeds[0].data.title, /Match call/);
+  state.callPings = [];
 });
 
 test('turning Discord events on checks for Manage Events first', async () => {

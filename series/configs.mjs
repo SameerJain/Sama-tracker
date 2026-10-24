@@ -31,7 +31,8 @@ Charts are static SVGs in \`images/\`, raw numbers in \`data/\` (JSON + CSV).
 - Ultimate only: ${c.ultEvents} Ultimate Singles events, ${c.totalSets.toLocaleString('en-US')} sets, ${c.totalGames.toLocaleString('en-US')} games with
   reported characters, ${c.charCount} distinct characters. Plus a Melee top-10 from ${c.meleeEvents} events.
 - Winners merged by start.gg player id across alias/sponsor changes.
-  Events-entered ranking from full entrant lists (${c.enteredCount} distinct players).
+  Nights-attended ranking from full Ultimate and Melee entrant lists, one per player per night
+  (${c.enteredCount} distinct players).
 - Page also has rivalries from every singles set (a checkbox narrows them
   to sets with characters reported), top-4 consistency and recent form, favourites and
   upsets, year-over-year retention, seasonality, character
@@ -91,8 +92,8 @@ Charts are static SVGs in \`images/\`, raw numbers in \`data/\` (JSON + CSV).
   (\`on-weeks-only.html\`); winners and matchups are on weeks only in both.
 - Largest: ${c.top.name}, ${c.top.attendees} attendees, ${c.top.date}.
 - Winners merged by start.gg player id across alias/sponsor changes.
-- Events-entered ranking from full Ultimate entrant lists plus the off-week
-  brackets, one entry per player per night (${c.enteredCount} distinct players).
+- Nights-attended ranking from full Ultimate and Melee entrant lists plus the
+  off-week brackets, one per player per night (${c.enteredCount} distinct players).
 - Redemption bracket ranked separately (${c.redemptionEvents} events).
 - Page also has rivalries from every singles set (a switch narrows them
   to sets with characters reported, and an Include off weeks toggle adds the

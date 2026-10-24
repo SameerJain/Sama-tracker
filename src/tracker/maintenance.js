@@ -247,8 +247,8 @@ export function startTracking(client, singleChannel = null) {
   startChecks();
 }
 
-// saved from before tournaments could be tracked. a reg reminder becomes a tracked tournament with reminders
-// on. match call pings were a switch anyone could flip on a player, now they're each person's own, so a player's
+// saved from before tournaments could be tracked. a reg reminder becomes a tracked tournament that follows the
+// server's switches (migrateTournamentPosts moves the old per-tournament ones to overrides). match call pings were a switch anyone could flip on a player, now they're each person's own, so a player's
 // discord keeps them only if the server switch was on and they were actually getting pinged. tournament admins
 // gave way to the TO role, and their tournaments stay tracked. a discord event id moves to state.discordEvents
 // unsynced, so the next sync puts start.gg's latest on it, venue address included
@@ -258,8 +258,8 @@ export function migrateTracking(now = secondsNow()) {
   delete state.dqWarnPings;
   delete state.messages.callsWarn;
   delete state.messages.callsDq;
+  migrateTournamentPosts();
   for (const tournament of Object.values(state.tournaments)) {
-    if (tournament.tracked) tournament.tracked.calls ??= false;
     if (!tournament.discordEventId) continue;
     state.discordEvents[tournament.id] ??= { eventId: tournament.discordEventId, slug: tournament.slug, startAt: tournament.startAt, synced: null };
     delete tournament.discordEventId;
@@ -286,6 +286,22 @@ export function migrateTracking(now = secondsNow()) {
   }
 }
 
+// a tracked tournament used to save every switch as its own field, all on but match calls. now the server's
+// /t-o settings is the default and only what a TO changed is saved, so the old fields become overrides where they
+// differ from what they started as, once, for tournaments with no posts yet
+const OLD_SWITCHES = { sets: ['sets', true], stream: ['streams', true], calls: ['calls', false], top8: ['top8', true], reminders: ['registration', true] };
+
+export function migrateTournamentPosts() {
+  for (const { tracked } of Object.values(state.tournaments)) {
+    if (!tracked || tracked.posts) continue;
+    tracked.posts = {};
+    for (const [old, [kind, fixed]] of Object.entries(OLD_SWITCHES)) {
+      if (typeof tracked[old] === 'boolean' && tracked[old] !== fixed) tracked.posts[kind] = tracked[old];
+      delete tracked[old];
+    }
+  }
+}
+
 // /track add saves this. set results and stream alerts start off since everyone with them on goes in a
 // check every 2 minutes. /track posts turns them on. trackedAt is when they were added, so the prune knows
 // a player with no sets yet isn't inactive
@@ -293,12 +309,11 @@ export function newTracked(player) {
   return { ...player, lastCheck: secondsNow(), trackedAt: secondsNow(), streamAlerts: false, setResults: false };
 }
 
-// /t-o tournament add, or a reminder from before tournaments were tracked. everything it posts starts on
-// but match calls, which a TO turns on with /t-o tournament posts for the whole bracket. /t-o tournament posts
-// turns parts off. its sets are looked at from now on, so tracking one partway through doesn't flood its thread
+// /t-o tournament add, or a reminder from before tournaments were tracked. it saves no switches, so every kind
+// follows the server's setting until /t-o tournament posts overrides one for this tournament. its sets are looked at from now on, so tracking one partway through doesn't flood its thread
 // with what already happened. reminder fills in at the next reminder check
 export function trackTournament(tournament, by, now = secondsNow()) {
-  tournament.tracked = { by, at: now, sets: true, stream: true, top8: true, reminders: true, calls: false };
+  tournament.tracked = { by, at: now, posts: {} };
   tournament.reminder ??= {};
   tournament.lastCheck = now;
   // looked at on the next check even when it's far off, for its events and crew

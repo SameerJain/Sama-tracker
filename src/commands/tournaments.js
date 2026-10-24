@@ -2,6 +2,7 @@ import { escapeMarkdown } from 'discord.js';
 import * as startgg from '../startgg.js';
 import { postsChannelId, state, save } from '../store.js';
 import { ensureDiscordEvent } from '../discord-events.js';
+import { TOURNAMENT_POSTS, postsOn } from '../message-settings.js';
 import {
   MAX_REMINDER_HOURS, MAX_REMINDERS, REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, missingThreadPermissions, nextRegReminder, regDeadline,
   reminderSchedule, secondsNow, trackTournament,
@@ -15,9 +16,10 @@ import { tournamentNotFound, tournamentSlug } from './registration.js';
 
 const HOUR = 60 * 60;
 
-// /t-o tournament posts switches, named the way the replies list them
+// /t-o tournament posts kinds, named the way the replies list them
 const POSTS = {
-  sets: () => t('Every set'), stream: () => t('Stream alerts'), calls: () => t('Match calls'), top8: () => t('Top 8s'), reminders: () => t('Reg reminders'),
+  sets: () => t('Set results'), streams: () => t('Stream alerts'), calls: () => t('Match calls'), next: () => t('Next opponents'),
+  top8: () => t('Top 8s'), registration: () => t('Reg reminders'),
 };
 
 // 7 days, 3 days, 1 day and 6 hours
@@ -49,18 +51,18 @@ function trackedPick(interaction) {
     ?? lookup(Object.fromEntries(tracked.map((tournament) => [String(tournament.id), tournament])), value, 'name');
 }
 
-// what a tracked tournament posts, on one line. a custom reminder schedule shows with it.
-// match calls start off, so a tournament tracked before they existed reads as off too
+// what a tracked tournament posts, on one line. a kind with its own setting reads on or off, one following
+// /t-o settings reads on (default) or off (default). a custom reminder schedule shows with reg reminders
 function postsText(tournament) {
-  const lines = Object.entries(POSTS).map(([name, label]) => {
-    const onOff = (on) => (on ? t('on') : t('off'));
-    if (name === 'reminders' && tournament.tracked[name] !== false && tournament.tracked.schedule) {
-      return t`**${label()}:** ${onOff(true)} (${shortSchedule(tournament.tracked.schedule)})`;
-    }
-    const on = name === 'calls' ? tournament.tracked[name] === true : tournament.tracked[name] !== false;
-    return t`**${label()}:** ${onOff(on)}`;
+  const { posts, schedule } = tournament.tracked;
+  const lines = TOURNAMENT_POSTS.map((kind) => {
+    const on = postsOn(kind, tournament);
+    const own = posts?.[kind] !== undefined;
+    const word = on ? (own ? t('on') : t('on (default)')) : (own ? t('off') : t('off (default)'));
+    if (kind === 'registration' && on && schedule) return t`**${POSTS[kind]()}:** ${word} · reminders ${shortSchedule(schedule)}`;
+    return t`**${POSTS[kind]()}:** ${word}`;
   });
-  return lines.join(t(' · '));
+  return [lines.join(t(' · ')), t('-# default follows /t-o settings, which every tournament without its own setting goes by')].join('\n');
 }
 
 // every set and stream alert goes in its thread, so say when that can't happen yet
@@ -77,7 +79,7 @@ function threadWarning(interaction) {
 
 // tracks a tournament from getRegistration by hand for /t-o tournament add, and says what that set up. one
 // already tracked keeps its switches and reminder schedule
-function trackLines(interaction, found, reminders, schedule, now = secondsNow()) {
+function trackLines(interaction, found, registration, schedule, now = secondsNow()) {
   const name = escapeMarkdown(found.name);
   if (state.tournaments[found.id]?.tracked) return [t`[tournament] Already tracking ${name}.`];
 
@@ -87,10 +89,14 @@ function trackLines(interaction, found, reminders, schedule, now = secondsNow())
     id, name: found.name, slug, startAt, endAt, city, addrState, venueName, venueAddress, isOnline, images, entries: [], userIds: [],
   };
   trackTournament(tournament, 'manual', now);
-  tournament.tracked.reminders = reminders;
+  if (registration) {
+    tournament.tracked.posts.registration = registration === 'on';
+    if (registration === 'on') tournament.tracked.onAt = { registration: now };
+  }
+  const reminders = postsOn('registration', tournament);
   if (schedule) tournament.tracked.schedule = schedule;
 
-  const lines = [t`Tracking ${name}. Every set and stream alert from it posts in its own thread, then results and each event's top 8 once the bracket is finished.`];
+  const lines = [t`Tracking ${name}.`, postsText(tournament)];
   const deadline = regDeadline(found);
   const hours = schedule ?? REG_REMINDER_HOURS;
   const next = nextRegReminder(deadline, hours);
@@ -107,7 +113,6 @@ function trackLines(interaction, found, reminders, schedule, now = secondsNow())
   }
   const warning = threadWarning(interaction);
   if (warning) lines.push(warning);
-  lines.push(t('-# `/t-o tournament posts` turns any of it off, or posts every called set with `calls:on`'));
   return lines;
 }
 
@@ -115,7 +120,7 @@ function trackLines(interaction, found, reminders, schedule, now = secondsNow())
 async function tournamentAdd(interaction) {
   if (!isTO(interaction)) return notTO(interaction, t('track tournaments'));
   const input = interaction.options.getString('tournament', true).trim();
-  const reminders = interaction.options.getString('reminders') !== 'off';
+  const registration = interaction.options.getString('registration');
   const schedule = parseSchedule(interaction.options.getString('schedule'));
   if (schedule?.error) return replyEphemeral(interaction, schedule.error);
   const addEvent = interaction.options.getString('add_event') === 'on';
@@ -131,7 +136,7 @@ async function tournamentAdd(interaction) {
     return interaction.editReply({ content: t`${name} is already tracked. \`/t-o tournament posts\` changes what it posts.`, allowedMentions: { parse: [] } });
   }
 
-  const lines = trackLines(interaction, found, reminders, schedule, now);
+  const lines = trackLines(interaction, found, registration, schedule, now);
   if (addEvent) lines.push(...await eventLines(interaction, found));
   save();
   await interaction.editReply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
@@ -148,9 +153,7 @@ function tournamentRemove(interaction) {
   const tournament = trackedPick(interaction);
   if (!tournament) return replyEphemeral(interaction, t('That tournament isn\'t tracked. `/track list` shows the ones that are.'));
   const name = escapeMarkdown(tournament.name);
-  const question = tournament.tracked.calls === true
-    ? t`Stop tracking ${name}? Its sets, stream alerts, match calls, top 8s and reg reminders stop.`
-    : t`Stop tracking ${name}? Its sets, stream alerts, top 8s and reg reminders stop.`;
+  const question = t`Stop tracking ${name}? Everything it posts stops.`;
   return askFirst(interaction, 'untrack_tournament', tournament.id, question, t('Stop tracking'));
 }
 
@@ -179,9 +182,10 @@ confirmable('untrack_tournament', {
   tooLate: () => t('Too late to undo. `/t-o tournament add` it again.'),
 });
 
-// with no switches it says what's on. sets turned back on start from now, the way a newly tracked tournament does,
-// and reminders turned back on start from the next one still to come, so nothing missed goes out late.
-// a new schedule starts from its next one still to come the same way, and default goes back to the usual four
+// with no switches it says what's on. a kind that goes from off to on starts from now, the way a newly tracked
+// tournament does, so nothing missed goes out late. that counts a kind going back to default when the server has
+// it on. a new schedule starts from its next one still to come the same way, and schedule default goes back to
+// the usual four
 function tournamentPosts(interaction) {
   if (!isTO(interaction)) return notTO(interaction, t('change what tournaments post'));
   const tournament = trackedPick(interaction);
@@ -191,22 +195,34 @@ function tournamentPosts(interaction) {
   const schedule = resetting ? null : parseSchedule(rawSchedule);
   if (schedule?.error) return replyEphemeral(interaction, schedule.error);
   const changes = {};
-  for (const name of Object.keys(POSTS)) {
-    const value = interaction.options.getString(name);
-    if (value) changes[name] = value === 'on';
+  for (const kind of TOURNAMENT_POSTS) {
+    const value = interaction.options.getString(kind);
+    if (value) changes[kind] = value;
   }
   const name = escapeMarkdown(tournament.name);
   if (!Object.keys(changes).length && !schedule && !resetting) return replyEphemeral(interaction, t`**${name}**\n${postsText(tournament)}`);
 
   const { tracked } = tournament;
-  if (changes.sets && tracked.sets === false) tournament.lastCheck = secondsNow();
-  if ((changes.reminders && tracked.reminders === false) || schedule || resetting) {
+  const before = Object.fromEntries(Object.keys(changes).map((kind) => [kind, postsOn(kind, tournament)]));
+  tracked.posts ??= {};
+  tracked.onAt ??= {};
+  for (const [kind, value] of Object.entries(changes)) {
+    if (value === 'default') delete tracked.posts[kind];
+    else tracked.posts[kind] = value === 'on';
+  }
+  const now = secondsNow();
+  for (const kind of Object.keys(changes)) {
+    if (!before[kind] && postsOn(kind, tournament)) tracked.onAt[kind] = now;
+    // already on keeps what it skipped before, and an override on needs a time either way
+    else if (changes[kind] === 'on') tracked.onAt[kind] ??= state.messages.enabledAt?.[kind] ?? 0;
+  }
+  if (changes.sets && !before.sets && postsOn('sets', tournament)) tournament.lastCheck = now;
+  if ((changes.registration && !before.registration && postsOn('registration', tournament)) || schedule || resetting) {
     tournament.reminder ??= {};
     delete tournament.reminder.next;
   }
   if (schedule) tracked.schedule = schedule;
   else if (resetting) delete tracked.schedule;
-  Object.assign(tracked, changes);
   save();
   const lines = [t`**${name}**`, postsText(tournament)];
   if (schedule) {

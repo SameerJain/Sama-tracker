@@ -15,7 +15,7 @@ import { findAccount, verifiedCaller } from '../accounts.js';
 import { slippiFor, slippiLookup } from './slippi.js';
 import { LOGO as slippiLogo } from '../slippi.js';
 import {
-  fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, fullReport, buttonRow,
+  fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, statPlayer, withCountdown, flag, fullReport, buttonRow,
   linkedPlayer, rememberPick, parseSince, t, listOf,
 } from './shared.js';
 
@@ -137,10 +137,10 @@ async function matchup(interaction) {
 }
 
 async function progress(interaction) {
-  const player = readPlayer(interaction);
-  if (!player) return replyNoPlayer(interaction);
+  const player = await statPlayer(interaction);
+  if (!player) return null;
 
-  await interaction.deferReply();
+  if (!interaction.deferred) await interaction.deferReply();
   return progressReport(interaction, { player, ...reportOptions(interaction) });
 }
 
@@ -245,12 +245,13 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
 }
 
 async function stats(interaction) {
-  const player = readPlayer(interaction);
-  if (!player) return replyNoPlayer(interaction);
+  // before the player, since a typed link gets looked up after the defer, and this answers privately
   const filters = filterOptions(interaction);
   if (filters.error) return replyEphemeral(interaction, filters.error);
+  const player = await statPlayer(interaction);
+  if (!player) return null;
 
-  await interaction.deferReply();
+  if (!interaction.deferred) await interaction.deferReply();
   return statsReport(interaction, { player, ...reportOptions(interaction), ...filters });
 }
 
@@ -275,10 +276,10 @@ async function statsReport(interaction, { player, verbose, melee, since, venue, 
 }
 
 async function doubles(interaction) {
-  const player = readPlayer(interaction);
-  if (!player) return replyNoPlayer(interaction);
+  const player = await statPlayer(interaction);
+  if (!player) return null;
 
-  await interaction.deferReply();
+  if (!interaction.deferred) await interaction.deferReply();
   return doublesReport(interaction, { player, ...reportOptions(interaction) });
 }
 
@@ -307,10 +308,10 @@ async function doublesReport(interaction, { player, verbose, melee }) {
 }
 
 async function characters(interaction) {
-  const player = readPlayer(interaction);
-  if (!player) return replyNoPlayer(interaction);
+  const player = await statPlayer(interaction);
+  if (!player) return null;
 
-  await interaction.deferReply();
+  if (!interaction.deferred) await interaction.deferReply();
   return charactersReport(interaction, { player, verbose: flag(interaction, 'verbose'), game: interaction.options.getInteger('game') });
 }
 

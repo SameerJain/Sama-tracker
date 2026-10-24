@@ -11,8 +11,11 @@ export default {
   '**Posts channel:** not set': '**Canal de publicaciones:** sin elegir',
   '**Weekly recap**': '**Resumen semanal**',
   '**Posts:** {0} · **Day and time:** {1} {2} {3}': '**Se publica:** {0} · **Día y hora:** {1} {2} {3}',
-  '-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.':
-    '-# Lo que no se publicó mientras un tipo estaba apagado no se envía al volver a encenderlo. Los cambios de horario del resumen aplican a los siguientes.',
+  '-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.':
+    '-# Los resultados de sets, avisos de stream, llamados de partida, próximos rivales, top 8 y recordatorios de inscripción de aquí son el valor por defecto de todos los torneos. /t-o tournament posts cambia un solo torneo.',
+  '-# Stream alerts, match calls and next opponents still going on post when switched back on. Anything else missed while off stays skipped. Recap schedule changes apply to future recaps.':
+    '-# Los avisos de stream, llamados de partida y próximos rivales que siguen en curso se publican al volver a encenderlos. Lo demás que pasó con el tipo apagado no se publica. Los cambios de horario del resumen aplican a los siguientes.',
+  'next opponents off': 'próximos rivales desactivados',
   '-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events':
     '-# `events` crea un evento de Discord para cada próximo torneo seguido, una vez por torneo. Necesita Gestionar eventos',
   '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.':
@@ -25,6 +28,7 @@ export default {
   'Set results': 'Resultados de sets',
   'Stream alerts': 'Avisos de stream',
   'Match call pings': 'Pings de llamados de partida',
+  'Next opponents': 'Próximos rivales',
   'Tournament roll calls': 'Pase de lista de torneos',
   'Tournament placements': 'Posiciones de torneos',
   'Top 8s': 'Top 8',

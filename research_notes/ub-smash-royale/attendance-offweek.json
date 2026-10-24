@@ -296,7 +296,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835301
   },
   {
     "tournamentId": 594975,
@@ -450,7 +451,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835303
   },
   {
     "tournamentId": 601358,
@@ -677,7 +679,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835304
   },
   {
     "tournamentId": 606044,
@@ -895,7 +898,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835306
   },
   {
     "tournamentId": 610862,
@@ -1113,7 +1117,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835307
   },
   {
     "tournamentId": 617045,
@@ -1268,7 +1273,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835309
   },
   {
     "tournamentId": 637043,
@@ -1486,7 +1492,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835310
   },
   {
     "tournamentId": 655549,
@@ -1650,7 +1657,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835312
   },
   {
     "tournamentId": 658679,
@@ -1949,7 +1957,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835313
   },
   {
     "tournamentId": 661153,
@@ -2642,7 +2651,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835315
   },
   {
     "tournamentId": 703221,
@@ -2950,7 +2960,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835316
   },
   {
     "tournamentId": 709776,
@@ -3341,7 +3352,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835318
   },
   {
     "tournamentId": 715097,
@@ -3532,7 +3544,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835319
   },
   {
     "tournamentId": 720729,
@@ -3723,7 +3736,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835321
   },
   {
     "tournamentId": 725026,
@@ -3923,7 +3937,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835322
   },
   {
     "tournamentId": 730026,
@@ -4087,7 +4102,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835324
   },
   {
     "tournamentId": 737276,
@@ -4324,7 +4340,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835325
   },
   {
     "tournamentId": 753944,
@@ -4478,7 +4495,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835327
   },
   {
     "tournamentId": 764670,
@@ -4633,7 +4651,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835329
   },
   {
     "tournamentId": 772119,
@@ -4824,7 +4843,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835330
   },
   {
     "tournamentId": 776774,
@@ -4934,7 +4954,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835331
   },
   {
     "tournamentId": 781167,
@@ -5143,7 +5164,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835333
   },
   {
     "tournamentId": 829863,
@@ -5325,7 +5347,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835334
   },
   {
     "tournamentId": 834559,
@@ -5435,7 +5458,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835336
   },
   {
     "tournamentId": 840834,
@@ -5537,7 +5561,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835337
   },
   {
     "tournamentId": 845443,
@@ -5620,7 +5645,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835339
   },
   {
     "tournamentId": 877254,
@@ -5739,7 +5765,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835340
   },
   {
     "tournamentId": 882173,
@@ -5849,7 +5876,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835342
   },
   {
     "tournamentId": 886698,
@@ -6123,7 +6151,8 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835343
   },
   {
     "tournamentId": 901772,
@@ -6298,6 +6327,7 @@
           }
         ]
       }
-    ]
+    ],
+    "meleeCheckedAt": 1792835345
   }
 ]

@@ -177,10 +177,10 @@ test('top 8s only come from tracked tournaments, every event with everyone in it
   assert.equal(untracked.top8Posted, true);
 
   // and switched off server-wide or for the tournament, neither does a tracked one
-  for (const [messages, top8] of [[{ top8: false }, true], [{}, false]]) {
+  for (const [messages, top8] of [[{ top8: false }, undefined], [{}, false]]) {
     state.messages = messages;
     sent.length = 0;
-    const quiet = { ...finished(), tracked: { ...tracked, top8 } };
+    const quiet = { ...finished(), tracked: { ...tracked, posts: { top8 } } };
     await tracker.postResults(quiet, channel);
     assert.equal(asked.length, 0);
     assert.equal(sent.length, 1);

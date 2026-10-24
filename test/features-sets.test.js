@@ -116,7 +116,7 @@ test('set_colors paints set result cards green for a win, red for a loss, gold f
   assert.match(corrected.description, /Corrected by TO/);
 });
 
-test('muted automatic messages are consumed without posting or replaying them later', async () => {
+test('muted automatic messages are consumed without posting or replaying them later, except streams and calls', async () => {
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
   const channel = { send: async payload => sent.push(payload) };
@@ -141,17 +141,21 @@ test('muted automatic messages are consumed without posting or replaying them la
 
   current = { ...node('muted-stream', now), state: 2, stream: { streamName: 'example', streamSource: 'TWITCH' } };
   await tracker.postStreamAlerts(channel, 0);
-  assert.ok(state.streamed.includes('muted-stream'));
+  // alerts are about sets live now, so muted ones aren't consumed and turning streams on announces the set
+  assert.ok(!state.streamed.includes('muted-stream'));
   state.messages.streams = true;
   await tracker.postStreamAlerts(channel, 0);
-  assert.equal(sent.length, 1);
+  assert.ok(state.streamed.includes('muted-stream'));
+  assert.equal(sent.length, 2);
 
   current = { ...node('muted-call', now), state: 6, updatedAt: now };
   await tracker.postMatchCalls(channel);
-  assert.ok(state.called.includes('muted-call'));
+  // calls aren't consumed while off: a set still called when they come back on posts then
+  assert.ok(!state.called.includes('muted-call'));
   state.messages.calls = true;
   await tracker.postMatchCalls(channel);
-  assert.equal(sent.length, 1);
+  assert.ok(state.called.includes('muted-call'));
+  assert.equal(sent.length, 3);
 
   const upcoming = { startAt: now + 1800, entries: [1, 2, 3].map(userId => ({ userId })) };
   await tracker.postRollCall(upcoming, channel);
@@ -164,8 +168,9 @@ test('muted automatic messages are consumed without posting or replaying them la
   mockApi(() => ({ tournament: { id: 1, startAt: now + 86400, endAt: now + 2 * 86400,
     registrationClosesAt: now + 3600, isRegistrationOpen: true, events: [] } }));
   await tracker.postRegReminders(channel);
-  assert.equal(state.tournaments[1].reminder.next, 4);
-  assert.equal(sent.length, 1);
+  // off for the tournament too, so start.gg is not asked and the reminder stays where it was
+  assert.equal(state.tournaments[1].reminder.next, 0);
+  assert.equal(sent.length, 3);
 });
 
 // answers only for the players a query names, like start.gg does, and keeps who got asked about
@@ -257,7 +262,7 @@ test('/track posts sets:on only marks when results came on for players switching
   assert.equal(state.players[1].setResults, false);
 });
 
-test('re-enabling between polls skips events that became due before re-enabling', async () => {
+test('re-enabling between polls skips what came due before it, except streams and calls, which are about now', async () => {
   const now = Math.floor(Date.now() / 1000);
   const sent = [];
   const channel = { send: async payload => sent.push(payload) };
@@ -286,7 +291,10 @@ test('re-enabling between polls skips events that became due before re-enabling'
   mockApi(() => ({ tournament: { id: 1, name: 'Local', slug: 'tournament/local', startAt: now + 86400, endAt: now + 2 * 86400,
     registrationClosesAt: now + 3600, isRegistrationOpen: true, events: [] } }));
   await tracker.postRegReminders(channel);
-  assert.equal(sent.length, 0);
+  // the stream alert and the match call for sets still live
+  assert.equal(sent.length, 2);
+  assert.match(sent[0].embeds[0].data.title, /Stream alert/);
+  assert.match(sent[1].embeds[0].data.title, /Match call/);
 });
 
 test('a set only waiting at the front of a stream queue still posts after streams come back on', async () => {
@@ -530,8 +538,13 @@ test('match call pings only go to people who turned them on, and the server swit
   state.messages = { calls: false };
   mockApi(() => ({ p10: { sets: { nodes: [called('server-off', 10)] } } }));
   await tracker.postMatchCalls(channel);
-  assert.ok(state.called.includes('server-off'));
+  // not consumed, so it posts once calls are back on while it's still called
+  assert.ok(!state.called.includes('server-off'));
   assert.equal(sent.length, 0);
+  state.messages = {};
+  await tracker.postMatchCalls(channel);
+  assert.ok(state.called.includes('server-off'));
+  assert.equal(sent.length, 1);
   state.callPings = [];
 });
 
@@ -658,7 +671,7 @@ test('a tracked tournament with calls on posts every called set, even with nobod
     7: {
       id: 7, name: 'Weekly', slug: 'tournament/weekly', startAt: now - 3600, endAt: now + 3600, entries: [],
       events: [{ id: 70, name: 'Singles', slug: 'tournament/weekly/event/singles', state: 'ACTIVE' }],
-      tracked: { by: 'manual', at: now - 3600, sets: true, stream: true, calls: true, top8: true, reminders: true },
+      tracked: { by: 'manual', at: now - 3600, posts: {} },
     },
   };
   const called = { ...node('801', null), state: 6, updatedAt: now - 60, stream: null };
@@ -679,7 +692,7 @@ test('a tracked tournament with calls on posts every called set, even with nobod
 
   // with calls off the tournament isn't asked about, so nothing posts
   state.called = [];
-  state.tournaments[7].tracked.calls = false;
+  state.tournaments[7].tracked.posts.calls = false;
   await tracker.postMatchCalls(channel);
   assert.equal(sent.length, 1);
   assert.deepEqual(state.called, []);

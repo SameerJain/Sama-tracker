@@ -17,18 +17,27 @@ import { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPos
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import {
-  pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag, t,
+  pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeral, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag,
+  listOf, t,
 } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
-import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
+import { MEMBER_H2H, MEMBER_SCOUT, commands } from './definitions.js';
+import { commandsFor, language } from '../i18n.js';
 
 export { commands } from './definitions.js';
+
+// what gets registered with discord at startup. a single-server build registers the server's saved language, so a
+// restart or a new deploy comes back in whatever a TO picked. multi-server commands are global, so they keep english
+// bases and each person's discord language picks the spanish
+export const registeredCommands = () => commandsFor(commands, isMultiGuild() ? 'en' : language());
 
 // these change what gets posted, so only tracked players can be picked. the rest are lookups, where linked people can be too
 const TRACKED_ONLY = ['track remove', 'track posts', 'notify'];
 // all means everyone tracked
 const TAKES_ALL = ['upcoming', 'recent', 'track posts', 'notify'];
+// the stat commands, whose player boxes also take a start.gg profile link or ID for anyone, tracked or not
+const TAKES_LINK = ['stats', 'doubles', 'characters', 'progress', 'run', 'recent', 'upcoming', 'h2h', 'predict', 'scout'];
 // a tournament link, or one the bot already knows. new is the ones /t-o tournament add can still track, tracked the ones it does,
 // event is every tracked one plus the upcoming ones for /t-o tournament event
 const TAKES_TOURNAMENT = { 't-o tournament add': 'new', 't-o tournament remove': 'tracked', 't-o tournament posts': 'tracked', 't-o tournament event': 'event', registered: 'known', reg_warn: 'known' };
@@ -101,8 +110,29 @@ const handlers = new Map([
   ...Object.values(funCommands).map((fun) => [fun.name, (interaction) => post(interaction, fun)]),
 ]);
 
+// the channels a TO limited the bot's commands to with /t-o settings commands_channel, none meaning every channel.
+// a deleted one stops counting, so a server can't end up with nowhere left to use the bot
+function commandChannels(interaction) {
+  const cache = interaction.guild?.channels?.cache;
+  return (state.messages.commandChannels ?? []).filter((id) => !cache || cache.has(id));
+}
+
+// the private reply for a command used outside those channels, null when it's fine here. a thread counts as the
+// channel it's in. /t-o always works, so a TO can change the setting from anywhere
+function wrongChannel(interaction) {
+  const allowed = commandChannels(interaction);
+  if (!allowed.length || interaction.commandName === 't-o') return null;
+  const parent = interaction.channel?.isThread?.() ? interaction.channel.parentId : null;
+  if (allowed.includes(interaction.channelId) || allowed.includes(parent)) return null;
+  return t`Use the bot in ${listOf(allowed.map((id) => `<#${id}>`))}. A TO picks where with \`/t-o settings commands_channel:\`.`;
+}
+
 export async function handleCommand(interaction) {
-  return inGuild(interaction, () => handlers.get(commandName(interaction))?.(interaction));
+  return inGuild(interaction, () => {
+    const elsewhere = wrongChannel(interaction);
+    if (elsewhere) return replyEphemeral(interaction, elsewhere);
+    return handlers.get(commandName(interaction))?.(interaction);
+  });
 }
 
 // a Full report press swapped twice at once shares the first lookup instead of asking
@@ -355,11 +385,15 @@ async function autocomplete(interaction) {
   matches.sort((a, b) => starts(b) - starts(a) || recency(a) - recency(b));
   for (const player of matches) choices.push({ name: state.players[player.userId] ? player.tag : t`${player.tag} (linked)`, value: String(player.userId) });
 
-  // an empty list looks broken, so say why. picking it gets the not found reply
+  // an empty list looks broken, so say why. picking it gets the not found reply. a stat command looks up anyone by a
+  // pasted start.gg link or ID, so there what's typed gets offered as that instead
   if (!choices.length) {
-    let why = trackedOnly ? t`Nobody tracked matches "${focused}"` : t`Nobody tracked or linked matches "${focused}", /track add them first`;
-    if (!people.length) why = t('Nobody is tracked yet, /track add someone first');
-    choices.push({ name: why.slice(0, 100), value: focused.slice(0, 100) || 'nobody' });
+    const takesLink = TAKES_LINK.includes(name);
+    let why;
+    if (takesLink && focused.trim()) why = t`Look up ${focused.trim()} on start.gg`;
+    else if (!people.length) why = takesLink ? t('Nobody is tracked yet. Paste a start.gg profile link to look anyone up') : t('Nobody is tracked yet, /track add someone first');
+    else why = trackedOnly ? t`Nobody tracked matches "${focused}"` : t`Nobody tracked or linked matches "${focused}", /track add them first`;
+    choices.push({ name: why.slice(0, 100), value: focused.trim().slice(0, 100) || 'nobody' });
   }
 
   await interaction.respond(choices.slice(0, 25));

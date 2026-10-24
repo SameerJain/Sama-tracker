@@ -1823,7 +1823,7 @@
     "addrState": "NY",
     "venueName": null,
     "venueAddress": "Clemens Hall, Buffalo, NY 14228, USA",
-    "numAttendees": 21,
+    "numAttendees": 48,
     "startAt": 1792798200,
     "endAt": 1792900740,
     "isOnline": false,
@@ -1835,7 +1835,7 @@
         "id": 1738930,
         "name": "Ultimate Singles",
         "slug": "tournament/smash-royale-49/event/ultimate-singles",
-        "numEntrants": 18,
+        "numEntrants": 38,
         "videogame": {
           "id": 1386,
           "displayName": "Ultimate"
@@ -1845,7 +1845,7 @@
         "id": 1738932,
         "name": "Melee Singles",
         "slug": "tournament/smash-royale-49/event/melee-singles",
-        "numEntrants": 7,
+        "numEntrants": 16,
         "videogame": {
           "id": 1,
           "displayName": "Melee"
@@ -1855,7 +1855,7 @@
         "id": 1738931,
         "name": "Redemption Bracket",
         "slug": "tournament/smash-royale-49/event/redemption-bracket",
-        "numEntrants": 0,
+        "numEntrants": 15,
         "videogame": {
           "id": 1386,
           "displayName": "Ultimate"

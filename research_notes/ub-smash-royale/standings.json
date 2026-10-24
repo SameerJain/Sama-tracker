@@ -4337,10 +4337,10 @@
     "tournamentName": "SMASH ROYALE #49",
     "slug": "tournament/smash-royale-49",
     "startAt": 1792798200,
-    "numAttendees": 21,
+    "numAttendees": 48,
     "eventId": 1738930,
     "eventName": "Ultimate Singles",
-    "numEntrants": 18,
+    "numEntrants": 38,
     "game": "Ultimate",
     "eventSlug": "tournament/smash-royale-49/event/ultimate-singles",
     "standings": [
@@ -4381,6 +4381,114 @@
           {
             "id": 297614,
             "tag": "MRW"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 966964,
+    "tournamentName": "SMASH ROYALE #49",
+    "slug": "tournament/smash-royale-49",
+    "startAt": 1792798200,
+    "numAttendees": 48,
+    "eventId": 1738932,
+    "eventName": "Melee Singles",
+    "numEntrants": 16,
+    "game": "Melee",
+    "eventSlug": "tournament/smash-royale-49/event/melee-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "yungrick",
+        "players": [
+          {
+            "id": 1997639,
+            "tag": "yungrick"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Squeegee",
+        "players": [
+          {
+            "id": 2454881,
+            "tag": "Squeegee"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "FlaagrasMiddleNut2",
+        "players": [
+          {
+            "id": 5597541,
+            "tag": "FlaagrasMiddleNut2"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TommyDee",
+        "players": [
+          {
+            "id": 4955361,
+            "tag": "TommyDee"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tournamentId": 966964,
+    "tournamentName": "SMASH ROYALE #49",
+    "slug": "tournament/smash-royale-49",
+    "startAt": 1792798200,
+    "numAttendees": 48,
+    "eventId": 1738931,
+    "eventName": "Redemption Bracket",
+    "numEntrants": 15,
+    "game": "Ultimate",
+    "eventSlug": "tournament/smash-royale-49/event/redemption-bracket",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "lmao | BORP!",
+        "players": [
+          {
+            "id": 3379702,
+            "tag": "BORP!"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "SCCS | Liam1283",
+        "players": [
+          {
+            "id": 2283224,
+            "tag": "Liam1283"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Spike Mike",
+        "players": [
+          {
+            "id": 3001665,
+            "tag": "Spike Mike"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "Humza",
+        "players": [
+          {
+            "id": 1493023,
+            "tag": "Humza"
           }
         ]
       }

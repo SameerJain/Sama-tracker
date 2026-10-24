@@ -30,6 +30,14 @@ function switchOption(name, description) {
   return { type: Option.String, name, description, choices: ON_OFF };
 }
 
+// a tracked tournament's own setting. default drops it, so the tournament follows /t-o settings again
+function overrideOption(name, description) {
+  return { type: Option.String, name, description, choices: [...ON_OFF, { name: 'default', value: 'default' }] };
+}
+
+// the /t-o settings switches a tracked tournament can override, which makes them the default for every tournament
+const TOURNAMENT_KINDS = ['sets', 'streams', 'calls', 'next', 'top8', 'registration'];
+
 // long-press a member, then Apps. these names are what the menu shows, so they can have capitals and spaces
 const MEMBER_H2H = 'H2H with me';
 const MEMBER_SCOUT = 'Scout them';
@@ -65,7 +73,9 @@ function venueOption() {
 }
 
 const SETTINGS_OPTIONS = [
-  ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({ type: Option.Boolean, name, description: `${label} on or off` })),
+  ...Object.entries(MESSAGE_TYPES).map(([name, label]) => ({
+    type: Option.Boolean, name, description: TOURNAMENT_KINDS.includes(name) ? `${label} on or off, the default for every tournament` : `${label} on or off`,
+  })),
   { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green win, red loss, gold crew vs crew, blue otherwise' },
   {
     type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
@@ -185,7 +195,7 @@ const commands = [
             description: 'Track every set, stream alert, results and top 8, plus registration reminders',
             options: [
               { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
-              switchOption('reminders', 'Reg reminders for people with /notify registration on. On unless you turn them off'),
+              switchOption('registration', 'Reg reminders and 1-hour DMs. Leave out to follow /t-o settings'),
               { type: Option.String, name: 'schedule', description: 'Custom reminder times, like 7d,3d,1d,6h. Leave out for the usual four' },
               switchOption('add_event', 'Also make a Discord event from it. Off unless you turn it on'),
             ],
@@ -199,14 +209,15 @@ const commands = [
           {
             type: Option.Subcommand,
             name: 'posts',
-            description: 'What a tracked tournament posts, on or off. Leave them all out to see them',
+            description: 'What one tracked tournament posts. default follows /t-o settings. Leave all out to see',
             options: [
               { type: Option.String, name: 'tournament', description: TRACKED_TOURNAMENT, required: true, autocomplete: true },
-              switchOption('sets', 'Every finished set, whoever played'),
-              switchOption('stream', 'Every set on stream or up next in the stream queue'),
-              switchOption('calls', 'Every called set, whoever played, even with no pings on'),
-              switchOption('top8', 'Each event\'s top 8 once the bracket is finished'),
-              switchOption('reminders', 'Reg reminders for people with /notify registration on'),
+              overrideOption('sets', 'Every finished set'),
+              overrideOption('streams', 'Every set on stream or up next in the stream queue'),
+              overrideOption('calls', 'Every set the TO calls on start.gg'),
+              overrideOption('next', 'Each next opponent once both players are known, round 1 left out'),
+              overrideOption('top8', 'Each event\'s top 8 once the bracket is finished'),
+              overrideOption('registration', 'Reg reminders, plus 1-hour DMs for people with /notify on'),
               { type: Option.String, name: 'schedule', description: 'Custom reminder times, like 7d,3d,1d,6h. default goes back to the usual four' },
             ],
           },

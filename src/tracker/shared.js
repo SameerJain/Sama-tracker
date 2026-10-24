@@ -3,7 +3,7 @@ import { RESTJSONErrorCodes } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state } from '../store.js';
-import { messageEnabled } from '../message-settings.js';
+import { messageEnabled, postsOn, TOURNAMENT_POSTS } from '../message-settings.js';
 
 export const SET_CHECK_MINUTES = 2;
 export const TOURNAMENT_CHECK_MINUTES = 15;
@@ -110,7 +110,7 @@ export const named = (tournament) => tournament.name ?? tournament.id;
 
 // whether a tracked tournament has this /t-o tournament posts switch on. untracked ones have none
 export function posting(tournament, kind) {
-  return Boolean(tournament?.tracked) && tournament.tracked[kind] !== false;
+  return Boolean(tournament?.tracked) && postsOn(kind, tournament);
 }
 
 // the tracked tournament a set is from. sets don't come with the tournament id, so it goes by slug
@@ -158,11 +158,11 @@ export function queued(check) {
 
 // fewest messages that fit discord's limits. the switch gets checked before each one in case it's turned off partway.
 // returns the messages that went out
-export async function post(list, type, dueAt, postChannel = currentChannel()) {
+export async function post(list, type, dueAt, postChannel = currentChannel(), tournament = null) {
   const sent = [];
   for (const batch of embeds.messages(list)) {
     // roll calls and placements name people but never ping them
-    if (messageEnabled(type, dueAt)) sent.push(await postChannel.send({ embeds: batch, allowedMentions: { parse: [] } }));
+    if (TOURNAMENT_POSTS.includes(type) ? postsOn(type, tournament, dueAt) : messageEnabled(type, dueAt)) sent.push(await postChannel.send({ embeds: batch, allowedMentions: { parse: [] } }));
   }
   return sent;
 }
@@ -188,11 +188,11 @@ export const mentionable = (id) => Boolean(id) && /^[\w-]+$/.test(String(id));
 export const mentions = (discordIds) => discordIds.filter(mentionable).map((id) => `<@${id}>`).join(' ');
 
 // the card and its buttons go with the first batch of pings, or alone if there's nobody to ping. the rest
-// stop if /t-o settings turns the type off partway through. returns the message with the card
-export async function sendPinging(postChannel, type, ids, text, embed, components = []) {
+// stop if stillOn says the switch was turned off partway through. returns the message with the card
+export async function sendPinging(postChannel, stillOn, ids, text, embed, components = []) {
   let first;
   for (let i = 0; i === 0 || i < ids.length; i += MENTIONS_PER_MESSAGE) {
-    if (i > 0 && !messageEnabled(type)) break;
+    if (i > 0 && !stillOn()) break;
     // ping lists come from discord, but the filter stays here so no caller can pass mention syntax through
     const users = ids.slice(i, i + MENTIONS_PER_MESSAGE).filter(mentionable);
     const sent = await postChannel.send({

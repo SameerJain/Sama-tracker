@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attendanceFlow, attendanceHistogram, attendanceRanking, bestWithoutTitle, charUsers, cumulativePlayers, crossSeries, favourites, headToHead, headToHeadSets, histogramBuckets, loyaltyTier, loyaltyTiers, matchupMatrix, periodRetention, podiumRates, returnRates, seasonality, titleSpread, ULTIMATE_ROSTER, wilson, winnersFromStandings } from '../series/shared/compute.mjs';
+import { attendanceFlow, attendanceHistogram, attendanceRanking, bestWithoutTitle, charUsers, cumulativePlayers, crossSeries, favourites, headToHead, headToHeadSets, histogramBuckets, loyaltyTier, loyaltyTiers, matchupMatrix, nightsAttended, periodRetention, podiumRates, returnRates, seasonality, titleSpread, ULTIMATE_ROSTER, wilson, winnersFromStandings } from '../series/shared/compute.mjs';
 import { growthLine, hbars, line } from '../series/shared/charts.mjs';
 import { clientModal, CLIENT_JS_UI, CLIENT_JS_SORT, CSS_EXTRA, filterInput, pageFooter, scrollTable, seriesSwitcher } from '../series/shared/page.mjs';
 import { unifyPlayers } from '../web/build.mjs';
@@ -43,6 +43,28 @@ test('attendance ranking counts a player once per night across an off week\'s br
   assert.deepEqual(ranked.map((p) => [p.tag, p.events, p.wins]), [['Ann', 2, 2], ['Bo', 1, 0], ['Cy', 1, 0]]);
   const flow = attendanceFlow(rows, (r) => r.tournamentId * 100);
   assert.deepEqual(flow.perEvent.map((r) => [r.entrants, r.first, r.second]), [[3, 3, 0], [1, 0, 1]]);
+});
+
+test('melee players count toward a night once, and only on nights that count', () => {
+  const ann = { name: 'Ann', players: [{ id: 1, tag: 'Ann' }] };
+  const bo = { name: 'Bo', players: [{ id: 2, tag: 'Bo' }] };
+  const cy = { name: 'Cy', players: [{ id: 3, tag: 'Cy' }] };
+  const bracket = [
+    { eventId: 10, tournamentId: 1, entrants: [ann] },
+    { tournamentId: 2, eventIds: [20], events: ['Off Week Singles'], entrants: [ann] },
+  ];
+  const melee = [
+    // Ann played both games the first night, Bo only melee
+    { eventId: 11, tournamentId: 1, entrants: [ann, bo] },
+    { eventId: 21, tournamentId: 2, entrants: [cy] },
+    // a club night with nothing but melee isn't a night of the series
+    { eventId: 31, tournamentId: 3, entrants: [ann, bo, cy] },
+  ];
+  const nights = nightsAttended(bracket, melee);
+  assert.deepEqual(nights.map((night) => [night.tournamentId, night.eventId ?? null, night.entrants.length]), [[1, 10, 3], [2, null, 2]]);
+  assert.deepEqual(attendanceRanking(nights).map((p) => [p.tag, p.events]), [['Ann', 2], ['Bo', 1], ['Cy', 1]]);
+  // the bracket rows stay as they were, for the stats about who entered the ultimate bracket
+  assert.deepEqual(bracket[0].entrants, [ann]);
 });
 
 test('return rates: first-time rate is per entry, later rates convert from the previous stage', () => {

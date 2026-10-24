@@ -436,6 +436,21 @@ async function fetchPlayer(interaction, input) {
   return player;
 }
 
+// a stat command's player box: someone picked from the list, whoever ran it when it's left out, or a start.gg profile
+// link or ID for anyone at all, tracked or not. a typed one gets looked up, which waits for the defer, so this defers
+// when it has to. a name that isn't anyone's gets the closest one suggested. null once it answered
+async function statPlayer(interaction, name = 'player') {
+  const picked = readPlayer(interaction, name);
+  if (picked) return picked;
+  const typed = interaction.options.getString(name);
+  if (typed === null) {
+    await replyNoPlayer(interaction, name);
+    return null;
+  }
+  if (!interaction.deferred) await interaction.deferReply();
+  return fetchPlayer(interaction, typed);
+}
+
 // an ephemeral reply that works after deferring too: the thinking reply gets dropped and the answer
 // goes out as its own ephemeral follow-up, since editing would put it in the channel for everyone
 async function replyEphemeralAfterDefer(interaction, content) {
@@ -449,7 +464,7 @@ const flag = (interaction, name) => interaction.options.getBoolean(name) ?? fals
 
 export {
   pickable, readChoice, readPlayer, readTracked, linkedPlayer, isSelf, lookup, nameMatches, didYouMean, recentPicks, rememberPick,
-  findPlayer, fetchPlayer, playerBySlug, flag, parseSince,
+  findPlayer, fetchPlayer, statPlayer, playerBySlug, flag, parseSince,
   sendEmbeds, withCountdown, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, replyNotTracked, failureMessage,
   reportButton, fullReport, h2hButton, buttonRow, readButton, commandLabel, roughly, LATE_SECONDS, t, count, listOf, language,
 };

@@ -28,8 +28,10 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // with it, for /t-o role list, and seeded whether the first TO got it.
 //
 // tournaments are keyed by id: the ones tracked players are in, and tracked ones.
-//   tracked: { by, at, sets, stream, top8, reminders, calls, schedule } says it's tracked. by is 'manual', or 'admin'
-//   from before the TO role, and the rest are its /t-o tournament posts switches. schedule is the TO's own reminder
+//   tracked: { by, at, posts, onAt, schedule } says it's tracked. by is 'manual', or 'admin' from before the TO role.
+//   posts holds only what a TO changed with /t-o tournament posts, { sets, streams, calls, next, top8, registration }
+//   as booleans. a kind left out follows the server's /t-o settings, live. onAt is when each override was turned on,
+//   in unix seconds, so what came due before then stays skipped. schedule is the TO's own reminder
 //   times in hours before registration closes, most first, left out for the default.
 //   reminder: { deadline, next } is its reg reminder progress, next being the index into that schedule.
 //   dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for.
@@ -53,6 +55,8 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // { id, at, channelId, messageId, pinned }. the last three are its card in the channel, pinned saying if the pin
 // worked, so it comes off once the tournament or event is over.
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete.
+// nextPings are discord ids with /notify next on. nextPosted are the set ids whose next opponent card went out
+// (1000 kept), and nextPosts the cards still watched for 60 minutes: { setId, channelId, messageId, at } (200 kept).
 // buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }.
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, with
 // outcome being startgg.outcomeOf when it was last shown.
@@ -88,6 +92,7 @@ const emptyGuild = {
   socials: [], messages: {}, weeklyRecap: null,
   slippi: {}, slippiSkipped: [], slippiWrapped: [],
   threads: {}, recentPicks: {}, buttons: [], resultPosts: [], callPosts: [], streamPinged: [], regWarned: [], billsPosted: [],
+  nextPings: [], nextPosted: [], nextPosts: [],
   matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
 };
 

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
-import { getActivePlayers, getCharacterSets, getEventHistory, getEventSets, getHeadToHead, getSetHistory, getStats, queueLength } from '../src/startgg.js';
+import {
+  UNPLAYED_STATES, getActivePlayers, getCharacterSets, getEventHistory, getEventSets, getHeadToHead, getNextSets, getSetHistory, getSetPairings, getStats,
+  getUnplayedEventSets, queueLength,
+} from '../src/startgg.js';
 import { predict } from '../src/predict.js';
 import { settle } from './fixtures.js';
 
@@ -310,4 +313,66 @@ test('a tracked tournament\'s events share one request for new sets, and an even
   assert.deepEqual(asked, ['events 601,602 since 500', 'event 601 page 2 of 10']);
   assert.equal(sets.length, 11);
   assert.deepEqual(sets.map((each) => each.id).slice(-2), ['a9', 'a10']);
+});
+
+test('getNextSets asks for unplayed sets and keeps only filled ones', async () => {
+  const requests = [];
+  const filled = { id: 501, state: 1, round: 2, fullRoundText: 'Winners Round 2', phaseGroup: { id: 77 }, station: { number: 3 }, event: { ...event, tournament: { name: 'T', startAt: 100, endAt: 200 } }, slots };
+  const open = { id: 502, state: 1, round: 3, event, slots: [slots[0], { entrant: null }] };
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    requests.push(body);
+    return { ok: true, json: async () => ({ data: { p10: { sets: { nodes: [filled, open] } } } }) };
+  };
+
+  const sets = await settle(getNextSets([10]));
+  assert.deepEqual(sets.map((set) => [set.id, set.roundNumber, set.state]), [['501', 2, 1]]);
+  assert.equal(sets[0].groupId, 77);
+  assert.equal(sets[0].station, 3);
+  assert.deepEqual(sets[0].event.tournament.startAt, 100);
+  assert.deepEqual(sets[0].event.tournament.endAt, 200);
+  assert.deepEqual(requests[0].variables.filters, { state: [1, 4, 6, 7] });
+  assert.deepEqual(UNPLAYED_STATES, [1, 4, 6, 7]);
+  const text = requests[0].query;
+  assert.match(text, /perPage:\s*4/);
+  for (const field of ['round', 'phaseGroup { id }', 'startAt', 'station', 'startAt endAt']) assert.ok(text.includes(field), field);
+  for (const field of ['games', 'vodUrl', 'standing']) assert.ok(!text.includes(field), field);
+});
+
+test('getNextSets dedupes a set both players share', async () => {
+  const node = { id: 9, state: 6, round: 1, event, slots };
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { sets: { nodes: [node] } }, p20: { sets: { nodes: [node] } } } }) });
+  assert.deepEqual((await settle(getNextSets([10, 20]))).map((set) => set.id), ['9']);
+});
+
+test('getUnplayedEventSets reads every page at 40 a page', async () => {
+  const requests = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    requests.push({ query, variables });
+    const page = variables.page ?? 1;
+    const nodes = [{ id: page * 10, state: 1, round: page, event, slots }];
+    return { ok: true, json: async () => ({ data: { e601: { sets: { pageInfo: { totalPages: 2 }, nodes } }, event: { sets: { pageInfo: { totalPages: 2 }, nodes } } } }) };
+  };
+
+  const sets = await settle(getUnplayedEventSets([601]));
+  assert.deepEqual(sets.map((set) => set.id), ['10', '20']);
+  assert.equal(requests.length, 2);
+  assert.match(requests[0].query, /perPage:\s*40/);
+  assert.equal(requests[1].variables.perPage, 40);
+  assert.deepEqual(requests[0].variables.filters, { state: [1, 4, 6, 7], showByes: false });
+  assert.ok(!requests[0].query.includes('games'));
+});
+
+test('getSetPairings gives each set its players by side, null once deleted', async () => {
+  let text;
+  globalThis.fetch = async (_url, options) => {
+    text = JSON.parse(options.body).query;
+    const side = (id) => ({ entrant: { participants: [{ player: { id } }] } });
+    return { ok: true, json: async () => ({ data: { s501: { state: 1, slots: [side(10), side(20)] }, s502: null } }) };
+  };
+  const pairings = await settle(getSetPairings(['501', '502']));
+  assert.deepEqual(pairings.get('501'), { state: 1, playerIds: [[10], [20]] });
+  assert.equal(pairings.get('502'), null);
+  assert.equal((text.match(/query/g) ?? []).length, 1);
 });

@@ -135,7 +135,8 @@ function settingsText() {
   if (isMultiGuild()) lines.push(state.channelId ? t`**Posts channel:** <#${state.channelId}>` : t('**Posts channel:** not set'));
   lines.push('', t('**Weekly recap**'),
     t`**Posts:** ${onOff(settings.recap)} · **Day and time:** ${t(WEEKDAYS[settings.recapDay])} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
-    t('-# Posts missed while a message type is off won\'t be sent when you turn it back on. Recap schedule changes apply to future recaps.'),
+    t('-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.'),
+    t('-# Stream alerts, match calls and next opponents still going on post when switched back on. Anything else missed while off stays skipped. Recap schedule changes apply to future recaps.'),
     t('-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events'),
     t('-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.'),
     t('-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.'),

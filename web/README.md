@@ -52,9 +52,10 @@ node web/build.mjs
 
 A third Vercel project rooted at `web/`, live at
 https://samatracker.vercel.app (like the two series projects are rooted at
-their folders). `node series/refresh.mjs --deploy-only` redeploys all three;
-its address lives in `HUB.url` in `series/configs.mjs`, which the series
-switchers link at.
+their folders). Every `node series/refresh.mjs` run that refreshes a series
+deploys it with them, and `node series/refresh.mjs --deploy-only` redeploys
+all three as they are. Its address lives in `HUB.url` in
+`series/configs.mjs`, which the series switchers link at.
 
 ## More analysis ideas (not built yet)
 

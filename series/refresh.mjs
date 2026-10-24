@@ -9,8 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { searchTournaments, getEvents, getTop4, getEntrants, getCharGames, OFFWEEK_SINGLES_RE } from './shared/scrape.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { searchTournaments, getEvents, getTournament, getTop4, getEntrants, getCharGames, OFFWEEK_SINGLES_RE } from './shared/scrape.mjs';
 import { HUB } from './configs.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -50,8 +50,10 @@ function dueNow(cfg, lastRunMs, now = new Date()) {
   return { due: false, why: `last run ${lastYmd}, next ${day} ${cfg.schedule.hour}:00 ${cfg.schedule.tz}` };
 }
 
-async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
-  const dir = path.join(ROOT, cfg.researchDir);
+// one series: discover new nights, recheck recent ones, save, rebuild and deploy. researchDir and build resolve from
+// the repo root, so an absolute path works too
+export async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
+  const dir = path.resolve(ROOT, cfg.researchDir);
   const tourEvents = readJSON(path.join(dir, 'tournaments-events.json'), []);
   // a series without tournaments.json gets its list from tournaments-events
   const tournaments = readJSON(path.join(dir, 'tournaments.json'), tourEvents.map(({ events, ...t }) => t));
@@ -61,7 +63,6 @@ async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
   const offweekAttendance = readJSON(path.join(dir, 'attendance-offweek.json'), []);
   const haveT = new Set(tourEvents.map((t) => t.id));
   const haveOff = new Set(offweekTournaments.map((t) => t.id));
-  const haveS = new Set(standings.map((s) => s.eventId));
   const nowSec = Math.floor(Date.now() / 1000);
   const nameRe = new RegExp(cfg.discover.nameRe, 'i');
   const offWeekRe = cfg.offWeekNameRe ? new RegExp(cfg.offWeekNameRe, 'i') : null;
@@ -86,7 +87,7 @@ async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
   console.log(`[${slug}] new tournaments: ${found.length}${dryRun ? ' (dry run, skipped scan)' : ''}`);
   for (const t of found) console.log('  +', new Date(t.startAt * 1000).toISOString().slice(0, 10), t.id, t.name);
 
-  const newTourEvents = [], newStandings = [], newAttendance = [], newChars = [], newOffweekTournaments = [], newOffweekAttendance = [], newOffweekChars = [];
+  const newTourEvents = [], newStandings = [], newAttendance = [], newMelee = [], newChars = [], newOffweekTournaments = [], newOffweekAttendance = [], newOffweekChars = [];
   // one event's sets and character games, the row shape of chars-by-event.jsonl and offweek-chars-by-event.jsonl
   const charRow = async (t, e) => {
     const { totalSets, sets, games, gamesTotal, setsWithChars, gamesPlayed } = await getCharGames(e.id);
@@ -95,98 +96,90 @@ async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
       eventName: e.name, numEntrants: e.numEntrants, totalSets, gamesReported: games.length, gamesTotal, setsWithChars, gamesPlayed, sets, games,
     };
   };
+  // everyone in a night's melee events, so melee players count toward attendance too. picked by game, not name,
+  // since TOs call them Melee Singles, Melee, Melee Stampede or an amateur bracket
+  const meleeAttendance = async (t, events) => {
+    for (const e of events) {
+      if (e.videogame?.id === 1 && (e.numEntrants ?? 0) > 0) newMelee.push({ eventId: e.id, tournamentId: t.id, entrants: await getEntrants(e.id) });
+    }
+  };
+  const mainEventRe = new RegExp(cfg.mainEventRe, 'i');
+  // a main night's standings, attendance and character games. a night just found and a recent one getting
+  // rechecked both come here, so a night saved before it ran gets all of it again once it has
+  const scrapeNight = async (t) => {
+    for (const e of t.events) {
+      if (cfg.skipGames.includes(e.videogame?.displayName ?? '')) continue;
+      if ((e.numEntrants ?? 0) >= (cfg.standingsMinEntrants ?? 0)) newStandings.push(standingsRow(t, e, await getTop4(e.id)));
+    }
+    for (const e of t.events) {
+      if (mainEventRe.test(e.name) && cfg.entrantsEventsRes.some((re) => new RegExp(re, 'i').test(e.name))) {
+        newAttendance.push({ eventId: e.id, tournamentId: t.id, entrants: await getEntrants(e.id) });
+      }
+    }
+    for (const e of t.events) {
+      if (cfg.charEventsRes.some((re) => new RegExp(re, 'i').test(e.name))) newChars.push(await charRow(t, e));
+    }
+    await meleeAttendance(t, t.events);
+  };
+  // an off-week club night: attendance, never its brackets' standings or character stats. a redemption bracket
+  // that reported standings is the one exception, so its winner can join the redemption ranking, and its real
+  // singles bracket's sets go in their own file, for the off-weeks layer on rivalries. a night with no ultimate
+  // gives null, since melee-only club nights stay out. meleeCheckedAt tells the backfill its melee is in
+  const scrapeOffweek = async (t, events) => {
+    const counted = events.filter((e) => e.videogame?.id === 1386 && (e.numEntrants ?? 0) > 0);
+    if (!counted.length) return null;
+    const entrants = [], eventIds = [], eventNames = [];
+    for (const e of counted) {
+      entrants.push(...await getEntrants(e.id));
+      eventIds.push(e.id);
+      eventNames.push(e.name);
+      if (/redemption/i.test(e.name)) {
+        const top = await getTop4(e.id);
+        if (top.length) newStandings.push(standingsRow(t, e, top));
+      }
+      if (OFFWEEK_SINGLES_RE.test(e.name)) newOffweekChars.push(await charRow(t, e));
+    }
+    await meleeAttendance(t, events);
+    return { tournamentId: t.id, eventIds, events: eventNames, entrants, meleeCheckedAt: Math.floor(Date.now() / 1000) };
+  };
   for (const t of found) {
     if (dryRun) continue;
     const events = await getEvents(t.id);
     if (!nameRe.test(t.name)) {
-      // off-week club night: attendance, never its brackets' standings or
-      // character stats. a redemption bracket that reported standings is the
-      // one exception, so its winner can join the redemption ranking. its real
-      // singles bracket's sets go in their own file, for the off-weeks layer
-      // on rivalries
-      const counted = events.filter((e) => e.videogame?.id === 1386 && (e.numEntrants ?? 0) > 0);
-      if (!counted.length) continue; // melee-only club nights stay out
-      const entrants = [], eventIds = [], eventNames = [];
-      for (const e of counted) {
-        entrants.push(...await getEntrants(e.id));
-        eventIds.push(e.id);
-        eventNames.push(e.name);
-        if (/redemption/i.test(e.name)) {
-          const top = await getTop4(e.id);
-          if (top.length) newStandings.push(standingsRow(t, e, top));
-        }
-        if (OFFWEEK_SINGLES_RE.test(e.name)) newOffweekChars.push(await charRow(t, e));
-      }
+      const row = await scrapeOffweek(t, events);
+      if (!row) continue;
       newOffweekTournaments.push({ ...t });
-      newOffweekAttendance.push({ tournamentId: t.id, eventIds, events: eventNames, entrants });
+      newOffweekAttendance.push(row);
       continue;
     }
-    newTourEvents.push({ ...t, events });
-    for (const e of events) {
-      const game = e.videogame?.displayName ?? '';
-      if (cfg.skipGames.includes(game)) continue;
-      if ((e.numEntrants ?? 0) >= (cfg.standingsMinEntrants ?? 0)) {
-        const top = await getTop4(e.id);
-        newStandings.push(standingsRow(t, e, top));
-      }
-    }
-    for (const e of events) {
-      if (!new RegExp(cfg.mainEventRe, 'i').test(e.name)) continue;
-      if (cfg.entrantsEventsRes.some((re) => new RegExp(re, 'i').test(e.name))) {
-        const entrants = await getEntrants(e.id);
-        newAttendance.push({ eventId: e.id, tournamentId: t.id, entrants });
-      }
-    }
-    for (const e of events) {
-      if (!cfg.charEventsRes.some((re) => new RegExp(re, 'i').test(e.name))) continue;
-      newChars.push(await charRow(t, e));
-    }
+    const night = { ...t, events };
+    newTourEvents.push(night);
+    await scrapeNight(night);
   }
 
-  // TOs fix results after the night, so recent tournaments get their standings, sets and character games
-  // again. sets need it anyway, since the scan can find a night the day before it runs
+  // TOs fix results after the night, and the scan reaches a day ahead, so it can save a night before it runs, with
+  // the entrants registered by then. so recent nights get start.gg's counts and events again, then their standings,
+  // attendance and character games
   const cutoff = nowSec - (cfg.recheckDays ?? 45) * 86400;
   const recent = tourEvents.filter((t) => t.startAt >= cutoff);
   console.log(`[${slug}] recheck: ${recent.length} tournaments in last ${cfg.recheckDays ?? 45}d`);
   let refreshed = 0;
   let offweekDirty = false;
   if (!dryRun) {
-    for (const t of recent) {
-      for (const e of t.events ?? []) {
-        if (cfg.skipGames.includes(e.videogame?.displayName ?? '')) continue;
-        if ((e.numEntrants ?? 0) < (cfg.standingsMinEntrants ?? 0)) continue;
-        const top = await getTop4(e.id);
-        const row = standingsRow(t, e, top);
-        const ix = standings.findIndex((s) => s.eventId === e.id);
-        if (ix >= 0) standings[ix] = row; else standings.push(row);
-        refreshed++;
-      }
-      for (const e of t.events ?? []) {
-        if (cfg.charEventsRes.some((re) => new RegExp(re, 'i').test(e.name))) newChars.push(await charRow(t, e));
-      }
+    for (const saved of recent) {
+      const fresh = await getTournament(saved.id);
+      // gone from start.gg, so what was saved stays
+      if (!fresh) continue;
+      const night = { ...saved, ...fresh, id: saved.id, events: fresh.events ?? [] };
+      newTourEvents.push(night);
+      await scrapeNight(night);
+      refreshed++;
     }
-    // recent off weeks get the same TO-correction pass, attendance + redemption only
+    // recent off weeks get the same TO-correction pass
     for (const t of offweekTournaments.filter((x) => x.startAt >= cutoff)) {
-      const counted = (await getEvents(t.id)).filter((e) => e.videogame?.id === 1386 && (e.numEntrants ?? 0) > 0);
-      if (!counted.length) continue;
-      const entrants = [], eventIds = [], eventNames = [];
-      for (const e of counted) {
-        entrants.push(...await getEntrants(e.id));
-        eventIds.push(e.id);
-        eventNames.push(e.name);
-        if (/redemption/i.test(e.name)) {
-          const top = await getTop4(e.id);
-          if (top.length) {
-            const row = standingsRow(t, e, top);
-            const ix = standings.findIndex((s) => s.eventId === e.id);
-            if (ix >= 0) standings[ix] = row; else standings.push(row);
-          }
-        }
-        if (OFFWEEK_SINGLES_RE.test(e.name)) newOffweekChars.push(await charRow(t, e));
-      }
-      const row = { tournamentId: t.id, eventIds, events: eventNames, entrants };
-      const ix = offweekAttendance.findIndex((r) => r.tournamentId === t.id);
-      if (ix >= 0) offweekAttendance[ix] = row; else offweekAttendance.push(row);
+      const row = await scrapeOffweek(t, await getEvents(t.id));
+      if (!row) continue;
+      newOffweekAttendance.push(row);
       offweekDirty = true;
       refreshed++;
     }
@@ -196,7 +189,9 @@ async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
 
   // a freshly scraped row replaces the saved one
   const byId = (rows, key) => [...new Map(rows.map((r) => [r[key], r])).values()];
-  const mergedT = byId([...tournaments, ...mainFound], 'id').sort((a, b) => a.startAt - b.startAt);
+  // tournaments.json has no events, and keeps anything only its first scrape had, like owner
+  const nights = new Map(newTourEvents.map(({ events, ...t }) => [t.id, t]));
+  const mergedT = byId([...tournaments, ...mainFound], 'id').map((t) => ({ ...t, ...nights.get(t.id) })).sort((a, b) => a.startAt - b.startAt);
   const mergedTE = byId([...tourEvents, ...newTourEvents], 'id').sort((a, b) => a.startAt - b.startAt);
   const mergedS = byId([...standings, ...newStandings], 'eventId').sort((a, b) => a.startAt - b.startAt);
   writeJSON(path.join(dir, 'tournaments.json'), mergedT);
@@ -205,6 +200,10 @@ async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
   if (newAttendance.length) {
     const mergedA = byId([...attendance, ...newAttendance], 'eventId');
     writeJSON(path.join(dir, 'attendance-ultimate.json'), mergedA);
+  }
+  if (newMelee.length) {
+    const meleeFile = path.join(dir, 'attendance-melee.json');
+    writeJSON(meleeFile, byId([...readJSON(meleeFile, []), ...newMelee], 'eventId'));
   }
   if (newOffweekTournaments.length || offweekDirty) {
     writeJSON(path.join(dir, 'offweek-tournaments.json'), byId([...offweekTournaments, ...newOffweekTournaments], 'id').sort((a, b) => a.startAt - b.startAt));
@@ -221,44 +220,47 @@ async function runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs = null }) {
 
   // the build runs the data checks too
   console.log(`[${slug}] rebuild: node ${cfg.build}`);
-  const res = spawnSync(process.execPath, [path.join(ROOT, cfg.build)], { cwd: ROOT, stdio: 'inherit' });
+  const res = spawnSync(process.execPath, [path.resolve(ROOT, cfg.build)], { cwd: ROOT, stdio: 'inherit' });
   if (res.status !== 0) throw new Error(`build failed for ${slug}`);
   deploy(slug, cfg, { noDeploy });
   return { newTournaments: found.length, refreshed };
 }
 
-const args = process.argv.slice(2);
-const slugArg = args.find((a) => !a.startsWith('--'));
-if (slugArg && !REG[slugArg]) { console.error(`unknown series "${slugArg}" (known: ${Object.keys(REG).join(', ')})`); process.exit(1); }
-const only = slugArg;
-const force = args.includes('--now');
-const dryRun = args.includes('--dry-run');
-const noDeploy = args.includes('--no-deploy');
-const deployOnly = args.includes('--deploy-only');
-const state = readJSON(STATE_FILE, {});
-const slugs = only ? [only] : Object.keys(REG);
-let ran = false;
-for (const slug of slugs) {
-  const cfg = REG[slug];
-  if (deployOnly) { deploy(slug, cfg, { dryRun, noDeploy }); ran = true; continue; }
-  const lastRun = state[slug]?.lastRun ?? null;
-  const { due, why } = force ? { due: true, why: '--now' } : dueNow(cfg, lastRun);
-  console.log(`[${slug}] schedule: day ${cfg.schedule.day} ${cfg.schedule.hour}:00 ${cfg.schedule.tz}: ${due ? 'DUE' : 'skip'} (${why})`);
-  if (!due) continue;
-  ran = true;
-  const stats = await runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs: lastRun });
-  if (!dryRun) {
-    state[slug] = { lastRun: Date.now(), ...stats };
-    writeJSON(STATE_FILE, state);
+// run as a script. a test imports runSeries without running anything
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const args = process.argv.slice(2);
+  const slugArg = args.find((a) => !a.startsWith('--'));
+  if (slugArg && !REG[slugArg]) { console.error(`unknown series "${slugArg}" (known: ${Object.keys(REG).join(', ')})`); process.exit(1); }
+  const only = slugArg;
+  const force = args.includes('--now');
+  const dryRun = args.includes('--dry-run');
+  const noDeploy = args.includes('--no-deploy');
+  const deployOnly = args.includes('--deploy-only');
+  const state = readJSON(STATE_FILE, {});
+  const slugs = only ? [only] : Object.keys(REG);
+  let ran = false;
+  for (const slug of slugs) {
+    const cfg = REG[slug];
+    if (deployOnly) { deploy(slug, cfg, { dryRun, noDeploy }); ran = true; continue; }
+    const lastRun = state[slug]?.lastRun ?? null;
+    const { due, why } = force ? { due: true, why: '--now' } : dueNow(cfg, lastRun);
+    console.log(`[${slug}] schedule: day ${cfg.schedule.day} ${cfg.schedule.hour}:00 ${cfg.schedule.tz}: ${due ? 'DUE' : 'skip'} (${why})`);
+    if (!due) continue;
+    ran = true;
+    const stats = await runSeries(slug, cfg, { dryRun, noDeploy, lastRunMs: lastRun });
+    if (!dryRun) {
+      state[slug] = { lastRun: Date.now(), ...stats };
+      writeJSON(STATE_FILE, state);
+    }
   }
+  // the hub bundle reads the rebuilt series data, so it rebuilds with them, and deploys with the rest once
+  // HUB.url names its Vercel project
+  if (ran && !dryRun && !deployOnly) {
+    console.log('[web-hub] rebuild: node web/build.mjs');
+    const res = spawnSync(process.execPath, [path.join(ROOT, 'web', 'build.mjs')], { cwd: ROOT, stdio: 'inherit' });
+    if (res.status !== 0) throw new Error('build failed for web-hub');
+  }
+  if (ran && HUB?.url) deploy('web-hub', HUB, { dryRun, noDeploy });
+  else if (ran) console.log('[web-hub] deploy: skipped (no HUB.url yet. link the web/ Vercel project first, see web/README.md)');
+  if (!ran) console.log('nothing due. use --now to force, --dry-run to preview.');
 }
-// the hub bundle reads the rebuilt series data, so it refreshes with them.
-// the hub deploys with the rest once HUB.url names its Vercel project
-if (ran && !dryRun && !deployOnly) {
-  console.log('[web-hub] rebuild: node web/build.mjs');
-  const res = spawnSync(process.execPath, [path.join(ROOT, 'web', 'build.mjs')], { cwd: ROOT, stdio: 'inherit' });
-  if (res.status !== 0) throw new Error('build failed for web-hub');
-}
-if (deployOnly && HUB?.url) deploy('web-hub', HUB, { dryRun, noDeploy });
-else if (deployOnly) console.log('[web-hub] deploy: skipped (no HUB.url yet. link the web/ Vercel project first, see web/README.md)');
-if (!ran) console.log('nothing due. use --now to force, --dry-run to preview.');

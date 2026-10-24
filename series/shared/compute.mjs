@@ -47,7 +47,7 @@ export function streaksFromStandings(rows) {
   return runs.filter((r) => r.n >= 2).sort((a, b) => b.n - a.n).slice(0, 5);
 }
 
-// events entered per player from entrant lists. rows: [{ entrants: [{ name, players: [{ id, tag }] }] }]
+// nights per player from entrant lists, once per row. rows: [{ entrants: [{ name, players: [{ id, tag }] }] }]
 export function attendanceRanking(rows, winsById = {}) {
   const entered = {};
   for (const r of rows) {
@@ -64,6 +64,20 @@ export function attendanceRanking(rows, winsById = {}) {
   return Object.entries(entered)
     .map(([id, v]) => { const names = [...v.names].sort((a, b) => b.length - a.length); return { id, tag: names[0], names, events: v.events, wins: winsById[id] ?? 0 }; })
     .sort((a, b) => b.events - a.events || a.tag.localeCompare(b.tag));
+}
+
+// who came each night, one row per tournament: its ultimate bracket or off-week brackets, plus anyone in a melee
+// event that night. someone in more than one is still there once, since every count here goes per row. melee
+// rows only join a night already counted, so a club night that ran nothing but melee stays out
+export function nightsAttended(bracketRows, meleeRows = []) {
+  const nights = new Map();
+  for (const r of bracketRows) {
+    const night = nights.get(r.tournamentId);
+    if (night) night.entrants.push(...r.entrants);
+    else nights.set(r.tournamentId, { ...r, entrants: [...r.entrants] });
+  }
+  for (const r of meleeRows) nights.get(r.tournamentId)?.entrants.push(...r.entrants);
+  return [...nights.values()];
 }
 
 // newcomers per edition + first/last dates per player. needs startAt per row
@@ -95,7 +109,7 @@ export function newcomers(rows, startAtOf) {
   return { first, perEdition };
 }
 
-// loyalty tiers by events entered. histogram buckets below never cross a tier
+// loyalty tiers by nights attended. histogram buckets below never cross a tier
 // boundary, so each bucket bar can take its tier's colour
 export const LOYALTY_TIERS = [
   { id: 'one-timer', label: 'One-timer', min: 1, max: 1, color: '#9e9e9e' },

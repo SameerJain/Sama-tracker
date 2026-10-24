@@ -8,7 +8,7 @@ import { setResultColors } from '../message-settings.js';
 import { count } from '../embeds/shared.js';
 import {
   buttonRow, findPlayer, flag, h2hButton, isSelf, linkedPlayer, readChoice, readPlayer, readTracked, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer,
-  replyNotTracked, sendEmbeds, t, listOf,
+  replyNotTracked, sendEmbeds, statPlayer, t, listOf,
 } from './shared.js';
 import { askFirst, confirmable, undoRow } from './confirm.js';
 import { isTO, notTO } from './to.js';
@@ -243,8 +243,9 @@ async function profile(interaction) {
 
 // tracked tournaments with whoever from the crew is going, and any other one 3 or more tracked players are in
 async function upcoming(interaction) {
-  const choice = readChoice(interaction);
-  if (!choice) return replyNoPlayer(interaction);
+  // all, someone from the list, or a start.gg profile link or ID for anyone
+  const choice = readChoice(interaction) ?? await statPlayer(interaction);
+  if (!choice) return null;
   // only tracked players' tournaments are saved
   if (choice !== 'all' && !state.players[choice.userId]) return upcomingFor(interaction, choice);
 
@@ -276,7 +277,7 @@ async function upcoming(interaction) {
 
 // someone from /link, straight from start.gg
 async function upcomingFor(interaction, player) {
-  await interaction.deferReply();
+  if (!interaction.deferred) await interaction.deferReply();
   const [[, found]] = await startgg.getUpcomingTournaments([player.userId]);
   const tournaments = [];
   for (const { id } of found) {
@@ -289,10 +290,11 @@ async function upcomingFor(interaction, player) {
 }
 
 async function recent(interaction) {
-  const choice = readChoice(interaction);
-  if (!choice) return replyNoPlayer(interaction);
+  // all, someone from the list, or a start.gg profile link or ID for anyone
+  const choice = readChoice(interaction) ?? await statPlayer(interaction);
+  if (!choice) return null;
 
-  await interaction.deferReply();
+  if (!interaction.deferred) await interaction.deferReply();
   // the latest 20 sets come from whoever played last, no need to ask about everyone.
   // the set check keeps lastSetAt fresh only for players with results on, so they go first
   const asking = choice === 'all'
@@ -337,10 +339,10 @@ function h2hButtons(player, sets) {
 }
 
 async function run(interaction) {
-  const player = readPlayer(interaction);
-  if (!player) return replyNoPlayer(interaction);
+  const player = await statPlayer(interaction);
+  if (!player) return null;
 
-  await interaction.deferReply();
+  if (!interaction.deferred) await interaction.deferReply();
   const now = secondsNow();
   // the saved ones too, in case start.gg's upcoming list drops one that's running late
   const [[, upcoming]] = await startgg.getUpcomingTournaments([player.userId]);

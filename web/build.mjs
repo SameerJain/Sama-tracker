@@ -4,7 +4,7 @@
 import { copyFileSync, readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { charCounts, crossSeries, headToHeadSets } from '../series/shared/compute.mjs';
+import { charCounts, crossSeries, headToHeadSets, nightsAttended } from '../series/shared/compute.mjs';
 
 // every ultimate singles bracket is this in the builder (series/shared/site.mjs)
 const MAIN_RE = /ultimate singles|^smash ultimate$/i;
@@ -84,9 +84,12 @@ export function buildHub() {
       dateOf[t.id] = t.startAt ?? 0;
     }
     // per-tournament entrant lists live in the research scrape, not the viewer
-    // data. one entry per player per night, the same way the viewer counts it
+    // data. one entry per player per night, melee included, the same way the viewer counts it
     const rdir = path.join(ROOT, reg.researchDir);
-    const entrantRows = [...readJson(path.join(rdir, 'attendance-ultimate.json'), []), ...readJson(path.join(rdir, 'attendance-offweek.json'), [])];
+    const entrantRows = nightsAttended(
+      [...readJson(path.join(rdir, 'attendance-ultimate.json'), []), ...readJson(path.join(rdir, 'attendance-offweek.json'), [])],
+      readJson(path.join(rdir, 'attendance-melee.json'), []),
+    );
     for (const row of entrantRows) {
       const seen = new Set();
       for (const e of row.entrants) for (const p of e.players ?? []) {
