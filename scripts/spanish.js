@@ -107,6 +107,34 @@ export function keysIn(source) {
   return keys;
 }
 
+// t(NOT_LINKED) or t(WARNINGS[i]) looks up text kept in a constant, so every line in its value counts. only names
+// in caps, the way the code names constants, and only ones made in the same file
+export function constantKeysIn(source) {
+  const keys = [];
+  const names = new Set([...source.matchAll(/(?<![\w$.'\\])t\(([A-Z][A-Z0-9_]*)\b/g)].map((match) => match[1]));
+  for (const name of names) {
+    const at = source.search(new RegExp(`\\bconst ${name}\\s*=`));
+    if (at === -1) continue;
+    const start = source.indexOf('=', at) + 1;
+    let end = start;
+    // to the ; that ends the declaration, past any strings with one in them
+    while (source[end] !== ';') {
+      if ('\'"`'.includes(source[end])) end = source[end] === '`' ? readTemplate(source, end).end : skipString(source, end);
+      else end += 1;
+    }
+    for (let i = start; i < end;) {
+      if (source[i] === '\'' || source[i] === '"') {
+        const close = skipString(source, i);
+        keys.push(cook(source.slice(i, close)));
+        i = close;
+      } else {
+        i += 1;
+      }
+    }
+  }
+  return keys;
+}
+
 // every word a count(n, 'word') in this source needs a spanish singular and plural for
 export function nounsIn(source) {
   const words = [];
@@ -131,12 +159,12 @@ function sourceFiles(dir) {
 export function scan() {
   return sourceFiles(SRC).map((path) => {
     const source = readFileSync(path, 'utf8');
-    return { file: relative(ROOT, path).replaceAll('\\', '/'), keys: keysIn(source), nouns: nounsIn(source) };
+    return { file: relative(ROOT, path).replaceAll('\\', '/'), keys: [...keysIn(source), ...constantKeysIn(source)], nouns: nounsIn(source) };
   });
 }
 
 // what's missing, what's unused, and spanish that adds a value the english doesn't have. dynamic is the keys
-// t gets from a variable, like the /settings labels, which no t`` in src spells out
+// t gets from a variable, like the /t-o settings labels, which no t`` in src spells out
 export function check(es, nouns, dynamic = []) {
   const files = scan();
   const used = new Set([...files.flatMap(({ keys }) => keys), ...dynamic]);
@@ -154,10 +182,14 @@ export function check(es, nouns, dynamic = []) {
 }
 
 // what t and commandsFor get from variables: every description and choice in the commands, the Apps menu
-// names, and the /settings labels. the multi-server commands, which have everything the single-server ones do
+// names, the /t-o settings labels, discord's permission names, the fun commands' lines and the Bills post titles.
+// the multi-server commands, which have everything the single-server ones do
 export async function dynamicKeys() {
   const { commands } = await import('../src/commands/definitions.js');
   const { MESSAGE_TYPES, THREAD_MODES, WEEKDAYS } = await import('../src/message-settings.js');
+  const { POSTING_PERMISSIONS, THREAD_PERMISSIONS } = await import('../src/tracker/shared.js');
+  const { funCommands } = await import('../src/fun/index.js');
+  const { TITLES } = await import('../src/fun/bills.js');
   const keys = [];
   const walk = (item) => {
     keys.push(item.description ?? item.name);
@@ -165,13 +197,19 @@ export async function dynamicKeys() {
     for (const option of item.options ?? []) walk(option);
   };
   commands.forEach(walk);
-  return [...new Set([...keys, ...Object.values(MESSAGE_TYPES), ...Object.values(THREAD_MODES), ...WEEKDAYS])];
+  return [...new Set([
+    ...keys, ...Object.values(MESSAGE_TYPES), ...Object.values(THREAD_MODES), ...WEEKDAYS,
+    ...Object.values(POSTING_PERMISSIONS), ...Object.values(THREAD_PERMISSIONS),
+    ...Object.values(funCommands).map((fun) => fun.line), ...TITLES,
+  ])];
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   // the commands file reads these at import. multi-server has every command and option single-server does
   process.env.STATE_DIR = mkdtempSync(join(tmpdir(), 'sama-spanish-'));
   process.env.MULTI_GUILD = 'true';
+  // the fun commands would start making posts with claude
+  delete process.env.ANTHROPIC_API_KEY;
   const { es, nouns } = await import('../src/i18n/es.js');
   const { missing, missingNouns, unused, extra } = check(es, nouns, await dynamicKeys());
   const show = (title, list) => list.length && console.log(`${title} (${list.length}):\n${list.map((line) => `  ${line}`).join('\n')}\n`);

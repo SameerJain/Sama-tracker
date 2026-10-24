@@ -14,7 +14,7 @@ export const guildId = () => guildLocal.getStore() ?? null;
 // multi-server mode is opt-in. unset means the original single-server build: GUILD_ID and
 // CHANNEL_ID are required, commands register to that one server, and everything reads the
 // root state. MULTI_GUILD=true serves every server it's invited to, each with its own
-// guild entry picked by /settings channel
+// guild entry picked by /t-o settings channel:
 export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 
 // what's in state, server by server:
@@ -41,7 +41,7 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 //   was reported yet, and the final goes out as a new message once every event is finished.
 //   top8Posted means its top 8 went out or was switched off, and top8Failed that it's being retried hourly for 3 days.
 //
-// socials are { name, url } in the order they were added. messages holds the /settings switches, recap schedule and language,
+// socials are { name, url } in the order they were added. messages holds the /t-o settings switches, recap schedule and language,
 // and weeklyRecap is the recap partway through sending, built once so a restart sends the rest.
 // slippi is the /slippi watchlist keyed by slippi user id, which outlasts a code change, with the ranked numbers from
 // the last check. userId is set when the code came from that start.gg player's netplay registrations, and discordId
@@ -49,7 +49,7 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // check before their profile turned over to a new season, for the wrap-up.
 // slippiSkipped are slippi user ids /slippi remove took off, so the code search doesn't add them back, and
 // slippiWrapped the names of the seasons that got a wrap-up, so each goes out once.
-// threads are the threads from /settings posts threads, keyed by tournament slug, or event slug for one per event:
+// threads are the threads from /t-o settings threads, keyed by tournament slug, or event slug for one per event:
 // { id, at, channelId, messageId, pinned }. the last three are its card in the channel, pinned saying if the pin
 // worked, so it comes off once the tournament or event is over.
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete.
@@ -67,7 +67,7 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // `discordId:game`, so a restart doesn't cancel them. matchmakingThreads are { id, at } for threads the bot deletes
 // 24 hours after /matchmaking search made them.
 // discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, so
-// /t-o tournament event, /t-o tournament add add_event and /settings posts events all land on the same one:
+// /t-o tournament event, /t-o tournament add add_event and /t-o settings events all land on the same one:
 // { eventId, slug, startAt, synced, gone }. synced is start.gg's side as of the last sync, null until one ran, and gone
 // means a mod deleted it, it started or start.gg deleted the tournament, so it's left alone.
 //
@@ -135,7 +135,7 @@ export function cleanState(parsed) {
 }
 
 // the stored data for one server, made on first use. channelId is where its posts go,
-// set by /settings channel (or the old CHANNEL_ID for the migrated server)
+// set by /t-o settings channel: (or the old CHANNEL_ID for the migrated server)
 export function forGuild(id) {
   if (!id) return null;
   raw.guilds[id] ??= structuredClone(emptyGuild);
@@ -154,7 +154,7 @@ export function guildIds() {
 }
 
 // where a server's automatic posts go. single-server builds always use CHANNEL_ID. multi-server builds use
-// /settings channel's pick, and the server migrated from GUILD_ID falls back to CHANNEL_ID until it runs /settings channel.
+// the channel picked with /t-o settings channel:, and the server migrated from GUILD_ID falls back to CHANNEL_ID until it picks one.
 // looking it up never makes the entry, so a stray id can't fill the file with empty servers
 export function postsChannelId(id = guildId()) {
   if (!isMultiGuild()) return process.env.CHANNEL_ID ?? null;

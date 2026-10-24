@@ -14,10 +14,21 @@ export function language() {
 
 export const locale = () => LOCALES[language()];
 
+// english plus every language a server has picked, for the fun posts made ahead at startup outside any server
+export function languagesInUse() {
+  const picked = [state.messages?.language, ...Object.values(state.guilds ?? {}).map((guild) => guild?.messages?.language)];
+  return ['en', ...new Set(picked.filter((lang) => lang !== 'en' && Object.hasOwn(LANGUAGES, lang)))];
+}
+
+// the same english can need two spanish lines: people take a personal "a" and tournaments don't. a key that starts
+// with a context like [tournament] gets its own spanish, and the context comes off the english
+const CONTEXT = /^\[\w+\] /;
+
 // t`Tracking ${name}.` looks up 'Tracking {0}.' and puts the values back in, wherever the translation moved them
 export function t(parts, ...values) {
   const key = typeof parts === 'string' ? parts : parts.reduce((text, part, i) => `${text}{${i - 1}}${part}`);
-  const text = language() === 'es' ? es[key] ?? key : key;
+  const english = key.replace(CONTEXT, '');
+  const text = language() === 'es' ? es[key] ?? english : english;
   return values.length ? text.replace(/\{(\d+)\}/g, (_, i) => values[i]) : text;
 }
 
@@ -34,8 +45,11 @@ export const ordinal = (n) => (language() === 'es' ? `${n}.º` : englishOrdinal(
 // a, b and c, or a, b y c
 export const listOf = (items) => new Intl.ListFormat(locale()).format(items);
 
+// discord's permission names, the way its settings show them in the server's language
+export const permissionList = (names) => listOf(names.map((name) => t(name)));
+
 // spanish discord clients see these on the commands. the rest see the base, see commandsFor
-export const DISCORD_SPANISH = ['es-ES', 'es-419'];
+const DISCORD_SPANISH = ['es-ES', 'es-419'];
 
 // the commands with spanish next to every description and choice. lang picks the base one, which every
 // other discord language shows: a single-server build registers the server's own language, so switching

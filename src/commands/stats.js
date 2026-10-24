@@ -16,7 +16,7 @@ import { slippiFor, slippiLookup } from './slippi.js';
 import { LOGO as slippiLogo } from '../slippi.js';
 import {
   fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, sendEmbeds, withCountdown, flag, fullReport, buttonRow,
-  linkedPlayer, rememberPick, parseSince, t, language,
+  linkedPlayer, rememberPick, parseSince, t, listOf,
 } from './shared.js';
 
 // /characters verbose, so the cards fit in one message
@@ -360,7 +360,7 @@ function characterCards(sets, verbose, picked) {
   const unreported = games.filter(({ game, usage }) => !usage.reported && !cards.some((card) => card.game.id === game.id))
     .sort((a, b) => b.usage.scanned - a.usage.scanned).map(({ game }) => game.displayName);
   const shown = unreported.length > 4 ? [...unreported.slice(0, 3), t`${unreported.length - 3} other games`] : unreported;
-  const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(shown);
+  const list = listOf(shown);
   return { cards, note: shown.length ? t`No characters reported for ${list}` : undefined };
 }
 
@@ -368,16 +368,27 @@ function characterCards(sets, verbose, picked) {
 // Melee and point at the game the odds do work for, since the old pair wording read like both were missing it.
 // the hint goes by the filters without the melee one, since melee-only histories never share another game
 function noOdds(a, b, historyA, historyB, melee, filters = {}, hintA = historyA, hintB = historyB) {
-  const tags = [escapeMarkdown(a.tag), escapeMarkdown(b.tag)];
-  const scope = filters.since || filters.venue ? t(' matching those filters') : '';
-  if (!melee) return t`${tags[0]} and ${tags[1]} haven't played singles in the same game on start.gg${scope}.`;
+  const [tagA, tagB] = [escapeMarkdown(a.tag), escapeMarkdown(b.tag)];
+  const filtered = Boolean(filters.since || filters.venue);
+  if (!melee) {
+    return filtered
+      ? t`${tagA} and ${tagB} haven't played singles in the same game on start.gg matching those filters.`
+      : t`${tagA} and ${tagB} haven't played singles in the same game on start.gg.`;
+  }
 
   const missing = [a, b].filter((player, i) => !gameSets(i ? historyB : historyA, player, 'Melee').length).map((player) => escapeMarkdown(player.tag));
-  const who = missing.length === 2 ? t`Neither ${tags[0]} nor ${tags[1]} has` : t`${missing[0]} hasn't`;
+  let none;
+  if (missing.length === 2) {
+    none = filtered
+      ? t`Neither ${tagA} nor ${tagB} has played Melee singles on start.gg matching those filters.`
+      : t`Neither ${tagA} nor ${tagB} has played Melee singles on start.gg.`;
+  } else {
+    none = filtered ? t`${missing[0]} hasn't played Melee singles on start.gg matching those filters.` : t`${missing[0]} hasn't played Melee singles on start.gg.`;
+  }
   // the game predict would pick without melee, which leaves out DQs, so leaving melee out really gives odds there
   const shared = sharedGame(a, b, hintA, hintB);
   const hint = shared ? t`\n-# Leave out \`melee\` for ${escapeMarkdown(shared)} odds` : '';
-  return t`${who} played Melee singles on start.gg${scope}.${hint}`;
+  return `${none}${hint}`;
 }
 
 // verbose explains the same odds instead of changing them

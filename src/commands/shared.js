@@ -413,10 +413,15 @@ async function typedPlayer(input) {
 }
 
 // the player behind a typed link or ID, for handlers that deferred first. null and a reply when
-// start.gg has nobody for it. whose is just for the wording, "use their/your profile link"
-async function findPlayer(interaction, input, whose = 'their') {
+// start.gg has nobody for it. own is just for the wording, "use your profile link" instead of their
+async function findPlayer(interaction, input, own = false) {
   const { shown, player } = await typedPlayer(input);
-  if (!player) await interaction.editReply({ content: t`Couldn't find a start.gg player for \`${shown}\`. Use ${whose} profile link, like start.gg/user/f64a83c8.`, allowedMentions: { parse: [] } });
+  if (!player) {
+    const content = own
+      ? t`Couldn't find a start.gg player for \`${shown}\`. Use your profile link, like start.gg/user/f64a83c8.`
+      : t`Couldn't find a start.gg player for \`${shown}\`. Use their profile link, like start.gg/user/f64a83c8.`;
+    await interaction.editReply({ content, allowedMentions: { parse: [] } });
+  }
   return player;
 }
 

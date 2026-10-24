@@ -12,7 +12,8 @@ const UNDO_SECONDS = 60;
 //   run(target): makes the change, returning { content } and undo, what was removed, when it can be put back
 //   cancel(target): the reply when they press Cancel
 //   undo(record, discordId): puts record back, returning the reply
-//   tooLate: the reply when Undo is pressed after the minute
+//   tooLate(): the reply when Undo is pressed after the minute
+// each returns its text already in the server's language, worked out at the press, not at import
 const kinds = new Map();
 const CHOICES = ['confirm', 'cancel', 'undo'];
 
@@ -73,14 +74,14 @@ async function handleChoice(interaction) {
   if (parts.length < 4 || !target || !spec) return replyEphemeral(interaction, t('That button doesn\'t work anymore.'));
   if (interaction.user.id !== discordId) return replyEphemeral(interaction, t`Only whoever ran \`${spec.command}\` can press this.`);
 
-  if (choice === 'cancel') return interaction.update({ content: t(spec.cancel(target)), components: [], allowedMentions: { parse: [] } });
+  if (choice === 'cancel') return interaction.update({ content: spec.cancel(target), components: [], allowedMentions: { parse: [] } });
   if (choice === 'confirm') {
     const key = scopedKey(interaction, interaction.customId);
     if (confirming.has(key)) return replyEphemeral(interaction, t('Already on it, one press is enough.'));
     confirming.add(key);
     try {
       const { content, undo } = spec.run(target);
-      return await interaction.update({ content: t(content), components: undo ? undoRow(interaction, kind, target, undo) : [], allowedMentions: { parse: [] } });
+      return await interaction.update({ content, components: undo ? undoRow(interaction, kind, target, undo) : [], allowedMentions: { parse: [] } });
     } finally {
       confirming.delete(key);
     }
@@ -91,9 +92,9 @@ async function handleChoice(interaction) {
   removed.delete(key);
   if (!kept || kept.scope !== scopeOf(interaction) || Date.now() - kept.at > UNDO_SECONDS * 1000) {
     await interaction.update({ components: [] });
-    return interaction.followUp({ content: t(spec.tooLate), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+    return interaction.followUp({ content: spec.tooLate(), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
   }
-  return interaction.update({ content: t(spec.undo(kept.record, discordId)), components: [], allowedMentions: { parse: [] } });
+  return interaction.update({ content: spec.undo(kept.record, discordId), components: [], allowedMentions: { parse: [] } });
 }
 
 export { confirmable, isChoice, askFirst, undoRow, handleChoice, UNDO_SECONDS };

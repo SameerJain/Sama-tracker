@@ -48,7 +48,7 @@ const FALLBACK_GIFS = [
   ['hqTvpwsFCHHLiaHXUh', 'Bills touchdown'],
   ['3o7TKW5SaCnLmbj5OU', 'Sammy Watkins touchdown'],
 ].map(([id, name]) => ({ name, image: `https://media.giphy.com/media/${id}/giphy.gif`, page: `https://giphy.com/gifs/${id}`, source: 'GIPHY' }));
-const TITLES = [
+export const TITLES = [
   'GO BILLS! 🦬🔥',
   'BILLS MAFIA! ❤️💙',
   'LET\'S GO BUFFALO! 🦬',
@@ -212,7 +212,8 @@ async function runPost() {
   } catch (err) {
     console.error('bills image download failed:', err.message);
   }
-  return { ...picked, file, title: t(TITLES[Math.floor(Math.random() * TITLES.length)]) };
+  // saved in english and translated when it's shown, since a post gets made ahead for whichever server asks next
+  return { ...picked, file, title: TITLES[Math.floor(Math.random() * TITLES.length)] };
 }
 
 // one at a time, so the round-robin and the no-repeat check see each finished post

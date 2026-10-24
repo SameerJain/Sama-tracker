@@ -1,6 +1,5 @@
 import { PermissionFlagsBits, RESTJSONErrorCodes, ThreadAutoArchiveDuration } from 'discord.js';
 import * as embeds from '../embeds/index.js';
-import { listOf, t } from '../i18n.js';
 import { state, save } from '../store.js';
 import { messageSettings } from '../message-settings.js';
 import {
@@ -86,8 +85,9 @@ async function tournamentThread(event, byEvent, postChannel) {
 
   // checked before the card goes out, or every set would leave another card with no thread on it
   const missing = missingThreadPermissions(postChannel);
-  if (!missing) throw new Error(t('threads can\'t be started in this channel'));
-  if (missing.length) throw new Error(t`missing ${listOf(missing)}`);
+  // in english, since it's logged, and /status shows it like the other errors it quotes
+  if (!missing) throw new Error('threads can\'t be started in this channel');
+  if (missing.length) throw new Error(`missing ${missing.join(' and ')}`);
 
   const card = await postChannel.send({
     embeds: embeds.withImage([byEvent ? embeds.eventThread(event) : embeds.tournamentThread(tournament)]), allowedMentions: { parse: [] },

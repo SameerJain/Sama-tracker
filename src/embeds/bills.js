@@ -1,5 +1,6 @@
 import { escapeMarkdown } from 'discord.js';
 import { FOOTER, baseEmbed, colors, t } from './shared.js';
+import { locale } from '../i18n.js';
 
 // middle length: the final, the records, quarters and yards, nothing more.
 // green for a Bills win, red for a loss, with the other team's logo on the side
@@ -27,7 +28,7 @@ export function billsFinal(game, details = null) {
   const theirs = details?.stats?.[opponent.abbreviation];
   const snapshot = [statLine(ours, theirs, t('Yards'), 'yards'), statLine(ours, theirs, t('Turnovers'), 'turnovers')].filter(Boolean);
   if (snapshot.length) lines.push(snapshot.join(' · '));
-  if (game.attendance) lines.push(t`-# ${game.attendance.toLocaleString('en-US')} at ${escapeMarkdown(game.venue ?? t('the game'))}`);
+  if (game.attendance) lines.push(t`-# ${game.attendance.toLocaleString(locale())} at ${escapeMarkdown(game.venue ?? t('the game'))}`);
   return embed.setDescription(lines.join('\n'));
 }
 

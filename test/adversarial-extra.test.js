@@ -139,7 +139,7 @@ test('an Undo pressed by the wrong user is refused and stays for whoever ran it'
     command: '/wrong-undo',
     run: () => ({ content: 'gone', undo: { tag: 'Rival' } }),
     cancel: () => 'cancelled',
-    tooLate: 'Too late to undo.',
+    tooLate: () => 'Too late to undo.',
     undo: (record) => `Tracking ${record.tag} again.`,
   });
   undoRow({ user: { id: 'runner' }, guildId: 'g1', editReply: async () => {} }, 'wrong-undo-kind', 'target', { tag: 'Rival' });
@@ -162,7 +162,7 @@ test('an Undo press with nothing remembered says it is too late, the way one aft
     command: '/gone',
     run: () => ({ content: 'ran' }),
     cancel: () => 'cancelled',
-    tooLate: 'Too late to undo.',
+    tooLate: () => 'Too late to undo.',
     undo: () => 'back',
   });
   const calls = [];

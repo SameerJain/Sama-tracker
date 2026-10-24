@@ -1,122 +1,201 @@
-// /help, in src/embeds/system.js
+// /help, in src/embeds/system.js. the full list is the reference, so every line keeps all its detail
 export default {
   'Sama-tracker': 'Sama-tracker',
+  // the short card
   '**Start here**': '**Empieza aquí**',
-  '`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up': '`/link` vincula tu Discord a tu start.gg, nada se publica. Sin `player` te busca a ti',
-  '`/track add` post your placements here. TOs can add anyone': '`/track add` publica tus posiciones aquí. Los TOs agregan a cualquiera',
-  '`/t-o settings channel:#channel` pick where automatic posts go': '`/t-o settings channel:#channel` elige dónde van los posts',
-  '`/notify` pings for match calls, streams, reg reminders and 1-hour DMs': '`/notify` pings de llamados, streams, registro y DMs de 1 hora',
-  '`/help verbose:True` the full list with the details': '`/help verbose:True` la lista completa con detalles',
-  '**Look up stats**': '**Ver estadísticas**',
-  '`/stats` record and placements · `/recent` latest sets · `/run` current run and next opponent': '`/stats` récord y posiciones · `/recent` últimos sets · `/run` run actual y rival',
-  '`/h2h opponent:` record and one-line odds · `/predict opponent:` odds and why': '`/h2h opponent:` historial y odds en una línea · `/predict opponent:` odds y por qué',
-  '`/scout opponent:` form and habits · `/progress` last 30 days vs the 30 before': '`/scout opponent:` forma y hábitos · `/progress` últimos 30 días vs 30 antes',
-  '`/characters` reported characters · `/doubles` 2v2 record · `/upcoming` tournaments': '`/characters` personajes · `/doubles` récord 2v2 · `/upcoming` torneos',
+  '`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up':
+    '`/link` vincula tu Discord con tu start.gg, sin publicar nada. Dejar `player` vacío te busca a ti',
+  '`/track add` post your placements here. TOs can add anyone': '`/track add` publica aquí tus posiciones. Los TOs pueden agregar a cualquiera',
+  '`/t-o settings channel:#channel` pick where automatic posts go': '`/t-o settings channel:#canal` elige dónde van las publicaciones automáticas',
+  '`/notify` pings for match calls, streams, reg reminders and 1-hour DMs':
+    '`/notify` pings de llamados de partida, streams, recordatorios de inscripción y DMs 1 hora antes',
+  '`/help verbose:True` the full list with the details': '`/help verbose:True` la lista completa con los detalles',
+  '**Look up stats**': '**Consulta estadísticas**',
+  '`/stats` record and placements · `/recent` latest sets · `/run` current run and next opponent':
+    '`/stats` récord y posiciones · `/recent` últimos sets · `/run` recorrido actual y próximo rival',
+  '`/h2h opponent:` record and one-line odds · `/predict opponent:` odds and why':
+    '`/h2h opponent:` historial y probabilidades en una línea · `/predict opponent:` probabilidades y por qué',
+  '`/scout opponent:` form and habits · `/progress` last 30 days vs the 30 before':
+    '`/scout opponent:` forma y hábitos · `/progress` últimos 30 días contra los 30 anteriores',
+  '`/characters` reported characters · `/doubles` 2v2 record · `/upcoming` tournaments':
+    '`/characters` personajes reportados · `/doubles` récord en 2v2 · `/upcoming` torneos',
   '**TOs**': '**TOs**',
-  '`/t-o role add user:` hand out the TO role · `/t-o role set role:` use an existing role': '`/t-o role add user:` da el rol TO · `/t-o role set role:` usa un rol existente',
-  '`/t-o tournament event tournament:` make a Discord event · `/track posts` results and alerts on or off': '`/t-o tournament event tournament:` crea un evento · `/track posts` sets y streams',
-  '-# TOs can use `/t-o settings`, track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one': '-# Los TOs usan `/t-o settings`, siguen, dejan de seguir y cambian pings de cualquiera. Sin rol TO, Manage Server cuenta como TO',
+  '`/t-o role add user:` hand out the TO role · `/t-o role set role:` use an existing role':
+    '`/t-o role add user:` da el rol TO · `/t-o role set role:` usa un rol que ya existe',
+  '`/t-o tournament event tournament:` make a Discord event · `/track posts` results and alerts on or off':
+    '`/t-o tournament event tournament:` crea un evento de Discord · `/track posts` enciende o apaga resultados y avisos',
+  '-# TOs can use `/t-o settings`, track, untrack, change posts and set pings for anyone. Until the server has a TO role, Manage Server counts as one':
+    '-# Los TOs pueden usar `/t-o settings`, seguir y dejar de seguir, y cambiar publicaciones y pings de cualquiera. Mientras el servidor no tenga rol TO, Gestionar servidor cuenta como uno',
   '**Tournaments**': '**Torneos**',
-  "`/registered tournament:` who's here · `/reg_warn tournament: user:` nudge the unregistered": "`/registered tournament:` quiénes están · `/reg_warn tournament: user:` avisa al no inscrito",
-  '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks': '`/bracket` brackets · `/stream_link` streams · `/slippi leaderboard` rangos netplay',
-  '`/data` Samatracker and both series data pages': '`/data` Samatracker y las páginas de ambas series',
-  '`/t-o settings` what posts here and when · `/status` uptime and last checks': '`/t-o settings` qué se publica y cuándo · `/status` uptime y checks',
-  '`/matchmaking role game:` get game pings · `/matchmaking search game:` find games': '`/matchmaking role game:` recibe pings · `/matchmaking search game:` busca juegos',
-  '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun': '-# `/socials` enlaces · `/profile` perfiles · `/view_pfp` mi foto · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` diversión',
+  '`/registered tournament:` who\'s here · `/reg_warn tournament: user:` nudge the unregistered':
+    '`/registered tournament:` quién de aquí va · `/reg_warn tournament: user:` avisa a quien no se ha inscrito',
+  '`/bracket` bracket links · `/stream_link` stream links · `/slippi leaderboard` netplay ranks':
+    '`/bracket` enlaces de brackets · `/stream_link` enlaces de streams · `/slippi leaderboard` rangos de netplay',
+  '`/data` Samatracker and both series data pages': '`/data` Samatracker y las páginas de datos de ambas series',
+  '`/t-o settings` what posts here and when · `/status` uptime and last checks':
+    '`/t-o settings` qué se publica aquí y cuándo · `/status` tiempo encendido y últimas revisiones',
+  '`/matchmaking role game:` get game pings · `/matchmaking search game:` find games':
+    '`/matchmaking role game:` recibe pings para jugar · `/matchmaking search game:` busca partidas',
+  '-# `/socials` saved links · `/profile` start.gg profiles · `/view_pfp` my picture · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` for fun':
+    '-# `/socials` enlaces guardados · `/profile` perfiles de start.gg · `/view_pfp` mi foto · `/64` `/melee` `/brawl` `/sm4sh` `/ult` `/pplus` `/bills` para divertirse',
+  // the full list
   '**General**': '**General**',
   '`/help` this list': '`/help` esta lista',
-  '`/status` uptime, when the latest version was deployed, the last start.gg and Slippi checks, and whether start.gg is down': '`/status` uptime, último deploy, últimos checks de start.gg y Slippi, y si start.gg está caído',
-  "`/profile` someone's start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member": "`/profile` perfil de start.gg de alguien, si el bot vio su cuenta. `player:` seguido o vinculado, `user:` miembro",
-  "`/data` links to Samatracker and both series data pages: every tournament's attendance, winners, most events entered and characters": "`/data` enlaces a Samatracker y ambas series: asistencia, ganadores, eventos y personajes",
-  '`/socials` saved streams and social links': '`/socials` streams y enlaces guardados',
-  '`/socials_edit` add or remove those links. Manage Server by default': '`/socials_edit` agrega o quita esos enlaces. Manage Server por defecto',
-  '**TO settings**': '**Ajustes TO**',
-  '`/t-o settings` automatic posts, threads, set result colors, Discord event length, weekly recap schedule and language': '`/t-o settings` posts, hilos, colores, duración de eventos, recap semanal e idioma',
-  '`channel:` picks where automatic posts go and checks the bot can post there': '`channel:` elige dónde van los posts y revisa que el bot pueda publicar',
-  '-# Leave every option blank to see the current settings. Only TOs can change them': '-# Deja todo en blanco para ver los ajustes. Solo los TOs los cambian',
+  '`/status` uptime, when the latest version was deployed, the last start.gg and Slippi checks, and whether start.gg is down':
+    '`/status` tiempo encendido, cuándo se publicó la última versión, las últimas revisiones de start.gg y Slippi, y si start.gg está caído',
+  '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member':
+    '`/profile` el perfil de start.gg de alguien, si el bot ya vio su cuenta. `player:` un jugador seguido o vinculado, `user:` un miembro del servidor',
+  '`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, most events entered and characters':
+    '`/data` enlaces a Samatracker y a las páginas de datos de ambas series: asistencia de cada torneo, ganadores, quién entró a más eventos y personajes',
+  '`/socials` saved streams and social links': '`/socials` streams y redes guardados',
+  '`/socials_edit` add or remove those links. Manage Server by default':
+    '`/socials_edit` agrega o quita esos enlaces. Por defecto, con Gestionar servidor',
+  '**TO settings**': '**Ajustes de TO**',
+  '`/t-o settings` automatic posts, threads, set result colors, Discord event length, weekly recap schedule and language':
+    '`/t-o settings` publicaciones automáticas, hilos, colores de resultados, duración de eventos de Discord, horario del resumen semanal e idioma',
+  '`channel:` picks where automatic posts go and checks the bot can post there':
+    '`channel:` elige dónde van las publicaciones automáticas y revisa que el bot pueda publicar ahí',
+  '-# Leave every option blank to see the current settings. Only TOs can change them':
+    '-# Deja todas las opciones vacías para ver los ajustes actuales. Solo los TOs pueden cambiarlos',
   '**Tracking players**': '**Seguir jugadores**',
-  '`/track add` track yourself, found by the Discord on your start.gg. TOs can add anyone by start.gg link or ID. Their placements post here': '`/track add` síguete, por el Discord en tu start.gg. Los TOs agregan por enlace o ID. Sus posiciones van aquí',
-  '`/track remove` stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back with their settings for a minute': '`/track remove` deja de seguirte, o a otro si eres TO. Pregunta y Undo devuelve un minuto',
-  '`/track list` everyone tracked, and the tracked tournaments': '`/track list` todos los seguidos y los torneos seguidos',
-  '`/track posts` your set results and stream alerts on or off. TOs can change anyone\'s, or everyone\'s with `player:all`, which asks first. Anyone can look': '`/track posts` tus sets y streams. Los TOs cambian cualquiera o todos con `player:all`. Todos pueden ver',
-  "`/t-o cleanup` untrack everyone whose start.gg Discord isn't in this server. Asks first. TOs only": "`/t-o cleanup` deja de seguir a quienes no estén aquí. Pregunta. Solo TOs",
-  '`/upcoming` tracked tournaments, and any other with 3 or more of the crew. `player:` checks one person, live from start.gg when linked but not tracked': '`/upcoming` torneos seguidos y otros con 3+ de la crew. `player:` revisa a uno, en vivo si está vinculado',
+  '`/track add` track yourself, found by the Discord on your start.gg. TOs can add anyone by start.gg link or ID. Their placements post here':
+    '`/track add` agrégate tú, encontrado por el Discord de tu start.gg. Los TOs pueden agregar a cualquiera por enlace o ID de start.gg. Sus posiciones se publican aquí',
+  '`/track remove` stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back with their settings for a minute':
+    '`/track remove` deja de seguirte, o a cualquiera si eres TO. Pregunta primero, y luego Deshacer lo devuelve con sus ajustes durante un minuto',
+  '`/track list` everyone tracked, and the tracked tournaments': '`/track list` todos los jugadores seguidos y los torneos seguidos',
+  '`/track posts` your set results and stream alerts on or off. TOs can change anyone\'s, or everyone\'s with `player:all`, which asks first. Anyone can look':
+    '`/track posts` enciende o apaga tus resultados de sets y avisos de stream. Los TOs pueden cambiar los de cualquiera, o los de todos con `player:all`, que pregunta primero. Cualquiera puede verlos',
+  '`/t-o cleanup` untrack everyone whose start.gg Discord isn\'t in this server. Asks first. TOs only':
+    '`/t-o cleanup` deja de seguir a todos los que no tengan su Discord de start.gg en este servidor. Pregunta primero. Solo TOs',
+  '`/upcoming` tracked tournaments, and any other with 3 or more of the crew. `player:` checks one person, live from start.gg when linked but not tracked':
+    '`/upcoming` torneos seguidos, y cualquier otro con 3 o más de la crew. `player:` revisa a una persona, en vivo desde start.gg si está vinculada pero no la sigo',
   '`/recent` latest sets': '`/recent` últimos sets',
-  '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them': '`/run` tu run y próximo rival en cada bracket, con estación y hora si el TO las puso',
-  '-# New players start with set results and stream alerts off. `player:all` works with posts, upcoming and recent. Leaving `player` out means you': '-# Los nuevos empiezan con sets y streams apagados. `player:all` vale en posts, upcoming y recent. Sin `player` eres tú',
-  '-# Players with no reported sets in 6 months come off the track list on their own': '-# Quienes lleven 6 meses sin sets salen de la lista solos',
-  '`/t-o role add` give someone the TO role. TOs only': '`/t-o role add` da el rol TO. Solo TOs',
-  '`/t-o role set` use an existing server role for TO privileges. Needs Manage Server': '`/t-o role set` usa un rol existente para TO. Necesita Manage Server',
-  '`/t-o role remove` take the TO role off someone. Refuses to remove the last known TO. TOs only': '`/t-o role remove` quita el rol TO. No quita al último TO. Solo TOs',
+  '`/run` your run and next opponent in each bracket, soonest first, with the station and scheduled time when the TO sets them':
+    '`/run` tu recorrido y próximo rival en cada bracket, el más próximo primero, con la estación y la hora programada cuando el TO las pone',
+  '-# New players start with set results and stream alerts off. `player:all` works with posts, upcoming and recent. Leaving `player` out means you':
+    '-# Los jugadores nuevos empiezan con los resultados de sets y avisos de stream apagados. `player:all` funciona con posts, upcoming y recent. Dejar `player` vacío significa tú',
+  '-# Players with no reported sets in 6 months come off the track list on their own':
+    '-# Quien pase 6 meses sin sets reportados sale solo de la lista de seguidos',
+  '`/t-o role add` give someone the TO role. TOs only': '`/t-o role add` dale a alguien el rol TO. Solo TOs',
+  '`/t-o role set` use an existing server role for TO privileges. Needs Manage Server':
+    '`/t-o role set` usa un rol que ya exista en el servidor para los permisos de TO. Necesita Gestionar servidor',
+  '`/t-o role remove` take the TO role off someone. Refuses to remove the last known TO. TOs only':
+    '`/t-o role remove` quítale a alguien el rol TO. No quita al último TO conocido. Solo TOs',
   '`/t-o role list` who the TOs are': '`/t-o role list` quiénes son los TOs',
-  '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one': '-# Los TOs control mensajes, siguen, dejan de seguir, cambian posts y pings de cualquiera y usan `/t-o tournament` y `/t-o cleanup`. Sin rol TO, Manage Server cuenta como TO',
-  '**Your pings**': '**Tus pings**',
-  '`/notify` your pings, or anyone\'s for a TO with `user:` or `player:`. `calls` covers match calls, `streams` covers stream sets, `registration` covers reg reminders, and `dm_registration` and `dm_start` cover 1-hour DMs. `all` changes all five. `player:all` changes everyone tracked and asks first. Leave them out to see yours': '`/notify` tus pings, o los de otro para un TO con `user:` o `player:`. `all` cambia los cinco. `player:all` cambia a todos y pregunta. En blanco para ver los tuyos',
-  '-# Only TOs can see or change someone else\'s with `user:` or `player:`, and only `user:` or `player:`, not both. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. `registration` pings the Reg Reminders role. Registration DMs skip registered players when start.gg has their Discord. DMs only go to current server members, checked right before each goes out': '-# Solo los TOs ven o cambian los de otro con `user:` o `player:`. `calls` y `streams` necesitan /link o seguimiento con Discord. Los DMs solo van a miembros actuales',
+  '-# TOs can control automatic messages, track, untrack, change posts and set pings for anyone, take anyone off the Slippi watchlist, and use `/t-o tournament` and `/t-o cleanup`. Everyone else only changes their own. Until the server has a TO role, Manage Server counts as one':
+    '-# Los TOs manejan las publicaciones automáticas, siguen y dejan de seguir, cambian publicaciones y pings de cualquiera, quitan a cualquiera de la lista de Slippi y usan `/t-o tournament` y `/t-o cleanup`. Los demás solo cambian lo suyo. Mientras el servidor no tenga rol TO, Gestionar servidor cuenta como uno',
+  '`/notify` your pings, or anyone\'s for a TO with `user:` or `player:`. `calls` covers match calls, `streams` covers stream sets, `registration` covers reg reminders, and `dm_registration` and `dm_start` cover 1-hour DMs. `all` changes all five. `player:all` changes everyone tracked and asks first. Leave them out to see yours':
+    '`/notify` tus pings, o los de cualquiera para un TO con `user:` o `player:`. `calls` son los llamados de partida, `streams` los sets en stream, `registration` los recordatorios de inscripción, y `dm_registration` y `dm_start` los DMs 1 hora antes. `all` cambia los cinco. `player:all` cambia a todos los seguidos y pregunta primero. Déjalos vacíos para ver los tuyos',
+  '-# Only TOs can see or change someone else\'s with `user:` or `player:`, and only `user:` or `player:`, not both. `calls` and `streams` need whoever it\'s for linked, or tracked with Discord on start.gg. `registration` pings the Reg Reminders role. Registration DMs skip registered players when start.gg has their Discord. DMs only go to current server members, checked right before each goes out':
+    '-# Solo los TOs pueden ver o cambiar los de otra persona con `user:` o `player:`, y solo uno de los dos, no ambos. `calls` y `streams` necesitan que esa persona esté vinculada, o seguida con Discord en start.gg. `registration` da ping al rol Reg Reminders. Los DMs de inscripción se saltan a quien ya está inscrito cuando start.gg tiene su Discord. Los DMs solo llegan a quien sigue en el servidor, revisado justo antes de mandar cada uno',
   '**Matchmaking**': '**Matchmaking**',
-  '`/matchmaking role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many hours, like 2 or 0.5 for 30 minutes, then it comes off on its own': '`/matchmaking role` toma el rol Ultimate o Melee con `game:`, o quítalo si lo tienes. `duration:` lo mantiene esas horas y luego se quita solo',
-  '`/matchmaking search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them, named like `Melee:Sam (10/21)`. Only people with the role can': '`/matchmaking search` menciona ese rol para buscar juegos. `thread:True` abre un hilo. Solo quienes tengan el rol',
-  '`/matchmaking channel` where a game\'s searches post with `game:` and `channel:`. TOs only to change it, anyone can look. Left out means wherever the command runs. `clear:True` goes back to that': '`/matchmaking channel` dónde van las búsquedas. Cambiar solo TOs, ver todos. En blanco donde se ejecuta. `clear:True` vuelve a eso',
-  '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it': '-# Todos pueden mencionar los roles sin comandos. El bot los crea la primera vez',
+  '`/matchmaking role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many hours, like 2 or 0.5 for 30 minutes, then it comes off on its own':
+    '`/matchmaking role` toma el rol Ultimate o Melee Matchmaking con `game:`, o quítatelo si ya lo tienes. `duration:` te lo deja esas horas, como 2, o 0.5 para 30 minutos, y luego se quita solo',
+  '`/matchmaking search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them, named like `Melee:Sam (10/21)`. Only people with the role can':
+    '`/matchmaking search` dale ping a ese rol para buscar partidas. `message:` dice lo que buscas, como tu código de conexión. `thread:True` abre un hilo para organizarlas, con un nombre como `Melee:Sam (10/21)`. Solo quienes tienen el rol pueden usarlo',
+  '`/matchmaking channel` where a game\'s searches post with `game:` and `channel:`. TOs only to change it, anyone can look. Left out means wherever the command runs. `clear:True` goes back to that':
+    '`/matchmaking channel` dónde se publican las búsquedas de un juego, con `game:` y `channel:`. Solo los TOs lo cambian, cualquiera puede verlo. Vacío significa donde se use el comando. `clear:True` vuelve a eso',
+  '-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it':
+    '-# Cualquiera puede mencionar los roles con @ sin usar los comandos. El bot crea cada uno la primera vez que alguien lo pide',
   '**Linking yourself**': '**Vincularte**',
-  '`/link` tie your Discord to your start.gg. Leave out the link and it finds yours': '`/link` vincula tu Discord a tu start.gg. Sin enlace busca el tuyo',
-  '`/unlink` undo that, with an Undo button for a minute': '`/unlink` lo deshace, con botón Undo un minuto',
-  '-# Tracking posts someone\'s results here. Linking posts nothing, it just tells commands who you are: a blank player means you, `/scout` works and others can pick you. Tracked players with Discord on start.gg don\'t need it': '-# Seguir publica resultados aquí. Vincular no publica, solo dice quién eres: sin jugador eres tú y `/scout` funciona. Seguidos con Discord no lo necesitan',
-  '**Player stats**': '**Estadísticas**',
-  '`/stats` set record, placements and best upset': '`/stats` récord, posiciones y mejor upset',
-  "`/doubles` one player's 2v2 record, partners and placements": "`/doubles` récord 2v2 de uno, parejas y posiciones",
-  '`/h2h` record against someone, with one-line odds': '`/h2h` historial contra alguien, con odds de una línea',
-  '`/predict` odds of beating someone, and why. `verbose:True` is the full breakdown, with how much each part counts and bars': '`/predict` odds contra alguien y por qué. `verbose:True` el desglose completo',
-  "`/scout` an opponent's form, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg": "`/scout` forma del rival y peores matchups. Necesitas estar vinculado con Discord en start.gg",
-  '`/progress` last 30 days vs the 30 before, by game': '`/progress` últimos 30 días vs los 30 antes, por juego',
-  '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more': '`/characters` personajes reportados. `game:` Ultimate o Melee, en blanco el que tenga más',
-  '-# `verbose:True` shows more, same as the Full report button on short reports other than `/progress`. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. Melee cards say Melee at the top, other games show nothing there since Ultimate is the default. Melee `/predict`, `/h2h` and `/scout` odds count them when both players are ranked, even with no Melee sets to go on. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out': '-# `verbose:True` muestra más, como el botón Full report. `melee:True` se queda en Melee y suma rangos Slippi de la watchlist. Slippi ranked es singles, así que `/doubles` lo deja fuera',
-  '-# `since:2026-01-01` counts only sets since that date, and `venue:` only offline or online tournaments, on `/stats`, `/h2h`, `/scout` and `/predict`. Full report buttons keep them': '-# `since:2026-01-01` solo cuenta desde esa fecha, y `venue:` presenciales o en línea, en `/stats`, `/h2h`, `/scout` y `/predict`',
-  '-# `/h2h`, `/predict` and `/scout` also take a start.gg link or ID, for players nobody tracks': '-# `/h2h`, `/predict` y `/scout` aceptan enlace o ID de start.gg, aunque nadie los siga',
-  '-# Your commands take start.gg turns one at a time. One sent while another loads says Queued and starts after it, up to 3 waiting. When start.gg is backed up for everyone, new commands ask you to try again in a minute. A public report done over a minute after you asked comes in a new message that pings you': '-# Tus comandos van de uno en uno a start.gg. Uno enviado mientras otro carga dice Queued y sigue después, hasta 3 en espera. Un reporte que tarde más de un minuto llega en mensaje nuevo que te menciona',
-  '-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, match calls and stream alerts have head-to-head buttons for the set coming up, which run the short report and come off when it ends': '-# Sin escribir: mantén a alguien, Apps, luego **H2H conmigo** o **Analízalos**. `/run`, llamados y streams traen botón de historial que se quita al terminar',
-  '-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation. A name that matches nobody gets the closest one suggested': '-# Las listas empiezan con tu última elección, y los nombres coinciden sin importar espacios o mayúsculas. Si nada coincide sugiere el más cercano',
-  '-# An event named for Melee but tagged on start.gg as Ultimate counts as Melee, and the other way around': '-# Un evento nombrado Melee pero etiquetado Ultimate cuenta como Melee, y al revés',
+  '`/link` tie your Discord to your start.gg. Leave out the link and it finds yours':
+    '`/link` vincula tu Discord con tu start.gg. Si dejas el enlace vacío, encuentra el tuyo',
+  '`/unlink` undo that, with an Undo button for a minute': '`/unlink` deshace eso, con un botón Deshacer durante un minuto',
+  '-# Tracking posts someone\'s results here. Linking posts nothing, it just tells commands who you are: a blank player means you, `/scout` works and others can pick you. Tracked players with Discord on start.gg don\'t need it':
+    '-# Seguir a alguien publica sus resultados aquí. Vincular no publica nada, solo le dice a los comandos quién eres: un jugador vacío eres tú, `/scout` funciona y otros pueden elegirte. Los jugadores seguidos con Discord en start.gg no lo necesitan',
+  '**Player stats**': '**Estadísticas de jugadores**',
+  '`/stats` set record, placements and best upset': '`/stats` récord de sets, posiciones y mejor upset',
+  '`/doubles` one player\'s 2v2 record, partners and placements': '`/doubles` récord en 2v2 de un jugador, sus compañeros y posiciones',
+  '`/h2h` record against someone, with one-line odds': '`/h2h` historial contra alguien, con las probabilidades en una línea',
+  '`/predict` odds of beating someone, and why. `verbose:True` is the full breakdown, with how much each part counts and bars':
+    '`/predict` probabilidades de ganarle a alguien, y por qué. `verbose:True` es el desglose completo, con cuánto cuenta cada parte y barras',
+  '`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg':
+    '`/scout` la forma de un rival, sus rivales más difíciles y peores matchups. Necesita que estés seguido o vinculado, con Discord conectado en start.gg',
+  '`/progress` last 30 days vs the 30 before, by game': '`/progress` últimos 30 días contra los 30 anteriores, por juego',
+  '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more':
+    '`/characters` personajes reportados. `game:` Ultimate o Melee; si lo dejas vacío, el que tenga más',
+  '-# `verbose:True` shows more, same as the Full report button on short reports other than `/progress`. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. Melee cards say Melee at the top, other games show nothing there since Ultimate is the default. Melee `/predict`, `/h2h` and `/scout` odds count them when both players are ranked, even with no Melee sets to go on. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out':
+    '-# `verbose:True` muestra más, igual que el botón Informe completo de los informes cortos, menos `/progress`. `melee:True` se queda en Melee y suma los rangos de Slippi de quienes están en la lista, que los informes de solo Melee muestran de todos modos. Las tarjetas de Melee dicen Melee arriba; los otros juegos no muestran nada ahí, porque Ultimate es el predeterminado. Las probabilidades de Melee en `/predict`, `/h2h` y `/scout` cuentan los rangos cuando los dos jugadores tienen uno, aunque no haya sets de Melee. `/characters game:Melee` suma los personajes de Slippi ranked. Slippi ranked es de singles, así que `/doubles` lo deja fuera',
+  '-# `since:2026-01-01` counts only sets since that date, and `venue:` only offline or online tournaments, on `/stats`, `/h2h`, `/scout` and `/predict`. Full report buttons keep them':
+    '-# `since:2026-01-01` cuenta solo los sets desde esa fecha, y `venue:` solo torneos presenciales o en línea, en `/stats`, `/h2h`, `/scout` y `/predict`. Los botones de Informe completo los mantienen',
+  '-# `/h2h`, `/predict` and `/scout` also take a start.gg link or ID, for players nobody tracks':
+    '-# `/h2h`, `/predict` y `/scout` también aceptan un enlace o ID de start.gg, para jugadores que nadie sigue',
+  '-# Your commands take start.gg turns one at a time. One sent while another loads says Queued and starts after it, up to 3 waiting. When start.gg is backed up for everyone, new commands ask you to try again in a minute. A public report done over a minute after you asked comes in a new message that pings you':
+    '-# Tus comandos usan start.gg de uno en uno. Uno que mandes mientras otro carga dice En cola y empieza después, con hasta 3 esperando. Cuando start.gg está saturado para todos, los comandos nuevos te piden intentar en un minuto. Un informe público que termina más de un minuto después llega en un mensaje nuevo con ping para ti',
+  '-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, match calls and stream alerts have head-to-head buttons for the set coming up, which run the short report and come off when it ends':
+    '-# Sin escribir: mantén presionado a alguien, luego Aplicaciones, y luego **H2H conmigo** o **Estudiar rival**. `/run`, los llamados de partida y los avisos de stream tienen botones de cara a cara para el set que viene, que muestran el informe corto y se quitan cuando termina',
+  '-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation. A name that matches nobody gets the closest one suggested':
+    '-# Las listas de jugadores empiezan con quien elegiste la última vez, y un nombre coincide sin importar espacios, mayúsculas o signos. Si un nombre no coincide con nadie, se sugiere el más parecido',
+  '-# An event named for Melee but tagged on start.gg as Ultimate counts as Melee, and the other way around':
+    '-# Un evento con nombre de Melee pero marcado en start.gg como Ultimate cuenta como Melee, y al revés',
   '**Slippi ranked**': '**Slippi ranked**',
-  '`/slippi add` add your connect code to the watchlist, or leave it out to find yours on your start.gg. TOs can add anyone\'s': '`/slippi add` agrega tu código a la watchlist, o en blanco lo busca en tu start.gg. Los TOs agregan cualquiera',
-  '`/slippi remove` take yourself off the watchlist, or anyone if you\'re a TO': '`/slippi remove` quítate de la watchlist, o a otro si eres TO',
-  '`/slippi rank` rank, rating, record, characters and past seasons. Takes any connect code': '`/slippi rank` rango, rating, récord, personajes y temporadas. Acepta cualquier código',
-  '`/slippi leaderboard` everyone on the watchlist, best rank first': '`/slippi leaderboard` toda la watchlist, mejor rango primero',
-  '-# Cards show the rank badge and their most played character. Tracked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it': '-# Las tarjetas muestran insignia y personaje más jugado. Los seguidos se agregan solos cuando su código aparece en start.gg. Rangos de slippi.gg, sin API pública, puede fallar si Slippi cambia',
-  '**Tournaments**': '**Torneos**',
-  '`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event': '`/t-o tournament add` sigue un torneo: cada set, streams y top 8 en su hilo, más recordatorios. `add_event:on` crea evento',
-  '`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute': '`/t-o tournament remove` deja de seguir uno. Pregunta y Undo lo devuelve un minuto',
-  '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, match calls, top 8s and reg reminders on or off. `schedule:` changes the reminder times, `default` goes back to the usual four': '`/t-o tournament posts` sets, streams, llamados, top 8 y recordatorios de un torneo. `schedule:` cambia tiempos',
-  "`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event": "`/registered` quiénes están inscritos, por nombre sin pings. `by_event:True` agrupa por evento",
-  "`/reg_warn` warn someone who isn't registered yet. If they are, it just says so. Once per person per tournament in 12 hours": "`/reg_warn` avisa a quien no esté inscrito. Solo una vez por persona y torneo en 12 horas",
-  '`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end': '`/bracket` brackets de torneos seguidos, 30 min antes a 6 h después',
-  '`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min': '`/stream_link` streams de torneos seguidos o con seguidos, en vivo o en 30 min',
-  "`/t-o tournament event` make a Discord event from a start.gg link, without tracking it. Its streams go in the description": "`/t-o tournament event` crea un evento de Discord desde start.gg, sin seguirlo. Sus streams van en la descripción",
-  '-# `/t-o tournament` is TOs only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time, end time, cover photo, place and streams, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map': '-# `/t-o tournament` solo TOs. Los eventos de Discord siguen hora, fin, foto, lugar y streams de start.gg, y se cancelan si se borra allí. Tarjetas y DMs muestran la dirección con mapa',
+  '`/slippi add` add your connect code to the watchlist, or leave it out to find yours on your start.gg. TOs can add anyone\'s':
+    '`/slippi add` agrega tu código de conexión a la lista de Slippi, o déjalo vacío para encontrar el tuyo en tu start.gg. Los TOs pueden agregar el de cualquiera',
+  '`/slippi remove` take yourself off the watchlist, or anyone if you\'re a TO':
+    '`/slippi remove` quítate de la lista de Slippi, o a cualquiera si eres TO',
+  '`/slippi rank` rank, rating, record, characters and past seasons. Takes any connect code':
+    '`/slippi rank` rango, rating, récord, personajes y temporadas pasadas. Acepta cualquier código de conexión',
+  '`/slippi leaderboard` everyone on the watchlist, best rank first': '`/slippi leaderboard` todos en la lista de Slippi, el mejor rango primero',
+  '-# Cards show the rank badge and their most played character. Tracked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it':
+    '-# Las tarjetas muestran la insignia de rango y el personaje más jugado. Los jugadores seguidos se agregan solos en cuanto su código aparece en una inscripción de netplay en start.gg. Los rangos salen de slippi.gg, que no tiene API pública, así que esto puede fallar si Slippi la cambia',
+  '`/t-o tournament add` track a tournament: every set, stream alerts and top 8s in its thread, plus reg reminders. `schedule:` sets custom reminder times, `add_event:on` also makes a Discord event':
+    '`/t-o tournament add` sigue un torneo: cada set, avisos de stream y top 8 en su hilo, más los recordatorios de inscripción. `schedule:` pone horarios de recordatorio propios, `add_event:on` también crea un evento de Discord',
+  '`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute':
+    '`/t-o tournament remove` deja de seguir uno. Pregunta primero, y luego Deshacer lo devuelve durante un minuto',
+  '`/t-o tournament posts` a tracked tournament\'s sets, stream alerts, match calls, top 8s and reg reminders on or off. `schedule:` changes the reminder times, `default` goes back to the usual four':
+    '`/t-o tournament posts` enciende o apaga los sets, avisos de stream, llamados de partida, top 8 y recordatorios de inscripción de un torneo seguido. `schedule:` cambia los horarios de recordatorio, `default` vuelve a los cuatro de siempre',
+  '`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event':
+    '`/registered` quién de aquí está inscrito, por nombre para que nadie reciba ping. `by_event:True` lo agrupa por evento',
+  '`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours':
+    '`/reg_warn` avísale a alguien que todavía no se ha inscrito. Si ya lo está, solo lo dice. Una vez por persona y torneo cada 12 horas',
+  '`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end':
+    '`/bracket` enlaces de brackets de torneos seguidos, desde 30 min antes del inicio hasta 6 horas después del final',
+  '`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min':
+    '`/stream_link` enlaces de stream de torneos seguidos o con jugadores seguidos, en vivo o que empiezan en menos de 30 min',
+  '`/t-o tournament event` make a Discord event from a start.gg link, without tracking it. Its streams go in the description':
+    '`/t-o tournament event` crea un evento de Discord desde un enlace de start.gg, sin seguirlo. Sus streams van en la descripción',
+  '-# `/t-o tournament` is TOs only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time, end time, cover photo, place and streams, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map':
+    '-# `/t-o tournament` es solo para TOs. `tournament:` acepta un enlace o uno que el bot ya conoce. Los eventos de Discord siguen la hora, hora de fin, foto de portada, lugar y streams de start.gg, revisados cada hora, y se cancelan si el torneo se borra ahí. Las tarjetas y los DMs muestran la dirección del lugar cuando el TO la puso en start.gg, con enlace a un mapa',
   '**Fun**': '**Diversión**',
-  '`/64` a 64 old head who says 64 did it first': '`/64` un veterano que dice que 64 lo hizo primero',
-  '`/melee` a Melee purist with a take': '`/melee` un purista de Melee con su opinión',
-  '`/brawl` the last person still defending Brawl': '`/brawl` el último que aún defiende Brawl',
+  '`/64` a 64 old head who says 64 did it first': '`/64` un veterano de 64 que dice que 64 lo hizo primero',
+  '`/melee` a Melee purist with a take': '`/melee` un purista de Melee con una opinión',
+  '`/brawl` the last person still defending Brawl': '`/brawl` la última persona que todavía defiende Brawl',
   '`/sm4sh` a love letter to Smash 4': '`/sm4sh` una carta de amor a Smash 4',
   '`/ult` an Ultimate player who hates Ultimate': '`/ult` un jugador de Ultimate que odia Ultimate',
   '`/pplus` a Project+ player who wants you on netplay': '`/pplus` un jugador de Project+ que te quiere en netplay',
-  '`/bills` Live pro-Bills photos and official Bills GIFs. Never sends the same image twice in a row': '`/bills` Fotos pro-Bills y GIFs oficiales. Nunca repite la misma imagen seguida',
-  '`/view_pfp` my profile picture, full size': '`/view_pfp` mi foto de perfil, en grande',
-  '-# `/t-o settings bills:True` posts Bills final scores here after each game, green for a win and red for a loss': '-# `/t-o settings bills:True` publica el marcador final de los Bills, verde victoria y rojo derrota',
-  '**Posted here automatically**': '**Publicado aquí solo**',
-  '**Set results.** Every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked. `/t-o settings set_colors` colors them green for a win, red for a loss, gold for crew vs crew and blue when nobody tracked played': '**Sets.** Cada set terminado en un torneo seguido, y sets de seguidos con resultados on, más su primer DQ. Una hora después se corrigen ganadores y se marcan resets. `/t-o settings set_colors` los colorea verde, rojo, dorado o azul',
-  '**Stream alerts.** Sets on stream or up next in the stream queue for 30 seconds, at tracked tournaments and for tracked players with stream alerts on, pinging whoever is playing with `/notify streams` on': '**Streams.** Sets en stream o siguientes por 30 segundos, en torneos seguidos y para seguidos con alertas on, con ping a `/notify streams`',
-  '**Match call pings.** Called sets, pinging whoever has `/notify calls` on with You\'re up and the station when start.gg has one, all four in one message for doubles. A tracked tournament with `calls:on` posts every called set even with nobody to ping. A call the TO takes back gets crossed out, and calling it again pings again': '**Llamados.** Sets llamados con ping a `/notify calls`, con estación si hay. En torneo con `calls:on` se publican todos aunque nadie tenga ping. Si el TO lo quita se tacha',
-  '**Tournament roll calls.** An hour before a tournament with 3+ of the crew, with the streams from its start.gg page. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server': '**Roll calls.** Una hora antes de un torneo con 3+ de la crew, con streams de start.gg. En torneo seguido cuenta seguidos e inscritos con Discord aquí',
-  '**Tournament placements.** Where the crew placed, with the top 8 when every event finishes at a tracked tournament, even if top 8 posts are off. Otherwise 12 hours after it ends. Projected placements get edited once start.gg has them final': '**Posiciones.** Dónde quedó la crew, con top 8 al terminar cada evento en torneo seguido. Si no, 12 h después. Las proyectadas se corrigen al final',
-  '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished': '**Top 8.** El top 8 completo de cada evento en torneo seguido, al terminar el bracket',
-  '**Registration reminders.** Tracked tournaments 7 days, 3 days and a day out, then a last call 6 hours before, pinging the Reg Reminders role, unless a TO sets custom times with `schedule:`. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start, both only while you\'re in this server. When registration closes within an hour of the start there\'s one DM, the start one': '**Recordatorios.** Torneos seguidos 7, 3 y 1 día antes y última llamada 6 h antes, con ping al rol Reg Reminders, salvo `schedule:` propio. Los DM llegan 1 h antes solo si sigues en el servidor',
-  '**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/t-o settings events` turns it on': '**Eventos Discord.** Cada torneo próximo recibe un evento con foto y streams, una vez. Off salvo `/t-o settings events`',
-  '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg. When a season ends, a wrap-up with the final ranks, biggest climbers and most played characters': '**Slippi.** Cambios de la watchlist cada 30 min. Seguidos se descubren por códigos en start.gg. Al cerrar temporada, resumen final',
-  '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/t-o settings bills` turns it on': '**Bills.** Marcador final con logo rival, verde victoria y rojo derrota. Off salvo `/t-o settings bills`',
-  '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/t-o settings` changes it': '**Recap semanal.** Seguidos con un set singles sin DQ esa semana. Domingo 9 pm ET salvo `/t-o settings`',
-  '**Bot updates.** A new version going live on Railway, with when it deployed and the commit message': '**Bot actualizado.** Nueva versión en Railway, con cuándo y el mensaje',
-  '**Back online.** After the bot was off 10 minutes or more, for how long and that commands sent then need sending again. While start.gg is down, commands say so right away and the bot\'s status shows it': '**De vuelta.** Tras 10+ min apagado, por cuánto y que hay que reenviar comandos. Si start.gg cae, los comandos lo dicen',
-  '-# Tracked tournaments post their set results and stream alerts in a thread. `/t-o settings threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here': '-# Los torneos seguidos publican sets y streams en un hilo. `/t-o settings threads` elige off, hilo por torneo o por evento. Cada hilo fija su tarjeta hasta que termina. Si falla, publican aquí',
+  '`/bills` Live pro-Bills photos and official Bills GIFs. Never sends the same image twice in a row':
+    '`/bills` fotos a favor de los Bills en vivo y GIFs oficiales de los Bills. Nunca manda la misma imagen dos veces seguidas',
+  '`/view_pfp` my profile picture, full size': '`/view_pfp` mi foto de perfil, en tamaño completo',
+  '-# `/t-o settings bills:True` posts Bills final scores here after each game, green for a win and red for a loss':
+    '-# `/t-o settings bills:True` publica aquí el marcador final de los Bills después de cada partido, en verde si ganan y en rojo si pierden',
+  '**Posted here automatically**': '**Se publica aquí automáticamente**',
+  '**Set results.** Every finished set at a tracked tournament, and anywhere else the sets of tracked players with set results on, plus a tracked player\'s first DQ in an event. For an hour after, a winner or score the TO fixes gets edited in, and a reset set gets marked. `/t-o settings set_colors` colors them green for a win, red for a loss, gold for crew vs crew and blue when nobody tracked played':
+    '**Resultados de sets.** Cada set terminado en un torneo seguido, y en cualquier otro lado los sets de jugadores seguidos con resultados de sets activados, más el primer DQ de un jugador seguido en un evento. Durante una hora después, si el TO corrige el ganador o el marcador se edita, y un set reiniciado se marca. `/t-o settings set_colors` los pinta de verde si ganan, rojo si pierden, dorado si se enfrenta la crew y azul si no jugó nadie seguido',
+  '**Stream alerts.** Sets on stream or up next in the stream queue for 30 seconds, at tracked tournaments and for tracked players with stream alerts on, pinging whoever is playing with `/notify streams` on':
+    '**Avisos de stream.** Sets en stream o siguientes en la cola del stream por 30 segundos, en torneos seguidos y de jugadores seguidos con avisos de stream activados, con ping a quien juegue y tenga `/notify streams` activado',
+  '**Match call pings.** Called sets, pinging whoever has `/notify calls` on with You\'re up and the station when start.gg has one, all four in one message for doubles. A tracked tournament with `calls:on` posts every called set even with nobody to ping. A call the TO takes back gets crossed out, and calling it again pings again':
+    '**Pings de llamados de partida.** Sets llamados, con ping a quien tenga `/notify calls` activado con Te toca y la estación cuando start.gg la tiene, los cuatro en un mensaje en dobles. Un torneo seguido con `calls:on` publica cada set llamado aunque no haya a quién darle ping. Si el TO quita un llamado se tacha, y si lo vuelve a llamar hay ping otra vez',
+  '**Tournament roll calls.** An hour before a tournament with 3+ of the crew, with the streams from its start.gg page. At a tracked tournament that counts tracked players and anyone registered whose start.gg Discord is in this server':
+    '**Pase de lista de torneos.** Una hora antes de un torneo con 3 o más de la crew, con los streams de su página de start.gg. En un torneo seguido cuenta a los jugadores seguidos y a cualquier inscrito cuyo Discord de start.gg esté en este servidor',
+  '**Tournament placements.** Where the crew placed, with the top 8 when every event finishes at a tracked tournament, even if top 8 posts are off. Otherwise 12 hours after it ends. Projected placements get edited once start.gg has them final':
+    '**Posiciones de torneos.** Dónde quedó la crew, con el top 8 cuando termina cada evento de un torneo seguido, aunque las publicaciones de top 8 estén apagadas. Si no, 12 horas después de que termina. Las posiciones proyectadas se editan cuando start.gg las tiene finales',
+  '**Top 8s.** The full top 8 of each event at a tracked tournament, as soon as the bracket is finished':
+    '**Top 8.** El top 8 completo de cada evento de un torneo seguido, en cuanto termina el bracket',
+  '**Registration reminders.** Tracked tournaments 7 days, 3 days and a day out, then a last call 6 hours before, pinging the Reg Reminders role, unless a TO sets custom times with `schedule:`. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start, both only while you\'re in this server. When registration closes within an hour of the start there\'s one DM, the start one':
+    '**Recordatorios de inscripción.** Torneos seguidos 7 días, 3 días y un día antes, y una última llamada 6 horas antes, con ping al rol Reg Reminders, salvo que un TO ponga horarios propios con `schedule:`. `dm_registration` te manda un DM 1 hora antes de que cierre la inscripción, salvo que ya estés inscrito, y `dm_start` te manda un DM 1 hora antes del inicio, los dos solo mientras sigas en este servidor. Cuando la inscripción cierra a menos de una hora del inicio, llega un solo DM, el del inicio',
+  '**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/t-o settings events` turns it on':
+    '**Eventos de Discord.** Cada próximo torneo seguido recibe un evento de Discord con la foto de portada de start.gg y los streams en la descripción, una vez. Apagado salvo que `/t-o settings events` lo encienda',
+  '**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg. When a season ends, a wrap-up with the final ranks, biggest climbers and most played characters':
+    '**Cambios de rango en Slippi.** Cambios en la lista de Slippi, revisados cada 30 minutos. Los jugadores seguidos se pueden descubrir por los códigos de conexión puestos en start.gg. Cuando termina una temporada, un cierre con los rangos finales, los que más subieron y los personajes más jugados',
+  '**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/t-o settings bills` turns it on':
+    '**Resultados finales de los Bills.** El marcador final con el logo del otro equipo, en verde si ganan y en rojo si pierden, revisado cada día y cada 15 minutos el día del partido. Apagado salvo que `/t-o settings bills` lo encienda',
+  '**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/t-o settings` changes it':
+    '**Resumen semanal de la crew.** Los jugadores seguidos con un set de singles sin DQ esa semana. Domingo 9 pm ET salvo que `/t-o settings` lo cambie',
+  '**Bot updates.** A new version going live on Railway, with when it deployed and the commit message':
+    '**Actualizaciones del bot.** Una versión nueva que sale en Railway, con cuándo se publicó y el mensaje del commit',
+  '**Back online.** After the bot was off 10 minutes or more, for how long and that commands sent then need sending again. While start.gg is down, commands say so right away and the bot\'s status shows it':
+    '**De vuelta en línea.** Cuando el bot estuvo apagado 10 minutos o más, por cuánto tiempo y que los comandos de ese rato hay que mandarlos otra vez. Mientras start.gg está caído, los comandos lo avisan enseguida y el estado del bot lo muestra',
+  '-# Tracked tournaments post their set results and stream alerts in a thread. `/t-o settings threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here':
+    '-# Los torneos seguidos publican sus resultados de sets y avisos de stream en un hilo. `/t-o settings threads` elige entre apagado, un hilo por torneo o uno por evento para todo, y uno por evento aplica también a los torneos seguidos. Cada hilo fija su tarjeta en el canal hasta que termina el torneo o el evento. Si no se puede usar un hilo, se publican aquí',
   '-# Page {0}/{1}': '-# Página {0}/{1}',
 };

@@ -4,7 +4,7 @@ import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { RUNS_LATE_HOURS, endTime, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
-import { replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag, t, listOf, language } from './shared.js';
+import { replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag, t, listOf } from './shared.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
@@ -94,7 +94,7 @@ async function streamLink(interaction) {
   if (!shown.length) {
     const names = live.slice(0, 5).map((tournament) => escapeMarkdown(tournament.name));
     if (live.length > 5) names.push(t`${live.length - 5} more`);
-    const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(names);
+    const list = listOf(names);
     return interaction.editReply({ content: t`No stream links on start.gg for ${list}. ${t(ASK_A_TO)}`, allowedMentions: { parse: [] } });
   }
   return sendEmbeds(interaction, shown.flatMap((tournament) => embeds.streamLinks(tournament, streams.get(String(tournament.id)))));

@@ -97,7 +97,7 @@ export async function postMatchCalls(postChannel = currentChannel()) {
 async function sendMatchCall(set, inSet, discordIds, postChannel) {
   const components = h2hRow(set, inSet[0]);
   const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
-  const text = set.station ? t`You're up - Station ${set.station}` : t(`You're up`);
+  const text = set.station ? t`You're up - Station ${set.station}` : t('You\'re up');
   const sent = await postChannel.send({
     content: discordIds.length ? `${mentions(discordIds)} ${text}` : undefined,
     embeds: embeds.withImage([embeds.matchCall(set, people)]),
@@ -143,7 +143,7 @@ export async function followCalls(postChannel = currentChannel()) {
       // uncalled: edit first so a failed edit stays watched for the next check
       state.called = state.called.filter((id) => id !== each.setId);
       // an edit never pings, the mentions just stay so they can see it was theirs
-      const struck = each.text ?? t(`You're up`);
+      const struck = each.text ?? t('You\'re up');
       const uncalled = t('Uncalled by the TO, wait for the next call');
       const content = each.discordIds.length ? `${mentions(each.discordIds)} ~~${struck}~~ ${uncalled}` : uncalled;
       await editPost(postChannel, each, { content, allowedMentions: { parse: [] } });

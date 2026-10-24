@@ -103,9 +103,9 @@ function watchUptime(client) {
   return outage;
 }
 
-// one server's posts go in its own channel, set by /settings channel. the old GUILD_ID/CHANNEL_ID
+// one server's posts go in its own channel, set by /t-o settings channel:. the old GUILD_ID/CHANNEL_ID
 // pair migrates into that server's entry, so the first multi-server boot keeps posting there.
-// a cached channel only counts while it's still the saved one, so /settings channel takes effect on the next check
+// a cached channel only counts while it's still the saved one, so /t-o settings channel: takes effect on the next check
 let botClient = null;
 const channelCache = new Map();
 
@@ -216,7 +216,7 @@ function startChecks() {
 }
 
 // single-server builds post in CHANNEL_ID with everything on the root state. multi-server builds post in
-// each server's /settings channel channel
+// each server's channel from /t-o settings channel:
 export function startTracking(client, singleChannel = null) {
   stopping = false;
   const now = secondsNow();

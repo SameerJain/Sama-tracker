@@ -4343,6 +4343,47 @@
     "numEntrants": 18,
     "game": "Ultimate",
     "eventSlug": "tournament/smash-royale-49/event/ultimate-singles",
-    "standings": []
+    "standings": [
+      {
+        "placement": 1,
+        "name": "DrkF | yeehaw",
+        "players": [
+          {
+            "id": 2194631,
+            "tag": "yeehaw"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "Balls | CAT",
+        "players": [
+          {
+            "id": 1423851,
+            "tag": "CAT"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      }
+    ]
   }
 ]

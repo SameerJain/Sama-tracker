@@ -273,7 +273,11 @@ Run `/t-o settings` without options to see every setting privately. TOs can chan
 
 Times use 24-hour `HH:MM` in the chosen timezone, with daylight saving. Settings save right away and survive restarts. Posts that came due while a type was off stay skipped after you turn it back on. Schedule changes apply to future recaps. Each player's `/track posts`, each tournament's `/t-o tournament posts` and everyone's own `/notify` pings still apply on top.
 
-`/t-o settings language:es` switches everything the bot says to Spanish: command descriptions in Discord, `/help`, every reply, card, automatic post, DM, button and fun post. `language:en` switches back. Single-server builds re-register the commands in the new language, so descriptions change at once. Fun posts reply in Spanish when the server is Spanish, from the same characters and talking points.
+### Language
+
+`/t-o settings language:Español` switches everything the bot says in the server to Spanish: `/help`, every reply, card, button, automatic post and DM. `language:English` switches back, and English is the default. Command and option names stay in English, since they're what you type, but their descriptions switch. A single-server build registers the commands again in the new language, so the descriptions change right away. Multi-server builds share one set of commands across every server, so there the descriptions follow each person's own Discord language, Spanish for anyone whose Discord is in Spanish.
+
+Names from start.gg stay as start.gg has them, like tournaments, events, rounds and players, and Discord shows dates and times in each person's own language. Fun posts are written in Spanish with the same characters and talking points. They're made ahead for each language a server uses, so the first one after switching takes a few seconds. Samatracker and the series data pages stay in English.
 
 ### Threads
 

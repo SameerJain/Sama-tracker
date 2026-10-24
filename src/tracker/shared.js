@@ -55,7 +55,9 @@ export const SLIPPI_SKIPPED_KEPT = 1000;
 // check after a long outage, or after this shipped, doesn't post about an old season
 export const SEASON_WRAP_DAYS = 7;
 export const SEASONS_WRAPPED_KEPT = 20;
-// /t-o settings threads needs these in the channel, named the way discord's settings show them
+// what the bot can't post in a channel without, and what /t-o settings threads needs on top, named the way discord's
+// settings show them. replies put them through permissionList so they read in the server's language
+export const POSTING_PERMISSIONS = { ViewChannel: 'View Channel', SendMessages: 'Send Messages', EmbedLinks: 'Embed Links' };
 export const THREAD_PERMISSIONS = { CreatePublicThreads: 'Create Public Threads', SendMessagesInThreads: 'Send Messages in Threads' };
 // longer than any tournament runs, then the thread is forgotten
 export const THREAD_KEPT_DAYS = 14;

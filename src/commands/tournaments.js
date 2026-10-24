@@ -6,8 +6,9 @@ import {
   MAX_REMINDER_HOURS, MAX_REMINDERS, REG_REMINDER_HOURS, RUNS_LATE_HOURS, checkRegReminders, checkTournaments, endTime, missingThreadPermissions, nextRegReminder, regDeadline,
   reminderSchedule, secondsNow, trackTournament,
 } from '../tracker.js';
-import { shortSchedule } from '../embeds/shared.js';
-import { lookup, replyEphemeral, t, language, listOf } from './shared.js';
+import { count, shortSchedule } from '../embeds/shared.js';
+import { lookup, replyEphemeral, t, listOf } from './shared.js';
+import { permissionList } from '../i18n.js';
 import { askFirst, confirmable } from './confirm.js';
 import { isTO, notTO } from './to.js';
 import { tournamentNotFound, tournamentSlug } from './registration.js';
@@ -15,13 +16,12 @@ import { tournamentNotFound, tournamentSlug } from './registration.js';
 const HOUR = 60 * 60;
 
 // /t-o tournament posts switches, named the way the replies list them
-const POSTS = { sets: 'Every set', stream: 'Stream alerts', calls: 'Match calls', top8: 'Top 8s', reminders: 'Reg reminders' };
+const POSTS = {
+  sets: () => t('Every set'), stream: () => t('Stream alerts'), calls: () => t('Match calls'), top8: () => t('Top 8s'), reminders: () => t('Reg reminders'),
+};
 
 // 7 days, 3 days, 1 day and 6 hours
-function inWords(hours) {
-  if (language() === 'es') return hours % 24 ? `${hours} horas` : `${hours / 24} día${hours === 24 ? '' : 's'}`;
-  return hours % 24 ? `${hours} hours` : `${hours / 24} day${hours === 24 ? '' : 's'}`;
-}
+const inWords = (hours) => (hours % 24 ? count(hours, 'hour') : count(hours / 24, 'day'));
 
 // custom reminder times before registration closes, like 7d,3d,1d,6h. bare numbers mean hours.
 // null when left out, { error } when it doesn't parse, otherwise hours before the deadline, most first
@@ -53,12 +53,12 @@ function trackedPick(interaction) {
 // match calls start off, so a tournament tracked before they existed reads as off too
 function postsText(tournament) {
   const lines = Object.entries(POSTS).map(([name, label]) => {
-    const onOff = (on) => t(on ? 'on' : 'off');
+    const onOff = (on) => (on ? t('on') : t('off'));
     if (name === 'reminders' && tournament.tracked[name] !== false && tournament.tracked.schedule) {
-      return t`**${t(label)}:** ${onOff(true)} (${shortSchedule(tournament.tracked.schedule)})`;
+      return t`**${label()}:** ${onOff(true)} (${shortSchedule(tournament.tracked.schedule)})`;
     }
     const on = name === 'calls' ? tournament.tracked[name] === true : tournament.tracked[name] !== false;
-    return t`**${t(label)}:** ${onOff(on)}`;
+    return t`**${label()}:** ${onOff(on)}`;
   });
   return lines.join(t(' · '));
 }
@@ -71,10 +71,7 @@ function threadWarning(interaction) {
   if (!postChannel) return null;
   const missing = missingThreadPermissions(postChannel);
   if (!missing) return t`Threads can't be started in <#${channelId}>, so its sets and stream alerts post there instead.`;
-  if (missing.length) {
-    const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(missing);
-    return t`I need ${list} in <#${channelId}> to start its thread. Until then its sets and stream alerts post there instead.`;
-  }
+  if (missing.length) return t`I need ${permissionList(missing)} in <#${channelId}> to start its thread. Until then its sets and stream alerts post there instead.`;
   return null;
 }
 
@@ -82,7 +79,7 @@ function threadWarning(interaction) {
 // already tracked keeps its switches and reminder schedule
 function trackLines(interaction, found, reminders, schedule, now = secondsNow()) {
   const name = escapeMarkdown(found.name);
-  if (state.tournaments[found.id]?.tracked) return [t`Already tracking ${name}.`];
+  if (state.tournaments[found.id]?.tracked) return [t`[tournament] Already tracking ${name}.`];
 
   const { id, slug, startAt, endAt, city, addrState, venueName, venueAddress, isOnline } = found;
   const images = (found.images ?? []).filter((image) => image.type === 'profile').map(({ url }) => ({ url }));
@@ -105,7 +102,7 @@ function trackLines(interaction, found, reminders, schedule, now = secondsNow())
   else if (!open) lines.push(t('Registration is closed, so no reg reminders.'));
   else if (firstAt <= now) lines.push(t`Registration ends <t:${deadline}:R>, sending the last call now.`);
   else {
-    const when = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(hours.slice(next).map(inWords));
+    const when = listOf(hours.slice(next).map(inWords));
     lines.push(t`Everyone with \`/notify registration\` on gets pinged ${when} before registration ends, starting <t:${firstAt}:R>.`);
   }
   const warning = threadWarning(interaction);
@@ -150,8 +147,11 @@ function tournamentRemove(interaction) {
   if (!isTO(interaction)) return notTO(interaction, t('stop tracking tournaments'));
   const tournament = trackedPick(interaction);
   if (!tournament) return replyEphemeral(interaction, t('That tournament isn\'t tracked. `/track list` shows the ones that are.'));
-  const calls = tournament.tracked.calls === true ? t('match calls, ') : '';
-  return askFirst(interaction, 'untrack_tournament', tournament.id, t`Stop tracking ${escapeMarkdown(tournament.name)}? Its sets, stream alerts, ${calls}top 8s and reg reminders stop.`, t('Stop tracking'));
+  const name = escapeMarkdown(tournament.name);
+  const question = tournament.tracked.calls === true
+    ? t`Stop tracking ${name}? Its sets, stream alerts, match calls, top 8s and reg reminders stop.`
+    : t`Stop tracking ${name}? Its sets, stream alerts, top 8s and reg reminders stop.`;
+  return askFirst(interaction, 'untrack_tournament', tournament.id, question, t('Stop tracking'));
 }
 
 confirmable('untrack_tournament', {
@@ -164,19 +164,19 @@ confirmable('untrack_tournament', {
     delete tournament.reminder;
     delete tournament.crew;
     save();
-    return { content: t`Stopped tracking ${escapeMarkdown(tournament.name)}.`, undo: kept };
+    return { content: t`[tournament] Stopped tracking ${escapeMarkdown(tournament.name)}.`, undo: kept };
   },
-  cancel: (id) => (state.tournaments[id]?.tracked ? t`Still tracking ${escapeMarkdown(state.tournaments[id].name)}.` : t('It isn\'t tracked anymore.')),
+  cancel: (id) => (state.tournaments[id]?.tracked ? t`[tournament] Still tracking ${escapeMarkdown(state.tournaments[id].name)}.` : t('It isn\'t tracked anymore.')),
   undo: (kept) => {
     const tournament = state.tournaments[kept.id];
     // its placements went out and it got cleared in the minute since, which the next check would redo anyway
     if (!tournament) return t('Too late to undo, it\'s over. `/t-o tournament add` it again.');
-    if (tournament.tracked) return t`${escapeMarkdown(tournament.name)} is already tracked again.`;
+    if (tournament.tracked) return t`[tournament] ${escapeMarkdown(tournament.name)} is already tracked again.`;
     Object.assign(tournament, { tracked: kept.tracked, reminder: kept.reminder, crew: kept.crew });
     save();
-    return t`Tracking ${escapeMarkdown(tournament.name)} again, with the same settings as before.`;
+    return t`[tournament] Tracking ${escapeMarkdown(tournament.name)} again, with the same settings as before.`;
   },
-  tooLate: t('Too late to undo. `/t-o tournament add` it again.'),
+  tooLate: () => t('Too late to undo. `/t-o tournament add` it again.'),
 });
 
 // with no switches it says what's on. sets turned back on start from now, the way a newly tracked tournament does,
@@ -210,7 +210,7 @@ function tournamentPosts(interaction) {
   save();
   const lines = [t`**${name}**`, postsText(tournament)];
   if (schedule) {
-    const when = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(schedule.map(inWords));
+    const when = listOf(schedule.map(inWords));
     lines.push(t`-# Reg reminders go out ${when} before registration ends, starting from the next one still to come`);
   } else if (resetting) lines.push(t('-# Reg reminders are back to the usual 7 days, 3 days, 1 day and 6 hours before registration ends'));
   return interaction.reply({ content: lines.join('\n'), allowedMentions: { parse: [] } });

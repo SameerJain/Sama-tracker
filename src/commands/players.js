@@ -8,7 +8,7 @@ import { setResultColors } from '../message-settings.js';
 import { count } from '../embeds/shared.js';
 import {
   buttonRow, findPlayer, flag, h2hButton, isSelf, linkedPlayer, readChoice, readPlayer, readTracked, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer,
-  replyNotTracked, sendEmbeds, t, language,
+  replyNotTracked, sendEmbeds, t, listOf,
 } from './shared.js';
 import { askFirst, confirmable, undoRow } from './confirm.js';
 import { isTO, notTO } from './to.js';
@@ -70,7 +70,7 @@ confirmable('untrack', {
     save();
     return t`Tracking ${escapeMarkdown(player.tag)} again, with the same settings as before.`;
   },
-  tooLate: t('Too late to undo. `/track add` them again, with set results and stream alerts starting off.'),
+  tooLate: () => t('Too late to undo. `/track add` them again, with set results and stream alerts starting off.'),
 });
 
 // who /t-o cleanup asked about, by the id its buttons carry, until someone presses one. a restart in between
@@ -92,7 +92,12 @@ async function trackCleanup(interaction) {
   const away = players.filter((player) => player.discordId && !members.has(player.discordId));
   const unknown = players.filter((player) => !player.discordId);
   const going = noDiscord ? [...away, ...unknown] : away;
-  const kept = noDiscord || !unknown.length ? '' : t`\n-# ${count(unknown.length, 'player has', 'players have')} no Discord on start.gg and stay${unknown.length === 1 ? 's' : ''}. \`no_discord:True\` untracks them too`;
+  let kept = '';
+  if (!noDiscord && unknown.length) {
+    kept = unknown.length === 1
+      ? t('\n-# 1 player has no Discord on start.gg and stays. `no_discord:True` untracks them too')
+      : t`\n-# ${unknown.length} players have no Discord on start.gg and stay. \`no_discord:True\` untracks them too`;
+  }
   if (!going.length) return interaction.editReply({ content: t`Everyone tracked has their start.gg Discord in this server.${kept}`, allowedMentions: { parse: [] } });
 
   const target = String(interaction.id ?? Date.now());
@@ -100,9 +105,10 @@ async function trackCleanup(interaction) {
   setTimeout(() => cleanups.delete(target), CLEANUP_SECONDS * 1000).unref?.();
   const names = going.slice(0, CLEANUP_NAMED).map((player) => escapeMarkdown(player.tag));
   if (going.length > CLEANUP_NAMED) names.push(t`${going.length - CLEANUP_NAMED} more`);
-  const list = new Intl.ListFormat(language() === 'es' ? 'es' : 'en').format(names);
-  const extra = noDiscord ? t(' or who have none') : '';
-  const question = t`Untrack ${count(going.length, 'player')} whose start.gg Discord isn't in this server${extra}? ${list}.${kept}`;
+  const list = listOf(names);
+  const question = noDiscord
+    ? t`Untrack ${count(going.length, 'player')} whose start.gg Discord isn't in this server or who have none? ${list}.${kept}`
+    : t`Untrack ${count(going.length, 'player')} whose start.gg Discord isn't in this server? ${list}.${kept}`;
   return askFirst(interaction, 'cleanup', target, question, t('Untrack them'));
 }
 
@@ -127,7 +133,7 @@ confirmable('cleanup', {
     save();
     return t`Tracking ${count(back.length, 'player')} again, with the same settings as before.`;
   },
-  tooLate: t('Too late to undo. `/track add` anyone you want back.'),
+  tooLate: () => t('Too late to undo. `/track add` anyone you want back.'),
 });
 
 // only lets commands default to them, they don't get tracked.
@@ -140,7 +146,7 @@ async function link(interaction) {
   const input = interaction.options.getString('profile');
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const player = input ? await findPlayer(interaction, input, t('your')) : await ownAccount(interaction, '/link');
+  const player = input ? await findPlayer(interaction, input, true) : await ownAccount(interaction, '/link');
   if (!player) return;
   if (player.discordId !== interaction.user.id) {
     return interaction.editReply(player.discordId
@@ -201,7 +207,7 @@ confirmable('unlink', {
     save();
     return t`Linked to ${escapeMarkdown(linked.tag)} again.`;
   },
-  tooLate: t('Too late to undo. `/link` again with your start.gg profile link.'),
+  tooLate: () => t('Too late to undo. `/link` again with your start.gg profile link.'),
 });
 
 // goes by the discord connected on start.gg, so nobody can claim someone else's

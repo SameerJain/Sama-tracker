@@ -615,6 +615,31 @@ test('queued fun posts survive a restart instead of discarding paid-for Claude p
   assert.deepEqual(state.funQueue['queue-test'] ?? [], []);
 });
 
+test('a spanish server gets fun posts written in spanish, from a queue of its own', async (t) => {
+  fakeSites();
+  t.mock.method(Math, 'random', () => 0.5);
+  state.messages = {};
+  const made = [];
+  const client = { messages: { create: async (request) => {
+    if (!request.messages[0].content.startsWith('Style: ')) return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'a scenario' }] };
+    const spanish = request.system.includes('Write it in Spanish');
+    made.push(spanish ? 'es' : 'en');
+    return { stop_reason: 'end_turn', content: [{ type: 'text', text: spanish ? 'post en español' : 'english post' }] };
+  } } };
+  const fun = makeFun({
+    name: 'language-test', line: 'LINE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: [], points: ['one', 'two', 'three'],
+    articles: ['Techniques (SSBM)'], videos: [],
+  }, client);
+  await untilSaved('language-test', 3);
+  assert.deepEqual([...new Set(made)], ['en'], 'nobody picked spanish, so nothing gets made in it');
+
+  state.messages = { language: 'es' };
+  assert.equal((await fun.takePost()).text, 'post en español');
+  await untilSaved('language-test:es', 3);
+  state.messages = {};
+  assert.equal((await fun.takePost()).text, 'english post');
+});
+
 test('queued bills posts survive a restart without reloading the pools', async (t) => {
   t.mock.method(Math, 'random', () => 0);
   globalThis.fetch = async (url) => {
