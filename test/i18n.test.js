@@ -109,6 +109,8 @@ async function switchLanguage(lang, guild) {
       getString: (name) => (name === 'language' ? lang : null),
     },
     reply: async (result) => { reply = result; },
+    // spanish runs past one message, so the answer carries on in follow-ups, read here as one
+    followUp: async (result) => { reply = { ...reply, content: `${reply.content}\n${result.content}` }; },
   });
   return reply;
 }

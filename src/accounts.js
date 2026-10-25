@@ -63,16 +63,22 @@ export async function serverMembers(guild, ids) {
   return found;
 }
 
+// the start.gg users saved for this one discord id: this server's first, then every other server's in a
+// multi-server build, so a server the bot just joined finds someone another server already knows. only ever
+// this discord id, and start.gg has to confirm it's connected, so it shows nothing else about another server
+function savedFor(discordId) {
+  return [state, ...Object.values(state.guilds ?? {})].flatMap((place) => [
+    ...Object.values(place.players ?? {}).filter((player) => player.discordId === discordId).map((player) => player.userId),
+    place.links?.[discordId]?.userId,
+    place.accounts?.[discordId],
+  ]);
+}
+
 // start.gg can't be searched by discord, so this tries the accounts the bot already has for it, then
 // everyone registered for a tracked tournament that isn't over. a match only counts if start.gg still has
 // this discord connected to it. null if nothing does
 export async function findAccount(discordId) {
-  const saved = [
-    ...Object.values(state.players).filter((player) => player.discordId === discordId).map((player) => player.userId),
-    state.links[discordId]?.userId,
-    state.accounts[discordId],
-  ];
-  const found = await connected(discordId, saved);
+  const found = await connected(discordId, savedFor(discordId));
   if (found) return found;
   // disconnected there since it was seen
   if (state.accounts[discordId]) {

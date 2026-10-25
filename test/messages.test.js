@@ -23,6 +23,8 @@ async function configure(values = {}, allowed = true, guild = undefined, user = 
     options: { getSubcommandGroup: () => null, getSubcommand: () => 'settings', getBoolean: name => values[name] ?? null,
       getString: name => values[name] ?? null, getInteger: name => values[name] ?? null, getChannel: name => values[name] ?? null },
     reply: async result => { reply = result; },
+    // a long answer carries on in follow-ups, read here as one
+    followUp: async result => { reply = { ...reply, content: `${reply.content}\n${result.content}` }; },
   });
   return reply;
 }
@@ -166,6 +168,29 @@ test('running settings without options shows the defaults privately, to anyone, 
   assert.match(reply.content, /Bills final results:\*\* off/);
   assert.match(reply.content, /Sunday 21:00 EST/);
   assert.deepEqual(state.messages, {});
+});
+
+test('settings too long for one Discord message go out in private parts, each 2000 characters or less', async () => {
+  // spanish runs longer than english, and discord turns down a message over 2000 characters
+  state.messages = { language: 'es' };
+  const sent = [];
+  await handleCommand({
+    commandName: 't-o', user: { id: 'anyone' }, memberPermissions: { has: () => false },
+    options: { getSubcommandGroup: () => null, getSubcommand: () => 'settings', getBoolean: () => null, getString: () => null, getInteger: () => null, getChannel: () => null },
+    reply: async (result) => sent.push(['reply', result]),
+    followUp: async (result) => sent.push(['followUp', result]),
+  });
+  assert.ok(sent.length > 1, 'split into more than one message');
+  assert.deepEqual(sent.map(([kind]) => kind), ['reply', ...Array(sent.length - 1).fill('followUp')]);
+  for (const [, result] of sent) {
+    assert.ok(result.content.length <= 2000, `${result.content.length} characters`);
+    assert.equal(result.flags, MessageFlags.Ephemeral);
+    assert.deepEqual(result.allowedMentions, { parse: [] });
+  }
+  const whole = sent.map(([, result]) => result.content).join('\n');
+  assert.match(whole, /^\*\*Publicaciones automáticas\*\*/);
+  assert.match(whole, /commands_channel/);
+  state.messages = {};
 });
 
 test('the recap timezone suggests the usual zones, then any zone with what was typed in it', async () => {

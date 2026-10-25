@@ -9,7 +9,7 @@ import { cantMakeEvents } from '../discord-events.js';
 import { switchFunLanguage } from '../fun/index.js';
 import { count } from '../embeds/shared.js';
 import { commandsFor, LANGUAGES, language, listOf, permissionList, t } from '../i18n.js';
-import { isSelf, linkedPlayer, readTracked, replyEphemeral, replyNotTracked } from './shared.js';
+import { isSelf, linkedPlayer, readTracked, replyEphemeral, replyInParts, replyNotTracked } from './shared.js';
 import { askFirst, confirmable } from './confirm.js';
 import { isTO, notTO } from './to.js';
 
@@ -91,7 +91,7 @@ async function configureSettings(interaction) {
   }
   const channel = interaction.options.getChannel?.('channel');
 
-  if (!Object.keys(changes).length && !channel) return replyEphemeral(interaction, settingsText(interaction.guild));
+  if (!Object.keys(changes).length && !channel) return replyInParts(interaction, settingsLines(interaction.guild), { ephemeral: true });
   if (!isTO(interaction)) return notTO(interaction, t('change server settings'));
   // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
   if (changes.events && !previous.events) {
@@ -125,10 +125,7 @@ async function configureSettings(interaction) {
   if (channel) state.channelId = channel.id;
   save();
   if (pickedLanguage) switchFunLanguage(pickedLanguage);
-  await interaction.reply({
-    content: [settingsText(interaction.guild), ...channelLines].join('\n'),
-    allowedMentions: { parse: [] },
-  });
+  await replyInParts(interaction, [...settingsLines(interaction.guild), ...channelLines]);
   // a single-server build registers its commands in the server's language, so their descriptions switch too.
   // multi-server commands are global, so there each person's own discord language picks. the setting already
   // saved either way, so a failed registration only gets logged
@@ -139,8 +136,9 @@ async function configureSettings(interaction) {
   }
 }
 
-// every setting, shown when /t-o settings has no options and after a change
-function settingsText(guild) {
+// every setting, shown when /t-o settings has no options and after a change. lines, since the whole list with its
+// footnotes runs past what one message holds, in spanish and in a multi-server build
+function settingsLines(guild) {
   const settings = messageSettings();
   const commandsIn = commandChannels(guild);
   const onOff = (on) => (on ? t('on') : t('off'));
@@ -164,7 +162,7 @@ function settingsText(guild) {
     t('-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.'),
     t('-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.'),
     t('-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.'));
-  return lines.join('\n');
+  return lines;
 }
 
 // twitch.tv/name works without the https. null for anything that isn't a web link

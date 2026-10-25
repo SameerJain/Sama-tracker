@@ -32,8 +32,9 @@ function fakeChannel(id, allowed = ['ViewChannel', 'SendMessages', 'EmbedLinks',
   };
 }
 
+// a long answer carries on in follow-ups, each held to discord's 2000 characters, read here as one
 async function setup(guildId, channel) {
-  let reply;
+  const parts = [];
   await handleCommand({
     commandName: 't-o', guildId, guild: { id: guildId }, user: { id: 'me' },
     client: { user: { id: 'bot' } },
@@ -42,9 +43,11 @@ async function setup(guildId, channel) {
       getSubcommandGroup: () => null, getSubcommand: () => 'settings', getChannel: () => channel,
       getBoolean: () => null, getString: () => null, getInteger: () => null,
     },
-    reply: async (result) => { reply = result; },
+    reply: async (result) => { parts.push(result); },
+    followUp: async (result) => { parts.push(result); },
   });
-  return reply;
+  for (const part of parts) assert.ok(part.content.length <= 2000, `${part.content.length} characters in one message`);
+  return { ...parts[0], content: parts.map((part) => part.content).join('\n') };
 }
 
 test('servers get their own track lists, settings and channels', async () => {
@@ -290,5 +293,34 @@ test('only the migrated server claims saved reg reminders in a multi-server buil
     assert.equal(state.regReminders, undefined);
   } finally {
     delete process.env.GUILD_ID;
+  }
+});
+
+test('finding your own start.gg also goes by what another server already knows, once start.gg confirms it', async () => {
+  const startgg = await import('../src/startgg.js');
+  const { findAccount } = await import('../src/accounts.js');
+  startgg.setRequestGap(0);
+  const originalFetch = globalThis.fetch;
+  const asked = [];
+  // start.gg has user 77 with this discord connected, and user 88 with someone else's
+  globalThis.fetch = async (_url, options) => {
+    const { query } = JSON.parse(options.body);
+    asked.push(query);
+    const user = (id, discord) => ({ slug: `user/${id}`, images: [], player: { gamerTag: `Player ${id}` }, authorizations: [{ externalId: discord }] });
+    return { ok: true, json: async () => ({ data: { u77: user(77, 'known-discord'), u88: user(88, 'someone-else') } }) };
+  };
+  try {
+    forGuild('first-server').links['known-discord'] = { userId: 77, tag: 'Player 77' };
+    forGuild('first-server').accounts['stale-discord'] = 88;
+    forGuild('new-server');
+    const found = await guildLocal.run('new-server', () => findAccount('known-discord'));
+    assert.equal(found?.slug, 'user/77');
+    assert.match(asked[0], /u77: user\(id: 77\)/);
+    // a saved account start.gg no longer connects to this discord finds nobody
+    assert.equal(await guildLocal.run('new-server', () => findAccount('stale-discord')), null);
+    // nothing about the first server got copied into the new one
+    assert.deepEqual(forGuild('new-server').links, {});
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });

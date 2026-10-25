@@ -1,6 +1,6 @@
 // /t-o settings, /track posts, /notify and the other settings replies in src/commands/settings.js
 export default {
-  // settingsText
+  // settingsLines
   '**Automatic posts**': '**Publicaciones automáticas**',
   '**{0}:** {1}': '**{0}:** {1}',
   '**Threads:** {0}': '**Hilos:** {0}',

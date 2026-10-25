@@ -204,7 +204,7 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional, and links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |
 
-`/profile` checks the Discord connected on start.gg against accounts the bot has already seen: tracked players, people who used `/link`, and people registered for a tournament the bot checks. It reads registration lists again at most every 10 minutes. If it can't find you, connect Discord on start.gg and run `/link` with your profile link. To find someone else with `/profile @them`, they have to be on that list first. Or pick them from the tracked and linked list with `player:`, which needs no Discord matching.
+`/profile` checks the Discord connected on start.gg against accounts the bot has already seen: tracked players, people who used `/link`, and people registered for a tournament the bot checks. With `MULTI_GUILD=true` that's in any server the bot is in, so a new server finds people another one already knows, and `/track add` and `/link` with no link find you the same way. It reads registration lists again at most every 10 minutes. If it can't find you, connect Discord on start.gg and run `/link` with your profile link. To find someone else with `/profile @them`, they have to be on that list first. Or pick them from the tracked and linked list with `player:`, which needs no Discord matching.
 
 `/socials_edit` needs **Manage Server** by default. You can hand it to other roles under Server Settings > Integrations > Sama-tracker, and the bot goes by that.
 

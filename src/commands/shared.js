@@ -4,6 +4,7 @@ import {
 } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
+import { split } from '../embeds/shared.js';
 import { state, save } from '../store.js';
 import { ApiError } from '../errors.js';
 import { t, count, listOf, language } from '../i18n.js';
@@ -342,6 +343,15 @@ async function withCountdown(interaction, doing, work, preview) {
 // start.gg tag or typed link can't ping anyone
 const replyEphemeral = (interaction, content) => interaction.reply({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 
+// discord turns down a message over 2000 characters, so a long answer goes out as the reply and follow-ups,
+// split between lines. a private reply keeps every part private
+async function replyInParts(interaction, lines, { ephemeral = false } = {}) {
+  const extra = { allowedMentions: { parse: [] }, ...(ephemeral && { flags: MessageFlags.Ephemeral }) };
+  const [first, ...rest] = split(lines, 2000).map((part) => part.join('\n'));
+  await interaction.reply({ content: first, ...extra });
+  for (const content of rest) await interaction.followUp({ content, ...extra });
+}
+
 // letters to add, drop or change to get from one to the other
 function distance(a, b) {
   let row = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -487,6 +497,6 @@ const flag = (interaction, name) => interaction.options.getBoolean(name) ?? fals
 export {
   pickable, readChoice, readPlayer, readTracked, linkedPlayer, isSelf, lookup, nameMatches, didYouMean, recentPicks, rememberPick,
   findPlayer, fetchPlayer, statPlayer, looksLikeProfile, notAPlayer, playerBySlug, flag, parseSince,
-  sendEmbeds, withCountdown, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, replyNotTracked, failureMessage,
+  sendEmbeds, withCountdown, replyEphemeral, replyEphemeralAfterDefer, replyInParts, replyNoPlayer, replyNotTracked, failureMessage,
   reportButton, fullReport, h2hButton, buttonRow, readButton, commandLabel, roughly, LATE_SECONDS, t, count, listOf, language,
 };
