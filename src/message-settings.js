@@ -6,7 +6,7 @@ export const MESSAGE_TYPES = {
   results: 'Tournament placements', top8: 'Top 8s', registration: 'Registration reminders', events: 'Discord events for tracked tournaments',
   slippi: 'Slippi rank changes and season wrap-ups', recap: 'Weekly crew recap', bills: 'Bills final results',
 };
-// where set results and stream alerts go, named the way /t-o settings lists them
+// where set results, stream alerts, match calls and next opponents go, named the way /t-o settings lists them
 export const THREAD_MODES = { off: 'Off, post in the channel', tournament: 'One thread per tournament', event: 'One thread per event' };
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 // only an explicit on counts for these, everything else starts on, tracked tournaments' posts included, since

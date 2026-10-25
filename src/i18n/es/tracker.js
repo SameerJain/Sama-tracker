@@ -4,6 +4,9 @@ export default {
   'You\'re up': 'Te toca',
   'You\'re up - Station {0}': 'Te toca - Estación {0}',
   'Uncalled by the TO, wait for the next call': 'El TO retiró el llamado, espera al siguiente',
+  // next.js
+  'Next opponent': 'Próximo rival',
+  'Changed by the TO': 'Cambiado por el TO',
   // streams.js
   'on stream': 'en stream',
   // reminders.js

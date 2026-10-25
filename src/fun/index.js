@@ -11,6 +11,15 @@ import bills from './bills.js';
 // release order, with project+ after the official games
 export const funCommands = Object.fromEntries([smash64, melee, brawl, sm4sh, ult, pplus, bills].map((fun) => [fun.name, fun]));
 
+// a server picked a language, so the posts made ahead follow it. bills only translates its titles when shown
+export function switchFunLanguage(lang) {
+  for (const fun of Object.values(funCommands)) fun.useLanguage?.(lang);
+}
+
+export function warmFunPosts() {
+  for (const fun of Object.values(funCommands)) fun.warmPosts?.();
+}
+
 export async function post(interaction, fun) {
   if (!fun.enabled) return interaction.reply(t(fun.line));
 

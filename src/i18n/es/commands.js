@@ -155,10 +155,10 @@ export default {
   'Match calls': 'Llamados de partida',
   'Reg reminders': 'Recordatorios de inscripción',
   ' · ': ' · ',
-  'Threads can\'t be started in <#{0}>, so its sets and stream alerts post there instead.':
-    'No se pueden abrir hilos en <#{0}>, así que sus sets y avisos de stream se publican ahí directamente.',
-  'I need {0} in <#{1}> to start its thread. Until then its sets and stream alerts post there instead.':
-    'Necesito {0} en <#{1}> para abrir su hilo. Hasta entonces, sus sets y avisos de stream se publican ahí directamente.',
+  'Threads can\'t be started in <#{0}>, so its sets, stream alerts, match calls and next opponents post there instead.':
+    'No se pueden abrir hilos en <#{0}>, así que sus sets, avisos de stream, llamados de partida y próximos rivales se publican ahí directamente.',
+  'I need {0} in <#{1}> to start its thread. Until then its sets, stream alerts, match calls and next opponents post there instead.':
+    'Necesito {0} en <#{1}> para abrir su hilo. Hasta entonces, sus sets, avisos de stream, llamados de partida y próximos rivales se publican ahí directamente.',
   'Tracking {0}.': 'Sigo {0}.',
   'No reg reminders.': 'Sin recordatorios de inscripción.',
   'Registration is closed, so no reg reminders.': 'La inscripción está cerrada, así que no hay recordatorios.',
@@ -281,6 +281,12 @@ export default {
   'Slippi doesn\'t have {0} ({1}) anymore.': 'Slippi ya no tiene a {0} ({1}).',
   'Slippi has nobody with the code {0}.{1}': 'Slippi no tiene a nadie con el código {0}.{1}',
   'Look up {0}': 'Buscar {0}',
+  'Look up {0} on start.gg': 'Buscar {0} en start.gg',
+  'Nobody tracked or linked matches "{0}". Paste their start.gg profile link': 'Nadie seguido o vinculado coincide con "{0}". Pega su enlace de perfil de start.gg',
+  'Nobody tracked or linked goes by `{0}`. Paste their start.gg profile link or ID, like start.gg/user/f64a83c8.':
+    'Nadie seguido o vinculado se llama `{0}`. Pega su enlace o ID de perfil de start.gg, como start.gg/user/f64a83c8.',
+  'Nobody is tracked yet. Paste a start.gg profile link to look anyone up': 'Todavía no sigo a nadie. Pega un enlace de perfil de start.gg para buscar a quien sea',
+  'Use the bot in {0}. A TO picks where with `/t-o settings commands_channel:`.': 'Usa el bot en {0}. Un TO elige dónde con `/t-o settings commands_channel:`.',
   'Nobody on the watchlist matches "{0}"': 'Nadie en la lista de Slippi coincide con "{0}"',
   'Nobody on the Slippi watchlist yet, /slippi add someone first':
     'Todavía no hay nadie en la lista de Slippi, agrega a alguien con /slippi add primero',

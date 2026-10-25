@@ -204,3 +204,6 @@ series monday-night-smashball:182 ub-smash-royale:78 | players 639 | finals 229 
 [monday-night-smashball] schedule: day 2 0:00 America/New_York: skip (last run 2026-10-24, next Tue 0:00 America/New_York)
 [ub-smash-royale] schedule: day 6 0:00 America/New_York: skip (last run 2026-10-24, next Sat 0:00 America/New_York)
 nothing due. use --now to force, --dry-run to preview.
+[monday-night-smashball] schedule: day 2 0:00 America/New_York: skip (last run 2026-10-24, next Tue 0:00 America/New_York)
+[ub-smash-royale] schedule: day 6 0:00 America/New_York: skip (last run 2026-10-24, next Sat 0:00 America/New_York)
+nothing due. use --now to force, --dry-run to preview.

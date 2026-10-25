@@ -91,6 +91,35 @@ test('leaving the player out looks up whoever ran it, from /link or a tracked di
   assert.equal((await run('stats', 'crew-discord')).embeds[0].data.title, 'Crew');
 });
 
+test('/run leaves out a finished saved tournament that start.gg still calls upcoming', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const royale = { id: 49, name: 'Smash Royale #49', slug: 'tournament/smash-royale-49', startAt: now - 12 * 3600, endAt: now + 3600 };
+  const graveyard = { id: 50, name: 'The Graveyard', slug: 'tournament/the-graveyard', startAt: now - 3600, endAt: now + 6 * 3600 };
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = {};
+  state.tournaments = { 49: { ...royale, userIds: [1], resultsPosted: true } };
+  const lookedUp = [];
+  mockApi(({ query, variables }) => {
+    if (query.includes('tournaments(query:')) return { u1: { tournaments: { nodes: [royale, graveyard] } } };
+    if (query.includes('tournament(id: $id)')) {
+      lookedUp.push(Number(variables.id));
+      const found = Number(variables.id) === 49 ? royale : graveyard;
+      return { tournament: { ...found, events: [{
+        id: Number(variables.id) * 10, name: 'Ultimate Singles', slug: `${found.slug}/event/ultimate-singles`, state: 'ACTIVE', numEntrants: 32,
+        u1: { id: 1, isDisqualified: false, standing: { placement: 3, isFinal: false } },
+      }] } };
+    }
+    if (query.includes('event(id:')) return { event: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    throw new Error(`no fake for ${query.slice(0, 80)}`);
+  });
+
+  const reply = await run('run', 'crew-discord');
+
+  assert.deepEqual(lookedUp, [50]);
+  assert.match(reply.embeds[0].data.title, /Graveyard/);
+  assert.doesNotMatch(reply.embeds[0].data.title, /Royale/);
+});
+
 test('stats asks start.gg for Melee standings only when the game option is enabled', async () => {
   // fresh playerId so the short /stats cache from earlier tests doesn't answer instead of start.gg
   state.players = { 1: { ...crew, playerId: 12, discordId: 'crew-discord' } };
@@ -102,16 +131,23 @@ test('stats asks start.gg for Melee standings only when the game option is enabl
   assert.deepEqual(requests.map(({ videogameId }) => videogameId), [1, undefined]);
 });
 
-test('nobody linked says to link, and a name nobody tracks gets looked up on start.gg instead of refused', async () => {
+test('nobody linked says to link, a typo gets the closest name, and a profile ID gets looked up on start.gg', async () => {
   state.players = { 1: crew };
   state.links = {};
   const unlinked = await run('stats', 'stranger');
   assert.ok(unlinked.flags);
   assert.match(unlinked.content, /\/link/);
-  mockApi(() => ({ user: null }));
-  const missed = await run('stats', 'stranger', { player: 'Crw' });
-  assert.ok(missed.flags, 'only whoever ran it sees the miss');
-  assert.match(missed.content, /^Couldn't find a start\.gg player for `Crw`\. Did you mean \*\*Crew\*\*\?/);
+  let asked = 0;
+  mockApi(() => { asked++; return { user: null }; });
+  // a name can't be a profile, so start.gg isn't asked
+  const typo = await run('stats', 'stranger', { player: 'Crw' });
+  assert.ok(typo.flags, 'only whoever ran it sees the miss');
+  assert.equal(typo.content, 'Nobody tracked or linked goes by `Crw`. Did you mean **Crew**?');
+  assert.equal(asked, 0);
+  const missed = await run('stats', 'stranger', { player: 'f64a83c8' });
+  assert.ok(missed.flags);
+  assert.match(missed.content, /^Couldn't find a start\.gg player for `f64a83c8`\./);
+  assert.equal(asked, 1);
 });
 
 test('every stat command takes a pasted start.gg profile link for someone nobody tracks', async () => {
@@ -133,11 +169,12 @@ test('every stat command takes a pasted start.gg profile link for someone nobody
 test('matchup commands wait for every validation reply before finishing', async () => {
   state.players = { 1: { ...crew, discordId: 'crew-discord' }, 7: me };
   state.links = {};
-  // a typed pick that matches nobody gets looked up as a link, and this one resolves to nobody
+  // a pasted link gets looked up, and this one resolves to nobody. a plain name that matches nobody answers too
   mockApi(() => ({ user: null }));
   for (const commandName of ['h2h', 'predict']) {
     for (const [user, values, message] of [
-      ['crew-discord', { opponent: 'missing' }, /Couldn't find a start\.gg player/],
+      ['crew-discord', { opponent: 'start.gg/user/missing' }, /Couldn't find a start\.gg player/],
+      ['crew-discord', { opponent: 'missing' }, /Nobody tracked or linked goes by `missing`/],
       ['stranger', { opponent: '7' }, /\/link/],
       ['crew-discord', { opponent: '1' }, /Pick two different players/],
     ]) {
@@ -428,7 +465,7 @@ test('/notify changes your own pings, and match calls need their start.gg', asyn
   // nothing given shows where theirs are at, and a tracked player's own posts
   const mine = await run('notify', 'crew-discord');
   assert.ok(mine.flags);
-  assert.match(mine.content, /\*\*Match calls:\*\* on\n\*\*Stream alerts:\*\* off\n\*\*Reg reminders:\*\* off\n\*\*Registration DMs:\*\* off\n\*\*Start DMs:\*\* off\n-# You're tracked as Crew, with set results on and stream alerts on/);
+  assert.match(mine.content, /\*\*Match calls:\*\* on\n\*\*Next opponents:\*\* off\n\*\*Stream alerts:\*\* off\n\*\*Reg reminders:\*\* off\n\*\*Registration DMs:\*\* off\n\*\*Start DMs:\*\* off\n-# You're tracked as Crew, with set results on and stream alerts on/);
   assert.doesNotMatch((await run('notify', 'me-discord')).content, /You're tracked/);
 
   // DMs opt in and out per person
@@ -445,6 +482,38 @@ test('/notify changes your own pings, and match calls need their start.gg', asyn
   state.streamPings = [];
   state.regDmPings = [];
   state.startDmPings = [];
+});
+
+test('/notify next:on saves the ping for a linked person and says so, and needs a start.gg', async () => {
+  state.players = { 1: { ...crew, discordId: 'crew-discord' } };
+  state.links = { 'me-discord': me };
+  Object.assign(state, { callPings: [], nextPings: [], streamPings: [], regPings: [], regDmPings: [], startDmPings: [], messages: {} });
+  globalThis.fetch = async () => assert.fail('no start.gg lookup');
+
+  // nothing to look up, so it stays off
+  const stranger = await run('notify', 'stranger', { next: 'on' });
+  assert.equal(stranger.content, 'Next opponent pings need your start.gg, so `/link` first. Leave out the link and it finds yours.');
+  assert.deepEqual(state.nextPings, []);
+
+  assert.equal((await run('notify', 'me-discord', { next: 'on' })).content, 'You\'ll get pinged when your next opponent is set.');
+  assert.deepEqual(state.nextPings, ['me-discord']);
+  assert.match((await run('notify', 'me-discord')).content, /\*\*Match calls:\*\* off\n\*\*Next opponents:\*\* on\n\*\*Stream alerts:\*\* off/);
+
+  // next off server-wide is the default for every tournament, so the pings only come where a TO turned a tournament on
+  state.messages = { next: false, streams: false };
+  const footnoted = await run('notify', 'crew-discord', { next: 'on', streams: 'on', calls: 'on' });
+  assert.deepEqual(footnoted.content.split('\n'), [
+    'You\'ll get pinged when your match is called.',
+    'You\'ll get pinged when your next opponent is set.',
+    'You\'ll get pinged when your set is on stream.',
+    '-# Next opponents are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.',
+    '-# Stream alerts are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.',
+  ]);
+  // turning one off, or failing to turn it on, says nothing about the server
+  assert.equal((await run('notify', 'crew-discord', { next: 'off' })).content, 'No more next opponent pings.');
+  assert.equal((await run('notify', 'stranger', { next: 'on' })).content.split('\n').length, 1);
+  assert.deepEqual(state.nextPings, ['me-discord']);
+  Object.assign(state, { callPings: [], nextPings: [], streamPings: [], messages: {} });
 });
 
 test('/notify lets TOs look at and change anyone\'s pings', async () => {
@@ -714,7 +783,9 @@ test('autocomplete explains an empty list instead of showing nothing', async () 
   assert.deepEqual(await choicesFor(''), [{ name: 'Nobody is tracked yet. Paste a start.gg profile link to look anyone up', value: 'nobody' }]);
   assert.deepEqual(await choicesFor('Leo', 'profile'), [{ name: 'Nobody is tracked yet, /track add someone first', value: 'Leo' }]);
   state.players = { 1: crew };
-  assert.deepEqual(await choicesFor('Leo', 'h2h'), [{ name: 'Look up Leo on start.gg', value: 'Leo' }]);
+  // a name can't be a profile, so it isn't offered as a lookup
+  assert.deepEqual(await choicesFor('Leo', 'h2h'), [{ name: 'Nobody tracked or linked matches "Leo". Paste their start.gg profile link', value: 'Leo' }]);
+  assert.deepEqual(await choicesFor('f64a83c8', 'h2h'), [{ name: 'Look up f64a83c8 on start.gg', value: 'f64a83c8' }]);
   assert.deepEqual(await choicesFor('Leo', 'profile'), [{ name: 'Nobody tracked or linked matches "Leo", /track add them first', value: 'Leo' }]);
   assert.deepEqual(await choicesFor('cr'), [{ name: 'Crew', value: '1' }]);
 

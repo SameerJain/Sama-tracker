@@ -206,6 +206,14 @@ const runs = [
   ['help', {}, /\/help verbose:True/], ['help', { values: { verbose: true } }, /Linking yourself/],
   ['status', {}, /Status/],
   ['t-o', { subcommand: 'settings', values: { channel: { id: 'channel-9', isTextBased: () => true }, events: false, day: 5, time: '20:00', language: 'en' } }, /Friday 20:00.*Automatic posts go in <#channel-9>/s],
+  // commands run in channel-1, so taking it off the list refuses them until the list is cleared
+  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'channel-1' } } }, /Bot commands:\*\* <#channel-1>/],
+  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'bots' } } }, /Bot commands:\*\* <#channel-1> and <#bots>/],
+  ['status', {}, /Status/],
+  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'channel-1' } } }, /Bot commands:\*\* <#bots>/],
+  ['status', {}, /Use the bot in <#bots>\. A TO picks where/],
+  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'bots' }, commands_anywhere: true } }, /Pick either `commands_channel` or `commands_anywhere:True`/],
+  ['t-o', { subcommand: 'settings', values: { commands_anywhere: true } }, /Bot commands:\*\* every channel/],
   ['socials', {}, /Nothing yet/],
   ['data', {}, /Monday Night SmashBall.*monday-night-smashball\.vercel\.app.*UB Smash Royale.*ub-smash-royale\.vercel\.app/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
@@ -248,6 +256,13 @@ const runs = [
   ['h2h', { values: { opponent: 'start.gg/user/opponent' } }, /Crew vs Opponent.*haven't played each other in singles on start\.gg yet/],
   ['h2h', { values: { player: 'start.gg/user/opponent', opponent: '2' } }, /Opponent vs Rival.*haven't played each other in singles on start\.gg yet/],
   ['h2h', { values: { opponent: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
+  // every stat command looks up a pasted profile link, tracked or not
+  ['stats', { values: { player: 'start.gg/user/opponent' } }, /Opponent/],
+  // the fake answers every set lookup with crew's sets, so this shows the link got past the pick list
+  ['recent', { values: { player: 'start.gg/user/opponent' } }, /^(?!.*Only tracked or linked).*Set result/],
+  ['run', { values: { player: 'start.gg/user/opponent' } }, /Opponent/],
+  ['characters', { values: { player: 'start.gg/user/opponent' } }, /Opponent/],
+  ['stats', { values: { player: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
   // long-press a member, then Apps. rival has this discord connected on start.gg
   ['H2H with me', { target: { id: 'rival-discord', bot: false, displayName: 'Rival' } }, /Crew 2-0 Rival.*Predicted/],
   ['Scout them', { target: { id: 'rival-discord', bot: false, displayName: 'Rival' } }, /Scouting Rival/],
@@ -280,8 +295,9 @@ const runs = [
   // everyone tracked has their discord in the fake server
   ['t-o', { subcommand: 'cleanup' }, /Everyone tracked has their start\.gg Discord in this server/],
   ['notify', {}, /Your pings.*Match calls:\*\* off.*Registration DMs:\*\* off.*Start DMs:\*\* off/],
-  ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off for the whole server/],
-  ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your set is on stream.*Reg Reminders role and its pings.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
+  ['notify', { values: { calls: 'on' } }, /pinged when your match is called.*Match calls are off by default for tournaments/],
+  ['notify', { values: { next: 'on' } }, /pinged when your next opponent is set/],
+  ['notify', { values: { all: 'on' } }, /pinged when your match is called.*pinged when your next opponent is set.*pinged when your set is on stream.*Reg Reminders role and its pings.*DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['notify', { values: { dm_registration: 'on', dm_start: 'on' } }, /DM 1 hour before registration closes.*DM 1 hour before the tournament starts/],
   ['matchmaking', { subcommand: 'role', values: { game: 'melee' } }, /You have the \*\*Melee Matchmaking\*\* role now/],
   ['matchmaking', { subcommand: 'role', values: { game: 'melee', duration: 0.5 } }, /for 30 minutes.*comes off on its own/],

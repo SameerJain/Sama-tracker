@@ -32,8 +32,8 @@ test('all server settings are options on one /t-o settings command', () => {
   const to = commands.find(c => c.name === 't-o');
   const command = to.options.find(o => o.name === 'settings');
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'next', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
-  assert.ok(['day', 'time', 'timezone', 'language'].every(name => command.options.some(o => o.name === name)));
+    ['sets', 'streams', 'calls', 'next', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors', 'commands_anywhere']);
+  assert.ok(['day', 'time', 'timezone', 'language', 'commands_channel'].every(name => command.options.some(o => o.name === name)));
   assert.equal(command.options.find(o => o.name === 'timezone').autocomplete, true);
   // three modes, picked by name
   const threads = command.options.find(o => o.name === 'threads');

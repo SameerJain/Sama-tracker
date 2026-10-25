@@ -435,13 +435,14 @@ test('/notify player:all asks first and changes every tracked player with Discor
   assert.deepEqual(state.streamPings, ['old-discord']);
 });
 
-test('/notify player:all all:on fits discord\'s button limit and changes all five', async () => {
+test('/notify player:all all:on fits discord\'s button limit and changes all six', async () => {
   state.players = {
     1: crew,
     2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', discordId: 'rival-discord' },
     3: { userId: 3, playerId: 30, tag: 'No Discord', slug: 'user/no-discord' },
   };
   state.callPings = [];
+  state.nextPings = [];
   state.streamPings = [];
   state.regPings = [];
   state.regDmPings = [];
@@ -450,13 +451,14 @@ test('/notify player:all all:on fits discord\'s button limit and changes all fiv
   const run = command('notify', { values: { player: 'all', all: 'on' }, user: 'runner-with-a-long-discord-id-1234567890' });
   await handleCommand(run);
   const asked = run.calls[0][1];
-  assert.match(asked.content, /Change \/notify for 2 tracked players\?.*Match calls on.*stream alerts on.*reg reminders on.*registration DMs on.*start DMs on/);
+  assert.match(asked.content, /Change \/notify for 2 tracked players\?.*Match calls on.*next opponents on.*stream alerts on.*reg reminders on.*registration DMs on.*start DMs on/);
   for (const row of asked.components) {
     for (const button of row.toJSON().components) assert.ok(button.custom_id.length <= 100, `button id too long: ${button.custom_id.length}`);
   }
   const changed = (await press(asked, 'Change pings', 'runner-with-a-long-discord-id-1234567890')).calls[0][1];
   assert.equal(changed.content, 'Updated /notify for 2 tracked players. Skipped 1 without Discord on start.gg.');
   assert.deepEqual(state.callPings.toSorted(), ['crew-discord', 'rival-discord']);
+  assert.deepEqual(state.nextPings.toSorted(), ['crew-discord', 'rival-discord']);
   assert.deepEqual(state.streamPings.toSorted(), ['crew-discord', 'rival-discord']);
   assert.deepEqual(state.regPings.toSorted(), ['crew-discord', 'rival-discord']);
   assert.deepEqual(state.regDmPings.toSorted(), ['crew-discord', 'rival-discord']);
@@ -518,8 +520,11 @@ test('a name that matches nobody suggests the closest tracked, linked or watchli
   assert.equal(await answer('stats', { values: { player: 'Tea Loe' } }), 'Nobody tracked or linked goes by `Tea Loe`. Did you mean **Tea | Leo**?');
   assert.equal(await answer('track', { subcommand: 'remove', values: { player: 'Rivl' } }), 'Nobody tracked goes by `Rivl`. Did you mean **Rival**?');
   // nothing close, or an id from a list that's changed since
-  assert.match(await answer('stats', { values: { player: 'zzzz' } }), /^Only tracked or linked players can be picked/);
-  assert.match(await answer('stats', { values: { player: '12345' } }), /^Only tracked or linked players can be picked/);
+  assert.equal(await answer('stats', { values: { player: 'zzzz' } }), 'Nobody tracked or linked goes by `zzzz`. Paste their start.gg profile link or ID, like start.gg/user/f64a83c8.');
+  assert.match(await answer('stats', { values: { player: '12345' } }), /^Nobody tracked or linked goes by `12345`. Paste their start.gg profile link/);
+  // the matchup commands answer a typo the same way, without asking start.gg
+  assert.equal(await answer('h2h', { values: { player: '1', opponent: 'Rivl' } }), 'Nobody tracked or linked goes by `Rivl`. Did you mean **Rival**?');
+  assert.equal(await answer('predict', { values: { player: 'Rivl', opponent: '1' } }), 'Nobody tracked or linked goes by `Rivl`. Did you mean **Rival**?');
 
   assert.equal(await answer('slippi', { subcommand: 'remove', values: { player: 'Crw' } }), 'They aren\'t on the Slippi watchlist. Did you mean **Crew (CREW#1)**?');
   assert.equal(await answer('slippi', { subcommand: 'remove', values: { player: 'CREW#2' } }), 'They aren\'t on the Slippi watchlist. Did you mean **Crew (CREW#1)**?');

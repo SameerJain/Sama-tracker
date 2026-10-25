@@ -3,9 +3,10 @@ import { isMultiGuild, postsChannelId, state, save } from '../store.js';
 import { currentChannel, missingThreadPermissions, secondsNow } from '../tracker.js';
 import { POSTING_PERMISSIONS } from '../tracker/shared.js';
 import {
-  MAX_EVENT_LENGTH_HOURS, MESSAGE_TYPES, MIN_EVENT_LENGTH_HOURS, REG_ROLE, THREAD_MODES, WEEKDAYS, messageEnabled, messageSettings,
+  MAX_EVENT_LENGTH_HOURS, MESSAGE_TYPES, MIN_EVENT_LENGTH_HOURS, REG_ROLE, THREAD_MODES, WEEKDAYS, messageSettings, postsOn,
 } from '../message-settings.js';
 import { cantMakeEvents } from '../discord-events.js';
+import { switchFunLanguage } from '../fun/index.js';
 import { count } from '../embeds/shared.js';
 import { commandsFor, LANGUAGES, language, listOf, permissionList, t } from '../i18n.js';
 import { isSelf, linkedPlayer, readTracked, replyEphemeral, replyNotTracked } from './shared.js';
@@ -28,6 +29,13 @@ function timezoneChoices(focused) {
   const typed = focused.trim().toLowerCase().replaceAll(' ', '_');
   const zones = typed ? Intl.supportedValuesOf('timeZone').filter((zone) => zone.toLowerCase().includes(typed)) : COMMON_ZONES;
   return zones.slice(0, 25).map((zone) => ({ name: zone, value: zone }));
+}
+
+// the channels a TO limited the bot's commands to with commands_channel, none meaning every channel. a deleted
+// one stops counting, so a server can't end up with nowhere left to use the bot
+function commandChannels(guild) {
+  const cache = guild?.channels?.cache;
+  return (state.messages.commandChannels ?? []).filter((id) => !cache || cache.has(id));
 }
 
 // every server setting lives on /t-o settings. leaving the options blank shows them all.
@@ -70,9 +78,20 @@ async function configureSettings(interaction) {
     if (!Object.hasOwn(LANGUAGES, pickedLanguage)) return fail(t('Pick English or Español.'));
     changes.language = pickedLanguage;
   }
+  // picking a channel adds it to the list, or takes it off if it's already there
+  const commandsChannel = interaction.options.getChannel?.('commands_channel');
+  const anywhere = interaction.options.getBoolean('commands_anywhere');
+  if (commandsChannel && anywhere) return fail(t('Pick either `commands_channel` or `commands_anywhere:True`, not both.'));
+  if (anywhere) changes.commandChannels = [];
+  if (commandsChannel) {
+    const saved = commandChannels(interaction.guild);
+    changes.commandChannels = saved.includes(commandsChannel.id)
+      ? saved.filter((id) => id !== commandsChannel.id)
+      : [...saved, commandsChannel.id];
+  }
   const channel = interaction.options.getChannel?.('channel');
 
-  if (!Object.keys(changes).length && !channel) return replyEphemeral(interaction, settingsText());
+  if (!Object.keys(changes).length && !channel) return replyEphemeral(interaction, settingsText(interaction.guild));
   if (!isTO(interaction)) return notTO(interaction, t('change server settings'));
   // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
   if (changes.events && !previous.events) {
@@ -105,8 +124,9 @@ async function configureSettings(interaction) {
   state.messages = { ...state.messages, ...changes };
   if (channel) state.channelId = channel.id;
   save();
+  if (pickedLanguage) switchFunLanguage(pickedLanguage);
   await interaction.reply({
-    content: [settingsText(), ...channelLines].join('\n'),
+    content: [settingsText(interaction.guild), ...channelLines].join('\n'),
     allowedMentions: { parse: [] },
   });
   // a single-server build registers its commands in the server's language, so their descriptions switch too.
@@ -120,8 +140,9 @@ async function configureSettings(interaction) {
 }
 
 // every setting, shown when /t-o settings has no options and after a change
-function settingsText() {
+function settingsText(guild) {
   const settings = messageSettings();
+  const commandsIn = commandChannels(guild);
   const onOff = (on) => (on ? t('on') : t('off'));
   const lines = [t('**Automatic posts**')];
   for (const [key, label] of Object.entries(MESSAGE_TYPES)) {
@@ -133,14 +154,16 @@ function settingsText() {
   lines.push(t`**Set result colors:** ${onOff(settings.setColors)}`);
   lines.push(t`**Language:** ${LANGUAGES[language()]}`);
   if (isMultiGuild()) lines.push(state.channelId ? t`**Posts channel:** <#${state.channelId}>` : t('**Posts channel:** not set'));
+  lines.push(commandsIn.length ? t`**Bot commands:** ${listOf(commandsIn.map((id) => `<#${id}>`))}` : t('**Bot commands:** every channel'));
   lines.push('', t('**Weekly recap**'),
     t`**Posts:** ${onOff(settings.recap)} · **Day and time:** ${t(WEEKDAYS[settings.recapDay])} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     t('-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.'),
     t('-# Stream alerts, match calls and next opponents still going on post when switched back on. Anything else missed while off stays skipped. Recap schedule changes apply to future recaps.'),
     t('-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events'),
-    t('-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.'),
+    t('-# `threads` has three modes for set results, stream alerts, match calls and next opponents. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.'),
     t('-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.'),
-    t('-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.'));
+    t('-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.'),
+    t('-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.'));
   return lines.join('\n');
 }
 
@@ -275,19 +298,39 @@ function trackPosts(interaction) {
 }
 
 // what each /notify switch keeps a list of, how the bulk question names a change, lowercase since that capitalizes
-// only the first letter like /track posts, and what the reply says, to whoever ran it when self or about someone else
+// only the first letter like /track posts, and what the reply says, to whoever ran it when self or about someone else.
+// the ones that go by start.gg say what's missing without a /link, and what turning them on means while the server
+// switch of the same name has them off by default
 const PINGS = {
   calls: {
     list: 'callPings',
     changed: (on) => (on ? t('match calls on') : t('match calls off')),
     on: (self) => (self ? t('You\'ll get pinged when your match is called.') : t('They\'ll get pinged when their match is called.')),
     off: () => t('No more match call pings.'),
+    unlinked: (self) => (self
+      ? t('Match call pings need your start.gg, so `/link` first. Leave out the link and it finds yours.')
+      : t('Match call pings need their start.gg. Ask them to run `/link` with their profile link.')),
+    serverOff: () => t('-# Match calls are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.'),
+  },
+  next: {
+    list: 'nextPings',
+    changed: (on) => (on ? t('next opponents on') : t('next opponents off')),
+    on: (self) => (self ? t('You\'ll get pinged when your next opponent is set.') : t('They\'ll get pinged when their next opponent is set.')),
+    off: () => t('No more next opponent pings.'),
+    unlinked: (self) => (self
+      ? t('Next opponent pings need your start.gg, so `/link` first. Leave out the link and it finds yours.')
+      : t('Next opponent pings need their start.gg. Ask them to run `/link` with their profile link.')),
+    serverOff: () => t('-# Next opponents are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.'),
   },
   streams: {
     list: 'streamPings',
     changed: (on) => (on ? t('stream alerts on') : t('stream alerts off')),
     on: (self) => (self ? t('You\'ll get pinged when your set is on stream.') : t('They\'ll get pinged when their set is on stream.')),
     off: () => t('No more stream alert pings.'),
+    unlinked: (self) => (self
+      ? t('Stream alert pings need your start.gg, so `/link` first. Leave out the link and it finds yours.')
+      : t('Stream alert pings need their start.gg. Ask them to run `/link` with their profile link.')),
+    serverOff: () => t('-# Stream alerts are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.'),
   },
   registration: {
     list: 'regPings',
@@ -315,14 +358,15 @@ const PINGS = {
   },
 };
 
-const callsOff = () => t('-# Match calls are off for the whole server, `/t-o settings calls:True` turns them on.');
+// footnotes for pings just turned on whose server switch is off
+const pingsOff = (changes) => Object.keys(changes).filter((ping) => changes[ping] && PINGS[ping].serverOff && !postsOn(ping)).map((ping) => PINGS[ping].serverOff());
 
 // where someone's pings are at, plus their posts if they're tracked. name is whose when
 // it isn't whoever ran it, already escaped
 function notifyText(discordId, me, name = null) {
   const has = (ping) => state[PINGS[ping].list].includes(discordId);
   const yours = !name;
-  // match calls and stream alerts go by start.gg, so they're on in name only until there's an account
+  // match calls, next opponents and stream alerts go by start.gg, so they're on in name only until there's an account
   const byStartgg = (ping) => {
     if (!has(ping)) return t('off');
     if (me) return t('on');
@@ -332,6 +376,7 @@ function notifyText(discordId, me, name = null) {
   const lines = [
     yours ? t('**Your pings**') : t`**${name}'s pings**`,
     t`**Match calls:** ${byStartgg('calls')}`,
+    t`**Next opponents:** ${byStartgg('next')}`,
     t`**Stream alerts:** ${byStartgg('streams')}`,
     t`**Reg reminders:** ${onOff(has('registration'))}`,
     t`**Registration DMs:** ${onOff(has('dm_registration'))}`,
@@ -346,30 +391,24 @@ function notifyText(discordId, me, name = null) {
   return lines.join('\n');
 }
 
-// saves one person's changes and says what changed. linked is their start.gg, which match calls and stream alerts need
+// saves one person's changes and says what changed. linked is their start.gg, which match calls, next opponents and
+// stream alerts need
 function changePings(discordId, changes, linked, self) {
   const lines = [];
+  const saved = {};
   for (const [ping, on] of Object.entries(changes)) {
-    if ((ping === 'calls' || ping === 'streams') && on && !linked) {
-      if (self) {
-        lines.push(ping === 'calls'
-          ? t('Match call pings need your start.gg, so `/link` first. Leave out the link and it finds yours.')
-          : t('Stream alert pings need your start.gg, so `/link` first. Leave out the link and it finds yours.'));
-      } else {
-        lines.push(ping === 'calls'
-          ? t('Match call pings need their start.gg. Ask them to run `/link` with their profile link.')
-          : t('Stream alert pings need their start.gg. Ask them to run `/link` with their profile link.'));
-      }
+    if (PINGS[ping].unlinked && on && !linked) {
+      lines.push(PINGS[ping].unlinked(self));
       continue;
     }
     const list = PINGS[ping].list;
     state[list] = state[list].filter((each) => each !== discordId);
     if (on) state[list].push(discordId);
+    saved[ping] = on;
     lines.push(on ? PINGS[ping].on(self) : PINGS[ping].off());
   }
   save();
-  if (changes.calls && linked && !messageEnabled('calls')) lines.push(callsOff());
-  return lines;
+  return [...lines, ...pingsOff(saved)];
 }
 
 // the Reg Reminders role shows who has registration on. it's made the first time, and has to be mentionable
@@ -413,7 +452,7 @@ function notifyChangesText(changes) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// short so the button id stays under discord's 100 characters, even with all five and a long discord id.
+// short so the button id stays under discord's 100 characters, even with all six and a long discord id.
 // one char per ping in PINGS order: 1 on, 0 off, - left alone. the old longer form still decodes for buttons already out
 const PING_ORDER = Object.keys(PINGS);
 function encodeNotifyChanges(changes) {
@@ -452,8 +491,7 @@ function applyNotifyBulk(changes) {
   const skipped = Object.keys(state.players).length - eligible.length;
   let content = t`Updated /notify for ${count(eligible.length, 'tracked player')}.`;
   if (skipped) content += t` Skipped ${skipped} without Discord on start.gg.`;
-  if (changes.calls && !messageEnabled('calls')) content += `\n${callsOff()}`;
-  return { content };
+  return { content: [content, ...pingsOff(changes)].join('\n') };
 }
 
 confirmable('notify_all', {
@@ -471,7 +509,7 @@ function notifyEveryone(interaction, changes) {
     if (!players.length) return replyEphemeral(interaction, t('Nobody is tracked yet, `/track add` someone first.'));
     const on = (ping) => eligible.filter((player) => state[PINGS[ping].list].includes(player.discordId)).length;
     const summary = `${t`**Pings for ${count(eligible.length, 'tracked player')}**`}\n`
-      + `${t`**Match calls:** on for ${on('calls')} · **Stream alerts:** on for ${on('streams')}`}\n`
+      + `${t`**Match calls:** on for ${on('calls')} · **Next opponents:** on for ${on('next')} · **Stream alerts:** on for ${on('streams')}`}\n`
       + `${t`**Reg reminders:** on for ${on('registration')} · **Registration DMs:** on for ${on('dm_registration')} · **Start DMs:** on for ${on('dm_start')}`}`
       + (skipped ? `\n${skipped === 1 ? t('-# 1 tracked player has no Discord on start.gg and stays out') : t`-# ${skipped} tracked players have no Discord on start.gg and stay out`}` : '');
     return replyEphemeral(interaction, summary);
@@ -552,8 +590,8 @@ function channelChange(interaction, channel) {
   if (has && !has.has(PermissionFlagsBits.AttachFiles)) lines.push(t('-# Without Attach Files there, posts that upload character art, rank badges or the Slippi logo fail.'));
   // a tracked tournament always posts in a thread, whatever /t-o settings threads says
   const threads = missingThreadPermissions(channel);
-  if (threads?.length) lines.push(t`-# Without ${permissionList(threads)} there, set results and stream alerts post in the channel instead of threads.`);
+  if (threads?.length) lines.push(t`-# Without ${permissionList(threads)} there, set results, stream alerts, match calls and next opponents post in the channel instead of threads.`);
   return lines;
 }
 
-export { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify };
+export { commandChannels, configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify };

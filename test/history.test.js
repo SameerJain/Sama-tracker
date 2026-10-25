@@ -143,10 +143,10 @@ test('h2h lookups send the opponent along, keep pairs apart, and forget failures
 
 test('/scout verbose builds on the pages /scout already has, without asking for any again', async () => {
   const asked = fakeStartgg({ 99: 40 });
-  await command('scout', { opponent: 'them' });
+  await command('scout', { opponent: 'start.gg/user/them' });
   assert.deepEqual(sets(asked, 99), Array.from({ length: 15 }, (_, i) => i + 1));
   const before = asked.length;
-  await command('scout', { opponent: 'them', verbose: true });
+  await command('scout', { opponent: 'start.gg/user/them', verbose: true });
   assert.deepEqual(sets(asked.slice(before), 99), Array.from({ length: 15 }, (_, i) => i + 16));
   assert.equal(new Set(asked).size, asked.length, 'nothing asked for twice');
 });
@@ -164,7 +164,7 @@ test('more pages failing keeps the copy it was adding to', async () => {
   await assert.rejects(settle(startgg.asCommand(() => handleCommand(interaction))), /HTTP 400/);
   // the 30 pages are still there, so /scout verbose needs none of them again
   const asked = fakeStartgg({ 99: 60 });
-  await command('scout', { opponent: 'them', verbose: true });
+  await command('scout', { opponent: 'start.gg/user/them', verbose: true });
   assert.deepEqual(sets(asked, 99), []);
 });
 
@@ -180,7 +180,7 @@ test('a first fetch that failed is not kept, so the next try asks again', async 
 test('after 10 minutes only their newest page gets asked for, and new sets show up', async () => {
   const asked = fakeStartgg({ 99: 60 }, { newest: (player) => (player === 99 ? 1 : 0) });
   mock.timers.tick(11 * 60 * 1000);
-  const replies = await command('scout', { opponent: 'them' });
+  const replies = await command('scout', { opponent: 'start.gg/user/them' });
   assert.deepEqual(sets(asked, 99), [1]);
   assert.match(JSON.stringify(replies.at(-1).embeds.map((embed) => embed.toJSON())), /set\/99-new/);
 });

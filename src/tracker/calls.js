@@ -8,6 +8,7 @@ import {
   currentChannel, secondsNow, postRefs, editPost, named, mentionable, mentions, trackedLive, trackedFor, eventsOf, CALL_WATCH_MINUTES, UNCALLED_STATES,
 } from './shared.js';
 import { h2hRow, rememberButton } from './buttons.js';
+import { tournamentPosts } from './threads.js';
 
 // everyone with /notify calls on, as the start.gg account commands know them by: their /link, or the tracked
 // player with their discord on start.gg. someone with neither has nothing to look up and waits for one
@@ -92,11 +93,13 @@ export async function postMatchCalls(postChannel = currentChannel()) {
   save();
 }
 
+// in the set's thread like set results, so a call lands next to the bracket it's for. the uncalled edit
+// goes by the saved channel and message ids, which work for a thread too
 async function sendMatchCall(set, inSet, discordIds, postChannel) {
   const components = h2hRow(set, inSet[0]);
   const people = { ...Object.fromEntries(inSet.map((player) => [player.userId, player])), ...state.players };
   const text = set.station ? t`You're up - Station ${set.station}` : t('You\'re up');
-  const sent = await postChannel.send({
+  const sent = await tournamentPosts(set, postChannel).send({
     content: discordIds.length ? `${mentions(discordIds)} ${text}` : undefined,
     embeds: embeds.withImage([embeds.matchCall(set, people)]),
     components,

@@ -346,10 +346,15 @@ async function run(interaction) {
   const now = secondsNow();
   // the saved ones too, in case start.gg's upcoming list drops one that's running late
   const [[, upcoming]] = await startgg.getUpcomingTournaments([player.userId]);
+  const finished = new Set(Object.values(state.tournaments)
+    .filter((tournament) => tournament.resultsPosted)
+    .map((tournament) => String(tournament.id)));
   const tournaments = new Map(Object.values(state.tournaments)
-    .filter((tournament) => tournament.userIds?.includes(player.userId))
+    .filter((tournament) => !tournament.resultsPosted && tournament.userIds?.includes(player.userId))
     .map((tournament) => [tournament.id, tournament]));
-  for (const tournament of upcoming) tournaments.set(tournament.id, tournament);
+  for (const tournament of upcoming) {
+    if (!finished.has(String(tournament.id))) tournaments.set(tournament.id, tournament);
+  }
   const current = [...tournaments.values()]
     .filter((tournament) => tournament.startAt <= now && now <= endTime(tournament) + RUNS_LATE_HOURS * 60 * 60)
     .sort((a, b) => b.startAt - a.startAt);

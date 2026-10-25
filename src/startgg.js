@@ -8,7 +8,8 @@ export {
   outcomeOf, namedGame, fromSide, singles, isMelee,
   getSets, getActivePlayers, getSetHistory, getHeadToHead, getDoublesHistory, getDoublesEvents, getPeriodHistory, getRunSets,
   getEventSets, getEventHistory, getStats, getCharacterSets, getStreamQueues, getStreamedSets, getSetStates, getSetOutcomes,
-  getSetsById, getCalledSets, getCalledEventSets, UNPLAYED_STATES, getNextSets, getUnplayedEventSets, getSetPairings,
+  getSetsById, getCalledSets, getCalledEventSets, UNPLAYED_STATES, getNextSets, getPlayerUnplayedSets, getUnplayedEventSets,
+  getSetPairings,
 } from './startgg/sets.js';
 export { getPlayerById, getPlayer, getProfiles, getConnectCodes } from './startgg/players.js';
 export {

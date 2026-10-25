@@ -1,4 +1,4 @@
-import { state } from './store.js';
+import { isMultiGuild, state } from './store.js';
 import { count as englishCount, ordinal as englishOrdinal } from './format.js';
 import { es, nouns } from './i18n/es.js';
 
@@ -14,10 +14,12 @@ export function language() {
 
 export const locale = () => LOCALES[language()];
 
-// english plus every language a server has picked, for the fun posts made ahead at startup outside any server
+// every server's language, english for one that never picked, for the fun posts made ahead outside any server.
+// a multi-server build nobody has joined yet gets english
 export function languagesInUse() {
-  const picked = [state.messages?.language, ...Object.values(state.guilds ?? {}).map((guild) => guild?.messages?.language)];
-  return ['en', ...new Set(picked.filter((lang) => lang !== 'en' && Object.hasOwn(LANGUAGES, lang)))];
+  const servers = isMultiGuild() ? Object.values(state.guilds ?? {}) : [state];
+  const picked = servers.map((server) => (Object.hasOwn(LANGUAGES, server?.messages?.language) ? server.messages.language : 'en'));
+  return picked.length ? [...new Set(picked)] : ['en'];
 }
 
 // the same english can need two spanish lines: people take a personal "a" and tournaments don't. a key that starts

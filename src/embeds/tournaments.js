@@ -65,14 +65,14 @@ function setEmbed(set, color, player, { author = true } = {}) {
 // heads a /t-o settings threads thread in the channel. tournament is the one sets carry under event
 export function tournamentThread(tournament) {
   return tournamentEmbed(colors.thread, t('Tournament thread'), tournament)
-    .setDescription(t('Set results and stream alerts from this tournament go in the thread.'));
+    .setDescription(t('Set results, stream alerts, match calls and next opponents from this tournament go in the thread.'));
 }
 
 // heads one event's thread with /t-o settings threads set to one per event
 export function eventThread(event) {
   const game = event.videogame?.displayName;
   return tournamentEmbed(colors.thread, t('Event thread'), event.tournament)
-    .setDescription(`**${escapeMarkdown(event.name)}**${game ? ` · ${game}` : ''}\n${t('Set results and stream alerts from this event go in the thread.')}`);
+    .setDescription(`**${escapeMarkdown(event.name)}**${game ? ` · ${game}` : ''}\n${t('Set results, stream alerts, match calls and next opponents from this event go in the thread.')}`);
 }
 
 export function onStream(set, players) {
@@ -92,6 +92,16 @@ export function onStream(set, players) {
   return card;
 }
 
+// the station when the TO set one, for match calls, next opponent cards and /run
+const stationText = (set) => (set.station ? t` · **${t('Station')} ${set.station}**` : '');
+
+// tacked onto the round and event line of a set card
+function onFirstLine(card, extra) {
+  if (!extra) return card;
+  const [first, ...rest] = (card.data.description ?? '').split('\n');
+  return card.setDescription([`${first}${extra}`, ...rest].join('\n'));
+}
+
 // a called set for someone with match call pings on. both sides can be tracked, still one card.
 // doubles shows the team names the way start.gg reports them. the station shows only when the TO set one
 export function matchCall(set, players) {
@@ -102,11 +112,23 @@ export function matchCall(set, players) {
   const card = setEmbed(set, colors.live, trackedA ?? findTracked(b, players))
     .setTitle(t`Match call · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
     .setURL(setUrl(set));
-  if (set.station) {
-    const [first, ...rest] = (card.data.description ?? '').split('\n');
-    card.setDescription([t`${first} · **${t('Station')} ${set.station}**`, ...rest].join('\n'));
-  }
-  return card;
+  return onFirstLine(card, stationText(set));
+}
+
+// a set with both players known that hasn't started, for /notify next and tracked tournaments. the tracked side
+// goes first, otherwise start.gg's order. start.gg fills startAt from the round's schedule, so a time already
+// gone by is the pool's start and gets left out
+export function nextOpponent(set, players, now = Math.floor(Date.now() / 1000)) {
+  const [a, b] = set.sides;
+  const trackedA = findTracked(a, players);
+  const trackedB = findTracked(b, players);
+  const [me, them] = !trackedA && trackedB ? [b, a] : [a, b];
+
+  const card = setEmbed(set, colors.live, trackedA ?? trackedB)
+    .setTitle(t`Next opponent · ${escapeMarkdown(me.name)} vs ${escapeMarkdown(them.name)}`)
+    .setURL(setUrl(set));
+  const time = set.startAt > now ? ` · <t:${set.startAt}:t>` : '';
+  return onFirstLine(card, `${stationText(set)}${time}`);
 }
 
 export function setResult(set, players, { setColors = false } = {}) {
@@ -454,9 +476,8 @@ function runStatus(player, { entry, sets }) {
 // discord shows the time in each viewer's own timezone
 function nextText({ set, them }, now) {
   const round = set.round ? ` · [${escapeMarkdown(set.round)}](${setUrl(set)})` : '';
-  const station = set.station ? t` · **${t('Station')} ${set.station}**` : '';
   const time = set.state !== 2 && set.startAt > now ? ` · <t:${set.startAt}:t>` : '';
-  return `${t(NEXT_TEXT[set.state])} **${escapeMarkdown(them.name)}**${round}${station}${time}`;
+  return `${t(NEXT_TEXT[set.state])} **${escapeMarkdown(them.name)}**${round}${stationText(set)}${time}`;
 }
 
 function statusText({ entry, finished }) {

@@ -13,12 +13,12 @@ import {
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
-import { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
+import { commandChannels, configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import {
   pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeral, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag,
-  listOf, t,
+  looksLikeProfile, listOf, t,
 } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
@@ -110,17 +110,10 @@ const handlers = new Map([
   ...Object.values(funCommands).map((fun) => [fun.name, (interaction) => post(interaction, fun)]),
 ]);
 
-// the channels a TO limited the bot's commands to with /t-o settings commands_channel, none meaning every channel.
-// a deleted one stops counting, so a server can't end up with nowhere left to use the bot
-function commandChannels(interaction) {
-  const cache = interaction.guild?.channels?.cache;
-  return (state.messages.commandChannels ?? []).filter((id) => !cache || cache.has(id));
-}
-
-// the private reply for a command used outside those channels, null when it's fine here. a thread counts as the
-// channel it's in. /t-o always works, so a TO can change the setting from anywhere
+// the private reply for a command used outside the channels a TO picked, null when it's fine here. a thread
+// counts as the channel it's in. /t-o always works, so a TO can change the setting from anywhere
 function wrongChannel(interaction) {
-  const allowed = commandChannels(interaction);
+  const allowed = commandChannels(interaction.guild);
   if (!allowed.length || interaction.commandName === 't-o') return null;
   const parent = interaction.channel?.isThread?.() ? interaction.channel.parentId : null;
   if (allowed.includes(interaction.channelId) || allowed.includes(parent)) return null;
@@ -386,12 +379,13 @@ async function autocomplete(interaction) {
   for (const player of matches) choices.push({ name: state.players[player.userId] ? player.tag : t`${player.tag} (linked)`, value: String(player.userId) });
 
   // an empty list looks broken, so say why. picking it gets the not found reply. a stat command looks up anyone by a
-  // pasted start.gg link or ID, so there what's typed gets offered as that instead
+  // pasted start.gg link or ID, so there a pasted one gets offered as that instead
   if (!choices.length) {
     const takesLink = TAKES_LINK.includes(name);
     let why;
-    if (takesLink && focused.trim()) why = t`Look up ${focused.trim()} on start.gg`;
+    if (takesLink && looksLikeProfile(focused)) why = t`Look up ${focused.trim()} on start.gg`;
     else if (!people.length) why = takesLink ? t('Nobody is tracked yet. Paste a start.gg profile link to look anyone up') : t('Nobody is tracked yet, /track add someone first');
+    else if (takesLink) why = t`Nobody tracked or linked matches "${focused}". Paste their start.gg profile link`;
     else why = trackedOnly ? t`Nobody tracked matches "${focused}"` : t`Nobody tracked or linked matches "${focused}", /track add them first`;
     choices.push({ name: why.slice(0, 100), value: focused.trim().slice(0, 100) || 'nobody' });
   }

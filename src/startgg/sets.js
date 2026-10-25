@@ -41,6 +41,7 @@ const UNPLAYED_FIELDS = `
   station { number }
   phaseGroup { id }
   event {
+    id
     name
     slug
     videogame { id displayName }
@@ -339,22 +340,44 @@ export function getUnplayedEventSets(eventIds) {
   return setsInEvents(eventIds, { state: UNPLAYED_STATES, showByes: false }, { fields: UNPLAYED_FIELDS, perPage: 40 });
 }
 
-// each player's next sets, for next opponent cards. 4 a player at about 15 objects is 60, so 20 players
-// to a request stays near 1200 at worst and splits when it runs over. no time filter: old abandoned sets
-// come back too, and the caller drops those by their tournament's dates
+const NEXT_SETS_PER_PLAYER = 4;
+
+// each player's next sets, for next opponent cards, and more: the players whose page came back full, who can have
+// sets it left out. 4 a player at about 15 objects is 60, so 20 players to a request stays near 1200 at worst and
+// splits when it runs over. no time filter: old abandoned sets come back too, and the caller drops those by their
+// tournament's dates
 export async function getNextSets(playerIds) {
   const data = await lookupMany(playerIds, (group) => `
     query ($filters: SetFilters) {
-      ${aliases(group, 'p', 'player', `sets(perPage: 4, page: 1, filters: $filters) { nodes { ${UNPLAYED_FIELDS} } }`)}
+      ${aliases(group, 'p', 'player', `sets(perPage: ${NEXT_SETS_PER_PLAYER}, page: 1, filters: $filters) { nodes { ${UNPLAYED_FIELDS} } }`)}
     }
   `, { filters: { state: UNPLAYED_STATES } });
 
   // two players can be in the same set
   const setsById = new Map();
-  for (const player of Object.values(data)) {
-    for (const set of toSets(player?.sets?.nodes ?? [])) setsById.set(set.id, set);
+  const more = new Set();
+  for (const id of playerIds) {
+    const nodes = data[`p${cleanId(id)}`]?.sets?.nodes ?? [];
+    if (nodes.length >= NEXT_SETS_PER_PLAYER) more.add(id);
+    for (const set of toSets(nodes)) setsById.set(set.id, set);
   }
-  return [...setsById.values()];
+  return { sets: [...setsById.values()], more };
+}
+
+// every unplayed set each player has in one event, as [{ eventId, playerId }], for a player whose getNextSets page
+// came back full. a pool is far under 40 sets, so one page each, and 8 to a request stays under the limit for
+// round-robin pools of up to 9
+export async function getPlayerUnplayedSets(pairs) {
+  const keys = pairs.map(({ eventId, playerId }) => `${cleanId(eventId)}_${cleanId(playerId)}`);
+  const data = await lookupMany(keys, (group) => `
+    query ($state: [Int]) {
+      ${group.map((key) => {
+        const [eventId, playerId] = key.split('_');
+        return `e${key}: event(id: ${eventId}) { sets(perPage: 40, page: 1, filters: { state: $state, showByes: false, playerIds: [${playerId}] }) { nodes { ${UNPLAYED_FIELDS} } } }`;
+      }).join('\n')}
+    }
+  `, { state: UNPLAYED_STATES }, 8);
+  return toSets(Object.values(data).flatMap((event) => event?.sets?.nodes ?? []));
 }
 
 const EVENT_HISTORY_QUERY = `

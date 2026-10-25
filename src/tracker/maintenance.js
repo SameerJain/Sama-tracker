@@ -15,6 +15,7 @@ import { updateTournaments } from './tournaments.js';
 import { postNewSets, fixCorrectedResults } from './sets.js';
 import { postStreamAlerts } from './streams.js';
 import { postMatchCalls, followCalls } from './calls.js';
+import { postNextOpponents, followNextOpponents } from './next.js';
 import { clearFinishedButtons } from './buttons.js';
 import { postRegReminders, postDmReminders } from './reminders.js';
 import { postWeeklyRecap } from './recap.js';
@@ -248,7 +249,8 @@ export function startTracking(client, singleChannel = null) {
 }
 
 // saved from before tournaments could be tracked. a reg reminder becomes a tracked tournament that follows the
-// server's switches (migrateTournamentPosts moves the old per-tournament ones to overrides). match call pings were a switch anyone could flip on a player, now they're each person's own, so a player's
+// server's switches, and migrateTournamentPosts moves the old per-tournament ones to overrides. match call pings
+// were a switch anyone could flip on a player, now they're each person's own, so a player's
 // discord keeps them only if the server switch was on and they were actually getting pinged. tournament admins
 // gave way to the TO role, and their tournaments stay tracked. a discord event id moves to state.discordEvents
 // unsynced, so the next sync puts start.gg's latest on it, venue address included
@@ -310,8 +312,9 @@ export function newTracked(player) {
 }
 
 // /t-o tournament add, or a reminder from before tournaments were tracked. it saves no switches, so every kind
-// follows the server's setting until /t-o tournament posts overrides one for this tournament. its sets are looked at from now on, so tracking one partway through doesn't flood its thread
-// with what already happened. reminder fills in at the next reminder check
+// follows the server's setting until /t-o tournament posts overrides one for this tournament. its sets are looked
+// at from now on, so tracking one partway through doesn't flood its thread with what already happened. reminder
+// fills in at the next reminder check
 export function trackTournament(tournament, by, now = secondsNow()) {
   tournament.tracked = { by, at: now, posts: {} };
   tournament.reminder ??= {};
@@ -374,6 +377,9 @@ const checkSets = queued(() => runScoped(async () => {
   await postStreamAlerts();
   await postMatchCalls();
   await followCalls();
+  // crossed out before the check, so a changed pairing's new card posts in the same run
+  await followNextOpponents();
+  await postNextOpponents();
   await clearFinishedButtons();
 }));
 export const checkTournaments = queued(() => runScoped(() => updateTournaments()));

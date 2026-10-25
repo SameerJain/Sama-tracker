@@ -13,6 +13,9 @@ export const ROLL_CALL_MIN_PLAYERS = 3;
 // results wait this long after the end since TOs often report top 4 late, then go out
 // with whatever exists. unfinished placements are marked as projected
 export const RESULTS_WAIT_HOURS = 12;
+// start.gg can leave an event active after every standing is final. give the TO an hour to correct it,
+// then treat it as finished anyway
+export const FULLY_REPORTED_WAIT_HOURS = 1;
 // a top 8 start.gg keeps erroring on holds the placements back this long, then they go without it
 export const TOP8_RETRY_HOURS = 12;
 // after downtime, don't post sets older than this
@@ -69,6 +72,8 @@ export const RESULT_WATCH_MINUTES = 60;
 export const CALL_WATCH_MINUTES = 15;
 // a set back to waiting, ready or queued isn't called anymore
 export const UNCALLED_STATES = [1, 4, 7];
+// next opponent cards get looked at this long for the TO putting someone else in the set
+export const NEXT_WATCH_MINUTES = 60;
 // placements that went out projected get edited once they're final, for this long after
 export const PROJECTED_KEPT_DAYS = 3;
 // players with no reported set in this long get taken off the track list silently

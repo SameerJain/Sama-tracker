@@ -8,6 +8,7 @@ export { clearFinishedButtons } from './tracker/buttons.js';
 export { postNewSets, fixCorrectedResults } from './tracker/sets.js';
 export { postStreamAlerts } from './tracker/streams.js';
 export { postMatchCalls, followCalls } from './tracker/calls.js';
+export { postNextOpponents, followNextOpponents } from './tracker/next.js';
 export { makeTournamentEvents, refreshCrew, postRollCall, postResults, verifyTopEight, correctPlacements } from './tracker/tournaments.js';
 export { postRegReminders, postDmReminders } from './tracker/reminders.js';
 export { postWeeklyRecap } from './tracker/recap.js';

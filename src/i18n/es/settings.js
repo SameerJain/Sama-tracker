@@ -9,6 +9,11 @@ export default {
   '**Language:** {0}': '**Idioma:** {0}',
   '**Posts channel:** <#{0}>': '**Canal de publicaciones:** <#{0}>',
   '**Posts channel:** not set': '**Canal de publicaciones:** sin elegir',
+  '**Bot commands:** {0}': '**Comandos del bot:** {0}',
+  '**Bot commands:** every channel': '**Comandos del bot:** todos los canales',
+  '-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.':
+    '-# `commands_channel` deja los comandos del bot solo en los canales elegidos, con sus hilos. Elegirlo otra vez lo quita, y `commands_anywhere:True` vacía la lista. `/t-o` funciona en todos lados.',
+  'Pick either `commands_channel` or `commands_anywhere:True`, not both.': 'Elige `commands_channel` o `commands_anywhere:True`, no los dos.',
   '**Weekly recap**': '**Resumen semanal**',
   '**Posts:** {0} · **Day and time:** {1} {2} {3}': '**Se publica:** {0} · **Día y hora:** {1} {2} {3}',
   '-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.':
@@ -18,8 +23,8 @@ export default {
   'next opponents off': 'próximos rivales desactivados',
   '-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events':
     '-# `events` crea un evento de Discord para cada próximo torneo seguido, una vez por torneo. Necesita Gestionar eventos',
-  '-# `threads` has three modes for set results and stream alerts. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.':
-    '-# `threads` tiene tres modos para los resultados de sets y los avisos de stream. Apagado los publica aquí, salvo los de un torneo seguido, que siempre tienen hilo. Uno por torneo le da un hilo a cada torneo, y uno por evento le da el suyo a cada evento, como Genesis 11 · Ultimate Singles. Cada hilo fija su tarjeta en el canal hasta que termina el torneo o el evento.',
+  '-# `threads` has three modes for set results, stream alerts, match calls and next opponents. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.':
+    '-# `threads` tiene tres modos para los resultados de sets, avisos de stream, llamados de partida y próximos rivales. Apagado los publica aquí, salvo los de un torneo seguido, que siempre tienen hilo. Uno por torneo le da un hilo a cada torneo, y uno por evento le da el suyo a cada evento, como Genesis 11 · Ultimate Singles. Cada hilo fija su tarjeta en el canal hasta que termina el torneo o el evento.',
   '-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.':
     '-# `set_colors` pinta los resultados de sets de verde si ganó un jugador seguido, rojo si perdió, dorado cuando se enfrentan dos seguidos y azul cuando no jugó ninguno. Apagado deja todas las tarjetas en azul.',
   '-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.':
@@ -71,7 +76,8 @@ export default {
   'I need {0} in <#{1}> to post there. Add them to my role or the channel, then try again.': 'Necesito {0} en <#{1}> para publicar ahí. Agrégalos a mi rol o al canal y vuelve a intentarlo.',
   'Automatic posts go in <#{0}>.': 'Las publicaciones automáticas van en <#{0}>.',
   '-# Without Attach Files there, posts that upload character art, rank badges or the Slippi logo fail.': '-# Sin Adjuntar archivos ahí, fallan las publicaciones que suben arte de personajes, insignias de rango o el logo de Slippi.',
-  '-# Without {0} there, set results and stream alerts post in the channel instead of threads.': '-# Sin {0} ahí, los resultados de sets y los avisos de stream se publican en el canal en vez de en hilos.',
+  '-# Without {0} there, set results, stream alerts, match calls and next opponents post in the channel instead of threads.':
+    '-# Sin {0} ahí, los resultados de sets, avisos de stream, llamados de partida y próximos rivales se publican en el canal en vez de en hilos.',
   // socials
   'That isn\'t a web link. Paste the profile, channel or page link.': 'Eso no es un enlace web. Pega el enlace del perfil, canal o página.',
   'Links can be up to {0} characters.': 'Los enlaces pueden tener hasta {0} caracteres.',
@@ -105,6 +111,7 @@ export default {
   '**Your pings**': '**Tus pings**',
   '**{0}\'s pings**': '**Pings de {0}**',
   '**Match calls:** {0}': '**Llamados de partida:** {0}',
+  '**Next opponents:** {0}': '**Próximos rivales:** {0}',
   '**Stream alerts:** {0}': '**Avisos de stream:** {0}',
   '**Reg reminders:** {0}': '**Recordatorios de inscripción:** {0}',
   '**Registration DMs:** {0}': '**DMs de inscripción:** {0}',
@@ -117,6 +124,7 @@ export default {
   // /notify changes
   'match calls on': 'llamados de partida activados',
   'match calls off': 'llamados de partida desactivados',
+  'next opponents on': 'próximos rivales activados',
   'set results on': 'resultados de sets activados',
   'stream alerts on': 'avisos de stream activados',
   'stream alerts off': 'avisos de stream desactivados',
@@ -130,6 +138,11 @@ export default {
   'Stream alert pings need your start.gg, so `/link` first. Leave out the link and it finds yours.': 'Los pings de avisos de stream necesitan tu start.gg, así que usa `/link` primero. Si dejas el enlace vacío, lo encuentra solo.',
   'Match call pings need their start.gg. Ask them to run `/link` with their profile link.': 'Los pings de llamados de partida necesitan su start.gg. Pídele que use `/link` con el enlace de su perfil.',
   'Stream alert pings need their start.gg. Ask them to run `/link` with their profile link.': 'Los pings de avisos de stream necesitan su start.gg. Pídele que use `/link` con el enlace de su perfil.',
+  'Next opponent pings need your start.gg, so `/link` first. Leave out the link and it finds yours.': 'Los pings de próximo rival necesitan tu start.gg, así que usa `/link` primero. Si dejas el enlace vacío, lo encuentra solo.',
+  'Next opponent pings need their start.gg. Ask them to run `/link` with their profile link.': 'Los pings de próximo rival necesitan su start.gg. Pídele que use `/link` con el enlace de su perfil.',
+  'You\'ll get pinged when your next opponent is set.': 'Te llegará un ping cuando se decida tu próximo rival.',
+  'They\'ll get pinged when their next opponent is set.': 'Le llegará un ping cuando se decida su próximo rival.',
+  'No more next opponent pings.': 'Ya no habrá pings de próximo rival.',
   'You\'ll get pinged when your match is called.': 'Te llegará un ping cuando llamen tu partida.',
   'They\'ll get pinged when their match is called.': 'Le llegará un ping cuando llamen su partida.',
   'No more match call pings.': 'Ya no habrá pings de llamados de partida.',
@@ -147,7 +160,12 @@ export default {
   'You\'ll get a DM 1 hour before the tournament starts, with the link, location and tournament image.': 'Te llegará un DM 1 hora antes de que empiece el torneo, con el enlace, el lugar y la imagen del torneo.',
   'They\'ll get a DM 1 hour before the tournament starts, with the link, location and tournament image.': 'Le llegará un DM 1 hora antes de que empiece el torneo, con el enlace, el lugar y la imagen del torneo.',
   'No more start DMs.': 'Ya no habrá DMs de inicio.',
-  '-# Match calls are off for the whole server, `/t-o settings calls:True` turns them on.': '-# Los llamados de partida están apagados en todo el servidor. `/t-o settings calls:True` los enciende.',
+  '-# Match calls are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.':
+    '-# Los llamados de partida están apagados por defecto para los torneos, así que los pings solo llegan donde `/t-o tournament posts` los encendió.',
+  '-# Next opponents are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.':
+    '-# Los próximos rivales están apagados por defecto para los torneos, así que los pings solo llegan donde `/t-o tournament posts` los encendió.',
+  '-# Stream alerts are off by default for tournaments, so pings only come where `/t-o tournament posts` turned them on.':
+    '-# Los avisos de stream están apagados por defecto para los torneos, así que los pings solo llegan donde `/t-o tournament posts` los encendió.',
   '-# I couldn\'t change your {0} role though, that needs Manage Roles and my role above it.': '-# Pero no pude cambiar tu rol {0}: necesita Gestionar roles y que mi rol esté por encima.',
   '-# I couldn\'t change their {0} role though, that needs Manage Roles and my role above it.': '-# Pero no pude cambiar su rol {0}: necesita Gestionar roles y que mi rol esté por encima.',
   // notify bulk and everyone
@@ -156,7 +174,8 @@ export default {
   'Bulk ping changes stay the way they were.': 'Los pings de todos se quedan como estaban.',
   'Nobody is tracked yet, `/track add` someone first.': 'Todavía no sigo a nadie. Agrega a alguien con `/track add` primero.',
   '**Pings for {0}**': '**Pings de {0}**',
-  '**Match calls:** on for {0} · **Stream alerts:** on for {1}': '**Llamados de partida:** activados para {0} · **Avisos de stream:** activados para {1}',
+  '**Match calls:** on for {0} · **Next opponents:** on for {1} · **Stream alerts:** on for {2}':
+    '**Llamados de partida:** activados para {0} · **Próximos rivales:** activados para {1} · **Avisos de stream:** activados para {2}',
   '**Reg reminders:** on for {0} · **Registration DMs:** on for {1} · **Start DMs:** on for {2}':
     '**Recordatorios de inscripción:** activados para {0} · **DMs de inscripción:** activados para {1} · **DMs de inicio:** activados para {2}',
   '-# 1 tracked player has no Discord on start.gg and stays out': '-# 1 jugador seguido no tiene Discord en start.gg y queda fuera',

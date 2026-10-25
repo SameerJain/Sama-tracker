@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test, { after, mock } from 'node:test';
 import {
   UNPLAYED_STATES, getActivePlayers, getCharacterSets, getEventHistory, getEventSets, getHeadToHead, getNextSets, getSetHistory, getSetPairings, getStats,
-  getUnplayedEventSets, queueLength,
+  getPlayerUnplayedSets, getUnplayedEventSets, queueLength,
 } from '../src/startgg.js';
 import { predict } from '../src/predict.js';
 import { settle } from './fixtures.js';
@@ -325,8 +325,10 @@ test('getNextSets asks for unplayed sets and keeps only filled ones', async () =
     return { ok: true, json: async () => ({ data: { p10: { sets: { nodes: [filled, open] } } } }) };
   };
 
-  const sets = await settle(getNextSets([10]));
+  const { sets, more } = await settle(getNextSets([10]));
   assert.deepEqual(sets.map((set) => [set.id, set.roundNumber, set.state]), [['501', 2, 1]]);
+  // 2 of a page of 4 came back, so that's all of them
+  assert.deepEqual([...more], []);
   assert.equal(sets[0].groupId, 77);
   assert.equal(sets[0].station, 3);
   assert.deepEqual(sets[0].event.tournament.startAt, 100);
@@ -342,7 +344,34 @@ test('getNextSets asks for unplayed sets and keeps only filled ones', async () =
 test('getNextSets dedupes a set both players share', async () => {
   const node = { id: 9, state: 6, round: 1, event, slots };
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { sets: { nodes: [node] } }, p20: { sets: { nodes: [node] } } } }) });
-  assert.deepEqual((await settle(getNextSets([10, 20]))).map((set) => set.id), ['9']);
+  assert.deepEqual((await settle(getNextSets([10, 20]))).sets.map((set) => set.id), ['9']);
+});
+
+test('getNextSets says whose page came back full, empty slots counted', async () => {
+  const nodes = (count) => Array.from({ length: count }, (_, i) => ({ id: 100 + i, state: 1, round: i + 1, event, slots: i ? slots : [slots[0], { entrant: null }] }));
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { p10: { sets: { nodes: nodes(4) } }, p20: { sets: { nodes: nodes(3) } } } }) });
+  const { sets, more } = await settle(getNextSets([10, 20]));
+  assert.deepEqual([...more], [10]);
+  assert.equal(sets.length, 3);
+});
+
+test('getPlayerUnplayedSets reads each player\'s sets in one event, all in one request', async () => {
+  const requests = [];
+  globalThis.fetch = async (_url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    requests.push({ query, variables });
+    return { ok: true, json: async () => ({ data: {
+      e70_10: { sets: { nodes: [{ id: 1, state: 1, round: 1, event, slots }, { id: 2, state: 1, round: 2, event, slots }] } },
+      e80_20: { sets: { nodes: [{ id: 3, state: 7, round: 1, event, slots }] } },
+    } }) };
+  };
+  const sets = await settle(getPlayerUnplayedSets([{ eventId: 70, playerId: 10 }, { eventId: 80, playerId: 20 }]));
+  assert.deepEqual(sets.map((set) => set.id), ['1', '2', '3']);
+  assert.equal(requests.length, 1);
+  assert.match(requests[0].query, /e70_10: event\(id: 70\) \{ sets\(perPage: 40, page: 1, filters: \{ state: \$state, showByes: false, playerIds: \[10\] \}\)/);
+  assert.match(requests[0].query, /e80_20: event\(id: 80\)[^\n]*playerIds: \[20\]/);
+  assert.deepEqual(requests[0].variables, { state: [1, 4, 6, 7] });
+  await assert.rejects(getPlayerUnplayedSets([{ eventId: '70) { x }', playerId: 10 }]), /bad start.gg id/);
 });
 
 test('getUnplayedEventSets reads every page at 40 a page', async () => {

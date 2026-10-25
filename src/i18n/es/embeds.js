@@ -376,14 +376,15 @@ export default {
   'Location TBA': 'Lugar por confirmar',
   '{0} · {1} entrants': '{0} · {1} participantes',
   'Tournament thread': 'Hilo del torneo',
-  'Set results and stream alerts from this tournament go in the thread.':
-    'Los resultados de sets y los avisos de stream de este torneo van en el hilo.',
+  'Set results, stream alerts, match calls and next opponents from this tournament go in the thread.':
+    'Los resultados de sets, avisos de stream, llamados de partida y próximos rivales de este torneo van en el hilo.',
   'Event thread': 'Hilo del evento',
-  'Set results and stream alerts from this event go in the thread.': 'Los resultados de sets y los avisos de stream de este evento van en el hilo.',
+  'Set results, stream alerts, match calls and next opponents from this event go in the thread.':
+    'Los resultados de sets, avisos de stream, llamados de partida y próximos rivales de este evento van en el hilo.',
   'Stream alert · {0} vs {1}': 'Aviso de stream · {0} vs {1}',
   Watch: 'Ver',
   'Match call · {0} vs {1}': 'Llamado de partida · {0} vs {1}',
-  '{0} · **{1} {2}**': '{0} · **{1} {2}**',
+  'Next opponent · {0} vs {1}': 'Próximo rival · {0} vs {1}',
   ' · **{0} {1}**': ' · **{0} {1}**',
   Station: 'Estación',
   'Set result · {0} · {1} {2} {3} · {4}': 'Resultado del set · {0} · {1} {2} {3} · {4}',

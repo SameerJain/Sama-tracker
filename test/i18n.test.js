@@ -146,14 +146,23 @@ test('/help reads in spanish, short and full, within discord\'s card limit', () 
   assert.ok(full.every((card) => !/\*\*Linking yourself\*\*|\*\*Player stats\*\*/.test(card.data.description)));
 });
 
-test('english and every language a server picked get fun posts made ahead', () => {
+test('only the languages servers use get fun posts made ahead', () => {
   assert.deepEqual(languagesInUse(), ['en']);
+  // a server on spanish has no use for english posts
   state.messages = { language: 'es' };
-  assert.deepEqual(languagesInUse(), ['en', 'es']);
+  assert.deepEqual(languagesInUse(), ['es']);
   state.messages = {};
-  state.guilds = { one: { messages: { language: 'es' } }, two: { messages: {} } };
-  assert.deepEqual(languagesInUse(), ['en', 'es']);
-  state.guilds = {};
+  process.env.MULTI_GUILD = 'true';
+  try {
+    assert.deepEqual(languagesInUse(), ['en'], 'nobody joined yet');
+    state.guilds = { one: { messages: { language: 'es' } }, two: { messages: {} } };
+    assert.deepEqual(languagesInUse().sort(), ['en', 'es']);
+    state.guilds = { one: { messages: { language: 'es' } } };
+    assert.deepEqual(languagesInUse(), ['es']);
+  } finally {
+    delete process.env.MULTI_GUILD;
+    state.guilds = {};
+  }
 });
 
 test('an Undo pressed too late answers in the language at the press, not the one at startup', async () => {

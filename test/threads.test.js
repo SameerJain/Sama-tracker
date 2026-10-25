@@ -251,6 +251,22 @@ test('stream alerts and their pings go in the tournament thread', async () => {
   assert.deepEqual(thread.sent[0].allowedMentions, { users: ['fan'] });
 });
 
+test('match calls and their pings go in the event thread', async () => {
+  state.messages = { threads: 'event' };
+  state.players[1].discordId = 'fan';
+  Object.assign(state, { callPings: ['fan'], callPosts: [], links: {} });
+  const channel = fakeChannel();
+  sets = [node('called', now(), tournament('Local'), 6)];
+  await tracker.postMatchCalls(channel);
+  const [thread] = channel.threads.all.values();
+  assert.equal(channel.sent.length, 1, 'only the thread card stays in the channel');
+  assert.equal(thread.name, 'Local · Singles');
+  assert.equal(thread.sent.length, 1);
+  assert.equal(thread.sent[0].content, '<@fan> You\'re up');
+  assert.deepEqual(thread.sent[0].allowedMentions, { users: ['fan'] });
+  state.callPings = [];
+});
+
 test('tournament and event threads pin their channel cards', async () => {
   const channel = fakeChannel();
   sets = [node('a1', now() - 30, tournament('Local'))];

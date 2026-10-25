@@ -7,6 +7,7 @@ import { badToken, checkToken } from './startgg.js';
 import { missingThreadPermissions, startTracking, stopTracking, dropGuildChannel } from './tracker.js';
 import { messageSettings } from './message-settings.js';
 import { setFallbackImage } from './embeds/index.js';
+import { warmFunPosts } from './fun/index.js';
 import { setHealthReady, startHealth, stopHealth } from './health.js';
 import { forGuild, guildLocal, isMultiGuild, migrateLegacyToGuild, postsChannelId, save } from './store.js';
 
@@ -99,6 +100,7 @@ function warnPosting(postChannel, where, threadsOn) {
 // railway's health check passes
 function goLive(singleChannel) {
   setFallbackImage(client.user.displayAvatarURL({ extension: 'png', size: 256 }));
+  warmFunPosts();
   process.once('SIGTERM', () => shutdown('SIGTERM', client).catch(console.error));
   process.once('SIGINT', () => shutdown('SIGINT', client).catch(console.error));
   startTracking(client, singleChannel);

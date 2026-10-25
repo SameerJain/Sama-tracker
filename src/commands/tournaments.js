@@ -65,15 +65,15 @@ function postsText(tournament) {
   return [lines.join(t(' · ')), t('-# default follows /t-o settings, which every tournament without its own setting goes by')].join('\n');
 }
 
-// every set and stream alert goes in its thread, so say when that can't happen yet
+// every set, stream alert, match call and next opponent goes in its thread, so say when that can't happen yet
 function threadWarning(interaction) {
   // the posts channel, not wherever this ran. a multi-server build with no channel in /t-o settings yet has none
   const channelId = postsChannelId();
   const postChannel = channelId && interaction.client?.channels?.cache?.get(channelId);
   if (!postChannel) return null;
   const missing = missingThreadPermissions(postChannel);
-  if (!missing) return t`Threads can't be started in <#${channelId}>, so its sets and stream alerts post there instead.`;
-  if (missing.length) return t`I need ${permissionList(missing)} in <#${channelId}> to start its thread. Until then its sets and stream alerts post there instead.`;
+  if (!missing) return t`Threads can't be started in <#${channelId}>, so its sets, stream alerts, match calls and next opponents post there instead.`;
+  if (missing.length) return t`I need ${permissionList(missing)} in <#${channelId}> to start its thread. Until then its sets, stream alerts, match calls and next opponents post there instead.`;
   return null;
 }
 

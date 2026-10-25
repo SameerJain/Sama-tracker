@@ -225,6 +225,7 @@ function makePost() {
 }
 
 const queue = postQueue('bills', {
+  size: 5,
   make: makePost,
   toSaved: ({ file, ...rest }) => rest,
   // the pools stay unloaded. a file that won't download again falls back to the url, the way a fresh post does
@@ -242,6 +243,7 @@ export default {
   description: 'Live pro-Bills photos and official GIFs with a message',
   enabled: true,
   takePost: queue.take,
+  warmPosts: queue.fill,
   format: ({ title, image, file, page, name, source }) => ({
     embeds: [embeds.funImage(t(title), file ? `attachment://${file.name}` : image, page, name, source)],
     files: file ? [file] : [],

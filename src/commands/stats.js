@@ -16,7 +16,7 @@ import { slippiFor, slippiLookup } from './slippi.js';
 import { LOGO as slippiLogo } from '../slippi.js';
 import {
   fetchPlayer, findPlayer, readPlayer, replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, statPlayer, withCountdown, flag, fullReport, buttonRow,
-  linkedPlayer, rememberPick, parseSince, t, listOf,
+  linkedPlayer, rememberPick, parseSince, looksLikeProfile, notAPlayer, t, listOf,
 } from './shared.js';
 
 // /characters verbose, so the cards fit in one message
@@ -108,6 +108,13 @@ async function pair(interaction) {
     await replyEphemeral(interaction, t('Pick a player by name, a start.gg link or ID, or `/link` your start.gg so leaving it out looks you up.'));
     return null;
   }
+  // a name that isn't on either list gets the closest one straight away, before any wait
+  const typo = [!a && interaction.options.getString('player'), !b && interaction.options.getString('opponent')]
+    .find((typed) => typed && !looksLikeProfile(typed));
+  if (typo) {
+    await replyEphemeral(interaction, notAPlayer(typo));
+    return null;
+  }
   // a typed link or ID isn't on either list, so it gets looked up; that request waits for the defer
   if (!a || !b) await interaction.deferReply();
   // a miss has already answered and deleted the thinking reply, so the other one doesn't get looked up
@@ -172,7 +179,9 @@ async function scout(interaction) {
 
   const input = interaction.options.getString('opponent', true);
   // a tracked or linked pick from autocomplete, otherwise a start.gg link or ID
-  const opponent = readPlayer(interaction, 'opponent') ?? await findPlayer(interaction, input);
+  const picked = readPlayer(interaction, 'opponent');
+  if (!picked && !looksLikeProfile(input)) return interaction.editReply({ content: notAPlayer(input), allowedMentions: { parse: [] } });
+  const opponent = picked ?? await findPlayer(interaction, input);
   if (!opponent) return;
   if (player.playerId === opponent.playerId) return interaction.editReply(t('Use an opponent\'s profile, not your own.'));
   const filters = filterOptions(interaction);

@@ -55,8 +55,10 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // { id, at, channelId, messageId, pinned }. the last three are its card in the channel, pinned saying if the pin
 // worked, so it comes off once the tournament or event is over.
 // recentPicks are the start.gg user ids each discord id last picked in a player option, newest first, for autocomplete.
-// nextPings are discord ids with /notify next on. nextPosted are the set ids whose next opponent card went out
-// (1000 kept), and nextPosts the cards still watched for 60 minutes: { setId, channelId, messageId, at } (200 kept).
+// nextPings are discord ids with /notify next on. nextPosted are the pairings whose next opponent card went out, as
+// `setId:side:side` with each side's player ids joined by + (1000 kept), so the same two in a set post once. nextPosts
+// are the cards still watched for 60 minutes: { setId, key, channelId, messageId, at, discordIds, text } (200 kept),
+// key being that pairing, discordIds who got pinged, and text the ping as it went out, so a changed pairing crosses it out.
 // buttons are match calls and stream alerts still showing a Head to head button: { setId, channelId, messageId, at }.
 // resultPosts are set results still watched for a TO's fix: { setId, channelId, messageId, at, outcome, reset }, with
 // outcome being startgg.outcomeOf when it was last shown.

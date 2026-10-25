@@ -280,12 +280,12 @@ test('results and the top 8 go out together as soon as the bracket is finished',
   assert.equal(quiet.top8Posted, true);
   assert.equal(quiet.resultsPosted, true);
 
-  // a bracket still running posts nothing and asks nothing
+  // a bracket still running checks whether its standings are actually final, but posts nothing
   state.messages = { top8: true };
   asked.length = 0;
   const running = { name: 'Local', slug: 'tournament/local', tracked, startAt: now - 2 * 3600, endAt: now + 2 * 3600, entries: [entry(false)] };
   await tracker.postResults(running, channel);
-  assert.equal(asked.length, 0);
+  assert.equal(asked.length, 1);
   assert.equal(sent.length, 1);
   assert.equal(running.top8Posted, undefined);
 
@@ -295,6 +295,49 @@ test('results and the top 8 go out together as soon as the bracket is finished',
   await tracker.postResults(undecided, channel);
   assert.equal(sent.length, 1);
   assert.equal(undecided.top8Posted, undefined);
+});
+
+test('final standings finish a tracked tournament after one hour without start.gg marking the event complete', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  state.players = { 1: { ...crewPlayer } };
+  state.messages = { top8: true };
+  const standing = (placement, name, isFinal = true) => ({ placement, isFinal, entrant: { name } });
+  let final = true;
+  mockApi(() => ({ e501: {
+    state: 'ACTIVE', standings: { nodes: [standing(1, 'Champ', final), standing(2, 'Runner', final)] },
+  } }));
+  const sent = [];
+  const channel = { send: async (payload) => sent.push(payload) };
+  const tournament = {
+    name: 'Smash Royale #49', slug: 'tournament/smash-royale-49', tracked,
+    startAt: now - 4 * 3600, endAt: now + 4 * 3600,
+    entries: [{ userId: 1, eventId: 501, event: 'Singles', eventSlug: event.slug, entrants: 32,
+      started: true, done: false, placement: 5, final: true }],
+  };
+
+  await tracker.postResults(tournament, channel);
+  assert.equal(sent.length, 0);
+  assert.ok(tournament.fullyReportedAt);
+  assert.equal(tournament.resultsPosted, undefined);
+
+  tournament.fullyReportedAt = now - 3600;
+  await tracker.postResults(tournament, channel);
+  assert.equal(sent.length, 2);
+  assert.equal(tournament.resultsPosted, true);
+  assert.equal(tournament.top8Posted, true);
+
+  const catchUp = { ...tournament, resultsPosted: undefined, top8Posted: undefined, fullyReportedAt: undefined, checkedAt: now - 2 * 3600 };
+  sent.length = 0;
+  await tracker.postResults(catchUp, channel);
+  assert.equal(sent.length, 2);
+  assert.equal(catchUp.resultsPosted, true);
+
+  const running = { ...tournament, resultsPosted: undefined, top8Posted: undefined, fullyReportedAt: now - 3600 };
+  final = false;
+  sent.length = 0;
+  await tracker.postResults(running, channel);
+  assert.equal(sent.length, 0);
+  assert.equal(running.fullyReportedAt, undefined);
 });
 
 test('a top 8 that fails to send is retried by the fail-safe instead of being lost', async () => {

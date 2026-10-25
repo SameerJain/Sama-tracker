@@ -406,6 +406,19 @@ function profileSlug(input) {
   return input.match(/user\/([\w-]+)/)?.[1] ?? input;
 }
 
+// a profile link, or the 8 hex characters start.gg gives every profile. anything else typed in a player box
+// is a name that isn't on the list, and isn't worth a start.gg request
+const looksLikeProfile = (input) => /user\/[\w-]+/.test(input) || /^[0-9a-f]{8}$/i.test(input.trim());
+
+// the answer to a name like that: the closest tracked or linked one, or how to look anyone else up
+function notAPlayer(typed) {
+  const code = typed.trim().replaceAll('`', '');
+  const near = didYouMean(Object.values(pickable()), typed);
+  return near
+    ? t`Nobody tracked or linked goes by \`${code}\`.${near}`
+    : t`Nobody tracked or linked goes by \`${code}\`. Paste their start.gg profile link or ID, like start.gg/user/f64a83c8.`;
+}
+
 // the player behind a typed profile link or ID, with the text as typed, backticks out so it can go in a code span
 async function typedPlayer(input) {
   const text = input.trim();
@@ -428,6 +441,10 @@ async function findPlayer(interaction, input, own = false) {
 // whoever a matchup option got that isn't tracked or linked: a start.gg profile link or ID. called
 // after deferReply, so a miss drops the thinking reply and answers ephemeral instead. null when nobody
 async function fetchPlayer(interaction, input) {
+  if (!looksLikeProfile(input)) {
+    await replyEphemeralAfterDefer(interaction, notAPlayer(input));
+    return null;
+  }
   const { text, shown, player } = await typedPlayer(input);
   if (!player) {
     const near = didYouMean(Object.values(pickable()), text) || t(' Pick a tracked or linked player, or use a profile link or ID like start.gg/user/f64a83c8.');
@@ -447,6 +464,11 @@ async function statPlayer(interaction, name = 'player') {
     await replyNoPlayer(interaction, name);
     return null;
   }
+  // answered before deferring, so a typo gets one private reply and no wait
+  if (!looksLikeProfile(typed)) {
+    await replyEphemeral(interaction, notAPlayer(typed));
+    return null;
+  }
   if (!interaction.deferred) await interaction.deferReply();
   return fetchPlayer(interaction, typed);
 }
@@ -464,7 +486,7 @@ const flag = (interaction, name) => interaction.options.getBoolean(name) ?? fals
 
 export {
   pickable, readChoice, readPlayer, readTracked, linkedPlayer, isSelf, lookup, nameMatches, didYouMean, recentPicks, rememberPick,
-  findPlayer, fetchPlayer, statPlayer, playerBySlug, flag, parseSince,
+  findPlayer, fetchPlayer, statPlayer, looksLikeProfile, notAPlayer, playerBySlug, flag, parseSince,
   sendEmbeds, withCountdown, replyEphemeral, replyEphemeralAfterDefer, replyNoPlayer, replyNotTracked, failureMessage,
   reportButton, fullReport, h2hButton, buttonRow, readButton, commandLabel, roughly, LATE_SECONDS, t, count, listOf, language,
 };

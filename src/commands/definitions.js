@@ -12,11 +12,10 @@ function playerOption(description, name = 'player', required = true) {
   return { type: Option.String, name, description, required, autocomplete: true };
 }
 
-const YOU = 'Tracked or linked player, leave out for yourself';
-const YOU_OR_ALL = 'Tracked or linked player, or all for everyone tracked. Leave out for yourself';
-// /h2h and /predict also take a start.gg profile link or ID, so neither player has to be tracked or linked
+// every stat command also takes a start.gg profile link or ID, so nobody has to be tracked or linked to look up
+const YOU = 'Tracked or linked player, or a start.gg profile link or ID. Leave out for yourself';
+const YOU_OR_ALL = 'Tracked or linked player, a start.gg link or ID, or all for everyone tracked. Blank for you';
 const MATCHUP = 'Tracked or linked player to compare with, or a start.gg profile link or ID';
-const MATCHUP_YOU = 'Tracked or linked player, or a start.gg profile link or ID. Leave out for yourself';
 
 // picking one saves pasting a link, which is slow on a phone
 const KNOWN_TOURNAMENT = 'start.gg tournament link, or pick one that\'s tracked or has tracked players in it';
@@ -78,7 +77,7 @@ const SETTINGS_OPTIONS = [
   })),
   { type: Option.Boolean, name: 'set_colors', description: 'Color set result cards green win, red loss, gold crew vs crew, blue otherwise' },
   {
-    type: Option.String, name: 'threads', description: 'Where set results and stream alerts go: the channel, a thread per tournament or per event',
+    type: Option.String, name: 'threads', description: 'Where set results, stream alerts, match calls and next opponents go: the channel or a thread',
     choices: Object.entries(THREAD_MODES).map(([value, name]) => ({ name, value })),
   },
   { type: Option.Integer, name: 'event_length', description: 'Discord event hours when start.gg has no end time, 2 to 12', min_value: 2, max_value: 12 },
@@ -89,6 +88,11 @@ const SETTINGS_OPTIONS = [
     type: Option.String, name: 'language', description: 'English or Spanish for this server',
     choices: [{ name: 'English', value: 'en' }, { name: 'Español', value: 'es' }],
   },
+  {
+    type: Option.Channel, name: 'commands_channel', description: 'Only let bot commands work in this channel. Pick one already on the list to take it off',
+    channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum],
+  },
+  { type: Option.Boolean, name: 'commands_anywhere', description: 'True lets bot commands work in every channel again' },
   ...(isMultiGuild() ? [{
     type: Option.Channel, name: 'channel', description: 'Channel for automatic posts',
     channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
@@ -238,23 +242,24 @@ const commands = [
       {
         type: Option.Subcommand,
         name: 'settings',
-        description: 'Automatic posts, recap schedule, language and posts channel. TOs only',
+        description: 'Automatic posts, recap schedule, language, posts channel and where commands work. TOs only',
         options: SETTINGS_OPTIONS,
       },
     ],
   },
   {
     name: 'notify',
-    description: 'Your pings for match calls, streams, reg reminders and 1-hour DMs. TOs can set anyone\'s',
+    description: 'Your pings for calls, next opponents, streams, reg reminders and 1-hour DMs. TOs can set anyone\'s',
     options: [
       { type: Option.User, name: 'user', description: 'Server member. Leave out for yourself. Someone else needs a TO' },
       playerOption('Tracked player or all, leave out for yourself. Someone else needs a TO', 'player', false),
       switchOption('calls', 'Your match getting called. Needs you linked, or tracked with Discord on start.gg'),
+      switchOption('next', 'Your next opponent being decided. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('streams', 'When your set is on stream. Needs you linked, or tracked with Discord on start.gg'),
       switchOption('registration', 'Reg Reminders role and its pings for tracked tournaments'),
       switchOption('dm_registration', 'DM 1 hour before registration closes, with link, location and image'),
       switchOption('dm_start', 'DM 1 hour before the tournament starts, with link, location and image'),
-      switchOption('all', 'All five at once'),
+      switchOption('all', 'All six at once'),
     ],
   },
   // not under /notify: these are roles people ping each other with, not posts the bot sends
@@ -330,7 +335,7 @@ const commands = [
     name: 'h2h',
     description: 'Head-to-head record with one-line predicted odds',
     options: [
-      playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
+      playerOption(MATCHUP, 'opponent'), playerOption(YOU, 'player', false),
       verboseOption('Every set, splits and streaks. Odds stay one line. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and Melee odds, plus Slippi ranks which count toward them' },
       sinceOption(), venueOption(),
@@ -370,7 +375,7 @@ const commands = [
     name: 'predict',
     description: 'Odds of beating another player',
     options: [
-      playerOption(MATCHUP, 'opponent'), playerOption(MATCHUP_YOU, 'player', false),
+      playerOption(MATCHUP, 'opponent'), playerOption(YOU, 'player', false),
       verboseOption('The full breakdown: how much each part counts, with bars and how sure the odds are'),
       { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks which count toward them' },
       sinceOption(), venueOption(),

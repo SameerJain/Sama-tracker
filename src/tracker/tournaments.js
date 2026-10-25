@@ -7,7 +7,8 @@ import { rememberAccounts, serverMembers } from '../accounts.js';
 import { cantMakeEvents, ensureDiscordEvent } from '../discord-events.js';
 import {
   currentChannel, secondsNow, health, post, postRefs, editPost, posting, named, crewOf, crewIds, endTime, overAt, eventsOf, shouldForgetTournament,
-  ROLL_CALL_MIN_PLAYERS, ROLL_CALL_HOURS_BEFORE, RESULTS_WAIT_HOURS, TOP8_RETRY_HOURS, FAR_OFF_CHECK_HOURS, PROJECTED_KEPT_DAYS, HOUR, DAY,
+  ROLL_CALL_MIN_PLAYERS, ROLL_CALL_HOURS_BEFORE, RESULTS_WAIT_HOURS, FULLY_REPORTED_WAIT_HOURS, TOP8_RETRY_HOURS, FAR_OFF_CHECK_HOURS,
+  PROJECTED_KEPT_DAYS, HOUR, DAY,
 } from './shared.js';
 import { unpinFinishedThreads, unpinTournamentThread } from './threads.js';
 
@@ -239,12 +240,27 @@ export async function postResults(tournament, postChannel = currentChannel()) {
 async function postFinishedResults(tournament, postChannel, now, topEightOn) {
   const scope = eventsOf(tournament);
   const started = scope.filter((entry) => entry.started);
-  if (!started.length || !started.every((entry) => entry.done)) return false;
+  if (!started.length) return false;
   // one that hasn't started might still run, like doubles after singles, so it waits for those until the end time
   if (started.length < scope.length && now <= endTime(tournament)) return false;
-  const withTopEight = topEightOn && postsOn('top8', tournament, now);
   let events = [];
-  if (withTopEight) {
+  if (!started.every((entry) => entry.done)) {
+    // the existing 12-hour fallback must not depend on one more successful start.gg lookup
+    if (now - overAt(tournament) >= RESULTS_WAIT_HOURS * HOUR) return false;
+    events = await topEightEvents(started);
+    const distinct = new Set(started.filter((entry) => entry.eventId).map((entry) => entry.eventId)).size;
+    const fullyReported = events.length === distinct
+      && events.every((event) => event.standings.length && event.standings.every((standing) => standing.final));
+    if (!fullyReported) {
+      delete tournament.fullyReportedAt;
+      return false;
+    }
+    tournament.fullyReportedAt ??= Math.min(now, tournament.checkedAt ?? now);
+    if (now < tournament.fullyReportedAt + FULLY_REPORTED_WAIT_HOURS * HOUR) return false;
+    tournament.doneAt ??= tournament.fullyReportedAt;
+  }
+  const withTopEight = topEightOn && postsOn('top8', tournament, now);
+  if (withTopEight && !events.length) {
     try {
       events = await fetchDoneTopEight(started);
     } catch (err) {

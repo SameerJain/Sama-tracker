@@ -12,6 +12,7 @@ const { articleExcerpt, categoryPages, excerpt, patchNotes } = await import('../
 const { addCommunity, searchVideos } = await import('../src/fun/youtube.js');
 const { billsImagePool } = await import('../src/fun/bills.js');
 const { SCENARIOS, funMessage, makeFun, pickStyle } = await import('../src/fun/generated.js');
+const { postQueue } = await import('../src/fun/queue.js');
 const { state } = await import('../src/store.js');
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
@@ -373,6 +374,27 @@ test('bills keeps posts queued so bursts reply right away', async (t) => {
   assert.equal(giphy, loaded.giphy);
 });
 
+test('bills starts filling its queue before the first command', async (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  let commons = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('commons.wikimedia.org')) {
+      commons++;
+      return json({ query: { pages: [{
+        title: 'File:Ready.jpg', imageinfo: [{ mime: 'image/jpeg', thumburl: 'https://images.example/ready.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Ready.jpg' }],
+      }] } });
+    }
+    if (url === 'https://giphy.com/buffalobills') return { ok: true, text: async () => String.raw`\"id\":\"readyGif\",\"title\":\"Bills Ready GIF by Buffalo Bills\",\"images\":{\"downsized\":{\"url\":\"https://media.giphy.com/media/readyGif/giphy.gif\"}}` };
+    return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) };
+  };
+
+  const { default: bills } = await import('../src/fun/bills.js?startup-prefetch');
+  bills.warmPosts();
+  await untilSaved('bills', 5);
+
+  assert.ok(commons > 0, 'the Bills media pool starts loading at startup');
+});
+
 test('the message lists the game\'s points, then the video and article as more of them', () => {
   const message = funMessage({
     style: 'a copypasta',
@@ -505,7 +527,7 @@ test('a made up scenario that fails falls back to the lists', async (t) => {
   console.error = originalError;
   assert.equal(post.text, 'post');
   assert.match(message, /^Style: a rant\n/);
-  assert.deepEqual(errors, Array(4).fill('melee made up scenario failed: overloaded'));
+  assert.deepEqual(errors, Array(6).fill('melee made up scenario failed: overloaded'));
 });
 
 test('most posts take their style from the lists', async (t) => {
@@ -554,8 +576,8 @@ test('smashwiki articles down and no youtube key still makes a post, from three 
   console.error = originalError;
   assert.equal(post.text, 'post');
   assert.match(message, /^Style: .+\nTalking points: [a-z]+; [a-z]+; [a-z]+$/);
-  // one for that post and the three more queued ahead plus its refill
-  assert.deepEqual(errors, Array(4).fill('melee SmashWiki article failed: SmashWiki returned 500'));
+  // one for that post and the five queued ahead
+  assert.deepEqual(errors, Array(6).fill('melee SmashWiki article failed: SmashWiki returned 500'));
 });
 
 test('more than one post stays queued so bursts reply right away', async (t) => {
@@ -569,6 +591,21 @@ test('more than one post stays queued so bursts reply right away', async (t) => 
   await nextPostWritten(sent);
   assert.equal((await fun.takePost()).text, 'post');
   await nextPostWritten(sent);
+});
+
+test('a fun queue can keep five finished posts ready', async () => {
+  let made = 0;
+  const queue = postQueue('five-ready', {
+    size: 5,
+    make: async () => ({ text: `post ${made++}` }),
+    toSaved: ({ text }) => ({ text }),
+    fromSaved: ({ text }) => Promise.resolve({ text }),
+  });
+
+  queue.fill();
+  await untilSaved('five-ready', 5);
+
+  assert.equal(state.funQueue['five-ready'].length, 5);
 });
 
 async function untilSaved(name, count) {
@@ -601,14 +638,15 @@ test('queued fun posts survive a restart instead of discarding paid-for Claude p
   t.mock.method(Math, 'random', () => 0.5);
   const sent1 = [];
   const first = countingFun('queue-test', sent1, 'saved');
-  await untilSaved('queue-test', 3);
+  await untilSaved('queue-test', 5);
   const saved = state.funQueue['queue-test'].map((each) => each.text);
-  assert.equal(new Set(saved).size, 3);
+  assert.equal(new Set(saved).size, 5);
 
   // a new run for the same command serves the saved posts, without asking Claude again for them
   const sent2 = [];
   const second = countingFun('queue-test', sent2, 'fresh');
-  const served = [await second.takePost(), await second.takePost(), await second.takePost()];
+  const served = [];
+  for (let i = 0; i < 5; i++) served.push(await second.takePost());
   assert.deepEqual(served.map((post) => post.text), saved);
   assert.ok(served.every((post) => Buffer.isBuffer(post.image.attachment)));
   // taking them consumes the saved queue
@@ -630,14 +668,128 @@ test('a spanish server gets fun posts written in spanish, from a queue of its ow
     name: 'language-test', line: 'LINE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: [], points: ['one', 'two', 'three'],
     articles: ['Techniques (SSBM)'], videos: [],
   }, client);
-  await untilSaved('language-test', 3);
+  await untilSaved('language-test', 5);
   assert.deepEqual([...new Set(made)], ['en'], 'nobody picked spanish, so nothing gets made in it');
 
   state.messages = { language: 'es' };
   assert.equal((await fun.takePost()).text, 'post en español');
-  await untilSaved('language-test:es', 3);
+  await untilSaved('language-test:es', 5);
   state.messages = {};
   assert.equal((await fun.takePost()).text, 'english post');
+});
+
+test('switching language rewrites the posts made ahead in the new one instead of throwing them away', async (t) => {
+  fakeSites();
+  t.mock.method(Math, 'random', () => 0.5);
+  state.messages = {};
+  let written = 0;
+  const rewrites = [];
+  const client = { messages: { create: async (request) => {
+    const content = request.messages[0].content;
+    if (content.startsWith('Style: ')) return { stop_reason: 'end_turn', content: [{ type: 'text', text: `post ${written++}` }] };
+    rewrites.push(request.system);
+    return { stop_reason: 'end_turn', content: [{ type: 'text', text: `reescrito: ${content}` }] };
+  } } };
+  const fun = makeFun({
+    name: 'switch-test', line: 'LINE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: [], points: ['one', 'two', 'three'],
+    articles: ['Techniques (SSBM)'], videos: [],
+  }, client);
+  await untilSaved('switch-test', 5);
+  const english = state.funQueue['switch-test'].map((each) => each.text);
+
+  state.messages = { language: 'es' };
+  fun.useLanguage('es');
+  await untilSaved('switch-test:es', 5);
+  assert.equal(written, 5, 'the same posts, rewritten, with nothing new written');
+  assert.ok(rewrites.every((system) => system.includes('Write it in Spanish')));
+  assert.deepEqual(state.funQueue['switch-test:es'].map((each) => each.text), english.map((text) => `reescrito: ${text}`));
+  // they moved over, so english doesn't keep a copy nobody will see
+  assert.deepEqual(state.funQueue['switch-test'], []);
+  const served = await fun.takePost();
+  assert.equal(served.text, `reescrito: ${english[0]}`);
+  assert.ok(Buffer.isBuffer(served.image.attachment), 'the screenshot came along');
+
+  // switching back rewrites them into english the same way
+  state.messages = {};
+  fun.useLanguage('en');
+  await untilSaved('switch-test', 5);
+  assert.ok(rewrites.at(-1).includes('Write it in English'));
+});
+
+test('a rewrite that fails gets a fresh post in the new language', async (t) => {
+  fakeSites();
+  t.mock.method(Math, 'random', () => 0.5);
+  state.messages = {};
+  const client = { messages: { create: async (request) => {
+    if (!request.messages[0].content.startsWith('Style: ')) throw new Error('overloaded');
+    const spanish = request.system.includes('Write it in Spanish');
+    return { stop_reason: 'end_turn', content: [{ type: 'text', text: spanish ? 'post nuevo' : 'english post' }] };
+  } } };
+  const fun = makeFun({
+    name: 'rewrite-fails', line: 'LINE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: [], points: ['one', 'two', 'three'],
+    articles: ['Techniques (SSBM)'], videos: [],
+  }, client);
+  await untilSaved('rewrite-fails', 5);
+  state.messages = { language: 'es' };
+  fun.useLanguage('es');
+  assert.equal((await fun.takePost()).text, 'post nuevo');
+  state.messages = {};
+});
+
+test('another server still on the old language keeps its posts while copies are rewritten for the new one', async (t) => {
+  fakeSites();
+  t.mock.method(Math, 'random', () => 0.5);
+  process.env.MULTI_GUILD = 'true';
+  state.guilds = { one: { messages: {} }, two: { messages: {} } };
+  let rewrote = 0;
+  const client = { messages: { create: async (request) => {
+    if (!request.messages[0].content.startsWith('Style: ')) rewrote++;
+    const spanish = request.system.includes('Write it in Spanish');
+    return { stop_reason: 'end_turn', content: [{ type: 'text', text: spanish ? 'post en español' : 'english post' }] };
+  } } };
+  try {
+    const fun = makeFun({
+      name: 'shared-test', line: 'LINE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: [], points: ['one', 'two', 'three'],
+      articles: ['Techniques (SSBM)'], videos: [],
+    }, client);
+    await untilSaved('shared-test', 5);
+    state.guilds.one.messages.language = 'es';
+    fun.useLanguage('es');
+    await untilSaved('shared-test:es', 5);
+    assert.equal(state.funQueue['shared-test'].length, 5, 'server two still reads english');
+    assert.ok(rewrote > 0);
+    assert.ok(state.funQueue['shared-test:es'].every(({ text }) => text === 'post en español'));
+  } finally {
+    delete process.env.MULTI_GUILD;
+    state.guilds = {};
+  }
+});
+
+test('posts left in a language nobody reads anymore get rewritten on the next start', async (t) => {
+  fakeSites();
+  t.mock.method(Math, 'random', () => 0.5);
+  state.messages = {};
+  countingFun('stranded', [], 'old');
+  await untilSaved('stranded', 5);
+  const english = state.funQueue.stranded.map((each) => each.text);
+
+  // the server switched to spanish before this version, then the bot restarted
+  state.messages = { language: 'es' };
+  let written = 0;
+  const client = { messages: { create: async (request) => {
+    const content = request.messages[0].content;
+    if (content.startsWith('Style: ')) written++;
+    return { stop_reason: 'end_turn', content: [{ type: 'text', text: `reescrito: ${content}` }] };
+  } } };
+  makeFun({
+    name: 'stranded', line: 'LINE', category: 'Screenshots (SSBM)', prompt: 'p', styles: ['a rant'], scenarios: [], points: ['one', 'two', 'three'],
+    articles: ['Techniques (SSBM)'], videos: [],
+  }, client);
+  await untilSaved('stranded:es', 5);
+  assert.equal(written, 0, 'nothing new written');
+  assert.deepEqual(state.funQueue['stranded:es'].map((each) => each.text), english.map((text) => `reescrito: ${text}`));
+  assert.deepEqual(state.funQueue.stranded, []);
+  state.messages = {};
 });
 
 test('queued bills posts survive a restart without reloading the pools', async (t) => {

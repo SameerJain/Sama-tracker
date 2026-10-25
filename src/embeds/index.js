@@ -1,6 +1,6 @@
 export { messages, withSections, withImage, setFallbackImage } from './shared.js';
 export {
-  tournamentThread, eventThread, onStream, matchCall, setResult, correctedResult, resetResult, rollCall, regReminder, startReminder,
+  tournamentThread, eventThread, onStream, matchCall, nextOpponent, setResult, correctedResult, resetResult, rollCall, regReminder, startReminder,
   regWarning, registered, results, topEight, bracket, streamLinks, upcoming, run, nextOpponents,
 } from './tournaments.js';
 export { stats, progress, weeklyRecap, lifetimeStats } from './stats.js';
