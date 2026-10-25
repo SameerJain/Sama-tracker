@@ -32,6 +32,13 @@ export { commands } from './definitions.js';
 // bases and each person's discord language picks the spanish
 export const registeredCommands = () => commandsFor(commands, isMultiGuild() ? 'en' : language());
 
+// switching modes leaves the other mode's commands registered, and discord lists both, so every command shows
+// twice. multi-server clears each server's own copies and single-server the global ones. one that won't clear
+// only gets logged, since the commands still work, just listed twice
+export async function clearLeftoverCommands(managers) {
+  await Promise.all(managers.map((manager) => manager.set([]).catch((err) => console.error(`couldn't clear the old commands (${err.message})`))));
+}
+
 // these change what gets posted, so only tracked players can be picked. the rest are lookups, where linked people can be too
 const TRACKED_ONLY = ['track remove', 'track posts', 'notify'];
 // all means everyone tracked

@@ -444,8 +444,8 @@ async function predictReport(interaction, { player: a, opponent: b, verbose, mel
   // netplay players can have a rank without a melee set on start.gg, which is when it says the most
   if (!odds) return noPredictions(interaction, a, b, { melee, filters, profiles, ...rest });
 
-  const more = verbose ? [] : buttonRow(fullReport('predict', { player: a, opponent: b, melee, since: sinceText, venue }));
-  await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, { ...filters, melee }), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }), more);
+  // no Full report button, since with little to go on the breakdown said the same thing. verbose:True is the way to it
+  await sendEmbeds(interaction, embeds.withSlippi(embeds.prediction(a, b, odds, verbose, { ...filters, melee }), [a, b], profiles, { odds: true, slippi: Boolean(odds.slippi) }));
 }
 
 

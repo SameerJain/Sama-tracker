@@ -165,9 +165,11 @@ export function queued(check) {
 // returns the messages that went out
 export async function post(list, type, dueAt, postChannel = currentChannel(), tournament = null) {
   const sent = [];
+  // a tournament's own override counts for the kinds it has one of
+  const on = () => (TOURNAMENT_POSTS.includes(type) ? postsOn(type, tournament, dueAt) : messageEnabled(type, dueAt));
   for (const batch of embeds.messages(list)) {
     // roll calls and placements name people but never ping them
-    if (TOURNAMENT_POSTS.includes(type) ? postsOn(type, tournament, dueAt) : messageEnabled(type, dueAt)) sent.push(await postChannel.send({ embeds: batch, allowedMentions: { parse: [] } }));
+    if (on()) sent.push(await postChannel.send({ embeds: batch, allowedMentions: { parse: [] } }));
   }
   return sent;
 }

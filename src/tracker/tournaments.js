@@ -312,7 +312,7 @@ export async function verifyTopEight(tournament, postChannel = currentChannel(),
     return false;
   }
   // switched off since it failed: keep the marker so it retries if switched back on
-  if (!(posting(tournament, 'top8') && postsOn('top8', tournament))) return false;
+  if (!posting(tournament, 'top8')) return false;
   try {
     const events = await fetchDoneTopEight(eventsOf(tournament));
     if (!events) return false;
@@ -358,7 +358,7 @@ export async function correctPlacements(tournament, postChannel = currentChannel
       await editPosts(postChannel, projected.top8, embeds.topEight(tournament, events), 'top8', t('Final top 8, the one above was projected'), tournament);
       projected.top8 = [];
     }
-  } else if (!tournament.top8Posted && posting(tournament, 'top8') && postsOn('top8', tournament)) {
+  } else if (!tournament.top8Posted && posting(tournament, 'top8')) {
     // nothing went out at 12 hours, so the final goes out as a new message once it's reported.
     // switched off waits for it to come back on instead of replaying later
     const events = await fetchDoneTopEight(eventsOf(tournament));

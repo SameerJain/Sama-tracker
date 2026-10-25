@@ -355,6 +355,16 @@ test('getNextSets says whose page came back full, empty slots counted', async ()
   assert.equal(sets.length, 3);
 });
 
+test('getNextSets asks 15 players to a request, so full pages still fit', async () => {
+  const groups = [];
+  globalThis.fetch = async (_url, options) => {
+    groups.push((JSON.parse(options.body).query.match(/: player\(/g) ?? []).length);
+    return { ok: true, json: async () => ({ data: {} }) };
+  };
+  await settle(getNextSets(Array.from({ length: 16 }, (_, i) => i + 1)));
+  assert.deepEqual(groups.toSorted((a, b) => b - a), [15, 1]);
+});
+
 test('getPlayerUnplayedSets reads each player\'s sets in one event, all in one request', async () => {
   const requests = [];
   globalThis.fetch = async (_url, options) => {

@@ -445,6 +445,24 @@ test('a round-robin pool too big for one page reads their own sets in it', async
   assert.deepEqual(titles(channel).slice(1), ['Next opponent · Active vs Third']);
 });
 
+test('a full page in a tracked event that gets read whole costs no second request', async () => {
+  state.tournaments = trackedWeekly();
+  state.links = { d10: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active', discordId: 'd10' } };
+  state.nextPings = ['d10'];
+  // a whole pool of 6, five rounds of three sets
+  const rounds = [
+    [[10, 20], [30, 60], [40, 50]], [[10, 30], [20, 40], [50, 60]], [[10, 40], [30, 50], [20, 60]],
+    [[10, 50], [40, 60], [20, 30]], [[10, 60], [20, 50], [30, 40]],
+  ];
+  const pool = rounds.flatMap((pairs, r) => pairs.map((pair, i) => unplayed(`76${r}${i}`, pair, { round: r + 1 })));
+  serve({ next: { 10: pool.filter((set) => plays(set, 10)).toReversed() }, events: { 70: pool } });
+  const channel = fakeChannel();
+  await run(channel);
+  assert.deepEqual(asked, ['e70', 'p10']);
+  // round 1 for the one with a ping, and nobody else's round 1
+  assert.deepEqual(titles(channel), ['Next opponent · Active vs Rival']);
+});
+
 test('a full page from abandoned brackets alone costs no second request', async () => {
   state.links = { d10: { userId: 1, playerId: 10, tag: 'Active', slug: 'user/active', discordId: 'd10' } };
   state.nextPings = ['d10'];

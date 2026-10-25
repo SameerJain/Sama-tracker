@@ -196,7 +196,7 @@ const commands = [
           {
             type: Option.Subcommand,
             name: 'add',
-            description: 'Track every set, stream alert, results and top 8, plus registration reminders',
+            description: 'Track a tournament: sets, streams, calls, next opponents, top 8s and reminders, per /t-o settings',
             options: [
               { type: Option.String, name: 'tournament', description: UPCOMING_TOURNAMENT, required: true, autocomplete: true },
               switchOption('registration', 'Reg reminders and 1-hour DMs. Leave out to follow /t-o settings'),

@@ -89,10 +89,9 @@ function trackLines(interaction, found, registration, schedule, now = secondsNow
     id, name: found.name, slug, startAt, endAt, city, addrState, venueName, venueAddress, isOnline, images, entries: [], userIds: [],
   };
   trackTournament(tournament, 'manual', now);
-  if (registration) {
-    tournament.tracked.posts.registration = registration === 'on';
-    if (registration === 'on') tournament.tracked.onAt = { registration: now };
-  }
+  // no onAt: reminders start from the next one still to come anyway, and a time would hold back a last call
+  // that's already due
+  if (registration) tournament.tracked.posts.registration = registration === 'on';
   const reminders = postsOn('registration', tournament);
   if (schedule) tournament.tracked.schedule = schedule;
 
@@ -212,7 +211,10 @@ function tournamentPosts(interaction) {
   }
   const now = secondsNow();
   for (const kind of Object.keys(changes)) {
-    if (!before[kind] && postsOn(kind, tournament)) tracked.onAt[kind] = now;
+    // reminders start again from the next one still to come below. a time would also hold back the last call,
+    // which goes out right away when it's already due
+    if (kind === 'registration') delete tracked.onAt.registration;
+    else if (!before[kind] && postsOn(kind, tournament)) tracked.onAt[kind] = now;
     // already on keeps what it skipped before, and an override on needs a time either way
     else if (changes[kind] === 'on') tracked.onAt[kind] ??= state.messages.enabledAt?.[kind] ?? 0;
   }

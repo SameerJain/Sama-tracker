@@ -1,5 +1,5 @@
 import { ActivityType, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes } from 'discord.js';
-import { buttonFailed, handleAutocomplete, handleButton, handleCommand, registeredCommands } from './commands/index.js';
+import { buttonFailed, clearLeftoverCommands, handleAutocomplete, handleButton, handleCommand, registeredCommands } from './commands/index.js';
 import { inTurn } from './commands/turns.js';
 import { failureMessage } from './commands/shared.js';
 import { seedFirstTO } from './commands/to.js';
@@ -116,6 +116,8 @@ async function bootMulti() {
 
   if (process.env.GUILD_ID) migrateLegacyToGuild(process.env.GUILD_ID, process.env.CHANNEL_ID);
   const guilds = [...client.guilds.cache.values()];
+  // a server that ran the single-server build still has its own copy of every command
+  await clearLeftoverCommands(guilds.map((guild) => guild.commands));
   for (const guild of guilds) forGuild(guild.id);
   if (!guilds.length) console.error('bot isn\'t in any server yet, invite it with the invite link in the README, then run /t-o settings there');
 
@@ -157,6 +159,8 @@ async function bootSingle() {
     quit(`couldn't load server ${process.env.GUILD_ID} from Discord (${err.message})`);
   });
   await registerCommands(guild.commands);
+  // global ones left from a multi-server run would show next to these
+  await clearLeftoverCommands([client.application.commands]);
 
   const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch((err) => {
     if (NOT_THERE.includes(err.code)) return null;

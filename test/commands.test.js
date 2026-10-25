@@ -442,7 +442,6 @@ const presses = [
   ['characters', {}, 'Full report', /Fox/],
   ['scout', { values: { opponent: '2' } }, 'Full report', /Crew vs Rival/],
   ['h2h', { values: { opponent: '2' } }, 'Full report', /First played/],
-  ['predict', { values: { opponent: '2' } }, 'Full report', /How it adds up/],
   // whoever's next, by the player id in the set. a shortcut for short /h2h, so no second press
   ['run', {}, 'H2H vs Rival', /Crew 2-0 Rival/],
 ];
@@ -483,15 +482,22 @@ test('every report button answers the way its command would, and the full report
       assert.doesNotMatch(JSON.stringify(answer), /First played/, what);
     }
   }
-  // short /progress has no Full report button, but one on a message from before still swaps in the full report
-  const progress = interaction('progress', {});
-  await runningCommand.run(progress, () => handleCommand(progress));
-  const short = progress.calls.findLast(([kind, result]) => kind === 'edit' && result.embeds?.length)?.[1];
-  assert.match(JSON.stringify(short.embeds), /Last 30 days/);
-  assert.deepEqual(short.components, []);
-  const old = press({ embeds: [], components: buttonRow(fullReport('progress', { player: state.players[1] })) }, 'Full report');
-  await runningCommand.run(old, () => handleButton(old));
-  assert.match(JSON.stringify(old.calls.findLast(([kind]) => kind === 'edit')[1]), /Every 30 days, newest first/);
+  // short /progress and /predict have no Full report button, but one on a message from before still swaps in the full report
+  const dropped = [
+    ['progress', {}, /Last 30 days/, { player: state.players[1] }, /Every 30 days, newest first/],
+    ['predict', { values: { opponent: '2' } }, /Crew \d+% · \d+% Rival/, { player: state.players[1], opponent: state.players[2] }, /How it adds up/],
+  ];
+  for (const [name, options, shortCard, buttonOptions, fullCard] of dropped) {
+    const command = interaction(name, options);
+    await runningCommand.run(command, () => handleCommand(command));
+    const short = command.calls.findLast(([kind, result]) => kind === 'edit' && result.embeds?.length)?.[1];
+    assert.match(JSON.stringify(short.embeds), shortCard, `/${name}`);
+    assert.doesNotMatch(JSON.stringify(short.embeds), fullCard, `/${name}`);
+    assert.deepEqual(short.components, [], `/${name}`);
+    const old = press({ embeds: [], components: buttonRow(fullReport(name, buttonOptions)) }, 'Full report');
+    await runningCommand.run(old, () => handleButton(old));
+    assert.match(JSON.stringify(old.calls.findLast(([kind]) => kind === 'edit')[1]), fullCard, `/${name} old Full report`);
+  }
   // /recent sets are over, so they get no head to head buttons
   const recent = interaction('recent', {});
   await runningCommand.run(recent, () => handleCommand(recent));

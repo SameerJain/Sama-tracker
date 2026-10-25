@@ -64,15 +64,27 @@ async function candidates(people) {
   const read = new Set();
   let more = new Set();
   const now = secondsNow();
+  for (const tournament of trackedLive('next')) {
+    try {
+      const eventIds = [...new Set(eventsOf(tournament).filter((entry) => entry.started && !entry.done).map((entry) => entry.eventId).filter(Boolean))];
+      for (const set of eventIds.length ? await startgg.getUnplayedEventSets(eventIds) : []) {
+        found.set(set.id, set);
+        read.add(set.event.slug);
+      }
+    } catch (err) {
+      console.error(`checking next opponents at ${named(tournament)} failed:`, err.message);
+    }
+  }
   if (playerIds.length) {
     try {
       const next = await startgg.getNextSets(playerIds);
       more = next.more;
       for (const set of next.sets) found.set(set.id, set);
       // a full page can leave sets out, like the rest of a round-robin pool, and start.gg doesn't say what order it
-      // lists them in. so those players get their own sets read whole in each event going on now
+      // lists them in. so those players get their own sets read whole in each event going on now, unless a tracked
+      // tournament's whole event was just read
       const pairs = new Map();
-      for (const set of next.sets.filter((each) => live(each, now))) {
+      for (const set of next.sets.filter((each) => live(each, now) && !read.has(each.event.slug))) {
         for (const playerId of set.sides.flatMap((side) => side.playerIds).filter((id) => more.has(id))) {
           pairs.set(`${set.event.slug}:${playerId}`, { eventId: set.event.id, playerId });
         }
@@ -86,17 +98,6 @@ async function candidates(people) {
     }
   }
   const asked = new Set(playerIds.filter((id) => !more.has(id)));
-  for (const tournament of trackedLive('next')) {
-    try {
-      const eventIds = [...new Set(eventsOf(tournament).filter((entry) => entry.started && !entry.done).map((entry) => entry.eventId).filter(Boolean))];
-      for (const set of eventIds.length ? await startgg.getUnplayedEventSets(eventIds) : []) {
-        found.set(set.id, set);
-        read.add(set.event.slug);
-      }
-    } catch (err) {
-      console.error(`checking next opponents at ${named(tournament)} failed:`, err.message);
-    }
-  }
   const complete = (set, playerId) => read.has(set.event.slug) || read.has(`${set.event.slug}:${playerId}`) || asked.has(playerId);
   return soonest([...found.values()].filter((set) => live(set, now)), complete);
 }

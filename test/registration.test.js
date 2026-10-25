@@ -297,7 +297,7 @@ test('reg_warn does not ping once registration closed, or for bots', async () =>
   assert.deepEqual(bot.calls.map(([kind]) => kind), ['reply']);
 });
 
-test('/t-o tournament add tracks the tournament with everything on but match calls and its reminders set, tracking nobody', async () => {
+test('/t-o tournament add tracks the tournament following /t-o settings, with its reminders set, tracking nobody', async () => {
   state.players = {};
   state.tournaments = {};
   // the reminder's own send is covered elsewhere, here it would post to no channel
@@ -308,7 +308,7 @@ test('/t-o tournament add tracks the tournament with everything on but match cal
   assert.deepEqual(state.players, {});
   const tracked = state.tournaments[5];
   assert.equal(tracked.name, 'Local');
-  assert.deepEqual({ ...tracked.tracked, at: undefined }, { by: 'manual', at: undefined, posts: { registration: true }, onAt: { registration: tracked.tracked.onAt.registration } });
+  assert.deepEqual({ ...tracked.tracked, at: undefined }, { by: 'manual', at: undefined, posts: { registration: true } });
   // sets from before it was tracked stay out of its thread
   assert.ok(tracked.lastCheck >= now);
   // closes in an hour, so the last call is all that's left
@@ -322,6 +322,35 @@ test('/t-o tournament add tracks the tournament with everything on but match cal
   const again = interaction('t-o', { tournament: 'local' }, undefined, undefined, { group: 'tournament', subcommand: 'add' });
   await handleCommand(again);
   assert.match(again.calls.find(([kind]) => kind === 'edit')[1].content, /Local is already tracked/);
+});
+
+test('turning registration on for one tournament inside the last 6 hours still sends the last call it promises', async () => {
+  const { postRegReminders } = await import('../src/tracker.js');
+  const lastCall = async (setUp) => {
+    state.tournaments = {};
+    Object.assign(state, { messages: { registration: false }, regPings: ['fan'] });
+    mockStartgg();
+    await setUp();
+    const sent = [];
+    await postRegReminders({ guild: null, send: async (payload) => { sent.push(payload); return {}; } });
+    return { sent, tracked: state.tournaments[5] };
+  };
+
+  // tracked with registration:on while the server has it off, registration closing in an hour
+  const added = await lastCall(() => handleCommand(interaction('t-o', { tournament: 'local', registration: 'on' }, undefined, undefined, { group: 'tournament', subcommand: 'add' })));
+  assert.equal(added.sent.length, 1);
+  assert.equal(added.sent[0].content, '<@fan> last call');
+  assert.equal(added.tracked.reminder.next, 4);
+
+  // tracked off, then turned on with /t-o tournament posts
+  const turnedOn = await lastCall(async () => {
+    await handleCommand(interaction('t-o', { tournament: 'local', registration: 'off' }, undefined, undefined, { group: 'tournament', subcommand: 'add' }));
+    await handleCommand(interaction('t-o', { tournament: 'local', registration: 'on' }, undefined, undefined, { group: 'tournament', subcommand: 'posts' }));
+  });
+  assert.equal(turnedOn.tracked.tracked.onAt?.registration, undefined);
+  assert.equal(turnedOn.sent.length, 1);
+  assert.equal(turnedOn.sent[0].content, '<@fan> last call');
+  state.regPings = [];
 });
 
 test('/t-o tournament add with reminders off or registration closed still tracks it, without reminders', async () => {

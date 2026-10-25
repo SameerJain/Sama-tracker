@@ -465,6 +465,25 @@ test('/notify player:all all:on fits discord\'s button limit and changes all six
   assert.deepEqual(state.startDmPings.toSorted(), ['crew-discord', 'rival-discord']);
 });
 
+test('a Change pings button from before next opponents still changes what it said', async () => {
+  state.players = { 1: crew, 2: { userId: 2, playerId: 20, tag: 'Rival', slug: 'user/rival', discordId: 'rival-discord' } };
+  Object.assign(state, { callPings: [], nextPings: ['crew-discord'], streamPings: ['crew-discord', 'rival-discord'] });
+  // five chars: match calls on, stream alerts off, the rest left alone
+  const calls = [];
+  await handleButton({
+    calls, customId: 'confirm:notify_all:10---:runner', user: { id: 'runner' }, guildId: null, isButton: () => true,
+    reply: async (result) => calls.push(['reply', result]),
+    update: async (result) => calls.push(['update', result]),
+    editReply: async (result) => calls.push(['edit', result]),
+    followUp: async (result) => calls.push(['followUp', result]),
+  });
+  assert.equal(calls[0][1].content, 'Updated /notify for 2 tracked players.');
+  assert.deepEqual(state.callPings.toSorted(), ['crew-discord', 'rival-discord']);
+  assert.deepEqual(state.streamPings, []);
+  assert.deepEqual(state.nextPings, ['crew-discord']);
+  Object.assign(state, { callPings: [], nextPings: [], streamPings: [] });
+});
+
 test('/t-o cleanup untracks players whose start.gg discord is not in the server, keeps ones with none unless asked, and Undo puts them back', async () => {
   state.players = {
     1: { ...crew },

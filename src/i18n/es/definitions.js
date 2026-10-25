@@ -72,7 +72,8 @@ export default {
   'A TO': 'Un TO',
   'Who the TOs are': 'Quiénes son los TOs',
   'TO tournament tools': 'Herramientas de TO para torneos',
-  'Track every set, stream alert, results and top 8, plus registration reminders': 'Sigue cada set, aviso de stream, resultados y top 8, más recordatorios de inscripción',
+  'Track a tournament: sets, streams, calls, next opponents, top 8s and reminders, per /t-o settings':
+    'Sigue un torneo: sets, streams, llamados, próximo rival, top 8 y recordatorios según /t-o settings',
   'Reg reminders and 1-hour DMs. Leave out to follow /t-o settings': 'Recordatorios de inscripción y DMs 1 hora antes. Vacío para seguir a /t-o settings',
   'Custom reminder times, like 7d,3d,1d,6h. Leave out for the usual four': 'Horarios propios de recordatorio, como 7d,3d,1d,6h. Vacío para los cuatro de siempre',
   'Also make a Discord event from it. Off unless you turn it on': 'También crea un evento de Discord. Apagado salvo que lo actives',

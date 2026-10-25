@@ -154,6 +154,38 @@ test('a tracked tournament posts every called set by default', async () => {
   assert.match(sent[0].embeds[0].data.title, /Match call/);
 });
 
+test('calls or streams off for a tournament pings nobody there, /notify people included', async () => {
+  const now = clock();
+  state.messages = {};
+  state.links = {};
+  state.players = { 1: { ...crewPlayer, discordId: 'fan', streamAlerts: true } };
+  Object.assign(state, { callPings: ['fan'], streamPings: ['fan'] });
+  const calls = async (posts) => {
+    Object.assign(state, { called: [], callPosts: [], tournaments: live(now, posts) });
+    mockApi(({ query }) => (query.includes('event(id:')
+      ? { e70: { sets: { pageInfo: { totalPages: 1 }, nodes: [] } } }
+      : { p10: { sets: { nodes: [{ ...setIn('c2', 6, now), updatedAt: now - 60 }] } } }));
+    const { sent, channel } = collect();
+    await tracker.postMatchCalls(channel);
+    return sent.map((each) => each.content);
+  };
+  assert.deepEqual(await calls({}), ['<@fan> You\'re up']);
+  assert.deepEqual(await calls({ calls: false }), []);
+
+  const streams = async (posts) => {
+    Object.assign(state, { streamed: [], streamPinged: [], tournaments: live(now, posts) });
+    mockApi(({ query }) => (query.includes('streamQueue') ? { tournament: { streamQueue: [] } } : { p10: { sets: { nodes: [setIn('s2', 2, now)] } } }));
+    const { sent, channel } = collect();
+    await tracker.postStreamAlerts(channel, 0);
+    return sent.map((each) => each.content);
+  };
+  assert.deepEqual(await streams({}), ['<@fan> on stream']);
+  assert.deepEqual(await streams({ streams: false }), []);
+  // off isn't consumed, so it's announced once it's back on and still on stream
+  assert.deepEqual(state.streamed, []);
+  Object.assign(state, { callPings: [], streamPings: [], players: {} });
+});
+
 test('registration off for a tournament stops its 1-hour DMs too', async () => {
   const now = clock();
   state.messages = {};
@@ -265,7 +297,8 @@ test('/t-o tournament add registration:off saves an override, and leaving it out
   state.tournaments = {};
   await run('t-o', to, { group: 'tournament', subcommand: 'add', values: { tournament: 'local', registration: 'on' } });
   assert.deepEqual(state.tournaments[7].tracked.posts, { registration: true });
-  assert.ok(state.tournaments[7].tracked.onAt.registration >= now);
+  // reminders go by reminder.next instead, so a last call already due still goes out
+  assert.equal(state.tournaments[7].tracked.onAt, undefined);
 });
 
 test('/t-o settings says its switches are the default for every tournament', async () => {
@@ -285,7 +318,7 @@ test('registration going off to on through posts clears the reminder progress', 
   state.tournaments[7].reminder = { deadline: now + 3600, next: 2 };
   await run('t-o', to, { group: 'tournament', subcommand: 'posts', values: { tournament: 'local', registration: 'on' } });
   assert.equal(state.tournaments[7].reminder.next, undefined);
-  assert.ok(state.tournaments[7].tracked.onAt.registration >= now);
+  assert.equal(state.tournaments[7].tracked.onAt.registration, undefined);
   // already on stays as it was
   state.tournaments[7].reminder.next = 3;
   await run('t-o', to, { group: 'tournament', subcommand: 'posts', values: { tournament: 'local', registration: 'on' } });

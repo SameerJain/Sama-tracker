@@ -462,10 +462,14 @@ function encodeNotifyChanges(changes) {
   }).join('');
 }
 
+// Change pings buttons from before next opponents carry one char for each of these. the question never expires
+const OLD_PING_ORDER = ['calls', 'streams', 'registration', 'dm_registration', 'dm_start'];
+
 function decodeNotifyChanges(target) {
   const changes = {};
-  if (target.length === PING_ORDER.length && /^[01-]+$/.test(target)) {
-    PING_ORDER.forEach((ping, i) => {
+  const order = [PING_ORDER, OLD_PING_ORDER].find((each) => each.length === target.length);
+  if (order && /^[01-]+$/.test(target)) {
+    order.forEach((ping, i) => {
       if (target[i] !== '-') changes[ping] = target[i] === '1';
     });
     return changes;

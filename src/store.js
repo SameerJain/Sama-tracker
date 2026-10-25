@@ -31,7 +31,8 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 //   tracked: { by, at, posts, onAt, schedule } says it's tracked. by is 'manual', or 'admin' from before the TO role.
 //   posts holds only what a TO changed with /t-o tournament posts, { sets, streams, calls, next, top8, registration }
 //   as booleans. a kind left out follows the server's /t-o settings, live. onAt is when each override was turned on,
-//   in unix seconds, so what came due before then stays skipped. schedule is the TO's own reminder
+//   in unix seconds, so what came due before then stays skipped. registration has none, since its reminders start
+//   again from reminder.next instead. schedule is the TO's own reminder
 //   times in hours before registration closes, most first, left out for the default.
 //   reminder: { deadline, next } is its reg reminder progress, next being the index into that schedule.
 //   dmRegSentFor and dmStartSentFor are the close and start times its 1-hour DMs went out for.
