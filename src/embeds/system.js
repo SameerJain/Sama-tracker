@@ -230,7 +230,7 @@ export function help(verbose = false) {
     ],
     [
       t('**Tracking players**'),
-      t('`/track add` track yourself, found by the Discord on your start.gg. TOs can add anyone by start.gg link or ID. Their placements post here'),
+      t('`/track add` track yourself, found by the Discord on your start.gg. TOs can add anyone by picking them with `user:` or by start.gg link or ID. Their placements post here'),
       t('`/track remove` stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back with their settings for a minute'),
       t('`/track list` everyone tracked, and the tracked tournaments'),
       t('`/track posts` your set results and stream alerts on or off. TOs can change anyone\'s, or everyone\'s with `player:all`, which asks first. Anyone can look'),

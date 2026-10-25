@@ -46,7 +46,7 @@ Player pickers start with the last 5 people you picked. Once you type, names tha
 
 | Command | What it does |
 | --- | --- |
-| `/track add` | Post your placements, wherever you play. Leave out `profile` to find your start.gg by its Discord, or give your own link. TOs can add anyone with `profile:<link or ID>`. Set results and stream alerts start off. |
+| `/track add` | Post your placements, wherever you play. Leave out `profile` to find your start.gg by its Discord, or give your own link. TOs can add anyone with `profile:<link or ID>`, or pick a server member from the list with `user:@someone`, found by the Discord on their start.gg the way `/profile` finds people. Set results and stream alerts start off. |
 | `/track remove` | Stop tracking yourself, or anyone with `player:` if you're a TO. Asks first, then an **Undo** button puts them back with all their settings for a minute. |
 | `/track list` | Tracked players, who has set results or stream alerts on, and the tracked tournaments. |
 | `/track posts sets:<on or off> stream:<on or off>` | Your set results and stream alerts. Leave both out to see them. A TO can change anyone's with `player:<name>`, or everyone's with `player:all`, which asks first for `sets:off` unless it's already off for everyone. Anyone can look at anyone's. Sets finished before results go on aren't posted. |

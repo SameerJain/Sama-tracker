@@ -234,7 +234,7 @@ test('bad command input answers instead of throwing', async () => {
       options: {
         getSubcommandGroup: () => null,
         getSubcommand: () => 'add',
-        getString: (name) => values[name] ?? null, getBoolean: () => null, getInteger: () => null,
+        getString: (name) => values[name] ?? null, getBoolean: () => null, getInteger: () => null, getUser: () => null, getMember: () => null,
       },
       reply: async (result) => calls.push(['reply', result]),
       deferReply: async () => {},

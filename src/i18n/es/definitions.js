@@ -55,6 +55,7 @@ export default {
   'Players whose placements get posted here, plus their sets and streams with /track posts': 'Jugadores cuyas posiciones se publican aquí, y sus sets y streams con /track posts',
   'Post your start.gg placements here. TOs can add anyone. /track posts turns on sets and streams': 'Publica aquí tus posiciones de start.gg. Los TOs agregan a quien sea. /track posts activa sets',
   'start.gg profile link or ID. Leave out to find yours. Someone else needs a TO': 'Enlace o ID de perfil de start.gg. Vacío encuentra el tuyo. Para otra persona hace falta un TO',
+  'Server member, found by the Discord on their start.gg. Someone else needs a TO': 'Miembro del servidor, encontrado por el Discord de su start.gg. Para otra persona hace falta un TO',
   'Stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back': 'Deja de seguirte, o a cualquiera si eres TO. Pregunta primero y Deshacer lo devuelve',
   'Tracked player, leave out for yourself. Someone else needs a TO': 'Jugador seguido, déjalo vacío para ti. Para otra persona hace falta un TO',
   'List tracked players and tournaments': 'Lista de jugadores y torneos seguidos',

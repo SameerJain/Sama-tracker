@@ -58,8 +58,8 @@ export default {
   '-# Leave every option blank to see the current settings. Only TOs can change them':
     '-# Deja todas las opciones vacías para ver los ajustes actuales. Solo los TOs pueden cambiarlos',
   '**Tracking players**': '**Seguir jugadores**',
-  '`/track add` track yourself, found by the Discord on your start.gg. TOs can add anyone by start.gg link or ID. Their placements post here':
-    '`/track add` agrégate tú, encontrado por el Discord de tu start.gg. Los TOs pueden agregar a cualquiera por enlace o ID de start.gg. Sus posiciones se publican aquí',
+  '`/track add` track yourself, found by the Discord on your start.gg. TOs can add anyone by picking them with `user:` or by start.gg link or ID. Their placements post here':
+    '`/track add` agrégate tú, encontrado por el Discord de tu start.gg. Los TOs pueden agregar a cualquiera eligiéndolo con `user:` o por enlace o ID de start.gg. Sus posiciones se publican aquí',
   '`/track remove` stop tracking yourself, or anyone if you\'re a TO. Asks first, then Undo puts them back with their settings for a minute':
     '`/track remove` deja de seguirte, o a cualquiera si eres TO. Pregunta primero, y luego Deshacer lo devuelve con sus ajustes durante un minuto',
   '`/track list` everyone tracked, and the tracked tournaments': '`/track list` todos los jugadores seguidos y los torneos seguidos',

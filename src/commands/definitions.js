@@ -137,7 +137,10 @@ const commands = [
         type: Option.Subcommand,
         name: 'add',
         description: 'Post your start.gg placements here. TOs can add anyone. /track posts turns on sets and streams',
-        options: [{ type: Option.String, name: 'profile', description: 'start.gg profile link or ID. Leave out to find yours. Someone else needs a TO' }],
+        options: [
+          { type: Option.String, name: 'profile', description: 'start.gg profile link or ID. Leave out to find yours. Someone else needs a TO' },
+          { type: Option.User, name: 'user', description: 'Server member, found by the Discord on their start.gg. Someone else needs a TO' },
+        ],
       },
       {
         type: Option.Subcommand,

@@ -690,6 +690,46 @@ test('/track add and remove let anyone track or untrack themselves, and only TOs
   state.accounts = {};
 });
 
+test('/track add user: picks a server member, found by the Discord on their start.gg, and someone else takes a TO', async () => {
+  state.players = {};
+  state.links = {};
+  state.tournaments = {};
+  state.accounts = { 'new-discord': 8 };
+  const profile = { id: 8, slug: 'user/new', images: [], player: { id: 80, gamerTag: 'New' }, authorizations: [{ externalId: 'new-discord' }] };
+  mockApi(({ query }) => {
+    if (query.includes('user(slug:')) return { user: profile };
+    if (query.includes('u8: user')) return { u8: { slug: 'user/new', player: { gamerTag: 'New' }, images: [], authorizations: [{ externalId: 'new-discord' }] } };
+    return {};
+  });
+  const pick = (id, displayName = 'New') => ({ user: { id }, member: { displayName } });
+
+  const refused = await run('track', 'someone', pick('new-discord'), 'add');
+  assert.equal(refused.content, 'Only TOs can track someone else. Leave out `user` to track yourself. `/t-o role list` shows who they are.');
+  assert.ok(refused.flags);
+  assert.equal(state.players[8], undefined);
+
+  const added = await run('track', 'to-discord', pick('new-discord'), 'add');
+  assert.match(added.embeds[0].data.description, /^Now tracking \[New\]/);
+  assert.equal(state.players[8].discordId, 'new-discord');
+  await settle();
+
+  // picking yourself needs no TO, the same as leaving it out
+  delete state.players[8];
+  const self = await run('track', 'new-discord', pick('new-discord'), 'add');
+  assert.match(self.embeds[0].data.description, /^Now tracking \[New\]/);
+  await settle();
+
+  // the name, never a mention, says why there's nothing to track yet
+  const unknown = await run('track', 'to-discord', pick('stranger-discord', 'Stranger'), 'add');
+  assert.equal(unknown.content, 'Couldn\'t find a start.gg with Stranger\'s Discord connected. Ask them to run `/link` once, or add them with `profile:` and their start.gg link.');
+  assert.deepEqual(unknown.allowedMentions, { parse: [] });
+
+  assert.equal((await run('track', 'to-discord', { user: { id: 'helper', bot: true }, member: {} }, 'add')).content, 'Bots don\'t have start.gg accounts.');
+  assert.equal((await run('track', 'to-discord', { ...pick('new-discord'), profile: 'start.gg/user/new' }, 'add')).content, 'Pick either `user` or `profile`, not both.');
+  assert.equal((await run('track', 'to-discord', { user: { id: 'gone' } }, 'add')).content, 'Pick someone in this server.');
+  state.accounts = {};
+});
+
 test('/recent all asks about players with set results on first, since only their last set time stays fresh', async () => {
   // the 40 with results off played later, as far as the set check last saw
   state.players = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [100 + i,

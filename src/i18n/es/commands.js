@@ -76,6 +76,10 @@ export default {
   'Only TOs can track someone else. {0}': 'Solo los TOs pueden seguir a otra persona. {0}',
   'Already tracking {0}.': 'Ya sigo a {0}.',
   'untrack someone else. Leave out `player` to untrack yourself': 'dejar de seguir a otra persona. Deja `player` vacío para quitarte tú',
+  'track someone else. Leave out `user` to track yourself': 'seguir a otra persona. Deja `user` vacío para agregarte tú',
+  'Pick either `user` or `profile`, not both.': 'Elige `user` o `profile`, no los dos.',
+  'Couldn\'t find a start.gg with {0}\'s Discord connected. Ask them to run `/link` once, or add them with `profile:` and their start.gg link.':
+    'No encontré un start.gg con el Discord de {0} conectado. Pídele que use `/link` una vez, o agrégalo con `profile:` y su enlace de start.gg.',
   'Stop tracking': 'Dejar de seguir',
   'Stop tracking {0}? Their set result and stream alert settings go with them.':
     '¿Dejar de seguir a {0}? Sus ajustes de resultados de sets y avisos de stream se van con él.',

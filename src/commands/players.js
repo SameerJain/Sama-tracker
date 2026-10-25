@@ -20,13 +20,23 @@ const RECENT_ALL_PLAYERS = 40;
 const CLEANUP_NAMED = 10;
 
 // anyone can track themselves: profile left out finds theirs, and a link counts when it has their discord
-// connected. only TOs can track someone else
+// connected. only TOs can track someone else, by link or by picking them in user:
 async function trackAdd(interaction) {
   const input = interaction.options.getString('profile');
+  const picked = interaction.options.getUser('user');
   const to = isTO(interaction);
+  if (picked) {
+    if (input) return replyEphemeral(interaction, t('Pick either `user` or `profile`, not both.'));
+    if (picked.bot) return replyEphemeral(interaction, t('Bots don\'t have start.gg accounts.'));
+    if (!interaction.options.getMember('user')) return replyEphemeral(interaction, t('Pick someone in this server.'));
+    if (picked.id !== interaction.user.id && !to) return notTO(interaction, t('track someone else. Leave out `user` to track yourself'));
+  }
 
   await interaction.deferReply();
-  const player = input ? await findPlayer(interaction, input) : await ownAccount(interaction, '/track add');
+  let player;
+  if (input) player = await findPlayer(interaction, input);
+  else if (picked && picked.id !== interaction.user.id) player = await memberAccount(interaction, picked);
+  else player = await ownAccount(interaction, '/track add');
   if (!player) return;
   if (!to && player.discordId !== interaction.user.id) {
     const tag = escapeMarkdown(player.tag);
@@ -177,6 +187,21 @@ async function ownAccount(interaction, command) {
   const player = account && await startgg.getPlayer(account.slug);
   if (!player) {
     await interaction.editReply(t`Couldn't find a start.gg with this Discord connected among the accounts I've seen. Connect it on your start.gg profile if you haven't, then run \`${command}\` with your profile link, like start.gg/user/f64a83c8.`);
+  }
+  return player;
+}
+
+// a member a TO picked in /track add user:, found the same way: by their discord among the accounts the bot has
+// seen. their name, not a mention, says why there's nothing yet, so nobody gets pinged
+async function memberAccount(interaction, user) {
+  const account = await findAccount(user.id);
+  const player = account && await startgg.getPlayer(account.slug);
+  if (!player) {
+    const name = escapeMarkdown(interaction.options.getMember('user')?.displayName ?? user.displayName ?? user.username);
+    await interaction.editReply({
+      content: t`Couldn't find a start.gg with ${name}'s Discord connected. Ask them to run \`/link\` once, or add them with \`profile:\` and their start.gg link.`,
+      allowedMentions: { parse: [] },
+    });
   }
   return player;
 }
