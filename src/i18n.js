@@ -30,7 +30,8 @@ const CONTEXT = /^\[\w+\] /;
 export function t(parts, ...values) {
   const key = typeof parts === 'string' ? parts : parts.reduce((text, part, i) => `${text}{${i - 1}}${part}`);
   const english = key.replace(CONTEXT, '');
-  const text = language() === 'es' ? es[key] ?? english : english;
+  // own keys only, so a line that happens to be "constructor" can't come back as Object's
+  const text = language() === 'es' && Object.hasOwn(es, key) ? es[key] : english;
   return values.length ? text.replace(/\{(\d+)\}/g, (_, i) => values[i]) : text;
 }
 

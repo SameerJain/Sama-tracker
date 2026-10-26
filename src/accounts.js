@@ -63,6 +63,17 @@ export async function serverMembers(guild, ids) {
   return found;
 }
 
+// this discord id's /link from another server, or a tracked player there with it on their start.gg. both were
+// checked against start.gg when they were saved, so it's still them, and someone linked in one server doesn't have
+// to link again in every other. this server's own link and tracked players come first, in linkedPlayer
+export function linkedElsewhere(discordId) {
+  for (const server of Object.values(state.guilds ?? {})) {
+    const found = server.links?.[discordId] ?? Object.values(server.players ?? {}).find((player) => player.discordId === discordId);
+    if (found) return found;
+  }
+  return null;
+}
+
 // the start.gg users saved for this one discord id: this server's first, then every other server's in a
 // multi-server build, so a server the bot just joined finds someone another server already knows. only ever
 // this discord id, and start.gg has to confirm it's connected, so it shows nothing else about another server
@@ -86,7 +97,11 @@ export async function findAccount(discordId) {
     save();
   }
 
-  const tracked = Object.values(state.tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted);
+  // every server's tracked tournaments, once each, so a server that tracks none still finds someone registered
+  // for another's. only this discord id is ever matched against them
+  const servers = [state, ...Object.values(state.guilds ?? {})];
+  const tracked = [...new Map(servers.flatMap((server) => Object.values(server.tournaments ?? {}))
+    .filter((tournament) => tournament.tracked && !tournament.resultsPosted).map((tournament) => [tournament.id, tournament])).values()];
   // one failing lookup leaves the rest, so a bad tournament id can't break /scout
   const participants = (await Promise.all(tracked.map((tournament) => participantsOf(tournament.id).catch(() => [])))).flat();
   rememberAccounts(participants);
@@ -98,11 +113,12 @@ export async function findAccount(discordId) {
 // whole tracked list for someone who connected it since the daily refresh cost a request per 20 players on
 // every miss, and /link finds them right away instead
 export async function verifiedCaller(discordId) {
-  const link = state.links[discordId];
-  const saved = [...Object.values(state.players).filter((player) => player.discordId === discordId).map((player) => player.userId), link?.userId];
-  const found = await connected(discordId, saved);
+  const saved = [
+    ...Object.values(state.players).filter((player) => player.discordId === discordId), state.links[discordId], linkedElsewhere(discordId),
+  ].filter(Boolean);
+  const found = await connected(discordId, saved.map((player) => player.userId));
   if (!found) return null;
-  return state.players[found.userId] ?? (String(link?.userId) === found.userId ? link : null);
+  return state.players[found.userId] ?? saved.find((player) => String(player.userId) === found.userId);
 }
 
 // the first of these start.gg users with this discord connected, checked live

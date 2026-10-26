@@ -254,14 +254,16 @@ test('an event named for Melee but tagged as Ultimate counts as Melee, and the o
 function command(commandName, { group = null, subcommand = null, values = {}, user = 'runner', guildId = null } = {}) {
   const calls = [];
   const run = {
-    calls, commandName, user: { id: user }, guildId, memberPermissions: { has: () => true },
+    calls, commandName, id: `command-${++commandsRun}`, user: { id: user }, guildId, memberPermissions: { has: () => true },
     options: { getSubcommandGroup: () => group, getSubcommand: () => subcommand, getString: (name) => values[name] ?? null, getBoolean: (name) => values[name] ?? null, getInteger: (name) => values[name] ?? null, getUser: () => null, getMember: () => null },
     reply: async (result) => calls.push(['reply', result]),
     deferReply: async () => { run.deferred = true; },
     editReply: async (result) => calls.push(['edit', result]),
+    followUp: async (result) => calls.push(['followUp', result]),
   };
   return run;
 }
+let commandsRun = 0;
 
 // pressing a button on the message something answered with
 async function press(message, label, user = 'runner', guildId = null) {
@@ -368,6 +370,44 @@ test('/unlink has an Undo that brings the link back, unless they linked someone 
   await handleCommand(nobody);
   assert.equal(nobody.calls[0][1].content, 'You weren\'t linked.');
   assert.equal(nobody.calls[0][1].components, undefined);
+});
+
+test('/t-o settings asks before turning off two or more kinds of post, and one at a time goes straight through', async () => {
+  const settings = (values) => {
+    const run = command('t-o', { subcommand: 'settings', values });
+    return handleCommand(run).then(() => run.calls[0][1]);
+  };
+  state.messages = {};
+  const one = await settings({ sets: false });
+  assert.equal(one.components, undefined);
+  assert.equal(state.messages.sets, false);
+
+  state.messages = {};
+  const asked = await settings({ sets: false, streams: false, calls: false });
+  assert.equal(asked.content, 'Turn off **Set results**, **Stream alerts**, and **Match call pings**? They stay off until a TO turns them back on, and what comes due meanwhile is skipped.');
+  assert.deepEqual(labels(asked), ['Turn them off', 'Cancel']);
+  assert.deepEqual(state.messages, {}, 'changed before anyone answered');
+  assert.equal((await press(asked, 'Turn them off', 'someone-else')).calls[0][1].content, 'Only whoever ran `/t-o settings` can press this.');
+  assert.equal((await press(asked, 'Cancel')).calls[0][1].content, 'Nothing changed.');
+  // a cancelled question can't be confirmed after
+  assert.equal((await press(asked, 'Turn them off')).calls[0][1].content, 'That button doesn\'t work anymore. Run `/t-o settings` again.');
+  assert.deepEqual(state.messages, {});
+
+  // confirmed, the rest of the same command goes through with it
+  const again = await settings({ sets: false, streams: false, calls: false, time: '20:00' });
+  const done = (await press(again, 'Turn them off')).calls[0][1];
+  assert.equal(done.content, 'Turned off **Set results**, **Stream alerts**, and **Match call pings**.\n-# `/t-o settings` with no options shows every setting.');
+  assert.deepEqual(done.components, []);
+  assert.deepEqual([state.messages.sets, state.messages.streams, state.messages.calls, state.messages.recapTime], [false, false, false, '20:00']);
+  // a second press of the same button has nothing left to do
+  assert.match((await press(again, 'Turn them off')).calls[0][1].content, /doesn't work anymore/);
+
+  // one already off doesn't count, and turning others on alongside doesn't either
+  state.messages = { sets: false };
+  const mixed = await settings({ sets: false, streams: false, calls: true });
+  assert.equal(mixed.components, undefined);
+  assert.equal(state.messages.streams, false);
+  state.messages = {};
 });
 
 test('/track posts for everyone off and /tournament remove ask first, and /track posts goes straight through when nothing would change', async () => {

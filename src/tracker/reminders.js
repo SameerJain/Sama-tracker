@@ -105,7 +105,7 @@ export async function postDmReminders(postChannel = currentChannel()) {
           const participants = await startgg.getParticipants(latest.id);
           rememberAccounts(participants);
           const registered = new Set(participants.map((participant) => participant.discordId));
-          to = await stillInServer(guild, state.regDmPings.filter((id) => !registered.has(id)));
+          to = notSentYet(await stillInServer(guild, state.regDmPings.filter((id) => !registered.has(id))), tournament, 'reg', deadline);
         }
         // marked once the lookups worked and before anything goes out, so a failure tries again next check
         // and nobody gets it twice
@@ -119,7 +119,7 @@ export async function postDmReminders(postChannel = currentChannel()) {
 
     try {
       if (state.startDmPings.length && tournament.dmStartSentFor !== startAt && dmDue(startAt)) {
-        const to = await stillInServer(guild, state.startDmPings);
+        const to = notSentYet(await stillInServer(guild, state.startDmPings), tournament, 'start', startAt);
         tournament.dmStartSentFor = startAt;
         const embed = embeds.startReminder(latest);
         for (const discordId of to) await dmUser(client, discordId, embed);
@@ -155,6 +155,16 @@ async function stillInServer(guild, ids) {
   if (!wanted.length) return [];
   const members = await serverMembers(guild, [...new Set(wanted)]);
   return wanted.filter((id) => members.has(id));
+}
+
+// the ones of these discord ids this DM hasn't gone to yet from any server, marked as sent. someone in two servers
+// that both track the tournament would otherwise get it twice. a TO moving the time makes it a new DM
+function notSentYet(ids, tournament, kind, at) {
+  const key = (id) => `${id}:${tournament.id}:${kind}:${at}`;
+  const sent = new Set(state.dmsSent);
+  const to = ids.filter((id) => !sent.has(key(id)));
+  state.dmsSent = [...state.dmsSent, ...to.map(key)].slice(-1000);
+  return to;
 }
 
 // one DM, skipped when DMs are closed or the user left. failures stay in the logs, the rest still go out

@@ -78,16 +78,20 @@ async function configureSettings(interaction) {
     if (!Object.hasOwn(LANGUAGES, pickedLanguage)) return fail(t('Pick English or Español.'));
     changes.language = pickedLanguage;
   }
-  // picking a channel adds it to the list, or takes it off if it's already there
+  // picking a channel adds it to the list, or takes it off if it's already there. commands_anywhere:False with it
+  // says commands shouldn't work everywhere, so then a pick only ever adds, and the last channel can't come off
   const commandsChannel = interaction.options.getChannel?.('commands_channel');
   const anywhere = interaction.options.getBoolean('commands_anywhere');
+  const commandsBefore = commandChannels(interaction.guild);
   if (commandsChannel && anywhere) return fail(t('Pick either `commands_channel` or `commands_anywhere:True`, not both.'));
+  if (anywhere === false && !commandsChannel && !commandsBefore.length) {
+    return fail(t('Pick the channel bot commands should work in with `commands_channel`.'));
+  }
   if (anywhere) changes.commandChannels = [];
   if (commandsChannel) {
-    const saved = commandChannels(interaction.guild);
-    changes.commandChannels = saved.includes(commandsChannel.id)
-      ? saved.filter((id) => id !== commandsChannel.id)
-      : [...saved, commandsChannel.id];
+    const listed = commandsBefore.includes(commandsChannel.id);
+    if (!listed) changes.commandChannels = [...commandsBefore, commandsChannel.id];
+    else if (anywhere !== false) changes.commandChannels = commandsBefore.filter((id) => id !== commandsChannel.id);
   }
   const channel = interaction.options.getChannel?.('channel');
 
@@ -98,6 +102,7 @@ async function configureSettings(interaction) {
     const cant = cantMakeEvents(interaction.guild);
     if (cant) return fail(cant);
   }
+  let pinLines = [];
   if (changes.threads && changes.threads !== 'off') {
     // checked when it's turned on so it doesn't wait for the next tournament to find out. in the posts
     // channel, not wherever this ran. a multi-server build with no posts channel yet posts nothing, and
@@ -108,32 +113,93 @@ async function configureSettings(interaction) {
       const missing = missingThreadPermissions(postChannel);
       if (!missing) return fail(t`Threads can't be started in <#${channelId}>, so posts stay in the channel.`);
       if (missing.length) return fail(t`I need ${permissionList(missing)} in <#${channelId}> to start threads. Add them to my role or the channel, then try again.`);
+      if (!channel) pinLines = pinNote(postChannel, interaction.client?.user);
     }
   }
   const channelLines = channel ? channelChange(interaction, channel) : [];
   if (typeof channelLines === 'string') return fail(channelLines);
+  channelLines.push(...pinLines);
 
+  const asked = { changes, channelId: channel?.id ?? null, commandsBefore, channelLines };
+  const turningOff = Object.keys(MESSAGE_TYPES).filter((type) => changes[type] === false && previous[type]);
+  if (turningOff.length >= ASK_WHEN_TURNING_OFF) {
+    const target = String(interaction.id ?? Date.now());
+    pending.set(target, asked);
+    setTimeout(() => pending.delete(target), ASK_SECONDS * 1000).unref?.();
+    return askFirst(interaction, 'settings', target, t`Turn off ${postNames(turningOff)}? They stay off until a TO turns them back on, and what comes due meanwhile is skipped.`, t('Turn them off'));
+  }
+  const lines = applySettings(asked);
+  await replyInParts(interaction, [...lines, ...settingsLines(interaction.guild), ...channelLines]);
+  await registerLanguage(interaction.guild, pickedLanguage);
+}
+
+// turning off this many kinds of post in one go asks first. one at a time is the usual change, and a misclick that
+// switches off half of what the server posts goes unnoticed until a tournament night goes quiet
+const ASK_WHEN_TURNING_OFF = 2;
+// how long the question's buttons work
+const ASK_SECONDS = 5 * 60;
+// asked-about changes waiting on a button press, by the command's interaction id
+const pending = new Map();
+
+const postNames = (types) => listOf(types.map((type) => `**${t(MESSAGE_TYPES[type])}**`));
+
+// saves a change and returns the lines that say what it did, besides the settings list. the times that go with it
+// are worked out against the settings as they are now, so one confirmed a few minutes after it was asked about
+// still skips what came due before then
+function applySettings({ changes, channelId, commandsBefore }) {
+  const previous = messageSettings();
+  const saved = { ...changes };
   const now = secondsNow();
   // anything that came due while one was off stays skipped once it's back on
-  const reenabled = Object.keys(MESSAGE_TYPES).filter((type) => changes[type] && !previous[type]);
-  if (reenabled.length) changes.enabledAt = { ...previous.enabledAt, ...Object.fromEntries(reenabled.map((type) => [type, now])) };
+  const reenabled = Object.keys(MESSAGE_TYPES).filter((type) => saved[type] && !previous[type]);
+  if (reenabled.length) saved.enabledAt = { ...previous.enabledAt, ...Object.fromEntries(reenabled.map((type) => [type, now])) };
   // a new schedule starts with the next recap
-  if (['recapDay', 'recapTime', 'timezone'].some((key) => Object.hasOwn(changes, key) && changes[key] !== previous[key])) {
-    changes.recapChangedAt = now;
+  if (['recapDay', 'recapTime', 'timezone'].some((key) => Object.hasOwn(saved, key) && saved[key] !== previous[key])) {
+    saved.recapChangedAt = now;
   }
-  state.messages = { ...state.messages, ...changes };
-  if (channel) state.channelId = channel.id;
+  state.messages = { ...state.messages, ...saved };
+  if (channelId) state.channelId = channelId;
   save();
-  if (pickedLanguage) switchFunLanguage(pickedLanguage);
-  await replyInParts(interaction, [...settingsLines(interaction.guild), ...channelLines]);
-  // a single-server build registers its commands in the server's language, so their descriptions switch too.
-  // multi-server commands are global, so there each person's own discord language picks. the setting already
-  // saved either way, so a failed registration only gets logged
-  if (pickedLanguage && !isMultiGuild()) {
-    const { commands } = await import('./definitions.js');
-    await interaction.guild?.commands?.set(commandsFor(commands, pickedLanguage))
-      .catch((err) => console.error('registering the commands in the new language failed:', err.message));
-  }
+  if (saved.language) switchFunLanguage(saved.language);
+  return saved.commandChannels ? [commandsChange(commandsBefore, saved.commandChannels), ''] : [];
+}
+
+// a single-server build registers its commands in the server's language, so their descriptions switch too.
+// multi-server commands are global, so there each person's own discord language picks. the setting already
+// saved either way, so a failed registration only gets logged
+async function registerLanguage(guild, picked) {
+  if (!picked || isMultiGuild()) return;
+  const { commands } = await import('./definitions.js');
+  await guild?.commands?.set(commandsFor(commands, picked))
+    .catch((err) => console.error('registering the commands in the new language failed:', err.message));
+}
+
+// the full list would run past what one message holds, so the answer is what changed and where to see the rest
+confirmable('settings', {
+  command: '/t-o settings',
+  run: (target, press) => {
+    const asked = pending.get(target);
+    pending.delete(target);
+    if (!asked) return { content: t('That button doesn\'t work anymore. Run `/t-o settings` again.') };
+    const off = Object.keys(MESSAGE_TYPES).filter((type) => asked.changes[type] === false);
+    const lines = applySettings(asked);
+    registerLanguage(press?.guild, asked.changes.language).catch((err) => console.error('registering the commands failed:', err.message));
+    return { content: [t`Turned off ${postNames(off)}.`, ...lines, ...asked.channelLines, t('-# `/t-o settings` with no options shows every setting.')].join('\n') };
+  },
+  cancel: (target) => {
+    pending.delete(target);
+    return t('Nothing changed.');
+  },
+});
+
+// what a commands_channel or commands_anywhere change did, first in the reply. picking a listed channel takes it
+// off, and the Bot commands line further down is easy to miss in a list this long
+function commandsChange(before, after) {
+  const now = after.length
+    ? t`Bot commands only work in ${listOf(after.map((id) => `<#${id}>`))} now.`
+    : t('Bot commands work in every channel now.');
+  const off = before.filter((id) => !after.includes(id));
+  return off.length === 1 ? `${t`Took <#${off[0]}> off the list.`} ${now}` : now;
 }
 
 // every setting, shown when /t-o settings has no options and after a change. lines, since the whole list with its
@@ -158,10 +224,10 @@ function settingsLines(guild) {
     t('-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.'),
     t('-# Stream alerts, match calls and next opponents still going on post when switched back on. Anything else missed while off stays skipped. Recap schedule changes apply to future recaps.'),
     t('-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events'),
-    t('-# `threads` has three modes for set results, stream alerts, match calls and next opponents. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.'),
+    t('-# `threads` has three modes for set results, stream alerts, match calls and next opponents. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament ends.'),
     t('-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.'),
     t('-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.'),
-    t('-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.'));
+    t('-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, except with `commands_anywhere:False`, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.'));
   return lines;
 }
 
@@ -593,7 +659,15 @@ function channelChange(interaction, channel) {
   // a tracked tournament always posts in a thread, whatever /t-o settings threads says
   const threads = missingThreadPermissions(channel);
   if (threads?.length) lines.push(t`-# Without ${permissionList(threads)} there, set results, stream alerts, match calls and next opponents post in the channel instead of threads.`);
+  else lines.push(...pinNote(channel, interaction.client?.user));
   return lines;
+}
+
+// pinning a thread's card needs Pin Messages, which discord split off from Manage Messages. threads work
+// without it, so it's a note and never a reason to turn the change down
+function pinNote(postChannel, me) {
+  const has = postChannel.permissionsFor?.(me);
+  return has && !has.has(PermissionFlagsBits.PinMessages) ? [t('-# Without Pin Messages there, thread cards don\'t get pinned.')] : [];
 }
 
 export { commandChannels, configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify };

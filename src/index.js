@@ -63,10 +63,13 @@ await checkToken().catch((err) => {
 // discord's codes for the bot not being in a server, or not seeing a channel
 const NOT_THERE = [RESTJSONErrorCodes.UnknownGuild, RESTJSONErrorCodes.UnknownChannel, RESTJSONErrorCodes.MissingAccess];
 
-// set here and not after login so it comes back after reconnects
+// set here and not after login so it comes back after reconnects. nothing pings unless the message names who:
+// start.gg tags and tournament names are anyone's to pick, and one called @everyone would otherwise ping the
+// server from any reply that forgot its own allowedMentions. the posts that ping list their user or role ids
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
   presence: { activities: [{ name: 'playing melee', type: ActivityType.Custom }] },
+  allowedMentions: { parse: [] },
 });
 
 // replaces whatever was registered before, so old commands go away
@@ -109,12 +112,14 @@ function goLive(singleChannel) {
 
 // every server the bot is in, each posting in the channel /t-o settings picked there
 async function bootMulti() {
+  // before the first await, since a command that lands while the commands register makes the server's entry,
+  // and the migration only copies into one that doesn't exist yet
+  if (process.env.GUILD_ID) migrateLegacyToGuild(process.env.GUILD_ID, process.env.CHANNEL_ID);
   // one registration for every server. global commands can take up to an hour to show up
   // on a server that just invited the bot, which is why /t-o settings says to wait a little
   await client.application.fetch().catch(() => null);
   await registerCommands(client.application.commands);
 
-  if (process.env.GUILD_ID) migrateLegacyToGuild(process.env.GUILD_ID, process.env.CHANNEL_ID);
   const guilds = [...client.guilds.cache.values()];
   // a server that ran the single-server build still has its own copy of every command
   await clearLeftoverCommands(guilds.map((guild) => guild.commands));

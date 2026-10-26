@@ -92,7 +92,7 @@ const SETTINGS_OPTIONS = [
     type: Option.Channel, name: 'commands_channel', description: 'Only let bot commands work in this channel. Pick one already on the list to take it off',
     channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum],
   },
-  { type: Option.Boolean, name: 'commands_anywhere', description: 'True lets bot commands work in every channel again' },
+  { type: Option.Boolean, name: 'commands_anywhere', description: 'True lets bot commands work in every channel again. False with commands_channel only adds it' },
   ...(isMultiGuild() ? [{
     type: Option.Channel, name: 'channel', description: 'Channel for automatic posts',
     channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
@@ -234,6 +234,7 @@ const commands = [
             description: 'Make a Discord event without tracking it. Time, end time, cover and streams from start.gg',
             options: [{ type: Option.String, name: 'tournament', description: KNOWN_TOURNAMENT, required: true, autocomplete: true }],
           },
+          { type: Option.Subcommand, name: 'list', description: 'Every tracked tournament: when, where, what it has off and its next reminder' },
         ],
       },
       {
@@ -380,7 +381,7 @@ const commands = [
     options: [
       playerOption(MATCHUP, 'opponent'), playerOption(YOU, 'player', false),
       verboseOption('The full breakdown: how much each part counts, with bars and how sure the odds are'),
-      { type: Option.Boolean, name: 'melee', description: 'Melee odds even when they play something else more, plus Slippi ranks which count toward them' },
+      { type: Option.Boolean, name: 'melee', description: 'Melee odds instead of Ultimate, plus Slippi ranks which count toward them' },
       sinceOption(), venueOption(),
     ],
   },
@@ -392,7 +393,10 @@ const commands = [
         type: Option.Subcommand,
         name: 'add',
         description: 'Add yourself to the watchlist, or anyone if you\'re a TO. Rank changes get posted here',
-        options: [{ type: Option.String, name: 'code', description: 'Your connect code like ABCD#123, or leave out to find it on your start.gg', max_length: 60 }],
+        options: [
+          { type: Option.String, name: 'code', description: 'Your connect code like ABCD#123, or leave out to find it on your start.gg', max_length: 60 },
+          { type: Option.User, name: 'user', description: 'Member whose code it is. Leave out for yours, except a TO\'s typed code, which is nobody\'s' },
+        ],
       },
       {
         type: Option.Subcommand,
@@ -404,7 +408,7 @@ const commands = [
         type: Option.Subcommand,
         name: 'rank',
         description: 'Rank, rating, record, characters and past seasons',
-        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist or any connect code. Leave out for yourself if tracked or linked', autocomplete: true }],
+        options: [{ type: Option.String, name: 'player', description: 'Player on the watchlist or any connect code. Leave out for yourself', autocomplete: true }],
       },
       { type: Option.Subcommand, name: 'leaderboard', description: 'Everyone on the watchlist, best rank first' },
     ],

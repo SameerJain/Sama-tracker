@@ -3,7 +3,7 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state } from '../store.js';
 import { secondsNow } from '../tracker.js';
-import { predict as predictOdds, gameSets, sharedGame } from '../predict.js';
+import { predict as predictOdds, gameSets } from '../predict.js';
 import { characterUsage, characterUsageByGame } from '../characters.js';
 import { periodSummary } from '../reports.js';
 import { PICKABLE_GAMES } from './definitions.js';
@@ -242,7 +242,7 @@ async function headToHeadReport(interaction, { player: a, opponent: b, verbose, 
     ]));
   const shown = scope.sets(sets);
   // every meeting in scope, so the odds go by the same record the card shows
-  const options = { game: melee ? 'Melee' : undefined, eventsA: scope.events(eventsA), eventsB: scope.events(eventsB), meetings: shown };
+  const options = { game: oddsGame(melee), eventsA: scope.events(eventsA), eventsB: scope.events(eventsB), meetings: shown };
   const { odds, profiles } = melee
     ? await oddsWithSlippi(a, b, scope.anyGame(historyA), scope.anyGame(historyB), options, ranked, true)
     : { odds: predictOdds(a, b, scope.anyGame(historyA), scope.anyGame(historyB), options), profiles: null };
@@ -374,31 +374,30 @@ function characterCards(sets, verbose, picked) {
   return { cards, note: shown.length ? t`No characters reported for ${list}` : undefined };
 }
 
-// nothing to predict with: without melee that means no game in common. with it, name whoever is missing
-// Melee and point at the game the odds do work for, since the old pair wording read like both were missing it.
-// the hint goes by the filters without the melee one, since melee-only histories never share another game
-function noOdds(a, b, historyA, historyB, melee, filters = {}, hintA = historyA, hintB = historyB) {
+// the game the odds are for. Ultimate unless melee:True, never whichever game the two share the most, which
+// put two Melee mains on Melee odds without anyone asking
+const oddsGame = (melee) => (melee ? 'Melee' : 'Ultimate');
+
+// nothing to predict with: names whoever hasn't played the game, since the pair wording read like both hadn't,
+// and points at the other game when both have played that one. histories are filtered by since and venue only
+function noOdds(a, b, historyA, historyB, melee, filters = {}) {
   const [tagA, tagB] = [escapeMarkdown(a.tag), escapeMarkdown(b.tag)];
   const filtered = Boolean(filters.since || filters.venue);
-  if (!melee) {
-    return filtered
-      ? t`${tagA} and ${tagB} haven't played singles in the same game on start.gg matching those filters.`
-      : t`${tagA} and ${tagB} haven't played singles in the same game on start.gg.`;
-  }
-
-  const missing = [a, b].filter((player, i) => !gameSets(i ? historyB : historyA, player, 'Melee').length).map((player) => escapeMarkdown(player.tag));
+  const game = oddsGame(melee);
+  const played = (name) => [a, b].filter((player, i) => gameSets(i ? historyB : historyA, player, name).length);
+  const missing = [a, b].filter((player) => !played(game).includes(player)).map((player) => escapeMarkdown(player.tag));
   let none;
   if (missing.length === 2) {
     none = filtered
-      ? t`Neither ${tagA} nor ${tagB} has played Melee singles on start.gg matching those filters.`
-      : t`Neither ${tagA} nor ${tagB} has played Melee singles on start.gg.`;
+      ? t`Neither ${tagA} nor ${tagB} has played ${game} singles on start.gg matching those filters.`
+      : t`Neither ${tagA} nor ${tagB} has played ${game} singles on start.gg.`;
+  } else if (missing.length === 1) {
+    none = filtered ? t`${missing[0]} hasn't played ${game} singles on start.gg matching those filters.` : t`${missing[0]} hasn't played ${game} singles on start.gg.`;
   } else {
-    none = filtered ? t`${missing[0]} hasn't played Melee singles on start.gg matching those filters.` : t`${missing[0]} hasn't played Melee singles on start.gg.`;
+    none = t`There's nothing on start.gg to go on for ${tagA} and ${tagB} in ${game}.`;
   }
-  // the game predict would pick without melee, which leaves out DQs, so leaving melee out really gives odds there
-  const shared = sharedGame(a, b, hintA, hintB);
-  const hint = shared ? t`\n-# Leave out \`melee\` for ${escapeMarkdown(shared)} odds` : '';
-  return `${none}${hint}`;
+  if (played(oddsGame(!melee)).length < 2) return none;
+  return `${none}${melee ? t('\n-# Leave out `melee` for Ultimate odds') : t('\n-# Add `melee:True` for Melee odds')}`;
 }
 
 // verbose explains the same odds instead of changing them
@@ -418,10 +417,10 @@ async function oddsFor(interaction, a, b, { melee, since, venue, doing }) {
       setHistory(a.playerId), setHistory(b.playerId), h2hHistory(a.playerId, b.playerId).catch(() => []),
       eventHistory(a.userId).catch(() => null), eventHistory(b.userId).catch(() => null),
     ]));
-  // the no-odds wording picks its own game out of these too
+  // the no-odds wording looks at the other game in these too
   const scopedA = scope.anyGame(historyA);
   const scopedB = scope.anyGame(historyB);
-  const options = { game: melee ? 'Melee' : undefined, eventsA: scope.events(eventsA), eventsB: scope.events(eventsB), meetings: scope.sets(meetings) };
+  const options = { game: oddsGame(melee), eventsA: scope.events(eventsA), eventsB: scope.events(eventsB), meetings: scope.sets(meetings) };
   const found = melee
     ? await oddsWithSlippi(a, b, scopedA, scopedB, options, ranked, true)
     : { odds: predictOdds(a, b, scopedA, scopedB, options), profiles: null };
@@ -429,9 +428,9 @@ async function oddsFor(interaction, a, b, { melee, since, venue, doing }) {
 }
 
 // nothing to predict with: says why, with their slippi ranks when they have them
-async function noPredictions(interaction, a, b, { melee, filters, profiles, scopedA, scopedB, historyA, historyB }) {
+async function noPredictions(interaction, a, b, { melee, filters, profiles, scopedA, scopedB }) {
   const ranks = embeds.slippiMatchup([a, b], profiles);
-  const hinted = noOdds(a, b, scopedA, scopedB, melee, filters, scopeSets(filters)(historyA), scopeSets(filters)(historyB));
+  const hinted = noOdds(a, b, scopedA, scopedB, melee, filters);
   await interaction.editReply(ranks.length ? { content: hinted, embeds: ranks, files: [slippiLogo], allowedMentions: { parse: [] } } : { content: hinted, allowedMentions: { parse: [] } });
   return null;
 }

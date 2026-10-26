@@ -136,8 +136,34 @@ function skipWhileDown() {
   return true;
 }
 
-// variables can be a function, which gets called once it's this request's turn
-export async function query(text, variables, retries = 2) {
+// a background check runs every server's part back to back, so the same question from two servers in one pass,
+// like the stream queue of a tournament both track, gets asked once. it's the same request, so it's the same
+// answer whichever server asked. each caller gets its own copy, so one server changing what it got can't change
+// another's. a pass is one check, so nothing is kept longer than that
+const sharedPass = new AsyncLocalStorage();
+export const sharingAcrossServers = (fn) => sharedPass.run(new Map(), fn);
+export const isSharing = () => Boolean(sharedPass.getStore());
+
+// variables can be a function, which gets called once it's this request's turn. those are never shared, since
+// what they ask for isn't known until then
+export function query(text, variables, retries = 2) {
+  const shared = sharedPass.getStore();
+  if (!shared || typeof variables === 'function') return ask(text, variables, retries);
+  const key = JSON.stringify([text, variables ?? null]);
+  let answer = shared.get(key);
+  if (!answer) {
+    answer = ask(text, variables, retries);
+    shared.set(key, answer);
+    // the next server asks again instead of getting the same failure
+    answer.catch(() => {
+      if (shared.get(key) === answer) shared.delete(key);
+    });
+  }
+  return answer.then((data) => structuredClone(data));
+}
+
+// retries come back here, never through query, which would have them wait on their own shared answer
+async function ask(text, variables, retries) {
   if (skipWhileDown()) throw new ApiError('start.gg', 'start.gg is down, so this wasn\'t sent');
   await takeTurn();
 
@@ -155,7 +181,7 @@ export async function query(text, variables, retries = 2) {
   } catch (err) {
     failed();
     // a slow request can time out even when start.gg is fine, so those retry within the same budget
-    if (retries > 0) return query(text, variables, retries - 1);
+    if (retries > 0) return ask(text, variables, retries - 1);
     throw new ApiError('start.gg', `start.gg didn't respond (${err.message})`);
   }
   if (res.status >= 500) failed();
@@ -165,10 +191,10 @@ export async function query(text, variables, retries = 2) {
     const queue = fromCommand.getStore();
     if (queue && queue !== background) queue.limited++;
     nextSlot = Date.now() + 15_000;
-    return query(text, variables, retries - 1);
+    return ask(text, variables, retries - 1);
   }
   // start.gg's servers hiccup now and then, so a 502 gets the same retries as a timeout
-  if (res.status >= 500 && retries > 0) return query(text, variables, retries - 1);
+  if (res.status >= 500 && retries > 0) return ask(text, variables, retries - 1);
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError('start.gg', `start.gg: ${body.message ?? `HTTP ${res.status}`}`, res.status);
   if (body.errors) throw new ApiError('start.gg', `start.gg: ${body.errors[0].message}`, res.status);

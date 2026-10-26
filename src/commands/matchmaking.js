@@ -163,6 +163,21 @@ async function checkMatchmakingExpiry(guild, now = Math.floor(Date.now() / 1000)
   return removed;
 }
 
+// one search per person per game this often, so nobody can ping the whole role over and over. kept in memory,
+// since a restart forgetting one only lets a single extra ping through. keyed by server too
+const SEARCH_COOLDOWN_MINUTES = 10;
+const searchedAt = new Map();
+const searchKey = (interaction, game) => `${interaction.guildId ?? ''}:${interaction.user.id}:${game}`;
+
+// for tests, which search as the same person over and over
+const forgetSearches = () => searchedAt.clear();
+
+function searched(interaction, game) {
+  const now = Math.floor(Date.now() / 1000);
+  for (const [key, at] of searchedAt) if (at <= now - SEARCH_COOLDOWN_MINUTES * 60) searchedAt.delete(key);
+  searchedAt.set(searchKey(interaction, game), now);
+}
+
 // /matchmaking search: pings the role with a card saying who's looking. only people with the role can, so it can't
 // be used to ping a group someone isn't in. thread:True starts a thread on the ping to arrange games.
 // a TO can point each game's searches at their own channel with /matchmaking channel, otherwise they
@@ -173,6 +188,11 @@ async function matchmakingSearch(interaction) {
   const role = findRole(interaction.guild, game);
   if (!role || !interaction.member.roles.cache.has(role.id)) {
     return replyEphemeral(interaction, t`You need the **${role?.name ?? MATCHMAKING[game].role}** role to ping it. \`/matchmaking role game:${label}\` gives it to you.`);
+  }
+  const last = searchedAt.get(searchKey(interaction, game));
+  const again = last && last + SEARCH_COOLDOWN_MINUTES * 60;
+  if (again > Date.now() / 1000) {
+    return replyEphemeral(interaction, t`You pinged **${role.name}** <t:${last}:R>. You can ping it again <t:${again}:R>, and anyone with the role can still answer that one.`);
   }
   // discord drops a bot's ping to a role that isn't mentionable unless the bot has Mention Everyone
   if (!role.mentionable && !interaction.appPermissions?.has(PermissionFlagsBits.MentionEveryone)) {
@@ -195,6 +215,7 @@ async function matchmakingSearch(interaction) {
       let posted;
       try {
         posted = await target.send(ping);
+        searched(interaction, game);
         await replyEphemeral(interaction, t`Posted your ${label} search in <#${target.id}>.`);
       } catch (err) {
         console.error(`posting a ${label} search in <#${channelId}> failed:`, err.message);
@@ -207,23 +228,24 @@ async function matchmakingSearch(interaction) {
     delete state.matchmakingChannels[game];
     save();
     await interaction.reply(ping);
+    searched(interaction, game);
     await interaction.followUp({ content: t`The saved ${label} channel is gone, so this posted here. A TO can set a new one with \`/matchmaking channel\`.`, flags: MessageFlags.Ephemeral }).catch(() => {});
   } else {
     await interaction.reply(ping);
+    searched(interaction, game);
   }
   if (thread) await startSearchThread(interaction, await interaction.fetchReply(), label);
 }
 
-// thread:True starts a thread on the search to arrange games
-// the ping stays even when the thread can't start, so a permission change never loses the search
+// thread:True starts a thread on the search to arrange games. discord archives it after a day with no messages,
+// so nothing has to clean it up. the ping stays even when the thread can't start, so a permission change never
+// loses the search
 async function startSearchThread(interaction, posted, label) {
   try {
     const name = interaction.member.displayName ?? interaction.user.username;
     const today = new Date();
     const dated = `${today.getUTCMonth() + 1}/${today.getUTCDate()}`;
-    const thread = await posted.startThread({ name: `${label}:${name} (${dated})`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
-    state.matchmakingThreads.push({ id: thread.id, at: Math.floor(Date.now() / 1000) });
-    save();
+    await posted.startThread({ name: `${label}:${name} (${dated})`.slice(0, 100), autoArchiveDuration: ThreadAutoArchiveDuration.OneDay });
   } catch (err) {
     console.error('starting a matchmaking thread failed:', err.message);
     await interaction.followUp({ content: t('Posted your search, but I couldn\'t start a thread here. A server admin can turn on **Create Public Threads** and **Send Messages in Threads** for this channel.'), flags: MessageFlags.Ephemeral }).catch(() => {});
@@ -271,4 +293,4 @@ async function matchmakingChannel(interaction) {
   return interaction.editReply({ content: t`**${label}** searches will post in <#${target.id}>.`, allowedMentions: { parse: [] } });
 }
 
-export { matchmakingRole, matchmakingSearch, matchmakingChannel, checkMatchmakingExpiry, expiryKey };
+export { matchmakingRole, matchmakingSearch, matchmakingChannel, checkMatchmakingExpiry, expiryKey, forgetSearches, SEARCH_COOLDOWN_MINUTES };

@@ -66,13 +66,13 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // callPosts are match calls still watched for going back to waiting: { setId, channelId, messageId, calledAt,
 // discordIds, text }, text being the You're up ping as it went out, so an uncalled edit matches it.
 // streamPinged is who already got pinged for a live streamed set: { setId, discordIds }.
-// regWarned are /reg_warn pings: { tournamentId, discordId, at }, so nobody is warned twice for a tournament.
+// regWarned are /reg_warn pings from the last day: { tournamentId, discordId, by, at }, so nobody is warned twice for
+// a tournament, and by, whoever sent it, can't send more than the daily cap.
 // billsPosted are the ESPN ids of Bills finals already posted.
 // matchmaking is each game's matchmaking role id, keyed ult and melee, so a role renamed in server settings still
 // counts. matchmakingChannels is the channel id each game's searches post in, left out for wherever the command ran.
 // matchmakingExpiry is when timed roles from /matchmaking role duration come off, in unix seconds keyed
-// `discordId:game`, so a restart doesn't cancel them. matchmakingThreads are { id, at } for threads the bot deletes
-// 24 hours after /matchmaking search made them.
+// `discordId:game`, so a restart doesn't cancel them.
 // discordEvents are the Discord scheduled events the bot made or found, keyed by start.gg tournament id, so
 // /t-o tournament event, /t-o tournament add add_event and /t-o settings events all land on the same one:
 // { eventId, slug, startAt, synced, gone }. synced is start.gg's side as of the last sync, null until one ran, and gone
@@ -85,6 +85,8 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // funQueue are the prefetched fun and bills posts still waiting, keyed by command name, so a restart serves them
 // instead of throwing away paid-for Claude posts. each is saved without its image bytes, which get downloaded again.
 // billsMeta is { lastImage, kinds }, so the bills no-repeat and even photo/gif rotation survive a restart too.
+// dmsSent are the 1-hour DMs that went out, as `discordId:tournamentId:reg|start:time` (1000 kept), so someone in two
+// servers that both track a tournament gets each DM once.
 const emptyGuild = {
   channelId: null,
   players: {}, links: {}, accounts: {},
@@ -96,17 +98,17 @@ const emptyGuild = {
   slippi: {}, slippiSkipped: [], slippiWrapped: [],
   threads: {}, recentPicks: {}, buttons: [], resultPosts: [], callPosts: [], streamPinged: [], regWarned: [], billsPosted: [],
   nextPings: [], nextPosted: [], nextPosts: [],
-  matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, matchmakingThreads: [], discordEvents: {},
+  matchmaking: {}, matchmakingChannels: {}, matchmakingExpiry: {}, discordEvents: {},
 };
 
 // the root also keeps a copy of every guild key so old state files and tests keep working, and live servers
 // read their guild's copy through the state proxy below. deploy is one per bot. the fun queues and the bills
 // rotation are one per bot too: posts get made ahead at startup, outside any server, so a per-server copy
-// would save them where no command reads them
-const GLOBAL_KEYS = new Set(['deploy', 'guilds', 'funQueue', 'billsMeta']);
+// would save them where no command reads them. dmsSent is one per bot since a DM goes to the person, not a server
+const GLOBAL_KEYS = new Set(['deploy', 'guilds', 'funQueue', 'billsMeta', 'dmsSent']);
 const empty = {
   ...structuredClone(emptyGuild),
-  deploy: null, guilds: {}, funQueue: {}, billsMeta: {},
+  deploy: null, guilds: {}, funQueue: {}, billsMeta: {}, dmsSent: [],
 };
 
 function isPlainObject(value) {
@@ -132,12 +134,17 @@ function withDefaults(parsed, defaults) {
   return out;
 }
 
+// keys older files have that nothing reads anymore. matchmakingThreads listed every /matchmaking search thread for a
+// cleanup that never got written, and grew forever
+const RETIRED_KEYS = ['matchmakingThreads'];
+
 export function cleanState(parsed) {
   const out = withDefaults(parsed, empty);
+  for (const key of RETIRED_KEYS) delete out[key];
   for (const [id, guild] of Object.entries(out.guilds)) {
     out.guilds[id] = withDefaults(guild, emptyGuild);
     // a server saved before these were one per bot had its own copy, which nothing reads now
-    for (const key of GLOBAL_KEYS) delete out.guilds[id][key];
+    for (const key of [...GLOBAL_KEYS, ...RETIRED_KEYS]) delete out.guilds[id][key];
   }
   return out;
 }
@@ -171,12 +178,14 @@ export function postsChannelId(id = guildId()) {
 }
 
 // copy the old single-server root into that server's entry once, so nobody loses their
-// track list. runs at startup for GUILD_ID/CHANNEL_ID, then those env vars are just fallback
+// track list. runs at startup for GUILD_ID/CHANNEL_ID, then those env vars are just fallback.
+// only into an entry that doesn't exist yet: a server that untracked everyone used to get the old
+// root's track list and settings back on every restart, its command channels and language included
 export function migrateLegacyToGuild(id, channelId = null) {
   if (!id) return null;
+  const fresh = !Object.hasOwn(raw.guilds, id);
   const guild = forGuild(id);
-  const hasData = Object.keys(guild.players).length || Object.keys(guild.tournaments).length;
-  if (!hasData) {
+  if (fresh) {
     for (const key of Object.keys(emptyGuild)) {
       if (key === 'channelId') continue;
       guild[key] = structuredClone(raw[key] ?? emptyGuild[key]);

@@ -208,6 +208,13 @@ export default {
   '-# Each follows /t-o settings until a TO changes it with `/t-o tournament posts`. Only what is off shows here':
     '-# Cada tipo sigue /t-o settings hasta que un TO lo cambia con `/t-o tournament posts`. Aquí solo se ve lo que está apagado',
   'Tracked tournaments · {0}': 'Torneos seguidos · {0}',
+  '-# Each follows /t-o settings until a TO changes it with `/t-o tournament posts`. Only what is off shows here. `/t-o tournament list` has more on each':
+    '-# Cada tipo sigue /t-o settings hasta que un TO lo cambia con `/t-o tournament posts`. Aquí solo se ve lo que está apagado. `/t-o tournament list` tiene más de cada uno',
+  // tournamentList
+  'No start time yet': 'Todavía sin hora de inicio',
+  'Going on now, started <t:{0}:R>': 'En curso, empezó <t:{0}:R>',
+  'next reminder <t:{0}:R>': 'próximo recordatorio <t:{0}:R>',
+  'Discord event': 'Evento de Discord',
   'TOs · {0}': 'TOs · {0}',
   'Nobody the bot has seen yet.': 'Todavía nadie que el bot haya visto.',
   'There\'s no TO role yet, so anyone with Manage Server counts as a TO. `/t-o role add` makes the role, or `/t-o role set` uses one already in the server.':

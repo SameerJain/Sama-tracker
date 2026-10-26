@@ -20,7 +20,9 @@ export function healthPort(env = process.env) {
 export function startHealth(port = healthPort()) {
   if (server) return server;
   const created = http.createServer((req, res) => {
-    const path = new URL(req.url, 'http://localhost').pathname;
+    // not new URL(): a path like //[ makes it throw, and a throw in here takes the whole bot down. this port is
+    // public on railway, so anyone could send one
+    const path = (req.url ?? '').split('?')[0];
     if (req.method === 'GET' && path === '/health') {
       const code = ready ? 200 : 503;
       res.writeHead(code, { 'content-type': 'application/json' });

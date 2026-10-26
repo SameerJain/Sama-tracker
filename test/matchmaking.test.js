@@ -11,14 +11,14 @@ process.env.STATE_DIR = directory;
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
 const { commands, handleCommand } = await import('../src/commands/index.js');
-const { checkMatchmakingExpiry, expiryKey } = await import('../src/commands/matchmaking.js');
+const { checkMatchmakingExpiry, expiryKey, forgetSearches, SEARCH_COOLDOWN_MINUTES } = await import('../src/commands/matchmaking.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 
 beforeEach(() => {
   state.matchmaking = {};
   state.matchmakingChannels = {};
   state.matchmakingExpiry = {};
-  state.matchmakingThreads = [];
+  forgetSearches();
   state.toRole = { id: null, members: [], seeded: false };
 });
 
@@ -278,22 +278,53 @@ test('any other discord failure says to try again instead of blaming start.gg', 
   assert.equal(logged.mock.callCount(), 1);
 });
 
+test('one search per person per game every 10 minutes, so the role can\'t be pinged over and over', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_800_000_000_000 });
+  state.matchmaking = { melee: 'melee-role', ult: 'ult-role' };
+  const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }, { id: 'ult-role', name: 'Ultimate Matchmaking', mentionable: true }]);
+  const member = person(['melee-role', 'ult-role']);
+  const search = (game, user) => run('matchmaking search', { guild, member, values: { game }, user });
+
+  assert.equal((await search('melee'))[0][1].content, '<@&melee-role>');
+  const again = (await search('melee'))[0][1];
+  assert.equal(again.flags, MessageFlags.Ephemeral);
+  assert.equal(again.content, 'You pinged **Melee Matchmaking** <t:1800000000:R>. You can ping it again <t:1800000600:R>, and anyone with the role can still answer that one.');
+  // the other game, and somebody else, aren't held up by it
+  assert.equal((await search('ult'))[0][1].content, '<@&ult-role>');
+  assert.equal((await search('melee', { id: 'friend-discord', username: 'Friend' }))[0][1].content, '<@&melee-role>');
+
+  t.mock.timers.tick(SEARCH_COOLDOWN_MINUTES * 60 * 1000 - 1000);
+  assert.match((await search('melee'))[0][1].content, /^You pinged/);
+  t.mock.timers.tick(1000);
+  assert.equal((await search('melee'))[0][1].content, '<@&melee-role>');
+});
+
+test('a search that couldn\'t post doesn\'t start the wait', async () => {
+  state.matchmaking = { melee: 'melee-role' };
+  state.matchmakingChannels = { melee: 'locked' };
+  const locked = { id: 'locked', isTextBased: () => true, send: async () => { throw Object.assign(new Error('Missing Access'), { code: 50001 }); } };
+  const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }], new Map(), new Map([['locked', locked]]));
+  const member = person(['melee-role']);
+  const failed = await run('matchmaking search', { guild, member, values: { game: 'melee' } });
+  assert.match(failed[0][1].content, /I couldn't post in <#locked>/);
+  state.matchmakingChannels = {};
+  assert.equal((await run('matchmaking search', { guild, member, values: { game: 'melee' } }))[0][1].content, '<@&melee-role>');
+});
+
 test('thread:True starts a thread on the ping, left out it sends none', async () => {
   state.matchmaking = { melee: 'melee-role' };
   const guild = server([{ id: 'melee-role', name: 'Melee Matchmaking', mentionable: true }]);
   const member = { ...person(['melee-role']), displayName: 'Sam' };
 
-  const before = Math.floor(Date.now() / 1000);
   const withThread = await run('matchmaking search', { guild, member, values: { game: 'melee', thread: true }, user: { id: 'me-discord', username: 'Sam' } });
   assert.equal(withThread[0][1].content, '<@&melee-role>');
   assert.equal(withThread.threads.length, 1);
   const today = new Date();
   assert.equal(withThread.threads[0].name, `Melee:Sam (${today.getUTCMonth() + 1}/${today.getUTCDate()})`);
-  assert.equal(state.matchmakingThreads.length, 1);
-  assert.equal(state.matchmakingThreads[0].id, 'match-thread-1');
-  assert.ok(state.matchmakingThreads[0].at >= before);
-  assert.deepEqual(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmakingThreads, state.matchmakingThreads);
+  // discord archives it after a day, so nothing about it is saved
+  assert.equal(JSON.parse(readFileSync(join(directory, 'state.json'), 'utf8')).matchmakingThreads, undefined);
 
+  forgetSearches();
   const withoutThread = await run('matchmaking search', { guild, member, values: { game: 'melee' } });
   assert.equal(withoutThread[0][1].content, '<@&melee-role>');
   assert.equal(withoutThread.threads.length, 0);
@@ -555,7 +586,5 @@ test('a redirected search still starts its thread', async () => {
   assert.equal(lfg.threads.length, 1);
   const today = new Date();
   assert.equal(lfg.threads[0].name, `Melee:Sam (${today.getUTCMonth() + 1}/${today.getUTCDate()})`);
-  assert.equal(state.matchmakingThreads.length, 1);
-  assert.equal(state.matchmakingThreads[0].id, 'channel-thread-1');
   assert.match(calls[0][1].content, /Posted your Melee search in <#lfg-melee>\./);
 });

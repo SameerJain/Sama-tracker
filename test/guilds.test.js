@@ -82,12 +82,16 @@ test('old single-server files migrate into their server once', async () => {
   assert.equal(guild.players[7].tag, 'Migrated');
   assert.equal(guild.tournaments[5].name, 'Local');
   assert.equal(guild.channelId, 'legacy-channel');
-  // a second boot keeps what the server changed since
+  // a second boot keeps what the server changed since, even with nothing tracked anymore
   await guildLocal.run('legacy-guild', async () => {
     state.players = {};
+    state.tournaments = {};
+    state.messages = { commandChannels: ['bots'] };
   });
   migrateLegacyToGuild('legacy-guild', 'legacy-channel');
   assert.deepEqual(forGuild('legacy-guild').players, {});
+  assert.deepEqual(forGuild('legacy-guild').tournaments, {});
+  assert.deepEqual(forGuild('legacy-guild').messages, { commandChannels: ['bots'] });
   assert.ok(guildIds().includes('legacy-guild'));
   save();
 });
@@ -96,6 +100,14 @@ test('bad guild shapes fall back instead of crashing', async () => {
   const cleaned = cleanState({ players: {}, guilds: { broken: null, half: { players: 'nope' } } });
   assert.deepEqual(cleaned.guilds.broken.players, {});
   assert.deepEqual(cleaned.guilds.half.players, {});
+});
+
+test('keys nothing reads anymore come out of old files, root and servers alike', () => {
+  const threads = [{ id: 'thread-1', at: 1 }];
+  const cleaned = cleanState({ matchmakingThreads: threads, guilds: { old: { matchmakingThreads: threads, matchmaking: { melee: 'role' } } } });
+  assert.equal(cleaned.matchmakingThreads, undefined);
+  assert.equal(cleaned.guilds.old.matchmakingThreads, undefined);
+  assert.deepEqual(cleaned.guilds.old.matchmaking, { melee: 'role' });
 });
 
 test('global commands only work in a server, never in a DM with the bot', () => {
@@ -127,6 +139,7 @@ test('/t-o settings with a guild id writes the channel to that server, not the r
       getBoolean: () => null, getString: () => null, getInteger: () => null,
     },
     reply: async (result) => calls.push(result),
+    followUp: async (result) => calls.push(result),
   };
   await handleCommand(interaction);
   assert.match(calls[0].content, /posts-1/);
@@ -198,6 +211,13 @@ test('/t-o settings turns down a channel the bot can\'t post in, and notes what 
   const bare = await setup('picky', fakeChannel('bare', ['ViewChannel', 'SendMessages', 'EmbedLinks']));
   assert.equal(forGuild('picky').channelId, 'bare');
   assert.match(bare.content, /Automatic posts go in <#bare>\.\n-# Without Attach Files there.*\n-# Without Create Public Threads and Send Messages in Threads there/);
+
+  // threads work without Pin Messages, so it's only a note, and one that can pin gets none
+  const unpinned = await setup('picky', fakeChannel('unpinned'));
+  assert.equal(forGuild('picky').channelId, 'unpinned');
+  assert.match(unpinned.content, /Automatic posts go in <#unpinned>\.\n-# Without Pin Messages there, thread cards don't get pinned\./);
+  const pinning = await setup('picky', fakeChannel('pinning', ['ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFiles', ...THREADS, 'PinMessages']));
+  assert.doesNotMatch(pinning.content, /Pin Messages/);
 });
 
 test('each server\'s posts channel is its own /t-o settings pick, with CHANNEL_ID only for the migrated server', async () => {

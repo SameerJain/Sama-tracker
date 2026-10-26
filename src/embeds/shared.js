@@ -63,7 +63,7 @@ export function baseEmbed(color, footer = FOOTER) {
 export function split(lines, max = 4096) {
   const groups = [];
   let size = Infinity;
-  for (const line of lines) {
+  for (const line of lines.flatMap((each) => (each.length > max ? cut(each, max) : [each]))) {
     if (size + line.length + 1 > max) {
       groups.push([]);
       size = 0;
@@ -72,6 +72,21 @@ export function split(lines, max = 4096) {
     size += line.length + 1;
   }
   return groups;
+}
+
+// one line longer than a whole card, broken at its last space before the limit, or right at it with no space
+// in reach. never inside an emoji or other character that takes two code units
+function cut(line, max) {
+  const pieces = [];
+  let rest = line;
+  while (rest.length > max) {
+    const space = rest.lastIndexOf(' ', max);
+    let at = space > max / 2 ? space : max;
+    if (at > 1 && /[\uD800-\uDBFF]/.test(rest[at - 1])) at -= 1;
+    pieces.push(rest.slice(0, at));
+    rest = rest.slice(at).replace(/^ /, '');
+  }
+  return [...pieces, rest];
 }
 
 // a list too long for one embed carries on in more of the same color

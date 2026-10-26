@@ -74,6 +74,7 @@ test('a tournament name with @everyone and backticks pings nobody and breaks no 
   state.regWarned = [];
   const calls = [];
   await registration.regWarn({
+    user: { id: 'runner' }, memberPermissions: { has: () => false },
     options: { getString: (name) => (name === 'tournament' ? 'evil' : null), getUser: () => ({ id: 'u9', bot: false, displayName: 'U' }), getMember: () => null },
     deferReply: async () => {},
     editReply: async (payload) => { calls.push(payload); },
@@ -129,8 +130,9 @@ test('/socials_edit goes by discord, so a role handed it can use it without Mana
 
 test('a corrupt saved social link renders as text instead of throwing /socials', async () => {
   state.socials = [{ name: 'Broken', url: 'not a url at all {{{' }];
-  const cards = embeds.socials(state.socials);
-  assert.ok(cards.length >= 1);
+  const [card] = embeds.socials(state.socials);
+  // shown as it was saved, never as a link discord would try to open
+  assert.equal(card.data.description, '**Broken** · not a url at all {{{');
   state.socials = [];
 });
 

@@ -271,6 +271,37 @@ test('a second reg_warn for the same person and tournament within 12 hours sends
   assert.ok(later.calls.some(([kind]) => kind === 'send'));
 });
 
+test('someone who isn\'t a TO can send 10 warnings a day, and the 11th asks start.gg nothing', async () => {
+  mockStartgg();
+  const sent = (run) => run.calls.some(([kind]) => kind === 'send');
+  const warn = (target, manager = false) => interaction('reg_warn', { tournament: 'local' }, { id: target, displayName: target }, undefined, { manager });
+  const day = 24 * 3600;
+  state.regWarned = Array.from({ length: 10 }, (_, i) => ({ tournamentId: 5, discordId: `friend-${i}`, by: 'runner', at: now - 3600 + i }));
+
+  lastFetch = 0;
+  const capped = warn('slacker');
+  await handleCommand(capped);
+  assert.deepEqual(capped.calls.map(([kind]) => kind), ['reply']);
+  assert.equal(capped.calls[0][1].content, `You've sent 10 registration warnings in the last day, the most anyone but a TO can. You can send another <t:${now - 3600 + day}:R>.`);
+  assert.ok(capped.calls[0][1].flags & MessageFlags.Ephemeral);
+  assert.equal(lastFetch, 0, 'asked start.gg anyway');
+
+  // a day after the oldest, one more goes through, and then it's full again
+  state.regWarned[0].at = now - day - 1;
+  const next = warn('slacker');
+  await handleCommand(next);
+  assert.ok(sent(next));
+  assert.equal(state.regWarned.find((each) => each.discordId === 'slacker').by, 'runner');
+  const full = warn('other');
+  await handleCommand(full);
+  assert.ok(!sent(full));
+
+  // a TO isn't held to it
+  const to = warn('other', true);
+  await handleCommand(to);
+  assert.ok(sent(to));
+});
+
 test('reg_warn falls back to a follow-up when it cannot post in the channel', async () => {
   mockStartgg();
   state.regWarned = [];

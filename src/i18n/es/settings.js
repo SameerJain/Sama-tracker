@@ -1,5 +1,13 @@
 // /t-o settings, /track posts, /notify and the other settings replies in src/commands/settings.js
 export default {
+  // turning off several at once asks first
+  'Turn off {0}? They stay off until a TO turns them back on, and what comes due meanwhile is skipped.':
+    '¿Apagar {0}? Siguen apagados hasta que un TO los vuelva a encender, y lo que toque mientras tanto se salta.',
+  'Turn them off': 'Apagarlos',
+  'That button doesn\'t work anymore. Run `/t-o settings` again.': 'Ese botón ya no funciona. Vuelve a usar `/t-o settings`.',
+  'Turned off {0}.': 'Apagué {0}.',
+  '-# `/t-o settings` with no options shows every setting.': '-# `/t-o settings` sin opciones muestra toda la configuración.',
+  'Nothing changed.': 'No cambió nada.',
   // settingsLines
   '**Automatic posts**': '**Publicaciones automáticas**',
   '**{0}:** {1}': '**{0}:** {1}',
@@ -11,9 +19,15 @@ export default {
   '**Posts channel:** not set': '**Canal de publicaciones:** sin elegir',
   '**Bot commands:** {0}': '**Comandos del bot:** {0}',
   '**Bot commands:** every channel': '**Comandos del bot:** todos los canales',
-  '-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.':
-    '-# `commands_channel` deja los comandos del bot solo en los canales elegidos, con sus hilos. Elegirlo otra vez lo quita, y `commands_anywhere:True` vacía la lista. `/t-o` funciona en todos lados.',
+  '-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, except with `commands_anywhere:False`, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.':
+    '-# `commands_channel` deja los comandos del bot solo en los canales elegidos, con sus hilos. Elegirlo otra vez lo quita, salvo con `commands_anywhere:False`, y `commands_anywhere:True` vacía la lista. `/t-o` funciona en todos lados.',
   'Pick either `commands_channel` or `commands_anywhere:True`, not both.': 'Elige `commands_channel` o `commands_anywhere:True`, no los dos.',
+  '-# Without Pin Messages there, thread cards don\'t get pinned.': '-# Sin Fijar mensajes ahí, las tarjetas de los hilos no se fijan.',
+  'Pick the channel bot commands should work in with `commands_channel`.': 'Elige con `commands_channel` el canal donde deben funcionar los comandos del bot.',
+  // commandsChange
+  'Bot commands only work in {0} now.': 'Ahora los comandos del bot solo funcionan en {0}.',
+  'Bot commands work in every channel now.': 'Ahora los comandos del bot funcionan en todos los canales.',
+  'Took <#{0}> off the list.': 'Quité <#{0}> de la lista.',
   '**Weekly recap**': '**Resumen semanal**',
   '**Posts:** {0} · **Day and time:** {1} {2} {3}': '**Se publica:** {0} · **Día y hora:** {1} {2} {3}',
   '-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.':
@@ -23,8 +37,8 @@ export default {
   'next opponents off': 'próximos rivales desactivados',
   '-# `events` makes a Discord event for each upcoming tracked tournament, once each. Needs Manage Events':
     '-# `events` crea un evento de Discord para cada próximo torneo seguido, una vez por torneo. Necesita Gestionar eventos',
-  '-# `threads` has three modes for set results, stream alerts, match calls and next opponents. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament or event ends.':
-    '-# `threads` tiene tres modos para los resultados de sets, avisos de stream, llamados de partida y próximos rivales. Apagado los publica aquí, salvo los de un torneo seguido, que siempre tienen hilo. Uno por torneo le da un hilo a cada torneo, y uno por evento le da el suyo a cada evento, como Genesis 11 · Ultimate Singles. Cada hilo fija su tarjeta en el canal hasta que termina el torneo o el evento.',
+  '-# `threads` has three modes for set results, stream alerts, match calls and next opponents. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament ends.':
+    '-# `threads` tiene tres modos para los resultados de sets, avisos de stream, llamados de partida y próximos rivales. Apagado los publica aquí, salvo los de un torneo seguido, que siempre tienen hilo. Uno por torneo le da un hilo a cada torneo, y uno por evento le da el suyo a cada evento, como Genesis 11 · Ultimate Singles. Cada hilo fija su tarjeta en el canal hasta que termina el torneo.',
   '-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.':
     '-# `set_colors` pinta los resultados de sets de verde si ganó un jugador seguido, rojo si perdió, dorado cuando se enfrentan dos seguidos y azul cuando no jugó ninguno. Apagado deja todas las tarjetas en azul.',
   '-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.':

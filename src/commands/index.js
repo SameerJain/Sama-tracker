@@ -11,7 +11,7 @@ import {
   progress, scout, headToHead, stats, doubles, characters, predict, memberHeadToHead, memberScout, reports, NOT_LINKED,
 } from './stats.js';
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
-import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent } from './tournaments.js';
+import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, tournamentList } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
 import { commandChannels, configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
@@ -107,6 +107,7 @@ const handlers = new Map([
   ['t-o tournament remove', tournamentRemove],
   ['t-o tournament posts', tournamentPosts],
   ['t-o tournament event', tournamentEvent],
+  ['t-o tournament list', tournamentList],
   ['bracket', bracket],
   ['stream_link', streamLink],
   ['registered', registered],

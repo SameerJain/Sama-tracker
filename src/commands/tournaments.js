@@ -8,7 +8,8 @@ import {
   reminderSchedule, secondsNow, trackTournament,
 } from '../tracker.js';
 import { count, shortSchedule } from '../embeds/shared.js';
-import { lookup, replyEphemeral, t, listOf } from './shared.js';
+import * as embeds from '../embeds/index.js';
+import { lookup, replyEphemeral, sendEmbeds, t, listOf } from './shared.js';
 import { permissionList } from '../i18n.js';
 import { askFirst, confirmable } from './confirm.js';
 import { isTO, notTO } from './to.js';
@@ -261,4 +262,21 @@ async function tournamentEvent(interaction) {
   await interaction.editReply({ content: lines.join('\n'), allowedMentions: { parse: [] } });
 }
 
-export { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, parseSchedule };
+// when a tracked tournament's next reg reminder goes out, or null when it has none left or they're off
+function nextReminderAt(tournament, now) {
+  const { reminder } = tournament;
+  if (!postsOn('registration', tournament) || !reminder?.deadline || reminder.deadline <= now) return null;
+  const hours = reminderSchedule(tournament)[reminder.next ?? 0];
+  return hours === undefined ? null : Math.max(now, reminder.deadline - hours * HOUR);
+}
+
+// anyone can see what's tracked, the way anyone can see who the TOs are. changing it stays with the TOs
+function tournamentList(interaction) {
+  const now = secondsNow();
+  const reminders = Object.fromEntries(Object.values(state.tournaments).map((tournament) => [tournament.id, nextReminderAt(tournament, now)]));
+  return sendEmbeds(interaction, embeds.tournamentList(state.tournaments, {
+    now, reminders, events: state.discordEvents, threads: state.threads, guildId: interaction.guildId ?? null,
+  }));
+}
+
+export { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, tournamentList, parseSchedule };

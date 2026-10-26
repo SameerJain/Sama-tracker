@@ -285,7 +285,7 @@ const runs = [
   ['predict', { values: { opponent: '2', melee: true } }, /Neither Crew nor Rival has played Melee singles on start\.gg\..*Leave out `melee` for Ultimate odds.*"name":"Slippi ranked","value":"\*\*Crew\*\*: \[CREW#1\][^"\\]*\\n-# Netplay ranked/],
   ['predict', { values: { opponent: '2', verbose: true, melee: true } }, /Neither Crew nor Rival has played Melee singles/],
   ['predict', { values: { opponent: '2', verbose: true, since: '2026-01-01', venue: 'offline' } }, /How it adds up.*give or take.*Offline only/],
-  ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /Crew and Opponent haven't played singles in the same game/],
+  ['predict', { values: { opponent: 'start.gg/user/opponent' } }, /"content":"Opponent hasn't played Ultimate singles on start\.gg\."/],
   ['predict', { values: { opponent: '2', since: 'someday' } }, /Couldn't read `someday` as a date/],
   ['predict', { values: { opponent: 'start.gg/user/nobody', verbose: true } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
   // crew has no set results field, which counts as on
@@ -325,6 +325,7 @@ const runs = [
   ['t-o', { group: 'tournament', subcommand: 'event', values: { tournament: 'start.gg/tournament/soon' } }, /"content":"Made a Discord event for Soon/],
   ['t-o', { group: 'tournament', subcommand: 'add', values: { tournament: 'start.gg/tournament/soon', add_event: 'on' } }, /Already tracking Soon.*Made a Discord event for Soon/],
   ['track', { subcommand: 'list' }, /Tracked tournaments · 1.*Soon.*top 8s off/],
+  ['t-o', { group: 'tournament', subcommand: 'list' }, /Tracked tournaments · 1.*\*\*\[Soon\]\(https:\/\/www\.start\.gg\/tournament\/soon\)\*\*\\n<t:\d+:f> · <t:\d+:R> · [^"]*top 8s off · reminders 2d, 6h · next reminder <t:\d+:R>/],
   ['bracket', {}, /No tracked tournaments going on right now/],
   ['t-o', { group: 'tournament', subcommand: 'remove', values: { tournament: 'soon' }, press: 'Stop tracking' }, /Stop tracking Soon\?.*"update",\{"content":"Stopped tracking Soon\."/],
   // no TO role yet, so Manage Server counts as one, and /t-o role add makes the role

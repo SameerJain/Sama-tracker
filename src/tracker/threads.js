@@ -112,8 +112,10 @@ async function tournamentThread(event, byEvent, postChannel) {
   return thread;
 }
 
-// pinned tournament and event starters whose tournament or event is over get unpinned. over means past the end plus time
-// for locals running late, or placements already posted for a TO with a far-out end date
+// pinned tournament and event starters whose tournament is over get unpinned, all of a tournament's at once. over
+// means past the end plus time for locals running late, or placements already posted for a TO with a far-out end
+// date. an event's card used to come off when that event finished, so with one thread per event the pin moved
+// from event to event, and only the one still going stayed pinned
 export async function unpinFinishedThreads(postChannel = currentChannel()) {
   if (!postChannel?.client) return;
   const now = secondsNow();
@@ -134,8 +136,7 @@ export async function unpinFinishedThreads(postChannel = currentChannel()) {
     const tournament = Object.values(state.tournaments).find((each) => each.slug === slug || slug.startsWith(`${each.slug}/event/`));
     // not tracked yet, or already pruned. deletions unpin on the way out, so this waits
     if (!tournament) continue;
-    const event = tournament.events?.find((each) => each.slug === slug);
-    if (event ? event.state !== 'COMPLETED' : !tournament.resultsPosted && now <= endTime(tournament) + RUNS_LATE_HOURS * HOUR) continue;
+    if (!tournament.resultsPosted && now <= endTime(tournament) + RUNS_LATE_HOURS * HOUR) continue;
     try {
       await unpinThreadRef(postChannel, entry);
     } catch (err) {

@@ -3,7 +3,7 @@ import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
 import { state, save } from '../store.js';
 import { ROLL_CALL_MIN_PLAYERS, RUNS_LATE_HOURS, checkTournaments, crewOf, endTime, newTracked, resultsOn, secondsNow } from '../tracker.js';
-import { findAccount, serverMembers } from '../accounts.js';
+import { findAccount, linkedElsewhere, serverMembers } from '../accounts.js';
 import { setResultColors } from '../message-settings.js';
 import { count } from '../embeds/shared.js';
 import {
@@ -213,7 +213,15 @@ function noLinkNeeded(player) {
 // an Undo button puts the link back for a minute after
 function unlink(interaction) {
   const linked = state.links[interaction.user.id];
-  if (!linked) return replyEphemeral(interaction, t('You weren\'t linked.'));
+  if (!linked) {
+    // a link from another server counts here too, but it's that server's to take off
+    const trackedHere = Object.values(state.players).some((player) => player.discordId === interaction.user.id);
+    const elsewhere = !trackedHere && linkedElsewhere(interaction.user.id);
+    if (elsewhere) {
+      return replyEphemeral(interaction, t`You aren't linked in this server, but commands here still find you as ${escapeMarkdown(elsewhere.tag)} from another server the bot is in. \`/unlink\` there takes it off.`);
+    }
+    return replyEphemeral(interaction, t('You weren\'t linked.'));
+  }
   delete state.links[interaction.user.id];
   save();
   let content = t`Unlinked from ${escapeMarkdown(linked.tag)}.`;

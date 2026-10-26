@@ -116,6 +116,8 @@ export default {
   'No need to link. You\'re tracked as {0} with this Discord on your start.gg, so leaving the player out of a command already looks you up.':
     'No hace falta vincular. Te sigo como {0} con este Discord en tu start.gg, así que dejar el jugador vacío en un comando ya te busca a ti.',
   'You weren\'t linked.': 'No estabas vinculado.',
+  'You aren\'t linked in this server, but commands here still find you as {0} from another server the bot is in. `/unlink` there takes it off.':
+    'No estás vinculado en este servidor, pero los comandos de aquí te siguen encontrando como {0} desde otro servidor donde está el bot. `/unlink` allá lo quita.',
   'Unlinked from {0}.': 'Te desvinculé de {0}.',
   ' Commands still find you as {0}, since you\'re tracked with this Discord on your start.gg.':
     ' Los comandos te siguen encontrando como {0}, porque te sigo con este Discord en tu start.gg.',
@@ -221,6 +223,8 @@ export default {
     'start.gg oculta quién está inscrito en {0}, así que no hay forma de saber si lo está. No mandé el aviso.',
   '{0} was already warned about {1} <t:{2}:R>. They can be warned again <t:{3}:R>.':
     'A {0} ya se le avisó de {1} <t:{2}:R>. Se le puede volver a avisar <t:{3}:R>.',
+  'You\'ve sent {0} registration warnings in the last day, the most anyone but a TO can. You can send another <t:{1}:R>.':
+    'Enviaste {0} avisos de inscripción en el último día, el máximo para quien no es TO. Puedes enviar otro <t:{1}:R>.',
   // matchmaking.js
   'Duration is hours to keep the role, {0}-{1}. Leave it out to keep it until you take it off.':
     'La duración son las horas que te quedas con el rol, de {0} a {1}. Déjala vacía para quedártelo hasta que te lo quites.',
@@ -240,6 +244,8 @@ export default {
   '**{0}** can\'t be pinged right now. A server admin can turn on "Allow anyone to @mention this role" in its settings.':
     'A **{0}** no se le puede dar ping ahora. Un admin del servidor puede activar "Permitir que cualquiera @mencione este rol" en los ajustes del rol.',
   'Posted your {0} search in <#{1}>.': 'Publiqué tu búsqueda de {0} en <#{1}>.',
+  'You pinged **{0}** <t:{1}:R>. You can ping it again <t:{2}:R>, and anyone with the role can still answer that one.':
+    'Le diste ping a **{0}** <t:{1}:R>. Puedes volver a darle ping <t:{2}:R>, y cualquiera con el rol todavía puede responder a ese.',
   'I couldn\'t post in <#{0}>. Give me View Channel and Send Messages there, then try again.':
     'No pude publicar en <#{0}>. Dame Ver canal y Enviar mensajes ahí, y vuelve a intentarlo.',
   'The saved {0} channel is gone, so this posted here. A TO can set a new one with `/matchmaking channel`.':
@@ -280,8 +286,23 @@ export default {
   'Nobody on the watchlist goes by that.{0}': 'No hay nadie con ese nombre en la lista de Slippi.{0}',
   ' Pick someone from the list, or type a connect code like ABCD#123.':
     ' Elige a alguien de la lista, o escribe un código de conexión como ABCD#123.',
-  'Pick someone, or `/link` your start.gg so leaving it out finds your connect code.':
-    'Elige a alguien, o vincula tu start.gg con `/link` para que dejarlo vacío encuentre tu código de conexión.',
+  'Pick someone, or add your code with `/slippi add code:ABCD#123` so leaving it out finds you.':
+    'Elige a alguien, o agrega tu código con `/slippi add code:ABCD#123` para que dejarlo vacío te encuentre.',
+  'Couldn\'t find a connect code on {0}\'s start.gg. Add yours with `/slippi add code:ABCD#123` and leaving `player` out finds it after that.':
+    'No encontré un código de conexión en el start.gg de {0}. Agrega el tuyo con `/slippi add code:ABCD#123` y después dejar `player` vacío lo encuentra.',
+  'Bots don\'t have connect codes.': 'Los bots no tienen código de conexión.',
+  'add someone else to the watchlist. Leave out `user` to add yourself':
+    'agregar a otra persona a la lista de Slippi. Deja `user` vacío para agregarte tú',
+  '{0} isn\'t tracked or linked, so there\'s no start.gg to find a code on. Add theirs with `code:`.':
+    '{0} no está seguido ni vinculado, así que no hay start.gg donde buscar su código. Agrega el suyo con `code:`.',
+  '{0} is on the watchlist as {1} ({2}). `/slippi remove` takes them off first if their code changed.':
+    '{0} está en la lista de Slippi como {1} ({2}). Si cambió de código, quítalo primero con `/slippi remove`.',
+  'You\'re on the watchlist as {0} ({1}). `/slippi remove` takes you off first if your code changed.':
+    'Estás en la lista de Slippi como {0} ({1}). Si cambiaste de código, quítate primero con `/slippi remove`.',
+  '{0} is on the Slippi watchlist as yours now.': '{0} está en la lista de Slippi como tuyo ahora.',
+  '{0} is on the Slippi watchlist as {1}\'s now.': '{0} está en la lista de Slippi como el código de {1} ahora.',
+  '\n-# Not tied to anyone, so `/slippi rank` with `player` left out won\'t find them. Add `user:` to say whose code it is.':
+    '\n-# No es de nadie, así que `/slippi rank` con `player` vacío no lo encuentra. Agrega `user:` para decir de quién es el código.',
   'Slippi doesn\'t have {0} ({1}) anymore.': 'Slippi ya no tiene a {0} ({1}).',
   'Slippi has nobody with the code {0}.{1}': 'Slippi no tiene a nadie con el código {0}.{1}',
   'Look up {0}': 'Buscar {0}',
@@ -312,15 +333,14 @@ export default {
   'Every game on its way': 'Todos los juegos vienen en camino',
   '{0} other games': '{0} juegos más',
   'No characters reported for {0}': 'No hay personajes reportados en {0}',
-  '{0} and {1} haven\'t played singles in the same game on start.gg.': '{0} y {1} no han jugado singles del mismo juego en start.gg.',
-  '{0} and {1} haven\'t played singles in the same game on start.gg matching those filters.':
-    '{0} y {1} no han jugado singles del mismo juego en start.gg con esos filtros.',
-  'Neither {0} nor {1} has played Melee singles on start.gg.': 'Ni {0} ni {1} han jugado singles de Melee en start.gg.',
-  'Neither {0} nor {1} has played Melee singles on start.gg matching those filters.':
-    'Ni {0} ni {1} han jugado singles de Melee en start.gg con esos filtros.',
-  '{0} hasn\'t played Melee singles on start.gg.': '{0} no ha jugado singles de Melee en start.gg.',
-  '{0} hasn\'t played Melee singles on start.gg matching those filters.': '{0} no ha jugado singles de Melee en start.gg con esos filtros.',
-  '\n-# Leave out `melee` for {0} odds': '\n-# Quita `melee` para ver las probabilidades en {0}',
+  'Neither {0} nor {1} has played {2} singles on start.gg.': 'Ni {0} ni {1} han jugado singles de {2} en start.gg.',
+  'Neither {0} nor {1} has played {2} singles on start.gg matching those filters.':
+    'Ni {0} ni {1} han jugado singles de {2} en start.gg con esos filtros.',
+  '{0} hasn\'t played {1} singles on start.gg.': '{0} no ha jugado singles de {1} en start.gg.',
+  '{0} hasn\'t played {1} singles on start.gg matching those filters.': '{0} no ha jugado singles de {1} en start.gg con esos filtros.',
+  'There\'s nothing on start.gg to go on for {0} and {1} in {2}.': 'start.gg no tiene nada con qué calcular {0} contra {1} en {2}.',
+  '\n-# Leave out `melee` for Ultimate odds': '\n-# Quita `melee` para ver las probabilidades en Ultimate',
+  '\n-# Add `melee:True` for Melee odds': '\n-# Agrega `melee:True` para ver las probabilidades en Melee',
   'Going through {0} and {1}\'s sets': 'Revisando los sets de {0} y {1}',
   'Going through {0} and {1}\'s sets for the full breakdown': 'Revisando los sets de {0} y {1} para el desglose completo',
   'Pick someone else. `/stats` is the one about you.': 'Elige a otra persona. `/stats` es el que habla de ti.',

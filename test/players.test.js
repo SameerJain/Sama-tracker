@@ -258,7 +258,7 @@ test('h2h and predict take a start.gg link or ID for either player', async () =>
 
   // /predict takes them the same way, even for someone with nothing linked
   const odds = await run('predict', 'stranger', { player: 'start.gg/user/other', opponent: 'start.gg/user/opponent' });
-  assert.match(odds.content, /Other and Opponent haven't played singles in the same game/);
+  assert.equal(odds.content, 'Neither Other nor Opponent has played Ultimate singles on start.gg.');
 });
 
 test('/link checks the discord on start.gg and does not track them', async () => {
@@ -776,6 +776,36 @@ test('/track list only notes what differs from a new player, then lists tracked 
   assert.equal(second, `[Weekly](https://www.start.gg/tournament/weekly) · <t:${now + 86400}:d> · match calls off · top 8s off`);
 });
 
+test('/t-o tournament list says what\'s going on now, where, and links each tournament\'s event and threads', () => {
+  const now = Math.floor(Date.now() / 1000);
+  const [card] = embeds.tournamentList({
+    5: {
+      id: 5, name: 'Weekly', slug: 'tournament/weekly', startAt: now + 86400, city: 'Buffalo', addrState: 'NY',
+      tracked: { by: 'manual', at: 0, posts: { top8: false }, schedule: [48, 6] }, images: [{ url: 'https://images.example/weekly.png' }],
+    },
+    6: { id: 6, name: 'Live', slug: 'tournament/live', startAt: now - 3600, endAt: now + 3600, isOnline: true, tracked: { by: 'manual', at: 0, posts: {} } },
+    7: { id: 7, name: 'Done', slug: 'tournament/done', startAt: now - 86400, resultsPosted: true, tracked: { by: 'manual', at: 0, posts: {} } },
+  }, {
+    now,
+    reminders: { 5: now + 3600 },
+    events: { 5: { eventId: 'event-5' }, 6: { eventId: 'event-6', gone: true } },
+    // one per event for the live one, keyed by event slugs that start with its own
+    threads: { 'tournament/live/event/singles': { id: 'thread-1' }, 'tournament/live/event/doubles': { id: 'thread-2' }, 'tournament/lively': { id: 'not-it' } },
+    guildId: 'server',
+  });
+  assert.equal(card.data.title, 'Tracked tournaments · 2');
+  assert.equal(card.data.thumbnail.url, 'https://images.example/weekly.png');
+  const [live, liveNotes, , weekly, weeklyNotes] = card.data.description.split('\n');
+  assert.equal(live, '**[Live](https://www.start.gg/tournament/live)**');
+  // the event a mod deleted isn't linked, and a slug that only starts the same isn't its thread
+  assert.equal(liveNotes, `Going on now, started <t:${now - 3600}:R> · Online · <#thread-1> · <#thread-2>`);
+  assert.equal(weekly, '**[Weekly](https://www.start.gg/tournament/weekly)**');
+  assert.equal(weeklyNotes, `<t:${now + 86400}:f> · <t:${now + 86400}:R> · Buffalo, NY · top 8s off · reminders 2d, 6h · next reminder <t:${now + 3600}:R> · [Discord event](https://discord.com/events/server/event-5)`);
+
+  const [empty] = embeds.tournamentList({}, { now });
+  assert.match(empty.data.description, /^None yet\. A TO can track one with `\/t-o tournament add`\./);
+});
+
 test('autocomplete puts recent picks first and matches names loosely', async () => {
   const { lookup, rememberPick } = await import('../src/commands/shared.js');
   const choicesFor = async (typed, discordId) => {
@@ -1157,4 +1187,31 @@ test('predict melee gives no such hint when the shared game is all DQs for one o
   });
   assert.equal((await run('predict', 'crew-discord', { opponent: '2', melee: true })).content,
     'Rival hasn\'t played Melee singles on start.gg.');
+});
+
+// fresh ids each, since the history caches outlive the test
+function predictPair(id, games) {
+  state.players = { [id]: { userId: id, playerId: id, tag: 'Crew', slug: `user/crew${id}`, discordId: 'crew-discord' }, [id + 1]: { userId: id + 1, playerId: id + 1, tag: 'Rival', slug: `user/rival${id}` } };
+  state.links = {};
+  const nodes = games.map((game, i) => predictNode(i + 1, game, [id, id + 1], i % 2 ? [0, 2] : [2, 0]));
+  mockApi(({ query }) => {
+    if (query.includes('user(id:')) return { user: { events: { pageInfo: { totalPages: 1 }, nodes: [] } } };
+    return { player: { sets: { pageInfo: { totalPages: 1 }, nodes } } };
+  });
+}
+
+test('predict sticks to Ultimate without melee, even for two who mostly play Melee', async () => {
+  predictPair(871, [MELEE, MELEE, MELEE, ULTIMATE]);
+  const ultimate = (await run('predict', 'crew-discord', { opponent: '872' })).embeds[0].data;
+  assert.match(ultimate.title, /Crew \d+% · \d+% Rival/);
+  assert.doesNotMatch(ultimate.author?.name ?? '', /Melee/);
+  const melee = (await run('predict', 'crew-discord', { opponent: '872', melee: true })).embeds[0].data;
+  assert.match(melee.author.name, /Melee/);
+});
+
+test('predict without melee names who has never played Ultimate and points at melee:True', async () => {
+  predictPair(881, [MELEE, MELEE]);
+  assert.equal((await run('predict', 'crew-discord', { opponent: '882' })).content,
+    'Neither Crew nor Rival has played Ultimate singles on start.gg.\n-# Add `melee:True` for Melee odds');
+  assert.match((await run('predict', 'crew-discord', { opponent: '882', melee: true })).embeds[0].data.title, /Crew \d+% · \d+% Rival/);
 });

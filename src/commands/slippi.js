@@ -39,49 +39,94 @@ function noCodeOnStartgg(player) {
   return t`Couldn't find a connect code on ${escapeMarkdown(player.tag)}'s start.gg. It's saved when you register for a netplay tournament that asks for one. Use \`code:\` instead, like \`/slippi add code:ABCD#123\`.`;
 }
 
-// whose watchlist entry this is: the start.gg player it came from, or whoever added their own code by hand.
-// a TO's typed code belongs to nobody
-function ownsEntry(interaction, entry) {
-  if (entry.discordId === interaction.user.id) return true;
-  const me = linkedPlayer(interaction.user.id);
-  return Boolean(me && entry.userId) && String(entry.userId) === String(me.userId);
+// whose watchlist entry this is: the start.gg player it came from, or whoever it was added as by hand.
+// a TO's typed code with nobody picked belongs to nobody
+function ownedBy(discordId, entry) {
+  if (entry.discordId === discordId) return true;
+  const linked = linkedPlayer(discordId);
+  return Boolean(linked && entry.userId) && String(entry.userId) === String(linked.userId);
 }
 
-// with the code left out, it's yours from start.gg. a code found there is tied to that start.gg player.
-// slippi can't tie a code to a discord, so a typed one goes on as whoever typed it, one each. TOs can add anyone
+const ownsEntry = (interaction, entry) => ownedBy(interaction.user.id, entry);
+
+// someone's own entry in this server, or with everywhere, one from another server when this one has none.
+// that's only read, for /slippi rank and /slippi add, so a code typed once finds you in every server
+function ownEntry(discordId, { everywhere = false } = {}) {
+  const here = Object.values(state.slippi).find((entry) => ownedBy(discordId, entry));
+  if (here || !everywhere) return here ?? null;
+  for (const server of Object.values(state.guilds ?? {})) {
+    const found = Object.values(server.slippi ?? {}).find((entry) => ownedBy(discordId, entry));
+    if (found) return found;
+  }
+  return null;
+}
+
+// with the code left out, it's from their start.gg, or the code they added in another server. a code found on
+// start.gg is tied to that start.gg player. slippi can't tie a code to a discord, so a typed one goes on as whoever
+// typed it, one each, or as the member a TO picks with user. a TO's typed code with nobody picked is nobody's,
+// since TOs add people who aren't in the server too
 async function slippiAdd(interaction) {
   const typed = interaction.options.getString('code');
   const code = typed && slippi.readCode(typed);
   if (typed && !code) return replyEphemeral(interaction, t(NOT_A_CODE));
-  const me = typed ? null : linkedPlayer(interaction.user.id);
-  if (!typed && !me) {
-    return replyEphemeral(interaction, t('Add a connect code, like `/slippi add code:ABCD#123`. Left out, it looks for yours on your start.gg, so `/link` that first.'));
+  const picked = interaction.options.getUser?.('user') ?? null;
+  if (picked?.bot) return replyEphemeral(interaction, t('Bots don\'t have connect codes.'));
+  const self = !picked || picked.id === interaction.user.id;
+  const to = isTO(interaction);
+  if (!self && !to) return notTO(interaction, t('add someone else to the watchlist. Leave out `user` to add yourself'));
+  const owner = picked ?? (typed && to ? null : interaction.user);
+  const who = picked && escapeMarkdown(interaction.options.getMember?.('user')?.displayName ?? picked.displayName ?? picked.username);
+  const player = !typed && linkedPlayer(owner.id);
+  const elsewhere = !typed && !player && ownEntry(owner.id, { everywhere: true });
+  if (!typed && !player && !elsewhere) {
+    return replyEphemeral(interaction, self
+      ? t('Add a connect code, like `/slippi add code:ABCD#123`. Left out, it looks for yours on your start.gg, so `/link` that first.')
+      : t`${who} isn't tracked or linked, so there's no start.gg to find a code on. Add theirs with \`code:\`.`);
   }
-  const claim = Boolean(typed) && !isTO(interaction);
-  const mine = claim && Object.values(state.slippi).find((each) => ownsEntry(interaction, each));
-  if (mine && mine.code !== code) {
-    return replyEphemeral(interaction, t`You're on the watchlist as ${escapeMarkdown(mine.name)} (${mine.code}). Only TOs can add someone else. \`/slippi remove\` takes you off first if your code changed.`);
+  const theirs = typed && owner && ownEntry(owner.id);
+  if (theirs && theirs.code !== code) {
+    const [name, onList] = [escapeMarkdown(theirs.name), theirs.code];
+    if (!self) return replyEphemeral(interaction, t`${who} is on the watchlist as ${name} (${onList}). \`/slippi remove\` takes them off first if their code changed.`);
+    return replyEphemeral(interaction, to
+      ? t`You're on the watchlist as ${name} (${onList}). \`/slippi remove\` takes you off first if your code changed.`
+      : t`You're on the watchlist as ${name} (${onList}). Only TOs can add someone else. \`/slippi remove\` takes you off first if your code changed.`);
   }
 
   await interaction.deferReply();
-  const found = code ?? await codeOnStartgg(me);
-  if (!found) return replyEphemeralAfterDefer(interaction, noCodeOnStartgg(me));
-  const profile = await slippi.getProfileByCode(found);
-  if (!profile) return replyEphemeralAfterDefer(interaction, t`Slippi has nobody with the code ${found}.`);
+  let profile;
+  const found = code ?? (player && await codeOnStartgg(player));
+  if (found) {
+    profile = await slippi.getProfileByCode(found);
+    if (!profile) return replyEphemeralAfterDefer(interaction, t`Slippi has nobody with the code ${found}.`);
+  } else if (elsewhere) {
+    profile = (await slippi.getProfiles([elsewhere.uid])).get(elsewhere.uid);
+    if (!profile) return replyEphemeralAfterDefer(interaction, t`Slippi doesn't have ${elsewhere.name} (${elsewhere.code}) anymore.`);
+  } else {
+    return replyEphemeralAfterDefer(interaction, noCodeOnStartgg(player));
+  }
 
   const existing = state.slippi[profile.uid];
   // the rank check moves an existing entry's numbers, so a rank change can't go unposted
   const entry = existing ?? slippiEntry(profile);
-  if (me) entry.userId = me.userId;
-  if (claim && !existing) entry.discordId = interaction.user.id;
+  if (player) entry.userId = player.userId;
+  // typing someone's code doesn't make it yours. one already on the list only changes hands when a TO says whose
+  // it is and nobody had it, which is how a TO's own typed code becomes theirs
+  const handed = owner && !player && (!existing || (to && picked && !existing.discordId && !existing.userId));
+  if (handed) entry.discordId = owner.id;
   state.slippi[profile.uid] = entry;
   state.slippiSkipped = state.slippiSkipped.filter((uid) => uid !== profile.uid);
   save();
 
   const name = escapeMarkdown(profile.name);
+  let content = t`Added ${name} to the Slippi watchlist. Their rank changes get posted here.`;
+  if (existing && handed) content = self ? t`${name} is on the Slippi watchlist as yours now.` : t`${name} is on the Slippi watchlist as ${who}'s now.`;
+  else if (existing) content = t`${name} is already on the Slippi watchlist.`;
+  if (to && !entry.discordId && !entry.userId) {
+    content += t('\n-# Not tied to anyone, so `/slippi rank` with `player` left out won\'t find them. Add `user:` to say whose code it is.');
+  }
   const { files, characterFile } = await slippi.slippiArt(profile);
   await interaction.editReply({
-    content: existing ? t`${name} is already on the Slippi watchlist.` : t`Added ${name} to the Slippi watchlist. Their rank changes get posted here.`,
+    content,
     embeds: embeds.slippiRank(profile, { entry, players: state.players, characterFile }),
     files,
     allowedMentions: { parse: [] },
@@ -113,17 +158,20 @@ function takeOff(interaction, entry) {
   return interaction.reply({ content: t`Took ${escapeMarkdown(entry.name)} (${entry.code}) off the Slippi watchlist.`, allowedMentions: { parse: [] } });
 }
 
-// someone on the watchlist, any connect code, or whoever ran it: their watchlist entry, or the code on their start.gg
+// someone on the watchlist, any connect code, or whoever ran it: the code they're on the watchlist with, here or in
+// another server, then the one on their start.gg
 async function slippiRank(interaction) {
   const typed = interaction.options.getString('player');
   const me = linkedPlayer(interaction.user.id);
-  let entry = typed ? watched(typed) : me && entryFor(me.userId);
+  const entry = typed ? watched(typed) : ownEntry(interaction.user.id, { everywhere: true });
   const code = typed && !entry ? slippi.readCode(typed) : null;
   if (typed && !entry && !code) {
     const near = nearestWatched(typed) || t(' Pick someone from the list, or type a connect code like ABCD#123.');
     return replyEphemeral(interaction, t`Nobody on the watchlist goes by that.${near}`);
   }
-  if (!typed && !entry && !me) return replyEphemeral(interaction, t('Pick someone, or `/link` your start.gg so leaving it out finds your connect code.'));
+  if (!typed && !entry && !me) {
+    return replyEphemeral(interaction, t('Pick someone, or add your code with `/slippi add code:ABCD#123` so leaving it out finds you.'));
+  }
 
   await interaction.deferReply();
   let profile;
@@ -132,17 +180,19 @@ async function slippiRank(interaction) {
     if (!profile) return replyEphemeralAfterDefer(interaction, t`Slippi doesn't have ${entry.name} (${entry.code}) anymore.`);
   } else {
     const found = code ?? await codeOnStartgg(me);
-    if (!found) return replyEphemeralAfterDefer(interaction, noCodeOnStartgg(me));
+    if (!found) {
+      return replyEphemeralAfterDefer(interaction, t`Couldn't find a connect code on ${escapeMarkdown(me.tag)}'s start.gg. Add yours with \`/slippi add code:ABCD#123\` and leaving \`player\` out finds it after that.`);
+    }
     profile = await slippi.getProfileByCode(found);
     if (!profile) {
       const near = typed ? nearestWatched(found) : '';
       return replyEphemeralAfterDefer(interaction, t`Slippi has nobody with the code ${found}.${near}`);
     }
-    // on the watchlist under a code they've since changed
-    entry = state.slippi[profile.uid] ?? null;
   }
+  // the card says whether they're on this server's watchlist, which yours might not be, or might be under an old code
+  const listed = state.slippi[profile.uid] ?? null;
   const { files, characterFile } = await slippi.slippiArt(profile);
-  return sendEmbeds(interaction, embeds.slippiRank(profile, { entry, players: state.players, characterFile }), [], files);
+  return sendEmbeds(interaction, embeds.slippiRank(profile, { entry: listed, players: state.players, characterFile }), [], files);
 }
 
 // the leader's rank badge goes with it, or the slippi logo when the watchlist is empty

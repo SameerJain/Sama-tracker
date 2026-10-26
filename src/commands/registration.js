@@ -5,12 +5,28 @@ import { state, save } from '../store.js';
 import { RUNS_LATE_HOURS, endTime, regDeadline, secondsNow } from '../tracker.js';
 import { rememberAccounts, serverMembers } from '../accounts.js';
 import { replyEphemeral, replyEphemeralAfterDefer, sendEmbeds, flag, t, listOf } from './shared.js';
+import { isTO } from './to.js';
 
 // /bracket shows a tournament this long before it starts
 const BRACKET_MINUTES_BEFORE = 30;
 
 // /reg_warn pings someone once per tournament in this long
 const REG_WARN_COOLDOWN_HOURS = 12;
+// warnings one person can send in a day, so /reg_warn can't be used to ping people over and over. TOs aren't
+// held to it, since nudging people to register is part of running a tournament
+const REG_WARNS_PER_DAY = 10;
+const DAY = 24 * 60 * 60;
+
+// the warnings this person sent in the last day, oldest first. ones saved before `by` existed don't count
+const sentToday = (discordId, now) => state.regWarned.filter((each) => each.by === discordId && each.at > now - DAY);
+
+// null when they can send another, otherwise the reply saying when
+function overDailyCap(interaction, now = secondsNow()) {
+  if (isTO(interaction)) return null;
+  const sent = sentToday(interaction.user.id, now);
+  if (sent.length < REG_WARNS_PER_DAY) return null;
+  return t`You've sent ${REG_WARNS_PER_DAY} registration warnings in the last day, the most anyone but a TO can. You can send another <t:${sent[0].at + DAY}:R>.`;
+}
 
 // start.gg/tournament/genesis-x/details, a short link like start.gg/genesis, or just the slug
 function tournamentSlug(input) {
@@ -130,6 +146,9 @@ async function regWarn(interaction) {
   const input = interaction.options.getString('tournament', true).trim();
   const user = interaction.options.getUser('user', true);
   if (user.bot) return replyEphemeral(interaction, t('Bots don\'t need to register.'));
+  // before anything asks start.gg, so someone at their cap costs nothing
+  const capped = overDailyCap(interaction);
+  if (capped) return replyEphemeral(interaction, capped);
 
   await interaction.deferReply();
   const tournament = await startgg.getRegistration(tournamentSlug(input));
@@ -147,15 +166,18 @@ async function regWarn(interaction) {
   // not on a hidden list means nothing, so no warning
   if (startgg.attendeesHidden(tournament, participants)) return say(t`start.gg hides who's registered for ${title}, so there's no telling if they are. No warning sent.`);
   // two people warning the same person about the same tournament is one too many. checked last, with nothing
-  // awaited before it's saved, so two at once can't both get through
+  // awaited before it's saved, so two at once can't both get through. the daily cap gets checked again here for
+  // the same reason, since someone's second /reg_warn can pass the first check while the first one is looking up
   const now = secondsNow();
-  state.regWarned = state.regWarned.filter((each) => each.at > now - REG_WARN_COOLDOWN_HOURS * 60 * 60);
-  const earlier = state.regWarned.find((each) => String(each.tournamentId) === String(tournament.id) && each.discordId === user.id);
+  const cooldown = REG_WARN_COOLDOWN_HOURS * 60 * 60;
+  state.regWarned = state.regWarned.filter((each) => each.at > now - Math.max(cooldown, DAY));
+  const earlier = state.regWarned.find((each) => String(each.tournamentId) === String(tournament.id) && each.discordId === user.id && each.at > now - cooldown);
   if (earlier) {
-    const again = earlier.at + REG_WARN_COOLDOWN_HOURS * 60 * 60;
-    return replyEphemeralAfterDefer(interaction, t`${name} was already warned about ${title} <t:${earlier.at}:R>. They can be warned again <t:${again}:R>.`);
+    return replyEphemeralAfterDefer(interaction, t`${name} was already warned about ${title} <t:${earlier.at}:R>. They can be warned again <t:${earlier.at + cooldown}:R>.`);
   }
-  state.regWarned = [...state.regWarned, { tournamentId: tournament.id, discordId: user.id, at: now }].slice(-200);
+  const stillCapped = overDailyCap(interaction, now);
+  if (stillCapped) return replyEphemeralAfterDefer(interaction, stillCapped);
+  state.regWarned = [...state.regWarned, { tournamentId: tournament.id, discordId: user.id, by: interaction.user.id, at: now }].slice(-200);
   save();
 
   // editing the reply wouldn't ping them, and a follow-up shows "Original message was deleted"

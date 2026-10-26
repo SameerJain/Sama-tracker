@@ -280,6 +280,67 @@ test('anyone can put their own code on the slippi watchlist and take it off, and
   assert.deepEqual(state.slippi, {});
 });
 
+// the rank card that went out, as text
+const rankCard = (calls) => JSON.stringify(calls.findLast(([kind]) => kind === 'edit' || kind === 'followUp')[1].embeds);
+
+test('/slippi rank with player left out finds the code you typed in, not just the one on start.gg', async () => {
+  assert.match(said(await run('slippi', 'fan-discord', { subcommand: 'add', values: { code: 'FAN#1' } })).content, /^Added FAN/);
+  // not linked and not tracked, so this used to ask for /link
+  assert.match(rankCard(await run('slippi', 'fan-discord', { subcommand: 'rank' })), /FAN · FAN#1/);
+  assert.deepEqual(said(await run('slippi', 'other-discord', { subcommand: 'rank' })), {
+    content: 'Pick someone, or add your code with `/slippi add code:ABCD#123` so leaving it out finds you.', private: true,
+  });
+});
+
+test('a TO says whose code it is with user, themselves included, and an untied one says so', async () => {
+  roles.set('to-role', { id: 'to-role', name: 'TO' });
+  members.set('to-discord', member('to-discord', { roles: ['to-role'] }));
+  const untied = said(await run('slippi', 'to-discord', { subcommand: 'add', values: { code: 'OTHER#2' } })).content;
+  assert.match(untied, /^Added OTHER to the Slippi watchlist\..*\n-# Not tied to anyone/s);
+  assert.equal(state.slippi['uid-1'].discordId, undefined);
+  // the screenshot case: a TO who added their own code that way, then claims it
+  const me = member('to-discord', { roles: ['to-role'] });
+  const claimed = said(await run('slippi', 'to-discord', { subcommand: 'add', values: { code: 'OTHER#2' }, picked: me })).content;
+  assert.equal(claimed, 'OTHER is on the Slippi watchlist as yours now.');
+  assert.equal(state.slippi['uid-1'].discordId, 'to-discord');
+  assert.match(rankCard(await run('slippi', 'to-discord', { subcommand: 'rank' })), /OTHER · OTHER#2/);
+
+  // someone else's, picked by a TO
+  const fan = member('fan-discord');
+  assert.match(said(await run('slippi', 'to-discord', { subcommand: 'add', values: { code: 'FAN#1' }, picked: fan })).content, /^Added FAN/);
+  assert.equal(state.slippi['uid-0'].discordId, 'fan-discord');
+  // and that stays theirs: a second code for them gets turned down
+  delete state.slippi['uid-1'];
+  assert.deepEqual(said(await run('slippi', 'to-discord', { subcommand: 'add', values: { code: 'OTHER#2' }, picked: fan })), {
+    content: 'fan is on the watchlist as FAN (FAN#1). `/slippi remove` takes them off first if their code changed.', private: true,
+  });
+});
+
+test('only a TO can pick someone else for /slippi add, and typing a listed code never makes it yours', async () => {
+  roles.set('to-role', { id: 'to-role', name: 'TO' });
+  assert.deepEqual(said(await run('slippi', 'fan-discord', { subcommand: 'add', values: { code: 'OTHER#2' }, picked: member('other-discord') })), {
+    content: 'Only TOs can add someone else to the watchlist. Leave out `user` to add yourself. `/t-o role list` shows who they are.', private: true,
+  });
+  assert.deepEqual(state.slippi, {});
+  state.slippi = { 'uid-1': { uid: 'uid-1', code: 'OTHER#2', name: 'OTHER', rank: 'Gold 1' } };
+  assert.match(said(await run('slippi', 'fan-discord', { subcommand: 'add', values: { code: 'OTHER#2' } })).content, /^OTHER is already on the Slippi watchlist\.$/);
+  assert.equal(state.slippi['uid-1'].discordId, undefined);
+  assert.deepEqual(said(await run('slippi', 'fan-discord', { subcommand: 'add', values: { code: 'X#1' }, picked: { id: 'bot', bot: true } })), {
+    content: 'Bots don\'t have connect codes.', private: true,
+  });
+});
+
+test('a code added in another server finds you in this one, for /slippi rank and /slippi add', async () => {
+  state.guilds['other-server'] = { slippi: { 'uid-0': { uid: 'uid-0', code: 'FAN#1', name: 'FAN', discordId: 'fan-discord', rank: 'Gold 1' } } };
+  try {
+    assert.match(rankCard(await run('slippi', 'fan-discord', { subcommand: 'rank' })), /FAN · FAN#1.*Not on the watchlist/);
+    assert.match(said(await run('slippi', 'fan-discord', { subcommand: 'add' })).content, /^Added FAN to the Slippi watchlist/);
+    assert.equal(state.slippi['uid-0'].discordId, 'fan-discord');
+  } finally {
+    delete state.guilds['other-server'];
+  }
+});
+
 test('a watchlist entry found on someone\'s start.gg is theirs to take off', async () => {
   roles.set('to-role', { id: 'to-role', name: 'TO' });
   state.players = { 1: { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew', discordId: 'crew-discord' } };

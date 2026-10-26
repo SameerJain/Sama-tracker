@@ -321,22 +321,38 @@ test('a pinned starter is unpinned once its tournament is over', async () => {
   assert.deepEqual(channel.unpinned, ['card-1']);
 });
 
-test('a pinned event starter is unpinned once its event is over', async () => {
+test('every event\'s starter stays pinned until the tournament is over, then they all come off', async () => {
   state.messages = { threads: 'event' };
   const channel = fakeChannel();
-  sets = [node('a1', now() - 30, tournament('Local'))];
+  sets = [node('s1', now() - 30, tournament('Local')), node('d1', now() - 20, tournament('Local'), 3, 'Doubles')];
   await tracker.postNewSets(channel);
-  const entry = state.threads['tournament/local/event/singles'];
-  assert.equal(entry.pinned, true);
+  const singles = state.threads['tournament/local/event/singles'];
+  const doubles = state.threads['tournament/local/event/doubles'];
+  assert.equal(singles.pinned, true);
+  assert.equal(doubles.pinned, true);
+  assert.equal(channel.pinned.length, 2);
 
+  // singles finishing used to unpin its card while doubles was still going, so the pin seemed to move between them
   state.tournaments = { 5: trackedLocal() };
-  await tracker.unpinFinishedThreads(channel);
-  assert.equal(entry.pinned, true);
-
   state.tournaments[5].events[0].state = 'COMPLETED';
   await tracker.unpinFinishedThreads(channel);
-  assert.equal(entry.pinned, false);
-  assert.deepEqual(channel.unpinned, ['card-1']);
+  assert.equal(singles.pinned, true);
+  assert.equal(doubles.pinned, true);
+  assert.deepEqual(channel.unpinned, []);
+
+  // a second tournament's cards go up next to them without taking either down
+  sets = [node('w1', now() - 10, tournament('Weekly'))];
+  await tracker.postNewSets(channel);
+  assert.equal(state.threads['tournament/weekly/event/singles'].pinned, true);
+  assert.equal(channel.pinned.length, 3);
+  assert.deepEqual(channel.unpinned, []);
+
+  state.tournaments[5].resultsPosted = true;
+  await tracker.unpinFinishedThreads(channel);
+  assert.equal(singles.pinned, false);
+  assert.equal(doubles.pinned, false);
+  assert.equal(state.threads['tournament/weekly/event/singles'].pinned, true);
+  assert.deepEqual(channel.unpinned.toSorted(), [singles.messageId, doubles.messageId].toSorted());
 });
 
 test('deleting a tournament unpins its event starters too', async () => {

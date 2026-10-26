@@ -3,6 +3,7 @@ import { startggUrl } from '../startgg.js';
 import { isMultiGuild } from '../store.js';
 import { postsOn } from '../message-settings.js';
 import { colors, FOOTER, baseEmbed, shortSchedule, withLines, withSections, playerLink, count, t } from './shared.js';
+import { locationText } from './tournaments.js';
 
 // kinds a tracked tournament can have off, named for the list. each follows /t-o settings until a TO overrides it.
 // a custom reminder schedule shows with it, so TOs can see which tournaments don't use the default
@@ -10,6 +11,49 @@ const TOURNAMENT_OFF = {
   sets: () => t('sets off'), streams: () => t('stream alerts off'), calls: () => t('match calls off'), next: () => t('next opponents off'),
   top8: () => t('top 8s off'), registration: () => t('reg reminders off'),
 };
+
+// tracked tournaments that aren't over, soonest first
+function stillTracked(tournaments) {
+  return Object.values(tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted)
+    .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
+}
+
+// what a tracked tournament has off, and its own reminder times. only what's off, since everything starts on
+function offNotes(tournament) {
+  const notes = Object.entries(TOURNAMENT_OFF).filter(([name]) => !postsOn(name, tournament)).map(([, note]) => note());
+  if (postsOn('registration', tournament) && Array.isArray(tournament.tracked.schedule)) {
+    notes.push(t`reminders ${shortSchedule(tournament.tracked.schedule)}`);
+  }
+  return notes;
+}
+
+// /t-o tournament list: each tracked tournament with when and where, what it has off, its next reg reminder, and
+// its Discord event and threads once it has them. /track list has the one-line version under the players.
+// reminders are next reminder times by tournament id, events are state.discordEvents and threads state.threads
+export function tournamentList(tournaments, { now, reminders = {}, events = {}, threads = {}, guildId = null } = {}) {
+  const tracked = stillTracked(tournaments);
+  const lines = tracked.flatMap((tournament) => {
+    const { startAt, endAt, slug } = tournament;
+    const live = Boolean(startAt) && startAt <= now && now < (endAt ?? Infinity);
+    let when = `<t:${startAt}:f> · <t:${startAt}:R>`;
+    if (!startAt) when = t('No start time yet');
+    else if (live) when = t`Going on now, started <t:${startAt}:R>`;
+    const notes = [when, locationText(tournament), ...offNotes(tournament)];
+    if (reminders[tournament.id]) notes.push(t`next reminder <t:${reminders[tournament.id]}:R>`);
+    const event = events[tournament.id];
+    if (guildId && event?.eventId && !event.gone) notes.push(`[${t('Discord event')}](https://discord.com/events/${guildId}/${event.eventId})`);
+    // its own thread, or one per event, whose slugs start with the tournament's
+    const own = Object.entries(threads).filter(([key, thread]) => thread?.id && (key === slug || key.startsWith(`${slug}/`)));
+    notes.push(...own.map(([, thread]) => `<#${thread.id}>`));
+    return [`**[${escapeMarkdown(tournament.name)}](${startggUrl(slug)})**`, notes.join(' · '), ''];
+  });
+  if (!tracked.length) lines.push(t('None yet. A TO can track one with `/t-o tournament add`.'), '');
+  lines.push(t('-# Each follows /t-o settings until a TO changes it with `/t-o tournament posts`. Only what is off shows here'));
+  const embed = baseEmbed(colors.brand).setTitle(t`Tracked tournaments · ${tracked.length}`);
+  const image = tracked.find((tournament) => tournament.images?.[0]?.url)?.images[0].url;
+  if (image) embed.setThumbnail(image);
+  return withLines(embed, lines);
+}
 
 // tracked players, then tracked tournaments that aren't over. linked is how many people linked their own start.gg without being tracked
 export function trackedList(players, linked = 0, tournaments = {}) {
@@ -24,19 +68,13 @@ export function trackedList(players, linked = 0, tournaments = {}) {
   lines.push('', t('-# Their placements get posted here, plus their sets and streams once `/track posts` turns them on. Anyone can track or untrack themselves, and TOs can do it for anyone. Players with no reported sets in 6 months come off the list on their own, and `/t-o cleanup` untracks anyone whose start.gg Discord isn\'t in this server. `/link` your own start.gg instead to use the lookups without being posted'));
   if (linked) lines.push(t`-# ${count(linked, 'more person', 'more people')} linked, for lookups only`);
 
-  // only what's off, since everything starts on
-  const tracked = Object.values(tournaments).filter((tournament) => tournament.tracked && !tournament.resultsPosted)
-    .sort((a, b) => (a.startAt ?? Infinity) - (b.startAt ?? Infinity));
+  const tracked = stillTracked(tournaments);
   const tournamentLines = tracked.map((tournament) => {
-    const notes = Object.entries(TOURNAMENT_OFF).filter(([name]) => !postsOn(name, tournament)).map(([, note]) => note());
-    if (postsOn('registration', tournament) && Array.isArray(tournament.tracked.schedule)) {
-      notes.push(t`reminders ${shortSchedule(tournament.tracked.schedule)}`);
-    }
     const when = tournament.startAt ? ` · <t:${tournament.startAt}:d>` : '';
-    return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${notes.map((note) => ` · ${note}`).join('')}`;
+    return `[${escapeMarkdown(tournament.name)}](${startggUrl(tournament.slug)})${when}${offNotes(tournament).map((note) => ` · ${note}`).join('')}`;
   });
   if (!tracked.length) tournamentLines.push(t('None yet. A TO can track one with `/t-o tournament add`.'));
-  tournamentLines.push('', t('-# Each follows /t-o settings until a TO changes it with `/t-o tournament posts`. Only what is off shows here'));
+  tournamentLines.push('', t('-# Each follows /t-o settings until a TO changes it with `/t-o tournament posts`. Only what is off shows here. `/t-o tournament list` has more on each'));
   return [...withLines(embed, lines), ...withLines(baseEmbed(colors.brand).setTitle(t`Tracked tournaments · ${tracked.length}`), tournamentLines)];
 }
 
@@ -224,7 +262,7 @@ export function help(verbose = false) {
     ],
     [
       t('**TO settings**'),
-      t('`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule, language and which channels commands work in'),
+      t('`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule, language and which channels commands work in. Turning off two or more posts at once asks first'),
       ...(isMultiGuild() ? [t('`channel:` picks where automatic posts go and checks the bot can post there')] : []),
       t('-# Leave every option blank to see the current settings. Only TOs can change them'),
     ],
@@ -257,7 +295,7 @@ export function help(verbose = false) {
     [
       t('**Matchmaking**'),
       t('`/matchmaking role` get the Ultimate or Melee Matchmaking role with `game:`, or take it off if you have it. `duration:` keeps it for that many hours, like 2 or 0.5 for 30 minutes, then it comes off on its own'),
-      t('`/matchmaking search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them, named like `Melee:Sam (10/21)`. Only people with the role can'),
+      t('`/matchmaking search` ping that role to find games. `message:` says what you want, like your connect code. `thread:True` starts a thread to arrange them, named like `Melee:Sam (10/21)`. Only people with the role can, once every 10 minutes per game'),
       t('`/matchmaking channel` where a game\'s searches post with `game:` and `channel:`. TOs only to change it, anyone can look. Left out means wherever the command runs. `clear:True` goes back to that'),
       t('-# Anyone can @ the roles without the commands too. The bot makes each one the first time someone asks for it'),
     ],
@@ -272,7 +310,7 @@ export function help(verbose = false) {
       t('`/stats` set record, placements and best upset'),
       t('`/doubles` one player\'s 2v2 record, partners and placements'),
       t('`/h2h` record against someone, with one-line odds'),
-      t('`/predict` odds of beating someone, and why. `verbose:True` is the full breakdown, with how much each part counts and bars'),
+      t('`/predict` odds of beating someone in Ultimate, or Melee with `melee:True`, and why. `verbose:True` is the full breakdown, with how much each part counts and bars'),
       t('`/scout` an opponent\'s form, how often they win game 3 and game 5 in Ultimate, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg'),
       t('`/progress` last 30 days vs the 30 before, by game'),
       t('`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more'),
@@ -286,9 +324,9 @@ export function help(verbose = false) {
     ],
     [
       t('**Slippi ranked**'),
-      t('`/slippi add` add your connect code to the watchlist, or leave it out to find yours on your start.gg. TOs can add anyone\'s'),
+      t('`/slippi add` add your connect code to the watchlist, or leave it out to find yours on your start.gg. TOs can add anyone\'s, and `user:` says whose it is'),
       t('`/slippi remove` take yourself off the watchlist, or anyone if you\'re a TO'),
-      t('`/slippi rank` rank, rating, record, characters and past seasons. Takes any connect code'),
+      t('`/slippi rank` rank, rating, record, characters and past seasons. Takes any connect code, and left out finds the code you added in any server'),
       t('`/slippi leaderboard` everyone on the watchlist, best rank first'),
       t('-# Cards show the rank badge and their most played character. Tracked players get added on their own once their code turns up in a start.gg netplay registration. Ranks come from slippi.gg, which has no public API, so this can break if Slippi changes it'),
     ],
@@ -298,11 +336,12 @@ export function help(verbose = false) {
       t('`/t-o tournament remove` stop tracking one. Asks first, then Undo puts it back for a minute'),
       t('`/t-o tournament posts` one tracked tournament\'s sets, streams, calls, next opponents, top 8s and registration on or off. `default` follows `/t-o settings` again. `schedule:` changes the reminder times, `schedule:default` goes back to the usual four'),
       t('`/registered` who here is registered, by name so nobody gets pinged. `by_event:True` groups it by event'),
-      t('`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours'),
+      t('`/reg_warn` warn someone who isn\'t registered yet. If they are, it just says so. Once per person per tournament in 12 hours, and 10 a day from anyone but a TO'),
       t('`/bracket` bracket links for tracked tournaments, 30 min before the start to 6 hours after the end'),
       t('`/stream_link` stream links for tournaments that are tracked or have tracked players, live or starting within 30 min'),
       t('`/t-o tournament event` make a Discord event from a start.gg link, without tracking it. Its streams go in the description'),
-      t('-# `/t-o tournament` is TOs only. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time, end time, cover photo, place and streams, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map'),
+      t('`/t-o tournament list` every tracked tournament, when and where, what it has off, its next reminder, and its Discord event and threads. Anyone can look'),
+      t('-# `/t-o tournament` is TOs only, other than `list`. `tournament:` takes a link or one the bot knows. Discord events follow start.gg\'s time, end time, cover photo, place and streams, checked hourly, and get cancelled if the tournament is deleted there. Cards and DMs show the venue\'s address when the TO put it on start.gg, linked to a map'),
     ],
     [
       t('**Fun**'),
@@ -329,7 +368,7 @@ export function help(verbose = false) {
       t('**Registration reminders.** Tracked tournaments 7 days, 3 days and a day out, then a last call 6 hours before, pinging the Reg Reminders role, unless a TO sets custom times with `schedule:`. `dm_registration` DMs you 1 hour before registration closes, skipped once you\'re registered, and `dm_start` DMs you 1 hour before the start, both only while you\'re in this server. When registration closes within an hour of the start there\'s one DM, the start one'),
       t('**Discord events.** Each upcoming tracked tournament gets a Discord event with start.gg\'s cover photo and streams in the description, once. Off unless `/t-o settings events` turns it on'),
       t('-# Set results, stream alerts, match calls, next opponents, top 8s and registration reminders follow `/t-o settings` at every tournament, and `/t-o tournament posts` turns them on or off for one. Off means none of those cards from it and no pings. Live ones still going on post when turned back on'),
-      t('-# Tracked tournaments post their set results, stream alerts, match calls and next opponents in a thread. `/t-o settings threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament or event ends. If a thread can\'t be used, they post here'),
+      t('-# Tracked tournaments post their set results, stream alerts, match calls and next opponents in a thread. `/t-o settings threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament ends. If a thread can\'t be used, they post here'),
     ],
     [
       t('**Posted here automatically**'),

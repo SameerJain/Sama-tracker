@@ -22,7 +22,7 @@ function timeText(seconds) {
 
 // the venue and its street address when the TO put them on start.gg, linked to a map, otherwise the city.
 // brackets come out of the link text so a venue name can't break the link
-function locationText(tournament) {
+export function locationText(tournament) {
   if (tournament.isOnline) return t('Online');
   const place = [tournament.city, tournament.addrState].filter(Boolean).join(', ');
   const venue = venueText(tournament);

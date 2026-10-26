@@ -9,7 +9,7 @@ const directory = mkdtempSync(join(tmpdir(), 'sama-dm-'));
 process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
-const { state } = await import('../src/store.js');
+const { state, guildLocal } = await import('../src/store.js');
 const tracker = await import('../src/tracker.js');
 const embeds = await import('../src/embeds/index.js');
 const startgg = await import('../src/startgg.js');
@@ -65,6 +65,7 @@ function reset() {
   state.startDmPings = [];
   state.messages = {};
   state.accounts = {};
+  state.dmsSent = [];
 }
 
 test('startReminder has the tournament image, link, time and location', () => {
@@ -430,4 +431,42 @@ test('someone who leaves while start.gg answers gets no DM', async () => {
   await tracker.postDmReminders(dmChannel(sent, inServer));
   assert.deepEqual(sent.map((each) => each.to), ['stays']);
   assert.equal(state.tournaments[1].dmStartSentFor, now + 1800);
+});
+
+test('someone in two servers that track the same tournament gets each DM once', async () => {
+  reset();
+  const now = Math.floor(Date.now() / 1000);
+  const startAt = now + 1800;
+  const local = () => ({
+    1: { id: 1, name: 'Local', slug: 'tournament/local', startAt, endAt: startAt + 3600, entries: [], userIds: [], tracked: { ...tracked }, reminder: {} },
+  });
+  const latest = (start) => ({
+    tournament: {
+      id: 1, name: 'Local', slug: 'tournament/local', startAt: start, endAt: start + 3600,
+      registrationClosesAt: start, isRegistrationOpen: true, images, numAttendees: 5, events: [],
+      city: 'Buffalo', addrState: 'NY', isOnline: false,
+    },
+  });
+  mockApi(() => latest(startAt));
+  const sent = [];
+  for (const server of ['server-a', 'server-b']) {
+    await guildLocal.run(server, async () => {
+      state.startDmPings = ['fan', `only-${server}`];
+      state.tournaments = local();
+      await tracker.postDmReminders(dmChannel(sent));
+    });
+  }
+  assert.deepEqual(sent.map((each) => each.to).sort(), ['fan', 'only-server-a', 'only-server-b']);
+
+  // a TO moving the start makes it a new DM, from whichever server sees it first
+  const moved = startAt + 600;
+  mockApi(() => latest(moved));
+  const again = [];
+  for (const server of ['server-b', 'server-a']) {
+    await guildLocal.run(server, async () => {
+      state.tournaments[1].startAt = moved;
+      await tracker.postDmReminders(dmChannel(again));
+    });
+  }
+  assert.deepEqual(again.map((each) => each.to).sort(), ['fan', 'only-server-a', 'only-server-b']);
 });

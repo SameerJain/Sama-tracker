@@ -9,7 +9,8 @@ const UNDO_SECONDS = 60;
 // nothing but a button's id, so it's choice:kind:target:discordId, with discordId whoever ran the command,
 // the only one who can press it. each kind is set up with confirmable by the module whose command it is:
 //   command: the command, for telling anyone else who presses it
-//   run(target): makes the change, returning { content } and undo, what was removed, when it can be put back
+//   run(target, press): makes the change, returning { content } and undo, what was removed, when it can be put back.
+//     press is the button interaction, for anything that needs its server
 //   cancel(target): the reply when they press Cancel
 //   undo(record, discordId): puts record back, returning the reply
 //   tooLate(): the reply when Undo is pressed after the minute
@@ -80,7 +81,7 @@ async function handleChoice(interaction) {
     if (confirming.has(key)) return replyEphemeral(interaction, t('Already on it, one press is enough.'));
     confirming.add(key);
     try {
-      const { content, undo } = spec.run(target);
+      const { content, undo } = spec.run(target, interaction);
       return await interaction.update({ content, components: undo ? undoRow(interaction, kind, target, undo) : [], allowedMentions: { parse: [] } });
     } finally {
       confirming.delete(key);

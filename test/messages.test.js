@@ -94,7 +94,9 @@ test('only TOs can change the server language', async () => {
 test('message switches and recap schedule save immediately and answer where everyone sees them', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
-  await configure({ sets: false, streams: false });
+  // one at a time, since two at once asks first
+  await configure({ sets: false });
+  await configure({ streams: false });
   const reply = await configure({ day: 0, time: '18:30', timezone: 'America/Los_Angeles' });
   assert.equal(reply.flags, undefined);
   assert.deepEqual(reply.allowedMentions, { parse: [] });
@@ -211,10 +213,10 @@ test('the recap timezone suggests the usual zones, then any zone with what was t
   assert.equal((await suggest('a')).length, 25);
 });
 
-test('threads footnote says each thread pins its card until the tournament or event ends', async () => {
+test('threads footnote says each thread pins its card until the tournament ends', async () => {
   state.messages = {};
   const reply = await configure();
-  assert.match(reply.content, /Each thread pins its channel card until the tournament or event ends/);
+  assert.match(reply.content, /Each thread pins its channel card until the tournament ends\./);
 });
 
 test('message timezone labels follow daylight saving', async (t) => {

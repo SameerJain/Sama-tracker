@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import http from 'node:http';
+import net from 'node:net';
 
 const directory = mkdtempSync(join(tmpdir(), 'sama-health-'));
 process.env.STATE_DIR = directory;
@@ -44,6 +45,30 @@ test('the health endpoint answers 503 while starting and 200 once ready', async 
   assert.deepEqual(await get(port, '/health'), { status: 200, body: { status: 'ok' } });
   await stopHealth();
   setHealthReady(false);
+});
+
+// a raw request, since fetch won't send a path this broken. node's URL parser throws on //[, and a throw in the
+// handler used to crash the whole bot from anyone who could reach the port
+function rawGet(port, path) {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect(port, '127.0.0.1', () => socket.write(`GET ${path} HTTP/1.1\r\nHost: bot\r\nConnection: close\r\n\r\n`));
+    let reply = '';
+    socket.on('data', (chunk) => { reply += chunk; });
+    socket.on('end', () => resolve(reply.split('\r\n')[0]));
+    socket.on('error', reject);
+  });
+}
+
+test('broken request paths get a 404 instead of taking the bot down', async () => {
+  const server = startHealth(0);
+  await new Promise((resolve) => server.on('listening', resolve));
+  const { port } = server.address();
+  setHealthReady(true);
+  for (const path of ['//[', '//a:b@[x', '//%zz', '/../../etc/passwd']) assert.equal(await rawGet(port, path), 'HTTP/1.1 404 Not Found', path);
+  // still answering, and a query string doesn't hide the health check
+  assert.deepEqual(await get(port, '/health?from=railway'), { status: 200, body: { status: 'ok' } });
+  setHealthReady(false);
+  await stopHealth();
 });
 
 test('a taken port logs and leaves the bot running instead of crashing', async (t) => {

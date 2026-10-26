@@ -7,6 +7,7 @@ import * as embeds from '../embeds/index.js';
 import { split } from '../embeds/shared.js';
 import { state, save } from '../store.js';
 import { ApiError } from '../errors.js';
+import { linkedElsewhere } from '../accounts.js';
 import { t, count, listOf, language } from '../i18n.js';
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
@@ -70,11 +71,15 @@ function nameMatches(name, typed, { start = false } = {}) {
   return start ? have.startsWith(want) : have.includes(want);
 }
 
-// from /link, or the tracked player whose start.gg has this discord connected
+// from /link, or the tracked player whose start.gg has this discord connected, in this server and then any other
 function linkedPlayer(discordId) {
   const linked = state.links[discordId];
   if (linked) return state.players[linked.userId] ?? linked;
-  return Object.values(state.players).find((player) => player.discordId === discordId);
+  const tracked = Object.values(state.players).find((player) => player.discordId === discordId);
+  if (tracked) return tracked;
+  // linked or tracked in another server only, which used to leave them unknown in every server but that one
+  const elsewhere = linkedElsewhere(discordId);
+  return elsewhere ? state.players[elsewhere.userId] ?? elsewhere : undefined;
 }
 
 // whether a tracked or linked player is whoever ran the command: their /link, or the discord on their start.gg.
