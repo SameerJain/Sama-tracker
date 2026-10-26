@@ -109,8 +109,8 @@ export default {
   '`/h2h` record against someone, with one-line odds': '`/h2h` historial contra alguien, con las probabilidades en una línea',
   '`/predict` odds of beating someone, and why. `verbose:True` is the full breakdown, with how much each part counts and bars':
     '`/predict` probabilidades de ganarle a alguien, y por qué. `verbose:True` es el desglose completo, con cuánto cuenta cada parte y barras',
-  '`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg':
-    '`/scout` la forma de un rival, sus rivales más difíciles y peores matchups. Necesita que estés seguido o vinculado, con Discord conectado en start.gg',
+  '`/scout` an opponent\'s form, how often they win game 3 and game 5 in Ultimate, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg':
+    '`/scout` la forma de un rival, cuánto gana la partida 3 y la partida 5 en Ultimate, sus rivales más difíciles y peores matchups. Necesita que estés seguido o vinculado, con Discord conectado en start.gg',
   '`/progress` last 30 days vs the 30 before, by game': '`/progress` últimos 30 días contra los 30 anteriores, por juego',
   '`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more':
     '`/characters` personajes reportados. `game:` Ultimate o Melee; si lo dejas vacío, el que tenga más',

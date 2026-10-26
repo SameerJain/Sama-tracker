@@ -1,5 +1,5 @@
 import { escapeMarkdown } from 'discord.js';
-import { singles, startggUrl } from '../startgg.js';
+import { ULTIMATE, singles, startggUrl } from '../startgg.js';
 import { characterUsageByGame, leans } from '../characters.js';
 import { lifetimeStats } from './stats.js';
 import { chancePercent, commonOpponentLines } from './players.js';
@@ -38,6 +38,36 @@ function formLines(played, verbose = false) {
     const lately = list.filter(({ set }) => set.completedAt >= since);
     return t`${line} · ${lately.length ? recordOf(lately) : t('none')} in the last 90 days`;
   });
+}
+
+// sets that came down to the last game, by final score. a best-of-3 can only end 2-1 that way and a best-of-5
+// only 3-2, so a best-of-5's game 3 never counts as a game 3. whoever won the set won that game. DQs never get
+// here, and a set with no score doesn't count
+function deciders(played, [last, other]) {
+  return played.filter(({ me, them }) => (me.score === last && them.score === other) || (me.score === other && them.score === last));
+}
+
+// how they do when it comes down to game 3 of a best-of-3 or game 5 of a best-of-5, one line per game
+function decidingLines(played) {
+  const rate = (list) => {
+    const won = list.filter((result) => result.won).length;
+    return { won, total: list.length, percent: Math.round((won / list.length) * 100) };
+  };
+  const lines = [...Map.groupBy(played, ({ set }) => gameName(set.event))].slice(0, GAMES_SHOWN).map(([game, list]) => {
+    const parts = [];
+    const threes = deciders(list, [2, 1]);
+    if (threes.length) {
+      const { won, total, percent } = rate(threes);
+      parts.push(t`game 3s ${percent}% (${won} of ${total})`);
+    }
+    const fives = deciders(list, [3, 2]);
+    if (fives.length) {
+      const { won, total, percent } = rate(fives);
+      parts.push(t`game 5s ${percent}% (${won} of ${total})`);
+    }
+    return parts.length ? `**${escapeMarkdown(game)}:** ${parts.join(' · ')}` : null;
+  }).filter(Boolean);
+  return lines.length ? [...lines, t('-# Game 3s count best-of-3 sets that went to game 3, and game 5s best-of-5 sets that went to game 5')] : [];
 }
 
 // W 2-1 vs Foo · Tournament · VOD · date, with the round for verbose and the VOD when the TO added one
@@ -110,6 +140,8 @@ export function scout(player, opponent, mine, theirs, characterSets, { melee = f
   const meetings = meetingsOf(player, opponent, mine, theirs);
   const lines = [];
   section(lines, t('Recent form'), played.length ? formLines(played) : [melee ? t('No recent Melee singles sets.') : t('No recent singles sets.')]);
+  // the short report keeps it to Ultimate, verbose shows every game
+  section(lines, t('Deciding games'), decidingLines(played.filter(({ set }) => set.event.videogame?.id === ULTIMATE)));
   section(lines, t('Latest sets'), played.slice(0, LATEST_SETS).map((result) => latestSetLine(result)));
   const characterLines = [];
   for (const { game, usage } of characterUsageByGame(characterSets).slice(0, GAMES_SHOWN)) {
@@ -150,6 +182,7 @@ export function scoutReport(player, opponent, { mine, theirs, characterSets, eve
 function tendencies(played, focus) {
   const lines = [];
   section(lines, t('Recent form'), formLines(played, true));
+  section(lines, t('Deciding games'), decidingLines(played));
   section(lines, t`Habits in ${escapeMarkdown(focus)}`, habitLines(played.filter(({ set }) => gameName(set.event) === focus)));
   section(lines, t('Latest sets'), played.slice(0, SCOUT_LATEST_SETS).map((result) => latestSetLine(result, true)));
   return withLines(baseEmbed(colors.brand).setTitle(t('Form and tendencies')), lines);

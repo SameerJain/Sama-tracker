@@ -110,7 +110,7 @@ The bot makes each role the first time someone asks for it, with no permissions 
 | `/doubles` | Recent 2v2 record, top partners, best finish, biggest upset and latest events. | Up to 600 doubles sets: every partner's record and best finish together, teams played and lost to most, seeds, close sets and best finishes. |
 | `/h2h opponent:<name or link/ID>` | Overall record, last 10 meetings and one-line predicted odds. | Every meeting, splits, streaks and the same one-line odds. |
 | `/predict opponent:<name or link/ID>` | Estimated odds of winning, and why. | The full breakdown: how much each part counts, with bars, model numbers and how sure the odds are. |
-| `/scout opponent:<player or link/ID>` | Any opponent's form, characters, toughest opponents and worst matchups, plus your head-to-head. | More history, habits, stages and your odds. |
+| `/scout opponent:<player or link/ID>` | Any opponent's form, how often they win game 3 and game 5 in Ultimate, characters, toughest opponents and worst matchups, plus your head-to-head. | More history, habits, game 3 and game 5 win rates in every game, stages and your odds. |
 | `/progress` | Last 30 days against the previous 30, with changes in win rates and placements. | More detail on each period, a 6-month trend and a win-rate graph. |
 | `/characters` | Reported characters in Ultimate or Melee. | More history, and other games with reported characters. |
 
@@ -121,7 +121,7 @@ Add `player:` to look up someone else, like `/h2h opponent:Sparg0 player:Leo`. `
 > [!TIP]
 > On a phone, skip the typing. Long-press a server member (right-click on desktop), open **Apps**, and pick **H2H with me** for `/h2h` or **Scout them** for `/scout`. Both find the member's start.gg the way `/profile` does, so the member has to be tracked, linked, or registered for a tournament the bot checks. **H2H with me** needs you tracked or linked too, and so does **Scout them**.
 
-These reports count singles and leave DQs out of set records. `/doubles` counts 2v2 sets only, for one player, with whoever they teamed with. Its placements come from the events those sets were in, so an event where they never played a set doesn't show. Characters and stages appear only when the TO reports them. `/characters` picks whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
+These reports count singles and leave DQs out of set records. `/scout`'s game 3 rate counts best-of-3 sets that went to game 3, and its game 5 rate best-of-5 sets that went to game 5, by the final score, so a best-of-5's game 3 never counts as a game 3. Sets without a reported score stay out. `/doubles` counts 2v2 sets only, for one player, with whoever they teamed with. Its placements come from the events those sets were in, so an event where they never played a set doesn't show. Characters and stages appear only when the TO reports them. `/characters` picks whichever of Ultimate or Melee has more reported games, or more sets if neither has reported characters.
 
 ### Slippi ranked
 

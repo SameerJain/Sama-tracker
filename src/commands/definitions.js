@@ -328,7 +328,7 @@ const commands = [
     name: 'scout', description: 'Scout any start.gg opponent. Needs you tracked or linked, with Discord connected on start.gg',
     options: [
       playerOption(MATCHUP, 'opponent'),
-      verboseOption('More history, habits, toughest opponents and worst matchups, stages and your odds. Slower'),
+      verboseOption('More history, habits, game 3 and 5 rates in every game, matchups, stages and your odds. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only look at their Melee sets, characters and Melee odds, plus Slippi ranks toward them' },
       sinceOption(), venueOption(),
     ],

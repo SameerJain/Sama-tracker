@@ -129,7 +129,7 @@ export default {
   'Streaks, close sets, seeds, upsets, rematches and characters, plus a 6 month trend. Slower': 'Rachas, sets cerrados, seeds, upsets, revanchas y personajes, más 6 meses de tendencia. Lento',
   'Only count Melee sets, placements and characters, plus Slippi rank vs last season': 'Solo sets, posiciones y personajes de Melee, más el rango de Slippi contra la temporada pasada',
   'Scout any start.gg opponent. Needs you tracked or linked, with Discord connected on start.gg': 'Estudia a cualquier rival de start.gg. Necesitas estar seguido o vinculado, con Discord',
-  'More history, habits, toughest opponents and worst matchups, stages and your odds. Slower': 'Más historial, hábitos, rivales más difíciles, peores matchups, escenarios y tus probabilidades',
+  'More history, habits, game 3 and 5 rates in every game, matchups, stages and your odds. Slower': 'Más historial, hábitos, partidas 3 y 5 en cada juego, matchups, escenarios y tus probabilidades',
   'Only look at their Melee sets, characters and Melee odds, plus Slippi ranks toward them': 'Solo sus sets, personajes y probabilidades de Melee, más los rangos de Slippi que cuentan',
   'Head-to-head record with one-line predicted odds': 'Historial cara a cara con las probabilidades en una línea',
   'Every set, splits and streaks. Odds stay one line. Slower': 'Cada set, divisiones y rachas. Las probabilidades siguen en una línea. Lento',

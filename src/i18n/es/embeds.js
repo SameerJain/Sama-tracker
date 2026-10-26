@@ -6,6 +6,11 @@ export default {
   'since {0}': 'desde {0}',
   Other: 'Otro',
   '**Close sets:** {0}': '**Sets cerrados:** {0}',
+  'Deciding games': 'Partidas decisivas',
+  'game 3s {0}% ({1} of {2})': 'partida 3 {0}% ({1} de {2})',
+  'game 5s {0}% ({1} of {2})': 'partida 5 {0}% ({1} de {2})',
+  '-# Game 3s count best-of-3 sets that went to game 3, and game 5s best-of-5 sets that went to game 5':
+    '-# La partida 3 cuenta los sets al mejor de 3 que llegaron a la partida 3, y la partida 5 los sets al mejor de 5 que llegaron a la partida 5',
   '**Vs higher seeds:** {0}': '**Contra mejores seeds:** {0}',
   '**Vs lower seeds:** {0}': '**Contra peores seeds:** {0}',
   'won {0} of {1} without dropping a game': 'ganó {0} de {1} sin perder una partida',

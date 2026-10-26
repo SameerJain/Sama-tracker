@@ -227,6 +227,45 @@ test('scout verbose covers their history, habits, matchups, stages and your odds
   }
 });
 
+test('scout shows how often they win game 3 of a best-of-3 and game 5 of a best-of-5, never mixing the two', () => {
+  const crew = { ...crewPlayer, tag: 'Crew' };
+  const target = { userId: 2, playerId: 99, tag: 'Target', slug: 'user/target' };
+  const ultimate = { id: 1386, displayName: 'Ultimate' };
+  const meleeGame = { id: 1, displayName: 'Melee' };
+  const played = (id, won, score, videogame = ultimate) => ({
+    ...result(id, 900, [99, 'Target', 1], [50, 'Other', 2], won, score),
+    event: { slug: `tournament/t-${id}/event/singles`, videogame, tournament: { name: `T-${id}` } },
+  });
+  const theirs = [
+    // best-of-3s that went to game 3: won 2 of 3
+    played('b3-won', true, [2, 1]), played('b3-won-again', true, [2, 1]), played('b3-lost', false, [1, 2]),
+    // best-of-5s that went to game 5: won 1 of 2, and neither one's game 3 counts as a game 3
+    played('b5-won', true, [3, 2]), played('b5-lost', false, [2, 3]),
+    // never went the distance, had no score, or was a DQ
+    played('sweep', true, [2, 0]), played('b5-short', true, [3, 1]), played('unscored', true, [null, null]), played('dq', true, [0, -1]),
+    played('melee-b3', true, [2, 1], meleeGame),
+  ];
+  const text = (cards) => cards.map((card) => card.toJSON().description).join('\n');
+  const deciding = '### Deciding games\n**Ultimate:** game 3s 67% (2 of 3) · game 5s 50% (1 of 2)';
+  const footnote = '-# Game 3s count best-of-3 sets that went to game 3, and game 5s best-of-5 sets that went to game 5';
+
+  // the short report is Ultimate only
+  const quick = text(embeds.scout(crew, target, [], theirs, []));
+  assert.ok(quick.includes(`${deciding}\n${footnote}`), quick);
+  assert.doesNotMatch(quick, /\*\*Melee:\*\* game 3s/);
+  // so a Melee-only one has none, and a sample with nothing that went the distance leaves the section out
+  assert.doesNotMatch(text(embeds.scout(crew, target, [], [theirs.at(-1)], [], { melee: true })), /Deciding games/);
+  assert.doesNotMatch(text(embeds.scout(crew, target, [], [played('only-sweep', true, [2, 0])], [])), /Deciding games/);
+  // one side never reaching game 5 only shows game 3s
+  assert.match(text(embeds.scout(crew, target, [], theirs.slice(0, 3), [])), /\*\*Ultimate:\*\* game 3s 67% \(2 of 3\)\n/);
+
+  // verbose shows every game they play
+  const full = text(embeds.scoutReport(crew, target, { mine: [], theirs, characterSets: [], events: [], odds: null, players: {} }));
+  assert.ok(full.includes(`${deciding}\n**Melee:** game 3s 100% (1 of 1)\n${footnote}`), full);
+  const meleeOnly = text(embeds.scoutReport(crew, target, { mine: [], theirs: [theirs.at(-1)], characterSets: [], events: [], odds: null, players: {}, melee: true }));
+  assert.match(meleeOnly, /### Deciding games\n\*\*Melee:\*\* game 3s 100% \(1 of 1\)/);
+});
+
 test('scout verbose says so when nothing is reported, and skips what it has nothing for', () => {
   const crew = { ...crewPlayer, tag: 'Crew' };
   const target = { userId: 2, playerId: 99, tag: 'Target', slug: 'user/target' };

@@ -273,7 +273,7 @@ export function help(verbose = false) {
       t('`/doubles` one player\'s 2v2 record, partners and placements'),
       t('`/h2h` record against someone, with one-line odds'),
       t('`/predict` odds of beating someone, and why. `verbose:True` is the full breakdown, with how much each part counts and bars'),
-      t('`/scout` an opponent\'s form, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg'),
+      t('`/scout` an opponent\'s form, how often they win game 3 and game 5 in Ultimate, toughest opponents and worst matchups. Needs you tracked or linked, with Discord connected on start.gg'),
       t('`/progress` last 30 days vs the 30 before, by game'),
       t('`/characters` reported characters. `game:` Ultimate or Melee, left out it\'s whichever has more'),
       t('-# `verbose:True` shows more, same as the Full report button on short reports other than `/progress` and `/predict`. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. Melee cards say Melee at the top, other games show nothing there since Ultimate is the default. Melee `/predict`, `/h2h` and `/scout` odds count them when both players are ranked, even with no Melee sets to go on. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out'),
