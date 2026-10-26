@@ -77,6 +77,7 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // /t-o tournament event, /t-o tournament add add_event and /t-o settings events all land on the same one:
 // { eventId, slug, startAt, synced, gone }. synced is start.gg's side as of the last sync, null until one ran, and gone
 // means a mod deleted it, it started or start.gg deleted the tournament, so it's left alone.
+// deployNotice is { id } for the latest deployment successfully announced in this server, so missed updates retry.
 //
 // and once per bot, in GLOBAL_KEYS below:
 //
@@ -89,6 +90,7 @@ export const isMultiGuild = () => process.env.MULTI_GUILD === 'true';
 // servers that both track a tournament gets each DM once.
 const emptyGuild = {
   channelId: null,
+  deployNotice: null,
   players: {}, links: {}, accounts: {},
   posted: [], streamed: [], called: [], dqs: [],
   regPings: [], streamPings: [], callPings: [], regDmPings: [], startDmPings: [],
@@ -115,7 +117,8 @@ function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function sameShape(value, fallback) {
+function sameShape(value, fallback, key) {
+  if (key === 'channelId') return value === null || typeof value === 'string';
   if (Array.isArray(fallback)) return Array.isArray(value);
   if (isPlainObject(fallback)) return isPlainObject(value);
   // null defaults like weeklyRecap and deploy are null or an object
@@ -129,7 +132,7 @@ function withDefaults(parsed, defaults) {
   if (!isPlainObject(parsed)) return structuredClone(defaults);
   const out = { ...structuredClone(defaults), ...parsed };
   for (const [key, fallback] of Object.entries(defaults)) {
-    if (out[key] === undefined || !sameShape(out[key], fallback)) out[key] = structuredClone(fallback);
+    if (out[key] === undefined || !sameShape(out[key], fallback, key)) out[key] = structuredClone(fallback);
   }
   return out;
 }

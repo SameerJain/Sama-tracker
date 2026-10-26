@@ -49,15 +49,25 @@ export function lastOutage(now = secondsNow()) {
 // what goes out when the bot starts: the bot update for a new deployment, with the outage on the same card
 // when there was one, or a back online card for an outage alone. single-server builds pass their channel,
 // multi-server ones post in every server's
+const noticesSending = new Set();
 export async function postStartNotice({ deploy = null, outage = null }, postChannel = null) {
-  const card = deploy ? embeds.deployUpdate(deploy, outage, CATCH_UP_HOURS) : outage && embeds.backOnline(outage, CATCH_UP_HOURS);
-  if (!card) return;
-  const what = deploy ? 'the bot update' : 'the back online notice';
+  if (!deploy && !outage) return;
   const send = async (target, where = '') => {
+    const key = guildId() ?? 'single';
+    const update = deploy && state.deployNotice?.id !== deploy.id;
+    if (noticesSending.has(key) || (!update && !outage)) return;
+    noticesSending.add(key);
     try {
+      const card = update ? embeds.deployUpdate(deploy, outage, CATCH_UP_HOURS) : embeds.backOnline(outage, CATCH_UP_HOURS);
       await target.send({ embeds: embeds.withImage([card]), allowedMentions: { parse: [] } });
+      if (update) {
+        state.deployNotice = { id: deploy.id };
+        save();
+      }
     } catch (err) {
-      console.error(`posting ${what} failed${where}:`, err.message);
+      console.error(`posting ${update ? 'the bot update' : 'the back online notice'} failed${where}:`, err.message);
+    } finally {
+      noticesSending.delete(key);
     }
   };
   if (postChannel) return send(postChannel);
@@ -244,7 +254,12 @@ export function startTracking(client, singleChannel = null) {
   noteDowntime(checked.length ? Math.min(...checked) : Infinity, outage, now);
   save();
   // a new railway deployment or an outage posts once, before the checks start their own posts
-  postStartNotice({ deploy: deployed, outage }, isMultiGuild() ? null : singleChannel).catch(console.error);
+  const currentDeploy = () => deployedAt() === null ? null : state.deploy;
+  const noticeChannel = () => isMultiGuild() ? null : currentChannel();
+  postStartNotice({ deploy: deployed ?? currentDeploy(), outage }, noticeChannel()).catch(console.error);
+  intervals.push(setInterval(() => {
+    postStartNotice({ deploy: currentDeploy() }, noticeChannel()).catch(console.error);
+  }, 60 * 1000));
   startChecks();
 }
 

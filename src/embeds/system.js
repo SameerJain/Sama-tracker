@@ -375,6 +375,7 @@ export function help(verbose = false) {
       t('**Slippi rank changes.** Watchlist changes, checked every 30 minutes. Tracked players can be discovered from connect codes entered on start.gg. When a season ends, a wrap-up with the final ranks, biggest climbers and most played characters'),
       t('**Bills final results.** The final score with the other team\'s logo, green for a win and red for a loss, checked daily and every 15 minutes on game day. Off unless `/t-o settings bills` turns it on'),
       t('**Weekly crew recap.** Tracked players with a non-DQ singles set that week. Sunday 9 pm ET unless `/t-o settings` changes it'),
+      t('**Bot updates.** Once per deployment in every server\'s bot channel. Missed notices retry every minute, including after channel setup or a restart'),
       t('**Bot updates.** A new version going live on Railway, with when it deployed and the commit message'),
       t('**Back online.** After the bot was off 10 minutes or more, for how long and that commands sent then need sending again. While start.gg is down, commands say so right away and the bot\'s status shows it'),
     ],
