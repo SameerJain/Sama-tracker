@@ -41,10 +41,11 @@ function choiceButton(choice, kind, target, discordId, label, style) {
 
 // the question goes in the channel like the answer would have, with label on the button that goes ahead.
 // a command that had to look something up first already deferred, so it edits that in
-function askFirst(interaction, kind, target, question, label) {
+function askFirst(interaction, kind, target, question, label, { ephemeral = false } = {}) {
   const { id } = interaction.user;
   const asking = {
     content: question,
+    ...(ephemeral && { flags: MessageFlags.Ephemeral }),
     components: buttonRow(choiceButton('confirm', kind, target, id, label, ButtonStyle.Danger), choiceButton('cancel', kind, target, id, t('Cancel'), ButtonStyle.Secondary)),
     allowedMentions: { parse: [] },
   };

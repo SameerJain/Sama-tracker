@@ -34,8 +34,8 @@ test('all server settings are options on one /t-o settings command', () => {
   const to = commands.find(c => c.name === 't-o');
   const command = to.options.find(o => o.name === 'settings');
   assert.deepEqual(command.options.filter(o => o.type === 5).map(o => o.name),
-    ['sets', 'streams', 'calls', 'next', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors', 'commands_anywhere']);
-  assert.ok(['day', 'time', 'timezone', 'language', 'commands_channel'].every(name => command.options.some(o => o.name === name)));
+    ['sets', 'streams', 'calls', 'next', 'rollcall', 'results', 'top8', 'registration', 'events', 'slippi', 'recap', 'bills', 'set_colors']);
+  assert.ok(['day', 'time', 'timezone', 'language', 'channel'].every(name => command.options.some(o => o.name === name)));
   assert.equal(command.options.find(o => o.name === 'timezone').autocomplete, true);
   // three modes, picked by name
   const threads = command.options.find(o => o.name === 'threads');
@@ -91,14 +91,14 @@ test('only TOs can change the server language', async () => {
   assert.equal(state.messages.language, 'es');
 });
 
-test('message switches and recap schedule save immediately and answer where everyone sees them', async (t) => {
+test('message switches and recap schedule save immediately and answer privately', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-15T12:00:00Z') });
   state.messages = {};
   // one at a time, since two at once asks first
   await configure({ sets: false });
   await configure({ streams: false });
   const reply = await configure({ day: 0, time: '18:30', timezone: 'America/Los_Angeles' });
-  assert.equal(reply.flags, undefined);
+  assert.equal(reply.flags, MessageFlags.Ephemeral);
   assert.deepEqual(reply.allowedMentions, { parse: [] });
   assert.match(reply.content, /Set results:\*\* off/);
   assert.match(reply.content, /Sunday 18:30 PST/);
@@ -191,7 +191,7 @@ test('settings too long for one Discord message go out in private parts, each 20
   }
   const whole = sent.map(([, result]) => result.content).join('\n');
   assert.match(whole, /^\*\*Publicaciones automáticas\*\*/);
-  assert.match(whole, /commands_channel/);
+  assert.doesNotMatch(whole, /commands_channel|commands_anywhere/);
   state.messages = {};
 });
 

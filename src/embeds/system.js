@@ -1,6 +1,5 @@
 import { escapeMarkdown } from 'discord.js';
 import { startggUrl } from '../startgg.js';
-import { isMultiGuild } from '../store.js';
 import { postsOn } from '../message-settings.js';
 import { colors, FOOTER, baseEmbed, shortSchedule, withLines, withSections, playerLink, count, t } from './shared.js';
 import { locationText } from './tournaments.js';
@@ -219,7 +218,7 @@ function shortHelp() {
     t('**Start here**'),
     t('`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up'),
     t('`/track add` post your placements here. TOs can add anyone'),
-    ...(isMultiGuild() ? [t('`/t-o settings channel:#channel` pick where automatic posts go')] : []),
+    t('`/t-o settings channel:#channel` pick where bot replies and automatic posts go'),
     t('`/notify` pings for match calls, next opponents, streams, reg reminders and 1-hour DMs'),
     t('`/help verbose:True` the full list with the details'),
     '',
@@ -255,15 +254,15 @@ export function help(verbose = false) {
       t('**General**'),
       t('`/help` this list'),
       t('`/status` uptime, when the latest version was deployed, the last start.gg and Slippi checks, and whether start.gg is down'),
-      t('`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member'),
+      t('`/profile` someone\'s start.gg profile. Use `/track add` or `/link` with their profile link first. `user:` picks a server member, `player:` a tracked or linked player'),
       t('`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, who came to the most nights and characters'),
       t('`/socials` saved streams and social links'),
       t('`/socials_edit` add or remove those links. Manage Server by default'),
     ],
     [
       t('**TO settings**'),
-      t('`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule, language and which channels commands work in. Turning off two or more posts at once asks first'),
-      ...(isMultiGuild() ? [t('`channel:` picks where automatic posts go and checks the bot can post there')] : []),
+      t('`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule, language and the one bot channel. Turning off two or more posts at once asks first'),
+      t('`channel:` picks the one channel for bot replies and automatic posts, with its threads. Settings work privately anywhere; matchmaking can use another channel'),
       t('-# Leave every option blank to see the current settings. Only TOs can change them'),
     ],
     [
@@ -317,6 +316,7 @@ export function help(verbose = false) {
       t('-# `verbose:True` shows more, same as the Full report button on short reports other than `/progress` and `/predict`. `melee:True` sticks to Melee and adds Slippi ranks for players on the watchlist, which all-Melee reports show anyway. Melee cards say Melee at the top, other games show nothing there since Ultimate is the default. Melee `/predict`, `/h2h` and `/scout` odds count them when both players are ranked, even with no Melee sets to go on. `/characters game:Melee` adds Slippi ranked picks. Slippi ranked is singles, so `/doubles` leaves it out'),
       t('-# `since:2026-01-01` counts only sets since that date, and `venue:` only offline or online tournaments, on `/stats`, `/h2h`, `/scout` and `/predict`. Full report buttons keep them'),
       t('-# Any player or opponent box also takes a start.gg profile link or ID, for someone nobody tracked or linked. It looks them up without tracking them'),
+      t('-# `user:` picks a Discord member for `/stats`, `/progress`, `/characters`, `/doubles`, `/recent`, `/upcoming` and `/run`, instead of `player:`. Use `/track add` or `/link` first'),
       t('-# Your commands take start.gg turns one at a time. One sent while another loads says Queued and starts after it, up to 3 waiting. When start.gg is backed up for everyone, new commands ask you to try again in a minute. A public report done over a minute after you asked comes in a new message that pings you'),
       t('-# No typing: long-press someone, then Apps, then **H2H with me** or **Scout them**. `/run`, match calls, next opponents and stream alerts have head-to-head buttons for the set coming up, which run the short report and come off when it ends'),
       t('-# Player lists start with whoever you picked last, and a name matches with any spacing, case or punctuation. A name that matches nobody gets the closest one suggested'),

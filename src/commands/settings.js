@@ -1,7 +1,7 @@
 import { MessageFlags, PermissionFlagsBits, escapeMarkdown } from 'discord.js';
 import { isMultiGuild, postsChannelId, state, save } from '../store.js';
 import { currentChannel, missingThreadPermissions, secondsNow } from '../tracker.js';
-import { POSTING_PERMISSIONS } from '../tracker/shared.js';
+import { POSTING_PERMISSIONS, setChannel } from '../tracker/shared.js';
 import {
   MAX_EVENT_LENGTH_HOURS, MESSAGE_TYPES, MIN_EVENT_LENGTH_HOURS, REG_ROLE, THREAD_MODES, WEEKDAYS, messageSettings, postsOn,
 } from '../message-settings.js';
@@ -29,13 +29,6 @@ function timezoneChoices(focused) {
   const typed = focused.trim().toLowerCase().replaceAll(' ', '_');
   const zones = typed ? Intl.supportedValuesOf('timeZone').filter((zone) => zone.toLowerCase().includes(typed)) : COMMON_ZONES;
   return zones.slice(0, 25).map((zone) => ({ name: zone, value: zone }));
-}
-
-// the channels a TO limited the bot's commands to with commands_channel, none meaning every channel. a deleted
-// one stops counting, so a server can't end up with nowhere left to use the bot
-function commandChannels(guild) {
-  const cache = guild?.channels?.cache;
-  return (state.messages.commandChannels ?? []).filter((id) => !cache || cache.has(id));
 }
 
 // every server setting lives on /t-o settings. leaving the options blank shows them all.
@@ -78,24 +71,9 @@ async function configureSettings(interaction) {
     if (!Object.hasOwn(LANGUAGES, pickedLanguage)) return fail(t('Pick English or Español.'));
     changes.language = pickedLanguage;
   }
-  // picking a channel adds it to the list, or takes it off if it's already there. commands_anywhere:False with it
-  // says commands shouldn't work everywhere, so then a pick only ever adds, and the last channel can't come off
-  const commandsChannel = interaction.options.getChannel?.('commands_channel');
-  const anywhere = interaction.options.getBoolean('commands_anywhere');
-  const commandsBefore = commandChannels(interaction.guild);
-  if (commandsChannel && anywhere) return fail(t('Pick either `commands_channel` or `commands_anywhere:True`, not both.'));
-  if (anywhere === false && !commandsChannel && !commandsBefore.length) {
-    return fail(t('Pick the channel bot commands should work in with `commands_channel`.'));
-  }
-  if (anywhere) changes.commandChannels = [];
-  if (commandsChannel) {
-    const listed = commandsBefore.includes(commandsChannel.id);
-    if (!listed) changes.commandChannels = [...commandsBefore, commandsChannel.id];
-    else if (anywhere !== false) changes.commandChannels = commandsBefore.filter((id) => id !== commandsChannel.id);
-  }
   const channel = interaction.options.getChannel?.('channel');
 
-  if (!Object.keys(changes).length && !channel) return replyInParts(interaction, settingsLines(interaction.guild), { ephemeral: true });
+  if (!Object.keys(changes).length && !channel) return replyInParts(interaction, settingsLines(), { ephemeral: true });
   if (!isTO(interaction)) return notTO(interaction, t('change server settings'));
   // checked when it's turned on, the way threads are, so a missing permission doesn't fail quietly later
   if (changes.events && !previous.events) {
@@ -120,16 +98,16 @@ async function configureSettings(interaction) {
   if (typeof channelLines === 'string') return fail(channelLines);
   channelLines.push(...pinLines);
 
-  const asked = { changes, channelId: channel?.id ?? null, commandsBefore, channelLines };
+  const asked = { changes, channel, channelLines };
   const turningOff = Object.keys(MESSAGE_TYPES).filter((type) => changes[type] === false && previous[type]);
   if (turningOff.length >= ASK_WHEN_TURNING_OFF) {
     const target = String(interaction.id ?? Date.now());
     pending.set(target, asked);
     setTimeout(() => pending.delete(target), ASK_SECONDS * 1000).unref?.();
-    return askFirst(interaction, 'settings', target, t`Turn off ${postNames(turningOff)}? They stay off until a TO turns them back on, and what comes due meanwhile is skipped.`, t('Turn them off'));
+    return askFirst(interaction, 'settings', target, t`Turn off ${postNames(turningOff)}? They stay off until a TO turns them back on, and what comes due meanwhile is skipped.`, t('Turn them off'), { ephemeral: true });
   }
-  const lines = applySettings(asked);
-  await replyInParts(interaction, [...lines, ...settingsLines(interaction.guild), ...channelLines]);
+  applySettings(asked);
+  await replyInParts(interaction, [...settingsLines(), ...channelLines], { ephemeral: true });
   await registerLanguage(interaction.guild, pickedLanguage);
 }
 
@@ -146,7 +124,7 @@ const postNames = (types) => listOf(types.map((type) => `**${t(MESSAGE_TYPES[typ
 // saves a change and returns the lines that say what it did, besides the settings list. the times that go with it
 // are worked out against the settings as they are now, so one confirmed a few minutes after it was asked about
 // still skips what came due before then
-function applySettings({ changes, channelId, commandsBefore }) {
+function applySettings({ changes, channel }) {
   const previous = messageSettings();
   const saved = { ...changes };
   const now = secondsNow();
@@ -158,10 +136,13 @@ function applySettings({ changes, channelId, commandsBefore }) {
     saved.recapChangedAt = now;
   }
   state.messages = { ...state.messages, ...saved };
-  if (channelId) state.channelId = channelId;
+  if (channel) {
+    state.channelId = channel.id;
+    if (!isMultiGuild()) setChannel(channel);
+  }
+  delete state.messages.commandChannels;
   save();
   if (saved.language) switchFunLanguage(saved.language);
-  return saved.commandChannels ? [commandsChange(commandsBefore, saved.commandChannels), ''] : [];
 }
 
 // a single-server build registers its commands in the server's language, so their descriptions switch too.
@@ -182,9 +163,9 @@ confirmable('settings', {
     pending.delete(target);
     if (!asked) return { content: t('That button doesn\'t work anymore. Run `/t-o settings` again.') };
     const off = Object.keys(MESSAGE_TYPES).filter((type) => asked.changes[type] === false);
-    const lines = applySettings(asked);
+    applySettings(asked);
     registerLanguage(press?.guild, asked.changes.language).catch((err) => console.error('registering the commands failed:', err.message));
-    return { content: [t`Turned off ${postNames(off)}.`, ...lines, ...asked.channelLines, t('-# `/t-o settings` with no options shows every setting.')].join('\n') };
+    return { content: [t`Turned off ${postNames(off)}.`, ...asked.channelLines, t('-# `/t-o settings` with no options shows every setting.')].join('\n') };
   },
   cancel: (target) => {
     pending.delete(target);
@@ -192,21 +173,10 @@ confirmable('settings', {
   },
 });
 
-// what a commands_channel or commands_anywhere change did, first in the reply. picking a listed channel takes it
-// off, and the Bot commands line further down is easy to miss in a list this long
-function commandsChange(before, after) {
-  const now = after.length
-    ? t`Bot commands only work in ${listOf(after.map((id) => `<#${id}>`))} now.`
-    : t('Bot commands work in every channel now.');
-  const off = before.filter((id) => !after.includes(id));
-  return off.length === 1 ? `${t`Took <#${off[0]}> off the list.`} ${now}` : now;
-}
-
 // every setting, shown when /t-o settings has no options and after a change. lines, since the whole list with its
 // footnotes runs past what one message holds, in spanish and in a multi-server build
-function settingsLines(guild) {
+function settingsLines() {
   const settings = messageSettings();
-  const commandsIn = commandChannels(guild);
   const onOff = (on) => (on ? t('on') : t('off'));
   const lines = [t('**Automatic posts**')];
   for (const [key, label] of Object.entries(MESSAGE_TYPES)) {
@@ -217,8 +187,7 @@ function settingsLines(guild) {
   lines.push(t`**Event length:** ${settings.eventLength} hours`);
   lines.push(t`**Set result colors:** ${onOff(settings.setColors)}`);
   lines.push(t`**Language:** ${LANGUAGES[language()]}`);
-  if (isMultiGuild()) lines.push(state.channelId ? t`**Posts channel:** <#${state.channelId}>` : t('**Posts channel:** not set'));
-  lines.push(commandsIn.length ? t`**Bot commands:** ${listOf(commandsIn.map((id) => `<#${id}>`))}` : t('**Bot commands:** every channel'));
+  lines.push(postsChannelId() ? t`**Posts channel:** <#${postsChannelId()}>` : t('**Posts channel:** not set'));
   lines.push('', t('**Weekly recap**'),
     t`**Posts:** ${onOff(settings.recap)} · **Day and time:** ${t(WEEKDAYS[settings.recapDay])} ${settings.recapTime} ${zoneLabel(settings.timezone)}`,
     t('-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.'),
@@ -227,7 +196,7 @@ function settingsLines(guild) {
     t('-# `threads` has three modes for set results, stream alerts, match calls and next opponents. Off posts them here, except a tracked tournament\'s, which always get a thread. One per tournament gives each tournament a thread, and one per event gives each event its own, like Genesis 11 · Ultimate Singles. Each thread pins its channel card until the tournament ends.'),
     t('-# `set_colors` paints set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played. Off leaves every card blue.'),
     t('-# `event_length` is how long a Discord event runs when start.gg has no end time. A major or regional with no end time still gets 12 hours.'),
-    t('-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, except with `commands_anywhere:False`, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.'));
+    t('-# Bot replies and automatic posts use the posts channel and its threads. Settings work privately anywhere. Matchmaking can use another channel.'));
   return lines;
 }
 
@@ -670,4 +639,4 @@ function pinNote(postChannel, me) {
   return has && !has.has(PermissionFlagsBits.PinMessages) ? [t('-# Without Pin Messages there, thread cards don\'t get pinned.')] : [];
 }
 
-export { commandChannels, configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify };
+export { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify };

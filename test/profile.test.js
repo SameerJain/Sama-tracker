@@ -125,8 +125,8 @@ test('a start.gg that disconnected their discord does not count, and gets forgot
   const [, miss] = calls[1];
   assert.match(miss.content, /^Couldn't find a start\.gg with Herb's Discord connected/);
   // says what they have to do, since start.gg has no way to search by discord
-  assert.match(miss.content, /Ask them to run `\/link` with their start\.gg link once/);
-  assert.match(miss.content, /register for a tournament the bot checks/);
+  assert.match(miss.content, /ask them to `\/link` it/);
+  assert.match(miss.content, /\/track add/);
   // by name, so they don't get pinged or even mentioned
   assert.doesNotMatch(miss.content, /<@/);
   assert.deepEqual(miss.allowedMentions, { parse: [] });
@@ -135,7 +135,7 @@ test('a start.gg that disconnected their discord does not count, and gets forgot
 
 test('not finding yourself says how to fix it', async () => {
   const calls = await profile();
-  assert.match(calls[1][1], /Connect it on your start\.gg profile if you haven't, then `\/link` it/);
+  assert.match(calls[1][1], /\/track add.*\/link/);
   // nothing saved for them and no reg reminder tournaments to look through
   assert.deepEqual(asked, []);
 });

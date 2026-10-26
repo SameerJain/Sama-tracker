@@ -40,7 +40,6 @@ export default {
   'English or Spanish for this server': 'Inglés o español para este servidor',
   English: 'English',
   Español: 'Español',
-  'Channel for automatic posts': 'Canal para las publicaciones automáticas',
   // commands
   'Short command list, verbose:True for the full one with details': 'Lista corta de comandos, verbose:True para la completa con detalles',
   'Every command with the details, instead of the short list': 'Cada comando con sus detalles, en vez de la lista corta',
@@ -93,9 +92,6 @@ export default {
   'Untrack players whose start.gg Discord isn\'t in this server. Asks first. TOs only': 'Deja de seguir a quien no tenga su Discord de start.gg aquí. Pregunta primero. Solo TOs',
   'Also untrack players with no Discord connected on start.gg': 'También deja de seguir a quien no tenga Discord conectado en start.gg',
   'Automatic posts, recap schedule, language, posts channel and where commands work. TOs only': 'Publicaciones automáticas, resumen, idioma, canal y dónde funcionan los comandos. Solo TOs',
-  'Only let bot commands work in this channel. Pick one already on the list to take it off': 'Que los comandos del bot solo funcionen en este canal. Elige uno de la lista para quitarlo',
-  'True lets bot commands work in every channel again. False with commands_channel only adds it':
-    'True: los comandos funcionan en todos los canales. False con commands_channel solo lo agrega',
   'Your pings for calls, next opponents, streams, reg reminders and 1-hour DMs. TOs can set anyone\'s': 'Pings de llamados, próximo rival, streams, inscripción y DMs 1 hora antes. Los TOs, los de quien sea',
   'Server member. Leave out for yourself. Someone else needs a TO': 'Miembro del servidor. Vacío para ti. Para otra persona hace falta un TO',
   'Tracked player or all, leave out for yourself. Someone else needs a TO': 'Jugador seguido o all, vacío para ti. Para otra persona hace falta un TO',
@@ -121,7 +117,6 @@ export default {
   'Link your own start.gg so commands know who you are. Unlike /track, nothing gets posted': 'Vincula tu start.gg para que los comandos sepan quién eres. A diferencia de /track, no publica',
   'Your start.gg profile link or ID. Leave out to find it by the Discord connected on start.gg': 'Enlace o ID de tu perfil de start.gg. Vacío lo busca por el Discord conectado en start.gg',
   'Remove your /link, with an Undo button for a minute. Doesn\'t change whether you\'re tracked': 'Quita tu /link, con un botón Deshacer durante un minuto. No cambia si te sigo',
-  'Someone\'s start.gg profile, once the bot has seen their account': 'El perfil de start.gg de alguien, una vez que el bot vio su cuenta',
   'Server member, leave out for yourself': 'Miembro del servidor, déjalo vacío para ti',
   'Tracked or linked player, instead of a server member': 'Jugador seguido o vinculado, en vez de un miembro del servidor',
   'Upcoming tournaments': 'Próximos torneos',
@@ -166,4 +161,7 @@ export default {
   'Warn someone who isn\'t registered for a tournament yet. No ping if they are, or got one in 12h': 'Avisa a quien no se ha inscrito en un torneo. Sin ping si ya lo está o recibió uno en 12 h',
   'Who to check': 'A quién revisar',
   'My profile picture, full size': 'Mi foto de perfil, en tamaño completo',
+  'The server channel for bot replies and automatic posts, except matchmaking': 'Canal del servidor para respuestas y publicaciones del bot, excepto matchmaking',
+  'Find a start.gg profile. Use /track add or /link with a profile link first': 'Busca un perfil de start.gg. Usa primero /track add o /link con el enlace al perfil',
+  'Server member instead of player. Use /track add or /link first': 'Miembro del servidor en vez de player. Usa primero /track add o /link',
 };

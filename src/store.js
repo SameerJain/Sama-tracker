@@ -168,11 +168,11 @@ export function guildIds() {
   return Object.keys(raw.guilds);
 }
 
-// where a server's automatic posts go. single-server builds always use CHANNEL_ID. multi-server builds use
+// where a server's bot replies and automatic posts go. a saved channel beats CHANNEL_ID. multi-server builds use
 // the channel picked with /t-o settings channel:, and the server migrated from GUILD_ID falls back to CHANNEL_ID until it picks one.
 // looking it up never makes the entry, so a stray id can't fill the file with empty servers
 export function postsChannelId(id = guildId()) {
-  if (!isMultiGuild()) return process.env.CHANNEL_ID ?? null;
+  if (!isMultiGuild()) return state.channelId ?? process.env.CHANNEL_ID ?? null;
   if (!id) return null;
   return peekGuild(id)?.channelId ?? (id === process.env.GUILD_ID ? process.env.CHANNEL_ID ?? null : null);
 }
@@ -186,6 +186,7 @@ export function migrateLegacyToGuild(id, channelId = null) {
   const fresh = !Object.hasOwn(raw.guilds, id);
   const guild = forGuild(id);
   if (fresh) {
+    guild.channelId = raw.channelId ?? channelId;
     for (const key of Object.keys(emptyGuild)) {
       if (key === 'channelId') continue;
       guild[key] = structuredClone(raw[key] ?? emptyGuild[key]);

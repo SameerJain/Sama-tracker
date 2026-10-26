@@ -102,6 +102,20 @@ test('bad guild shapes fall back instead of crashing', async () => {
   assert.deepEqual(cleaned.guilds.half.players, {});
 });
 
+test('switching to multi-server keeps the saved bot channel instead of the old environment default', () => {
+  const before = state.channelId;
+  try {
+    state.channelId = 'saved-channel';
+    migrateLegacyToGuild('saved-channel-guild', 'environment-channel');
+    assert.equal(forGuild('saved-channel-guild').channelId, 'saved-channel');
+    forGuild('saved-channel-guild').channelId = 'new-channel';
+    migrateLegacyToGuild('saved-channel-guild', 'environment-channel');
+    assert.equal(forGuild('saved-channel-guild').channelId, 'new-channel');
+  } finally {
+    state.channelId = before;
+  }
+});
+
 test('keys nothing reads anymore come out of old files, root and servers alike', () => {
   const threads = [{ id: 'thread-1', at: 1 }];
   const cleaned = cleanState({ matchmakingThreads: threads, guilds: { old: { matchmakingThreads: threads, matchmaking: { melee: 'role' } } } });

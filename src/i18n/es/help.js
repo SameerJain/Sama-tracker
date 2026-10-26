@@ -6,7 +6,6 @@ export default {
   '`/link` tie your Discord to your start.gg, nothing gets posted. Leaving `player` out looks you up':
     '`/link` vincula tu Discord con tu start.gg, sin publicar nada. Dejar `player` vacío te busca a ti',
   '`/track add` post your placements here. TOs can add anyone': '`/track add` publica aquí tus posiciones. Los TOs pueden agregar a cualquiera',
-  '`/t-o settings channel:#channel` pick where automatic posts go': '`/t-o settings channel:#canal` elige dónde van las publicaciones automáticas',
   '`/notify` pings for match calls, next opponents, streams, reg reminders and 1-hour DMs':
     '`/notify` pings de llamados de partida, próximos rivales, streams, recordatorios de inscripción y DMs 1 hora antes',
   '`/help verbose:True` the full list with the details': '`/help verbose:True` la lista completa con los detalles',
@@ -43,18 +42,12 @@ export default {
   '`/help` this list': '`/help` esta lista',
   '`/status` uptime, when the latest version was deployed, the last start.gg and Slippi checks, and whether start.gg is down':
     '`/status` tiempo encendido, cuándo se publicó la última versión, las últimas revisiones de start.gg y Slippi, y si start.gg está caído',
-  '`/profile` someone\'s start.gg profile, if the bot has seen their account. `player:` a tracked or linked player, `user:` a server member':
-    '`/profile` el perfil de start.gg de alguien, si el bot ya vio su cuenta. `player:` un jugador seguido o vinculado, `user:` un miembro del servidor',
   '`/data` links to Samatracker and both series data pages: every tournament\'s attendance, winners, who came to the most nights and characters':
     '`/data` enlaces a Samatracker y a las páginas de datos de ambas series: asistencia de cada torneo, ganadores, quién vino a más noches y personajes',
   '`/socials` saved streams and social links': '`/socials` streams y redes guardados',
   '`/socials_edit` add or remove those links. Manage Server by default':
     '`/socials_edit` agrega o quita esos enlaces. Por defecto, con Gestionar servidor',
   '**TO settings**': '**Ajustes de TO**',
-  '`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule, language and which channels commands work in. Turning off two or more posts at once asks first':
-    '`/t-o settings` publicaciones automáticas, que también son el valor por defecto de todos los torneos, hilos, colores de resultados, duración de eventos de Discord, horario del resumen semanal, idioma y en qué canales funcionan los comandos. Apagar dos o más publicaciones a la vez pregunta primero',
-  '`channel:` picks where automatic posts go and checks the bot can post there':
-    '`channel:` elige dónde van las publicaciones automáticas y revisa que el bot pueda publicar ahí',
   '-# Leave every option blank to see the current settings. Only TOs can change them':
     '-# Deja todas las opciones vacías para ver los ajustes actuales. Solo los TOs pueden cambiarlos',
   '**Tracking players**': '**Seguir jugadores**',
@@ -205,4 +198,9 @@ export default {
   '-# Tracked tournaments post their set results, stream alerts, match calls and next opponents in a thread. `/t-o settings threads` picks off, one thread per tournament or one per event for everything, and one per event applies to tracked tournaments too. Each thread pins its channel card until the tournament ends. If a thread can\'t be used, they post here':
     '-# Los torneos seguidos publican sus resultados de sets, avisos de stream, llamados de partida y próximos rivales en un hilo. `/t-o settings threads` elige entre apagado, un hilo por torneo o uno por evento para todo, y uno por evento aplica también a los torneos seguidos. Cada hilo fija su tarjeta en el canal hasta que termina el torneo. Si no se puede usar un hilo, se publican aquí',
   '-# Page {0}/{1}': '-# Página {0}/{1}',
+  '`/t-o settings channel:#channel` pick where bot replies and automatic posts go': '`/t-o settings channel:#channel` elige dónde van las respuestas y publicaciones del bot',
+  '`/profile` someone\'s start.gg profile. Use `/track add` or `/link` with their profile link first. `user:` picks a server member, `player:` a tracked or linked player': '`/profile` el perfil de start.gg de alguien. Usa primero `/track add` o `/link` con su enlace. `user:` elige un miembro del servidor, `player:` un jugador seguido o vinculado',
+  '`/t-o settings` automatic posts, which are also the default for every tournament, threads, set result colors, Discord event length, weekly recap schedule, language and the one bot channel. Turning off two or more posts at once asks first': '`/t-o settings` publicaciones automáticas y valores predeterminados para cada torneo, hilos, colores de resultados, duración de eventos de Discord, horario del resumen semanal, idioma y el canal del bot. Pide confirmación para desactivar dos o más publicaciones a la vez',
+  '`channel:` picks the one channel for bot replies and automatic posts, with its threads. Settings work privately anywhere; matchmaking can use another channel': '`channel:` elige el único canal para respuestas y publicaciones automáticas del bot, con sus hilos. Los ajustes funcionan en privado desde cualquier canal; matchmaking puede usar otro',
+  '-# `user:` picks a Discord member for `/stats`, `/progress`, `/characters`, `/doubles`, `/recent`, `/upcoming` and `/run`, instead of `player:`. Use `/track add` or `/link` first': '-# `user:` elige un miembro de Discord para `/stats`, `/progress`, `/characters`, `/doubles`, `/recent`, `/upcoming` y `/run`, en vez de `player:`. Usa primero `/track add` o `/link`',
 };

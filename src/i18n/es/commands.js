@@ -128,10 +128,6 @@ export default {
   'Too late to undo. `/link` again with your start.gg profile link.':
     'Ya es tarde para deshacer. Usa `/link` otra vez con el enlace de tu perfil de start.gg.',
   'Bots don\'t have start.gg accounts.': 'Los bots no tienen cuentas de start.gg.',
-  'Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.':
-    'No encontré un start.gg con tu Discord conectado. Conéctalo en tu perfil de start.gg si no lo has hecho y luego vincúlalo con `/link`.',
-  'Couldn\'t find a start.gg with {0}\'s Discord connected.\n-# Ask them to run `/link` with their start.gg link once, or to register for a tournament the bot checks, and then this finds them. start.gg can\'t be searched by Discord':
-    'No encontré un start.gg con el Discord de {0} conectado.\n-# Pídele que use `/link` una vez con su enlace de start.gg, o que se inscriba en un torneo que el bot revise, y entonces esto lo encuentra. start.gg no se puede buscar por Discord',
   'No sets found.': 'No encontré sets.',
   '{0} has no current tournament run on start.gg.': '{0} no tiene un torneo en curso en start.gg.',
   // to.js
@@ -311,7 +307,6 @@ export default {
   'Nobody tracked or linked goes by `{0}`. Paste their start.gg profile link or ID, like start.gg/user/f64a83c8.':
     'Nadie seguido o vinculado se llama `{0}`. Pega su enlace o ID de perfil de start.gg, como start.gg/user/f64a83c8.',
   'Nobody is tracked yet. Paste a start.gg profile link to look anyone up': 'Todavía no sigo a nadie. Pega un enlace de perfil de start.gg para buscar a quien sea',
-  'Use the bot in {0}. A TO picks where with `/t-o settings commands_channel:`.': 'Usa el bot en {0}. Un TO elige dónde con `/t-o settings commands_channel:`.',
   'Nobody on the watchlist matches "{0}"': 'Nadie en la lista de Slippi coincide con "{0}"',
   'Nobody on the Slippi watchlist yet, /slippi add someone first':
     'Todavía no hay nadie en la lista de Slippi, agrega a alguien con /slippi add primero',
@@ -349,4 +344,9 @@ export default {
   'Run `/link` with your start.gg first, so the bot knows which one is yours.':
     'Usa `/link` con tu start.gg primero, para que el bot sepa cuál es el tuyo.',
   'That\'s your own start.gg.': 'Ese es tu propio start.gg.',
+  'Use the bot in <#{0}>. A TO picks the channel with `/t-o settings channel:`.': 'Usa el bot en <#{0}>. Un TO elige el canal con `/t-o settings channel:`.',
+  'A TO needs to pick the bot channel with `/t-o settings channel:` first.': 'Un TO debe elegir primero el canal del bot con `/t-o settings channel:`.',
+  'Couldn\'t find a start.gg with your Discord connected. Connect Discord on start.gg, then run `/track add` or `/link` with your profile link first.': 'No encontré una cuenta de start.gg con tu Discord conectado. Conecta Discord en start.gg y usa primero `/track add` o `/link` con el enlace a tu perfil.',
+  'Couldn\'t find a start.gg with {0}\'s Discord connected.\n-# Use `/track add` with their start.gg profile link first (TOs can add someone else), or ask them to `/link` it. Connect Discord on start.gg so `user:` can find them': 'No encontré una cuenta de start.gg con el Discord de {0} conectado.\n-# Usa primero `/track add` con el enlace a su perfil de start.gg (los TO pueden agregar a otra persona), o pídele que use `/link`. Conecta Discord en start.gg para que `user:` pueda encontrarla',
+  'No start.gg found for that member. Use `/track add` with their profile link, or ask them to `/link` it first.': 'No encontré el start.gg de ese miembro. Usa `/track add` con el enlace a su perfil, o pídele que use `/link` primero.',
 };

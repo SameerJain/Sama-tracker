@@ -12,6 +12,10 @@ function playerOption(description, name = 'player', required = true) {
   return { type: Option.String, name, description, required, autocomplete: true };
 }
 
+function memberOption() {
+  return { type: Option.User, name: 'user', description: 'Server member instead of player. Use /track add or /link first' };
+}
+
 // every stat command also takes a start.gg profile link or ID, so nobody has to be tracked or linked to look up
 const YOU = 'Tracked or linked player, or a start.gg profile link or ID. Leave out for yourself';
 const YOU_OR_ALL = 'Tracked or linked player, a start.gg link or ID, or all for everyone tracked. Blank for you';
@@ -89,14 +93,9 @@ const SETTINGS_OPTIONS = [
     choices: [{ name: 'English', value: 'en' }, { name: 'Español', value: 'es' }],
   },
   {
-    type: Option.Channel, name: 'commands_channel', description: 'Only let bot commands work in this channel. Pick one already on the list to take it off',
-    channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum],
-  },
-  { type: Option.Boolean, name: 'commands_anywhere', description: 'True lets bot commands work in every channel again. False with commands_channel only adds it' },
-  ...(isMultiGuild() ? [{
-    type: Option.Channel, name: 'channel', description: 'Channel for automatic posts',
+    type: Option.Channel, name: 'channel', description: 'The server channel for bot replies and automatic posts, except matchmaking',
     channel_types: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
-  }] : []),
+  },
 ];
 
 const commands = [
@@ -307,20 +306,20 @@ const commands = [
   { name: 'unlink', description: 'Remove your /link, with an Undo button for a minute. Doesn\'t change whether you\'re tracked' },
   {
     name: 'profile',
-    description: 'Someone\'s start.gg profile, once the bot has seen their account',
+    description: 'Find a start.gg profile. Use /track add or /link with a profile link first',
     options: [
       { type: Option.User, name: 'user', description: 'Server member, leave out for yourself' },
       playerOption('Tracked or linked player, instead of a server member', 'player', false),
     ],
   },
-  { name: 'upcoming', description: 'Upcoming tournaments', options: [playerOption(YOU_OR_ALL, 'player', false)] },
-  { name: 'recent', description: 'Latest reported sets', options: [playerOption(YOU_OR_ALL, 'player', false)] },
-  { name: 'run', description: 'Current tournament run and next opponent', options: [playerOption(YOU, 'player', false)] },
+  { name: 'upcoming', description: 'Upcoming tournaments', options: [playerOption(YOU_OR_ALL, 'player', false), memberOption()] },
+  { name: 'recent', description: 'Latest reported sets', options: [playerOption(YOU_OR_ALL, 'player', false), memberOption()] },
+  { name: 'run', description: 'Current tournament run and next opponent', options: [playerOption(YOU, 'player', false), memberOption()] },
   {
     name: 'progress',
     description: 'Last 30 days compared with the previous 30, by game',
     options: [
-      playerOption(YOU, 'player', false),
+      playerOption(YOU, 'player', false), memberOption(),
       verboseOption('Streaks, close sets, seeds, upsets, rematches and characters, plus a 6 month trend. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets, placements and characters, plus Slippi rank vs last season' },
     ],
@@ -349,7 +348,7 @@ const commands = [
     name: 'stats',
     description: 'Recent placements and set record',
     options: [
-      playerOption(YOU, 'player', false), verboseOption('Full lifetime report, slower'),
+      playerOption(YOU, 'player', false), memberOption(), verboseOption('Full lifetime report, slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only count Melee sets and placements, plus their Slippi rank' },
       sinceOption(), venueOption(),
     ],
@@ -358,7 +357,7 @@ const commands = [
     name: 'doubles',
     description: 'One player\'s 2v2 doubles: record, partners and placements',
     options: [
-      playerOption(YOU, 'player', false),
+      playerOption(YOU, 'player', false), memberOption(),
       verboseOption('Up to 600 doubles sets: every partner, teams played, seeds and best finishes. Slower'),
       { type: Option.Boolean, name: 'melee', description: 'Only count Melee doubles sets and placements' },
     ],
@@ -367,7 +366,7 @@ const commands = [
     name: 'characters',
     description: 'Characters a player has reported in Ultimate or Melee',
     options: [
-      playerOption(YOU, 'player', false),
+      playerOption(YOU, 'player', false), memberOption(),
       {
         type: Option.Integer, name: 'game', description: 'Ultimate or Melee, leave out for whichever has more reported. Melee adds Slippi ranked picks',
         choices: PICKABLE_GAMES.map((game) => ({ name: game.displayName, value: game.id })),

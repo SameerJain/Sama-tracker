@@ -17,17 +17,8 @@ export default {
   '**Language:** {0}': '**Idioma:** {0}',
   '**Posts channel:** <#{0}>': '**Canal de publicaciones:** <#{0}>',
   '**Posts channel:** not set': '**Canal de publicaciones:** sin elegir',
-  '**Bot commands:** {0}': '**Comandos del bot:** {0}',
-  '**Bot commands:** every channel': '**Comandos del bot:** todos los canales',
-  '-# `commands_channel` limits bot commands to the channels picked, threads in them included. Picking one again takes it off, except with `commands_anywhere:False`, and `commands_anywhere:True` clears the list. `/t-o` works everywhere.':
-    '-# `commands_channel` deja los comandos del bot solo en los canales elegidos, con sus hilos. Elegirlo otra vez lo quita, salvo con `commands_anywhere:False`, y `commands_anywhere:True` vacía la lista. `/t-o` funciona en todos lados.',
-  'Pick either `commands_channel` or `commands_anywhere:True`, not both.': 'Elige `commands_channel` o `commands_anywhere:True`, no los dos.',
   '-# Without Pin Messages there, thread cards don\'t get pinned.': '-# Sin Fijar mensajes ahí, las tarjetas de los hilos no se fijan.',
-  'Pick the channel bot commands should work in with `commands_channel`.': 'Elige con `commands_channel` el canal donde deben funcionar los comandos del bot.',
   // commandsChange
-  'Bot commands only work in {0} now.': 'Ahora los comandos del bot solo funcionan en {0}.',
-  'Bot commands work in every channel now.': 'Ahora los comandos del bot funcionan en todos los canales.',
-  'Took <#{0}> off the list.': 'Quité <#{0}> de la lista.',
   '**Weekly recap**': '**Resumen semanal**',
   '**Posts:** {0} · **Day and time:** {1} {2} {3}': '**Se publica:** {0} · **Día y hora:** {1} {2} {3}',
   '-# Set results, stream alerts, match calls, next opponents, top 8s and reg reminders here are the default for every tournament. /t-o tournament posts changes one tournament.':
@@ -205,4 +196,5 @@ export default {
   'Pick either `user` or `player`, not both.': 'Elige `user` o `player`, no los dos.',
   'see or change everyone\'s pings. Leave out `player` for yours': 'ver o cambiar los pings de todos. Deja `player` vacío para los tuyos',
   'see or change a tracked player\'s pings. Leave out `player` for yours': 'ver o cambiar los pings de un jugador seguido. Deja `player` vacío para los tuyos',
+  '-# Bot replies and automatic posts use the posts channel and its threads. Settings work privately anywhere. Matchmaking can use another channel.': '-# Las respuestas del bot y las publicaciones automáticas van al canal elegido y sus hilos. Los ajustes funcionan en privado desde cualquier canal. Matchmaking puede usar otro canal.',
 };

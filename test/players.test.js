@@ -59,6 +59,50 @@ const crew = { userId: 1, playerId: 10, tag: 'Crew', slug: 'user/crew' };
 const me = { userId: 7, playerId: 70, tag: 'Me', slug: 'user/me' };
 const noStats = () => ({ player: { recentStandings: [], sets: { nodes: [] } } });
 
+test('single-player reports offer Discord member picks and reject two different picks', async () => {
+  for (const name of ['stats', 'progress', 'characters', 'doubles', 'recent', 'upcoming', 'run']) {
+    assert.equal(commands.find(command => command.name === name).options.find(option => option.name === 'user')?.type, 6, name);
+    const reply = await run(name, 'someone', { user: { id: 'other' }, member: {}, player: '1' });
+    assert.match(reply.content, /Pick either `user` or `player`/);
+  }
+});
+
+test('a Discord member pick loads their player ID and overrides the caller default', async () => {
+  state.players = { 1: { ...crew, discordId: 'caller' } };
+  state.links = { other: me };
+  state.tournaments = {};
+  const asked = [];
+  mockApi(({ query, variables }) => {
+    if (query.includes('u7: user')) return { u7: { slug: me.slug, player: { gamerTag: me.tag }, authorizations: [{ externalId: 'other' }] } };
+    if (query.includes('user(slug:')) return { user: { id: 7, slug: me.slug, player: { id: 70, gamerTag: me.tag }, authorizations: [{ externalId: 'other' }] } };
+    asked.push(variables);
+    return noStats();
+  });
+  const reply = await run('stats', 'caller', { user: { id: 'other' }, member: {} });
+  assert.match(JSON.stringify(reply.embeds), /Me/);
+  assert.ok(asked.some(values => Object.values(values).includes(70)), 'report uses the picked member player ID');
+  assert.ok(!asked.some(values => Object.values(values).includes(10)), 'does not use the caller');
+});
+
+test('/track add accepts every profile format that /link accepts', async () => {
+  const account = { id: 8, slug: 'user/f64a83c8', player: { id: 80, gamerTag: 'New' }, authorizations: [{ externalId: 'new-discord' }] };
+  for (const input of ['https://www.start.gg/user/f64a83c8', 'start.gg/user/f64a83c8', 'user/f64a83c8', ' f64a83c8 ']) {
+    state.players = {};
+    state.links = {};
+    state.tournaments = {};
+    mockApi(({ query, variables }) => {
+      if (!query.includes('user(slug:')) return {};
+      assert.equal(variables.slug, account.slug);
+      return { user: account };
+    });
+    await run('link', 'new-discord', { profile: input });
+    assert.equal(state.links['new-discord'].userId, 8, input);
+    await run('track', 'new-discord', { profile: input }, 'add');
+    assert.equal(state.players[8].discordId, 'new-discord', input);
+    await settle();
+  }
+});
+
 test('single-player options are optional, and h2h and predict take the opponent first', () => {
   for (const name of ['upcoming', 'recent', 'run', 'progress', 'stats', 'characters']) {
     assert.equal(commands.find(c => c.name === name).options[0].required, false, name);

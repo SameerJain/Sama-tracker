@@ -7,7 +7,7 @@ import * as embeds from '../embeds/index.js';
 import { split } from '../embeds/shared.js';
 import { state, save } from '../store.js';
 import { ApiError } from '../errors.js';
-import { linkedElsewhere } from '../accounts.js';
+import { findAccount, linkedElsewhere } from '../accounts.js';
 import { t, count, listOf, language } from '../i18n.js';
 import { MEMBER_H2H, MEMBER_SCOUT } from './definitions.js';
 
@@ -472,6 +472,22 @@ async function fetchPlayer(interaction, input) {
 // link or ID for anyone at all, tracked or not. a typed one gets looked up, which waits for the defer, so this defers
 // when it has to. a name that isn't anyone's gets the closest one suggested. null once it answered
 async function statPlayer(interaction, name = 'player') {
+  const user = name === 'player' && interaction.options.getUser?.('user');
+  if (user) {
+    if (interaction.options.getString(name)) {
+      await replyEphemeral(interaction, t('Pick either `user` or `player`, not both.'));
+      return null;
+    }
+    if (user.bot || !interaction.options.getMember?.('user')) {
+      await replyEphemeral(interaction, user.bot ? t('Bots don\'t have start.gg accounts.') : t('Pick someone in this server.'));
+      return null;
+    }
+    if (!interaction.deferred) await interaction.deferReply();
+    const account = await findAccount(user.id);
+    const player = account && await startgg.getPlayer(account.slug);
+    if (!player) await replyEphemeralAfterDefer(interaction, t('No start.gg found for that member. Use `/track add` with their profile link, or ask them to `/link` it first.'));
+    return player;
+  }
   const picked = readPlayer(interaction, name);
   if (picked) return picked;
   const typed = interaction.options.getString(name);

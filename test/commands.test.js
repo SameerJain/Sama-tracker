@@ -9,8 +9,7 @@ import { MessageFlags } from 'discord.js';
 // every command once against a fake start.gg, so a handler that throws shows up here
 const directory = mkdtempSync(join(tmpdir(), 'sama-commands-'));
 process.env.STATE_DIR = directory;
-// multi-server on here so /t-o settings channel is covered too. the fakes carry no guildId,
-// so every command still runs on the root exactly like single-server mode
+// multi-server covers the complete global command definitions; partial interactions use root state
 process.env.MULTI_GUILD = 'true';
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
@@ -78,6 +77,7 @@ function respond(query, variables) {
   if (query.includes('user(slug:')) {
     // the matchup commands pair() something typed that isn't tracked or linked, so one slug resolves to nobody
     if (variables.slug?.includes('nobody')) return { user: null };
+    if (variables.slug === 'user/crew') return { user: { id: 1, slug: 'user/crew', images: [], player: { id: 10, gamerTag: 'Crew' }, authorizations: [{ externalId: 'crew-discord' }] } };
     return { user: { id: 3, slug: 'user/opponent', images: [], player: { id: 30, gamerTag: 'Opponent' }, authorizations: [{ externalId: 'opponent-discord' }] } };
   }
   if (query.includes('registrationClosesAt')) {
@@ -156,7 +156,6 @@ function interaction(commandName, { group = null, subcommand = null, values = {}
     commandName, calls, waitedOn: [],
     user: { id: user, bot: false, displayName: 'Crew' },
     targetUser: target, targetMember: target && { displayName: target.displayName },
-    channelId: 'channel-1',
     guild: {
       id: 'guild-1',
       members: { fetch: async ({ user: ids }) => { beforeAnswer(run, 'discord members'); return new Map(ids.map((id) => [id, {}])); } },
@@ -206,14 +205,7 @@ const runs = [
   ['help', {}, /\/help verbose:True/], ['help', { values: { verbose: true } }, /Linking yourself/],
   ['status', {}, /Status/],
   ['t-o', { subcommand: 'settings', values: { channel: { id: 'channel-9', isTextBased: () => true }, events: false, day: 5, time: '20:00', language: 'en' } }, /Friday 20:00.*Automatic posts go in <#channel-9>/s],
-  // commands run in channel-1, so taking it off the list refuses them until the list is cleared
-  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'channel-1' } } }, /Bot commands:\*\* <#channel-1>/],
-  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'bots' } } }, /Bot commands:\*\* <#channel-1> and <#bots>/],
-  ['status', {}, /Status/],
-  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'channel-1' } } }, /Bot commands:\*\* <#bots>/],
-  ['status', {}, /Use the bot in <#bots>\. A TO picks where/],
-  ['t-o', { subcommand: 'settings', values: { commands_channel: { id: 'bots' }, commands_anywhere: true } }, /Pick either `commands_channel` or `commands_anywhere:True`/],
-  ['t-o', { subcommand: 'settings', values: { commands_anywhere: true } }, /Bot commands:\*\* every channel/],
+  ['t-o', { subcommand: 'settings', values: { channel: { id: 'channel-1', isTextBased: () => true } } }, /Automatic posts go in <#channel-1>/],
   ['socials', {}, /Nothing yet/],
   ['data', {}, /Monday Night SmashBall.*monday-night-smashball\.vercel\.app.*UB Smash Royale.*ub-smash-royale\.vercel\.app/],
   ['socials_edit', { subcommand: 'add', values: { name: '716 Esports', link: 'twitch.tv/716esports' } }, /Added https:\/\/twitch\.tv\/716esports under 716 Esports/],
@@ -258,6 +250,7 @@ const runs = [
   ['h2h', { values: { opponent: 'start.gg/user/nobody' } }, /Couldn't find a start\.gg player for `start\.gg\/user\/nobody`/],
   // every stat command looks up a pasted profile link, tracked or not
   ['stats', { values: { player: 'start.gg/user/opponent' } }, /Opponent/],
+  ['stats', { values: { user: { id: 'crew-discord', bot: false, displayName: 'Crew' } } }, /Crew/],
   // the fake answers every set lookup with crew's sets, so this shows the link got past the pick list
   ['recent', { values: { player: 'start.gg/user/opponent' } }, /^(?!.*Only tracked or linked).*Set result/],
   ['run', { values: { player: 'start.gg/user/opponent' } }, /Opponent/],

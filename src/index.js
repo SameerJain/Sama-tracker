@@ -167,11 +167,11 @@ async function bootSingle() {
   // global ones left from a multi-server run would show next to these
   await clearLeftoverCommands([client.application.commands]);
 
-  const channel = await client.channels.fetch(process.env.CHANNEL_ID).catch((err) => {
+  const channel = await client.channels.fetch(postsChannelId()).catch((err) => {
     if (NOT_THERE.includes(err.code)) return null;
-    quit(`couldn't load channel ${process.env.CHANNEL_ID} from Discord (${err.message})`);
+    quit(`couldn't load channel ${postsChannelId()} from Discord (${err.message})`);
   });
-  if (!channel?.isTextBased()) quit(`can't see a text channel with id ${process.env.CHANNEL_ID}, check CHANNEL_ID`);
+  if (!channel?.isTextBased()) quit(`can't see a text channel with id ${postsChannelId()}, check the saved bot channel or CHANNEL_ID`);
   const missing = missingPosting(channel);
   if (missing.length) quit(`missing permissions in #${channel.name}: ${missing.join(', ')}`);
 

@@ -2,7 +2,7 @@ import { hostname } from 'node:os';
 import { HTTPError, MessageFlags, RESTJSONErrorCodes } from 'discord.js';
 import * as startgg from '../startgg.js';
 import * as embeds from '../embeds/index.js';
-import { forGuild, guildLocal, isMultiGuild, state } from '../store.js';
+import { forGuild, guildLocal, isMultiGuild, postsChannelId, state } from '../store.js';
 import { deployedAt, health } from '../tracker.js';
 import { funCommands, post } from '../fun/index.js';
 import { verifiedCaller } from '../accounts.js';
@@ -13,12 +13,12 @@ import {
 import { bracket, streamLink, registered, regWarn, tournamentChoices } from './registration.js';
 import { tournamentAdd, tournamentRemove, tournamentPosts, tournamentEvent, tournamentList } from './tournaments.js';
 import { toAdd, toSet, toRemove, toList } from './to.js';
-import { commandChannels, configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
+import { configureSettings, timezoneChoices, socialsAdd, socialsRemove, trackPosts, notify } from './settings.js';
 import { slippiAdd, slippiRemove, slippiRank, slippiLeaderboard, slippiChoices } from './slippi.js';
 import { matchmakingRole, matchmakingSearch, matchmakingChannel } from './matchmaking.js';
 import {
   pickable, sendEmbeds, readButton, parseSince, playerBySlug, replyEphemeral, replyEphemeralAfterDefer, recentPicks, nameMatches, failureMessage, flag,
-  looksLikeProfile, listOf, t,
+  looksLikeProfile, t,
 } from './shared.js';
 import { handleChoice, isChoice } from './confirm.js';
 
@@ -118,14 +118,18 @@ const handlers = new Map([
   ...Object.values(funCommands).map((fun) => [fun.name, (interaction) => post(interaction, fun)]),
 ]);
 
-// the private reply for a command used outside the channels a TO picked, null when it's fine here. a thread
-// counts as the channel it's in. /t-o always works, so a TO can change the setting from anywhere
+// every public reply stays in the posts channel or its threads. settings stay reachable for setup,
+// and matchmaking has its own channel choice
 function wrongChannel(interaction) {
-  const allowed = commandChannels(interaction.guild);
-  if (!allowed.length || interaction.commandName === 't-o') return null;
+  if (interaction.commandName === 'matchmaking' || (interaction.commandName === 't-o' && commandName(interaction) === 't-o settings')) return null;
+  const channelId = postsChannelId();
+  // partial interactions in tests have no channel; real server interactions always do
+  if (!interaction.channelId) return null;
   const parent = interaction.channel?.isThread?.() ? interaction.channel.parentId : null;
-  if (allowed.includes(interaction.channelId) || allowed.includes(parent)) return null;
-  return t`Use the bot in ${listOf(allowed.map((id) => `<#${id}>`))}. A TO picks where with \`/t-o settings commands_channel:\`.`;
+  if (channelId && (interaction.channelId === channelId || parent === channelId)) return null;
+  return channelId
+    ? t`Use the bot in <#${channelId}>. A TO picks the channel with \`/t-o settings channel:\`.`
+    : t('A TO needs to pick the bot channel with `/t-o settings channel:` first.');
 }
 
 export async function handleCommand(interaction) {
@@ -285,6 +289,8 @@ async function pressButton(interaction) {
   // Are you sure and Undo answer by changing the message they're on, see confirm.js
   if (isChoice(interaction.customId)) return handleChoice(interaction);
   const { action } = readButton(interaction.customId);
+  const elsewhere = action !== 'private' && !interaction.message?.flags?.has(MessageFlags.Ephemeral) && wrongChannel(interaction);
+  if (elsewhere) return replyEphemeral(interaction, elsewhere);
   const press = async () => {
     if (await deferButtonOrRetry(interaction, action)) return answerButton(interaction);
   };

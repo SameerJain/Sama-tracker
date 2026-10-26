@@ -10,7 +10,7 @@ process.env.STATE_DIR = directory;
 // the fun posts would call Claude on import
 delete process.env.ANTHROPIC_API_KEY;
 const { state } = await import('../src/store.js');
-const { handleCommand } = await import('../src/commands/index.js');
+const { handleButton, handleCommand } = await import('../src/commands/index.js');
 after(() => rmSync(directory, { recursive: true, force: true }));
 beforeEach(() => {
   state.messages = {};
@@ -40,65 +40,59 @@ async function run(commandName, { channelId = 'general', parent = null, subcomma
 
 const settings = (values) => run('t-o', { subcommand: 'settings', values });
 
-test('with no channels picked, commands work everywhere', async () => {
-  const reply = await run('help');
-  assert.ok(reply.embeds?.length, 'help answered');
-});
-
-test('picked channels are the only place commands work, threads in them included', async () => {
-  state.messages = { commandChannels: ['bots', 'stats'] };
+test('the posts channel is the one place for public commands, including its threads', async () => {
+  state.channelId = 'bots';
+  state.messages.commandChannels = ['stats'];
   const refused = await run('help', { channelId: 'general' });
-  assert.equal(refused.content, 'Use the bot in <#bots> and <#stats>. A TO picks where with `/t-o settings commands_channel:`.');
-  assert.ok(refused.flags & MessageFlags.Ephemeral, 'only whoever ran it sees it');
+  assert.match(refused.content, /Use the bot in <#bots>/);
+  assert.ok(refused.flags & MessageFlags.Ephemeral);
   assert.ok((await run('help', { channelId: 'bots' })).embeds?.length);
-  assert.ok((await run('help', { channelId: 'a-thread', parent: 'stats' })).embeds?.length);
+  assert.ok((await run('help', { channelId: 'a-thread', parent: 'bots' })).embeds?.length);
+  assert.match((await run('help', { channelId: 'stats' })).content, /Use the bot in <#bots>/);
 });
 
-test('/t-o works anywhere, so a TO can always change where commands go', async () => {
-  state.messages = { commandChannels: ['bots'] };
-  const reply = await run('t-o', { channelId: 'general', subcommand: 'settings' });
-  assert.doesNotMatch(reply.content, /^Use the bot in/);
-});
-
-test('a picked channel that was deleted stops counting, so the bot is never locked out', async () => {
-  state.messages = { commandChannels: ['gone'] };
-  assert.ok((await run('help', { channelId: 'general' })).embeds?.length);
-  state.messages = { commandChannels: ['gone', 'bots'] };
-  assert.match((await run('help', { channelId: 'general' })).content, /^Use the bot in <#bots>\./);
-});
-
-test('the refusal reads in the server\'s language', async () => {
-  state.messages = { commandChannels: ['bots'], language: 'es' };
-  assert.match((await run('help', { channelId: 'general' })).content, /<#bots>/);
-  assert.doesNotMatch((await run('help', { channelId: 'general' })).content, /^Use the bot/);
-});
-
-test('commands_anywhere:False with a channel only adds it, so a second pick can\'t lift the limit', async () => {
-  const added = await settings({ commands_channel: { id: 'bots' }, commands_anywhere: false });
-  assert.match(added.content, /^Bot commands only work in <#bots> now\./);
-  assert.deepEqual(state.messages.commandChannels, ['bots']);
-  assert.match((await run('help', { channelId: 'general' })).content, /^Use the bot in <#bots>\./);
-
-  const again = await settings({ commands_channel: { id: 'bots' }, commands_anywhere: false });
-  assert.deepEqual(state.messages.commandChannels, ['bots']);
-  assert.match(again.content, /\*\*Bot commands:\*\* <#bots>/);
-  assert.match((await run('help', { channelId: 'general' })).content, /^Use the bot in <#bots>\./);
-});
-
-test('picking a listed channel takes it off, and the reply says so first', async () => {
-  await settings({ commands_channel: { id: 'bots' } });
-  const both = await settings({ commands_channel: { id: 'stats' } });
-  assert.match(both.content, /^Bot commands only work in <#bots> and <#stats> now\./);
-  const one = await settings({ commands_channel: { id: 'bots' } });
-  assert.match(one.content, /^Took <#bots> off the list\. Bot commands only work in <#stats> now\./);
-  const none = await settings({ commands_channel: { id: 'stats' } });
-  assert.match(none.content, /^Took <#stats> off the list\. Bot commands work in every channel now\./);
-  assert.ok((await run('help', { channelId: 'general' })).embeds?.length);
-});
-
-test('commands_anywhere:False alone, with nothing picked, asks for a channel', async () => {
-  const reply = await settings({ commands_anywhere: false });
-  assert.equal(reply.content, 'Pick the channel bot commands should work in with `commands_channel`.');
+test('settings remain available privately anywhere, including before a channel is set', async () => {
+  state.channelId = 'bots';
+  const reply = await settings({});
+  assert.match(reply.content, /Posts channel:\*\* <#bots>/);
   assert.ok(reply.flags & MessageFlags.Ephemeral);
-  assert.equal(state.messages.commandChannels, undefined);
+  state.channelId = null;
+  assert.match((await run('help')).content, /t-o settings channel:/);
+});
+
+test('the separate command-channel options are gone in both modes', async () => {
+  const { commands } = await import('../src/commands/definitions.js');
+  const options = commands.find(command => command.name === 't-o').options.find(option => option.name === 'settings').options;
+  assert.ok(options.some(option => option.name === 'channel'));
+  assert.ok(!options.some(option => ['commands_channel', 'commands_anywhere'].includes(option.name)));
+});
+
+test('matchmaking keeps its channel choice outside the bot channel', async () => {
+  state.channelId = 'bots';
+  const reply = await run('matchmaking', { subcommand: 'channel', values: { game: 'ult' } });
+  assert.match(reply.content, /Ultimate.*searches post wherever the command runs/);
+});
+
+test('changing the single-server channel switches replies and background posts together', async () => {
+  const { currentChannel } = await import('../src/tracker.js');
+  const { postsChannelId } = await import('../src/store.js');
+  const channel = { id: 'stats', isTextBased: () => true };
+  const reply = await settings({ channel });
+  assert.ok(reply.flags & MessageFlags.Ephemeral);
+  assert.equal(postsChannelId(), 'stats');
+  assert.equal(currentChannel(), channel);
+  assert.ok((await run('help', { channelId: 'stats' })).embeds?.length);
+  assert.match((await run('help', { channelId: 'bots' })).content, /Use the bot in <#stats>/);
+});
+
+test('public report buttons in the old channel point to the new bot channel', async () => {
+  state.channelId = 'bots';
+  let reply;
+  await handleButton({
+    channelId: 'old', customId: 'new:stats:crew:::::', user: { id: 'someone' },
+    reply: async (result) => { reply = result; },
+    deferReply: async () => assert.fail('old channel must not start a public report'),
+  });
+  assert.match(reply.content, /Use the bot in <#bots>/);
+  assert.ok(reply.flags & MessageFlags.Ephemeral);
 });

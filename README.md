@@ -14,7 +14,7 @@ Made by Samatron. See it running in [this Discord server](https://discord.gg/VuM
 
 ## Get started
 
-1. **Pick the posts channel (multi-server only).** With `MULTI_GUILD=true` a TO runs `/t-o settings channel:#channel` in each server. Every server tracks its own players and tournaments, with its own settings, in its own channel. Without it the bot answers commands but posts nothing. Single-server builds skip this: they post in `CHANNEL_ID`.
+1. **Pick the bot channel.** A TO runs `/t-o settings channel:#channel` in each server. Bot replies and automatic posts use that channel and its threads. Settings work privately anywhere, and matchmaking can use its own channels. Single-server builds start with `CHANNEL_ID` until a TO changes it.
 2. **Link yourself.** Connect Discord on your start.gg profile, then run `/link`. Commands then know who you are, and nothing gets posted about you. Tracked players with Discord connected can skip this.
 3. **Set up the TO role.** `/t-o role set role:@TO(Buffalo)` uses a role already in the server, or `/t-o role add user:@someone` gives the default **TO** role to someone. TOs use `/t-o tournament`, change `/t-o settings` and can change tracking for anyone. See [TOs](#tos).
 4. **Track your tournaments.** A TO's `/t-o tournament add tournament:<link>` posts every set, stream alert, match call, next opponent, results card and top 8 from a tournament, plus registration reminders, following `/t-o settings`. `/t-o tournament event tournament:<link>` makes a Discord event from a link that keeps up with start.gg, and `/t-o tournament list` shows everything tracked.
@@ -53,9 +53,9 @@ Player pickers start with the last 5 people you picked. Once you type, names tha
 | `/t-o cleanup` | Untrack everyone whose start.gg Discord isn't in this server. Names them and asks first, then **Undo** puts them back for a minute. Players with no Discord on start.gg stay unless you add `no_discord:True`. TOs only. |
 | `/link profile:<link or ID>` | Link your own start.gg account. Leave out `profile` to find it by the Discord connected on start.gg, among the accounts `/profile` searches. With `MULTI_GUILD=true` a link counts in every server the bot is in, until a server has its own. |
 | `/unlink` | Remove your link, with an **Undo** button for a minute. Tracking stays as it was. |
-| `/upcoming` | Tracked tournaments, and any other live or upcoming tournament with 3 or more of the crew registered. `player:` checks one person instead, live from start.gg when they're linked but not tracked. |
-| `/recent` | Your last 5 sets. With `player:all`, up to 20 sets, at most 3 per player, from up to 40 players: those with set results on first, then whoever played most recently. |
-| `/run` | Your run and next opponent in each current bracket, with the station and scheduled time when the TO set them. Each next opponent gets a head-to-head button for the short report, up to 5, singles only. |
+| `/upcoming [user:<member>]` | Tracked tournaments, and any other live or upcoming tournament with 3 or more of the crew registered. `player:` checks one person instead, live from start.gg when they're linked but not tracked. |
+| `/recent [user:<member>]` | Your last 5 sets. With `player:all`, up to 20 sets, at most 3 per player, from up to 40 players: those with set results on first, then whoever played most recently. |
+| `/run [user:<member>]` | Your run and next opponent in each current bracket, with the station and scheduled time when the TO set them. Each next opponent gets a head-to-head button for the short report, up to 5, singles only. |
 
 Anyone can track, untrack and change posts for themselves. Yourself means the start.gg you `/link`ed, or the one whose Discord is yours. Only TOs can do it for someone else. New players start with both off. Players with no reported sets in 6 months come off the track list on their own.
 
@@ -106,15 +106,15 @@ The bot makes each role the first time someone asks for it, with no permissions 
 
 | Command | Short report | With `verbose:True` |
 | --- | --- | --- |
-| `/stats` | Recent record, placements and biggest upset. | Lifetime results, opponents and seed performance. |
-| `/doubles` | Recent 2v2 record, top partners, best finish, biggest upset and latest events. | Up to 600 doubles sets: every partner's record and best finish together, teams played and lost to most, seeds, close sets and best finishes. |
+| `/stats [user:<member>]` | Recent record, placements and biggest upset. | Lifetime results, opponents and seed performance. |
+| `/doubles [user:<member>]` | Recent 2v2 record, top partners, best finish, biggest upset and latest events. | Up to 600 doubles sets: every partner's record and best finish together, teams played and lost to most, seeds, close sets and best finishes. |
 | `/h2h opponent:<name or link/ID>` | Overall record, last 10 meetings and one-line predicted odds. | Every meeting, splits, streaks and the same one-line odds. |
 | `/predict opponent:<name or link/ID>` | Estimated odds of winning, and why. | The full breakdown: how much each part counts, with bars, model numbers and how sure the odds are. |
 | `/scout opponent:<player or link/ID>` | Any opponent's form, how often they win game 3 and game 5 in Ultimate, characters, toughest opponents and worst matchups, plus your head-to-head. | More history, habits, game 3 and game 5 win rates in every game, stages and your odds. |
-| `/progress` | Last 30 days against the previous 30, with changes in win rates and placements. | More detail on each period, a 6-month trend and a win-rate graph. |
-| `/characters` | Reported characters in Ultimate or Melee. | More history, and other games with reported characters. |
+| `/progress [user:<member>]` | Last 30 days against the previous 30, with changes in win rates and placements. | More detail on each period, a 6-month trend and a win-rate graph. |
+| `/characters [user:<member>]` | Reported characters in Ultimate or Melee. | More history, and other games with reported characters. |
 
-Add `player:` to look up someone else, like `/h2h opponent:Sparg0 player:Leo`. `/scout` always compares the opponent with you. Any `player:` or `opponent:` also takes a start.gg profile link or ID, like `start.gg/user/f64a83c8`, so you can look up someone nobody tracked or linked. That only looks them up and doesn't track them. A pasted link or ID that matches no name shows up in the list as a start.gg lookup. A name that matches nobody gets the closest tracked or linked one suggested right away.
+Add `player:` to look up someone else, like `/h2h opponent:Sparg0 player:Leo`. `/scout` always compares the opponent with you. For `/stats`, `/progress`, `/characters`, `/doubles`, `/recent`, `/upcoming` and `/run`, `user:` opens Discord's member picker with usernames, avatars and status. Use it instead of `player:` after the member has used `/link` or been added with `/track add`. Any `player:` or `opponent:` also takes a start.gg profile link or ID, like `start.gg/user/f64a83c8`, so you can look up someone nobody tracked or linked. That only looks them up and doesn't track them. A pasted link or ID that matches no name shows up in the list as a start.gg lookup. A name that matches nobody gets the closest tracked or linked one suggested right away.
 
 `/h2h` runs the same prediction as `/predict` but keeps it to one line, even with `verbose:True`. Both give Ultimate odds unless `melee:True`, even for two players who mostly play Melee, and say so when one of them has never played that game. Run `/predict` for the reasoning behind the odds, and add `verbose:True` for the full breakdown with bars and model numbers. `/scout` always compares the opponent with you, replies privately, and needs you tracked or linked, with Discord connected on start.gg.
 
@@ -138,8 +138,8 @@ Melee reports add Slippi ranked info for players on the watchlist. That covers r
 
 | Command | Slippi ranked adds |
 | --- | --- |
-| `/stats` | Rank, rating, season record, daily leaderboard placement and top characters. |
-| `/progress` | The same, plus the change in rating since the end of last season. |
+| `/stats [user:<member>]` | Rank, rating, season record, daily leaderboard placement and top characters. |
+| `/progress [user:<member>]` | The same, plus the change in rating since the end of last season. |
 | `/h2h`, `/predict`, `/scout` | Rank, rating and season record for each player on the watchlist. When both players are ranked and the odds are for Melee, their ratings count toward the odds, even with no Melee sets to go on. Otherwise the ranks are only shown. |
 | `/characters game:Melee` | Ranked characters this season with game counts, next to what TOs reported. |
 
@@ -197,15 +197,15 @@ Connect Discord on start.gg so the bot recognizes your registration and skips yo
 | Command | What it does |
 | --- | --- |
 | `/help` | Short command list. `verbose:True` lists every command with the details. |
-| `/t-o settings` | Every server setting in one command: automatic posts, threads, set colors, Discord event length, weekly recap schedule, language, which channels commands work in and, in multi-server mode, the posts channel. Leave every option blank to see the current settings. TOs only. |
+| `/t-o settings` | Every server setting in one command: automatic posts, threads, set colors, Discord event length, weekly recap schedule, language, the one bot channel for replies and automatic posts. Settings replies are private and work anywhere. Anyone can view them; only TOs can change them. |
 | `/status` | Uptime, when the latest version was deployed plus its message, the last start.gg and Slippi checks, how many players and tournaments are tracked, requests waiting on start.gg, whether start.gg is down right now, any downtime before the last start, why a post last missed its thread, and a link to the GitHub repo. A copy run on another computer also shows that computer's name. |
-| `/profile` | A tracked or linked player's start.gg with `player:`, or a server member's with `user:`. Leave both blank for yourself. |
+| `/profile` | Use `/track add` or `/link` with a start.gg profile link first. Then pick a server member with `user:` or a tracked or linked player with `player:`. Leave both blank for yourself. |
 | `/data` | Links to [Samatracker](https://samatracker.vercel.app), the web companion with cached player lookup, recent results and Slippi ranks, and both series data pages: the [Monday Night SmashBall data page](https://monday-night-smashball.vercel.app) and the [UB Smash Royale data page](https://ub-smash-royale.vercel.app), with every tournament's attendance, winners, who came to the most nights, counting Ultimate and Melee, and characters. |
 | `/socials` | Saved streams and social links. |
 | `/socials_edit add name:<who> link:<url>` | Save a link. `https://` is optional, and links with the same name share a line. |
 | `/socials_edit remove link:<url>` | Remove a saved link. |
 
-`/profile` checks the Discord connected on start.gg against accounts the bot has already seen: tracked players, people who used `/link`, and people registered for a tournament the bot checks. With `MULTI_GUILD=true` that's in any server the bot is in, and any server's tracked tournaments, so a new server finds people another one already knows, and `/track add` and `/link` with no link find you the same way. A `/link`, or being tracked with Discord connected on start.gg, counts in every server too: leaving the player out of `/stats`, `/scout` or `/slippi rank`, H2H with me and your `/notify` pings all find you in a server you never linked in. That server's own link or tracking comes first, and `/unlink` only takes off the link in the server it runs in. It reads registration lists again at most every 10 minutes. If it can't find you, connect Discord on start.gg and run `/link` with your profile link. To find someone else with `/profile @them`, they have to be on that list first. Or pick them from the tracked and linked list with `player:`, which needs no Discord matching.
+`/profile` checks the Discord connected on start.gg against accounts the bot has already seen: tracked players, people who used `/link`, and people registered for a tournament the bot checks. With `MULTI_GUILD=true` that's in any server the bot is in, and any server's tracked tournaments, so a new server finds people another one already knows, and `/track add` and `/link` with no link find you the same way. A `/link`, or being tracked with Discord connected on start.gg, counts in every server too: leaving the player out of `/stats`, `/scout` or `/slippi rank`, H2H with me and your `/notify` pings all find you in a server you never linked in. That server's own link or tracking comes first, and `/unlink` only takes off the link in the server it runs in. It reads registration lists again at most every 10 minutes. If it can't find you, connect Discord on start.gg and run `/track add` or `/link` with your profile link first. `/track add` takes the same profile links, IDs and automatic lookup as `/link`, and TOs can also pick someone else with `user:`. To find someone else with `/profile @them`, they have to be on that list first. Or pick them from the tracked and linked list with `player:`, which needs no Discord matching.
 
 `/socials_edit` needs **Manage Server** by default. You can hand it to other roles under Server Settings > Integrations > Sama-tracker, and the bot goes by that.
 
@@ -273,7 +273,7 @@ Some TOs tag an event with the wrong game, like a "Melee Singles" tagged as Ulti
 
 ### Turning posts on and off
 
-Run `/t-o settings` without options to see every setting privately. TOs can change any of the twelve switches: `sets`, `streams`, `calls`, `next`, `rollcall`, `results`, `top8`, `registration`, `events`, `slippi`, `recap` and `bills`, plus the thread mode, event length, set colors, recap schedule, language, command channels and posts channel. Six of them, `sets`, `streams`, `calls`, `next`, `top8` and `registration`, are the default for every tournament, and `/t-o tournament posts` beats them for one. Only Bills finals and Discord events start off server-wide. `set_colors` colors set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played, and starts off. Turning `events` on checks for Manage Events first, and it makes events for upcoming tournaments already tracked. The `/notify` DMs go by each person's own setting and the tournament's `registration`, which follows this switch unless `/t-o tournament posts` changed it. Match calls only ping people who turned on `/notify calls`, next opponents only ping people with `/notify next` on, stream alerts only ping whoever is playing with `/notify streams` on, and top 8s only come from tracked tournaments.
+Run `/t-o settings` without options to see every setting privately. TOs can change any of the twelve switches: `sets`, `streams`, `calls`, `next`, `rollcall`, `results`, `top8`, `registration`, `events`, `slippi`, `recap` and `bills`, plus the thread mode, event length, set colors, recap schedule, language and the bot channel. Six of them, `sets`, `streams`, `calls`, `next`, `top8` and `registration`, are the default for every tournament, and `/t-o tournament posts` beats them for one. Only Bills finals and Discord events start off server-wide. `set_colors` colors set result cards green for a tracked win, red for a loss, gold when two tracked players meet and blue when nobody tracked played, and starts off. Turning `events` on checks for Manage Events first, and it makes events for upcoming tournaments already tracked. The `/notify` DMs go by each person's own setting and the tournament's `registration`, which follows this switch unless `/t-o tournament posts` changed it. Match calls only ping people who turned on `/notify calls`, next opponents only ping people with `/notify next` on, stream alerts only ping whoever is playing with `/notify streams` on, and top 8s only come from tracked tournaments.
 
 Turning off two or more switches that are on, in one command, asks first, the way `/t-o cleanup` does. Only whoever ran it can press **Turn them off** or **Cancel**, the buttons work for 5 minutes, and Cancel changes nothing. Everything else in the same command goes through with the press. One switch at a time, or ones already off, change right away.
 
@@ -283,7 +283,7 @@ Turning off two or more switches that are on, in one command, asks first, the wa
 
 Times use 24-hour `HH:MM` in the chosen timezone, with daylight saving. Settings save right away and survive restarts. A stream alert, match call or next opponent still going on posts at the next check when its type is turned back on. Anything else that came due while a type was off stays skipped after you turn it back on. Schedule changes apply to future recaps. Each player's `/track posts`, each tournament's `/t-o tournament posts` and everyone's own `/notify` pings still apply on top.
 
-Bot commands work in every channel until a TO picks some with `/t-o settings commands_channel:#bot-commands`. Each pick adds a channel to the list, threads in it included, and picking one already on the list takes it off. With `commands_anywhere:False` too, a pick only ever adds, so running the same pick twice can't lift the limit. The reply starts with where commands work now. `commands_anywhere:True` clears the list. Anywhere else, a command gets a private reply naming the channels to use. `/t-o` itself works everywhere, so a TO can always change it, and a channel that gets deleted drops off the list, so the bot never ends up usable nowhere.
+Each server has one bot channel, picked with `/t-o settings channel:#channel`. Commands and automatic posts use it and its threads; a command used elsewhere gets a private reply pointing there. `/t-o settings` works privately anywhere so a TO can set or replace the channel. `/matchmaking` works elsewhere and keeps its own per-game channel settings. The old `commands_channel` and `commands_anywhere` options are removed.
 
 ### Language
 
@@ -327,7 +327,7 @@ You need Node.js 22.9 or newer, a Discord bot and a start.gg API token.
 | `DISCORD_TOKEN` | Yes | The bot's token from the Developer Portal. |
 | `STARTGG_TOKEN` | Yes | The start.gg API token. |
 | `GUILD_ID` | Single-server, or switching to multi-server | The server. Single-server commands register here. With `MULTI_GUILD=true` it's only used to move this server's track list and settings into its own entry, so keep it set when switching a single-server bot over, and leave it out of a new multi-server copy. |
-| `CHANNEL_ID` | Single-server, or switching to multi-server | The channel for automatic posts. With `MULTI_GUILD=true` it stays that server's posts channel until a TO picks another with `/t-o settings channel:`. |
+| `CHANNEL_ID` | Single-server, or switching to multi-server | The initial bot channel for replies and automatic posts. A TO can replace it with `/t-o settings channel:` in either mode. |
 | `MULTI_GUILD` | No | Set to `true` to serve every server the bot is invited to, each with its own track list, settings and `/t-o settings channel` posts channel. Its commands only work in servers, not in a DM with the bot. Off by default. Switching either way clears the other mode's commands at startup, so none show twice. |
 | `ANTHROPIC_API_KEY` | No | Claude Haiku writes the fun command posts. |
 | `YOUTUBE_API_KEY` | No | YouTube videos for fun posts. Enable YouTube Data API v3 in a Google Cloud project and create an API key. OAuth isn't needed. |
@@ -400,16 +400,16 @@ Keeping Discord events up to date costs one start.gg request per upcoming event 
 
 | Command | History checked |
 | --- | --- |
-| `/stats` | Latest 15 standings and 30 singles sets. With `melee:True`, standings are filtered by game and older pages are read for 30 Melee sets, or all there are if fewer. |
+| `/stats [user:<member>]` | Latest 15 standings and 30 singles sets. With `melee:True`, standings are filtered by game and older pages are read for 30 Melee sets, or all there are if fewer. |
 | `/stats verbose:True` | Every finished singles event and up to 3,000 sets. |
-| `/doubles` | Latest 30 doubles sets and the events they're from. With `melee:True`, up to 300 sets are read for 30 Melee ones. |
+| `/doubles [user:<member>]` | Latest 30 doubles sets and the events they're from. With `melee:True`, up to 300 sets are read for 30 Melee ones. |
 | `/doubles verbose:True` | Up to 600 doubles sets and the events they're from. |
 | `/h2h` | Every meeting with the opponent, plus up to 600 sets per player for the one-line odds, in either report length. |
 | `/predict` | Every meeting between the two players, plus up to 600 sets per player. Verbose breaks down the same prediction. |
 | `/scout` | Up to 600 sets per player and 400 sets for the opponent's characters. |
 | `/scout verbose:True` | Up to 1,200 opponent sets, 800 for characters and stages, every finished event, and 600 of your sets. |
-| `/characters` | Up to 400 sets, or 1,600 with verbose. Verbose shows up to 6 games. |
-| `/progress` | 60 days, or 180 with verbose, split into 30-day periods. |
+| `/characters [user:<member>]` | Up to 400 sets, or 1,600 with verbose. Verbose shows up to 6 games. |
+| `/progress [user:<member>]` | 60 days, or 180 with verbose, split into 30-day periods. |
 
 `melee:True` filters the history each report checks, and the limits above still apply. `/h2h` and `/predict` check every meeting. Short `/stats` and `/doubles` read back far enough to fill their Melee set windows when they can. `since` and `venue` filter the same history: short `/stats` reads back far enough to fill its 30-set window for those too, and anything older than the checked history stays out.
 

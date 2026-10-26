@@ -265,11 +265,11 @@ async function profile(interaction) {
     return interaction.editReply({ content: null, embeds: embeds.withImage([card]), allowedMentions: { parse: [] } });
   }
   if (user.id === interaction.user.id) {
-    return interaction.editReply(t('Couldn\'t find a start.gg with your Discord connected. Connect it on your start.gg profile if you haven\'t, then `/link` it.'));
+    return interaction.editReply(t('Couldn\'t find a start.gg with your Discord connected. Connect Discord on start.gg, then run `/track add` or `/link` with your profile link first.'));
   }
   // their name and not a mention, so nobody gets pinged. a name can spell out a role mention, so mentions are off too
   return interaction.editReply({
-    content: t`Couldn't find a start.gg with ${escapeMarkdown(member.displayName)}'s Discord connected.\n-# Ask them to run \`/link\` with their start.gg link once, or to register for a tournament the bot checks, and then this finds them. start.gg can't be searched by Discord`,
+    content: t`Couldn't find a start.gg with ${escapeMarkdown(member.displayName)}'s Discord connected.\n-# Use \`/track add\` with their start.gg profile link first (TOs can add someone else), or ask them to \`/link\` it. Connect Discord on start.gg so \`user:\` can find them`,
     allowedMentions: { parse: [] },
   });
 }
@@ -277,7 +277,7 @@ async function profile(interaction) {
 // tracked tournaments with whoever from the crew is going, and any other one 3 or more tracked players are in
 async function upcoming(interaction) {
   // all, someone from the list, or a start.gg profile link or ID for anyone
-  const choice = readChoice(interaction) ?? await statPlayer(interaction);
+  const choice = interaction.options.getUser?.('user') ? await statPlayer(interaction) : readChoice(interaction) ?? await statPlayer(interaction);
   if (!choice) return null;
   // only tracked players' tournaments are saved
   if (choice !== 'all' && !state.players[choice.userId]) return upcomingFor(interaction, choice);
@@ -324,7 +324,7 @@ async function upcomingFor(interaction, player) {
 
 async function recent(interaction) {
   // all, someone from the list, or a start.gg profile link or ID for anyone
-  const choice = readChoice(interaction) ?? await statPlayer(interaction);
+  const choice = interaction.options.getUser?.('user') ? await statPlayer(interaction) : readChoice(interaction) ?? await statPlayer(interaction);
   if (!choice) return null;
 
   if (!interaction.deferred) await interaction.deferReply();
