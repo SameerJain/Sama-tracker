@@ -2364,5 +2364,18 @@
     "startAt": 1792449000,
     "endAt": 1792468740,
     "isOnline": false
+  },
+  {
+    "id": 967162,
+    "name": "Monday Night SmashBall 184 Halloween Edition @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-184-halloween-edition-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1793053800,
+    "endAt": 1793073540,
+    "isOnline": false
   }
 ]

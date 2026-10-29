@@ -5837,5 +5837,30 @@
         }
       }
     ]
+  },
+  {
+    "id": 967162,
+    "name": "Monday Night SmashBall 184 Halloween Edition @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-184-halloween-edition-heart-of-the-game",
+    "city": "Buffalo",
+    "addrState": "NY",
+    "venueName": null,
+    "venueAddress": "85 S Rossler Ave, Buffalo, NY 14206, USA",
+    "numAttendees": 17,
+    "startAt": 1793053800,
+    "endAt": 1793073540,
+    "isOnline": false,
+    "events": [
+      {
+        "id": 1739388,
+        "name": "Ultimate Singles",
+        "slug": "tournament/monday-night-smashball-184-halloween-edition-heart-of-the-game/event/ultimate-singles",
+        "numEntrants": 17,
+        "videogame": {
+          "id": 1386,
+          "displayName": "Ultimate"
+        }
+      }
+    ]
   }
 ]

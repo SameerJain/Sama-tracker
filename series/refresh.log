@@ -210,3 +210,148 @@ nothing due. use --now to force, --dry-run to preview.
 [monday-night-smashball] schedule: day 2 0:00 America/New_York: skip (last run 2026-10-24, next Tue 0:00 America/New_York)
 [ub-smash-royale] schedule: day 6 0:00 America/New_York: skip (last run 2026-10-24, next Sat 0:00 America/New_York)
 nothing due. use --now to force, --dry-run to preview.
+[monday-night-smashball] schedule: day 2 0:00 America/New_York: DUE (scheduled weekday+hour reached)
+[monday-night-smashball] discover: NY scan since 2026-10-06
+^C[monday-night-smashball] schedule: day 2 0:00 America/New_York: skip (last run 2026-10-24, next Tue 0:00 America/New_York)
+[ub-smash-royale] schedule: day 6 0:00 America/New_York: skip (last run 2026-10-24, next Sat 0:00 America/New_York)
+nothing due. use --now to force, --dry-run to preview.
+[monday-night-smashball] schedule: day 2 0:00 America/New_York: skip (last run 2026-10-24, next Tue 0:00 America/New_York)
+[ub-smash-royale] schedule: day 6 0:00 America/New_York: skip (last run 2026-10-24, next Sat 0:00 America/New_York)
+nothing due. use --now to force, --dry-run to preview.
+[monday-night-smashball] schedule: day 2 0:00 America/New_York: DUE (--now)
+[monday-night-smashball] discover: NY scan since 2026-10-08
+[monday-night-smashball] new tournaments: 1
+  + 2026-10-26 967162 Monday Night SmashBall 184 Halloween Edition @ Heart Of The Game
+[monday-night-smashball] recheck: 6 tournaments in last 45d
+[monday-night-smashball] rebuild: node monday-night-smashball/build.mjs
+DATA CHECKS (42):
+ - tag "stu" on 2 ids (3318196, 2684986), maybe one person on two accounts
+ - tag "716 | annehathawayfan" on 2 ids (2982999, 989934), maybe one person on two accounts
+ - tag "xau/usd" on 2 ids (3938163, 3980864), maybe one person on two accounts
+ - attendance tag "wojo" on 2 ids (2976929, 5039467)
+ - attendance tag "dawn gone" on 2 ids (536703, 4154546)
+ - attendance tag "tone" on 2 ids (1285997, 3330677)
+ - attendance tag "clueless" on 2 ids (3330647, 3638460)
+ - attendance tag "timelord" on 2 ids (3330643, 3343722)
+ - attendance tag "light" on 3 ids (3358140, 3238926, 3495962)
+ - attendance tag "vital" on 2 ids (3480773, 4953334)
+ - attendance tag "trey" on 2 ids (3518628, 3599793)
+ - attendance tag "reverse" on 5 ids (3529690, 3551236, 3561922, 3563797, 3599758)
+ - attendance tag "troy" on 2 ids (3638469, 3967036)
+ - attendance tag "imd" on 2 ids (3637873, 154710)
+ - attendance tag "retep" on 2 ids (3688693, 4909994)
+ - attendance tag "waterfang" on 2 ids (3688687, 3283518)
+ - attendance tag "gino" on 4 ids (3749647, 3770485, 3811874, 3885436)
+ - attendance tag "cobi" on 3 ids (3856414, 3899490, 4370621)
+ - attendance tag "dino boy" on 2 ids (3899540, 4154535)
+ - attendance tag "shockfire101" on 2 ids (1997837, 5010722)
+ - attendance tag "lookup" on 2 ids (3980868, 3173673)
+ - attendance tag "jacy" on 2 ids (4115776, 4359792)
+ - attendance tag "obama phone" on 2 ids (4134898, 4154390)
+ - attendance tag "mike" on 2 ids (4216261, 4281165)
+ - attendance tag "sir vonny" on 2 ids (4240984, 4537747)
+ - attendance tag "mmw" on 2 ids (4240980, 4359830)
+ - attendance tag "sirvonny" on 5 ids (4281169, 4309278, 4359829, 4381873, 4471076)
+ - attendance tag "rockstar" on 2 ids (4295355, 2042112)
+ - attendance tag "earthwokker" on 2 ids (4333904, 4384898)
+ - attendance tag "mellow" on 2 ids (4359845, 4381874)
+viewer built: C:\Users\samee\Desktop\Sama-tracker\monday-night-smashball
+tournaments 183 | ultimate events 182 | melee events 57 | sets 8274 | games w/ chars 4420 | chars 85
+top winner: Fresh 25 | top char: Incineroar 881
+[monday-night-smashball] deploy: npx vercel --prod in monday-night-smashball
+<claude-code-hint v="1" type="plugin" value="vercel@claude-plugins-official" />
+Vercel CLI 65.8.0 (Node.js 22.23.4)
+  Inspect         https://vercel.com/sam-bd37/monday-night-smashball/BjLQdH2Ac8r7tvu8FQk2zyLYuXTk
+  Production      https://monday-night-smashball-kzs10d54u-sam-bd37.vercel.app
+▲ Aliased         https://monday-night-smashball.vercel.app
+{
+  "status": "ok",
+  "deployment": {
+    "id": "dpl_BjLQdH2Ac8r7tvu8FQk2zyLYuXTk",
+    "url": "https://monday-night-smashball-kzs10d54u-sam-bd37.vercel.app",
+    "productionUrl": "https://monday-night-smashball.vercel.app",
+    "inspectorUrl": "https://vercel.com/sam-bd37/monday-night-smashball/BjLQdH2Ac8r7tvu8FQk2zyLYuXTk",
+    "readyState": "READY",
+    "target": "production",
+    "deploymentApiUrl": "https://api.vercel.com/v13/deployments/dpl_BjLQdH2Ac8r7tvu8FQk2zyLYuXTk",
+    "buildMachine": {
+      "cores": 2,
+      "memory": 8192,
+      "machine": "basic",
+      "selectionType": "fixed",
+      "selectionSource": "plan-default"
+    },
+    "deploymentProtection": [
+      "vercel_authentication"
+    ]
+  },
+  "message": "Deployment monday-night-smashball-kzs10d54u-sam-bd37.vercel.app ready. Production URL: https://monday-night-smashball.vercel.app",
+  "next": [
+    {
+      "command": "vercel git connect",
+      "when": "Automatically deploy changes on every push"
+    },
+    {
+      "command": "vercel curl https://monday-night-smashball.vercel.app",
+      "when": "Verify deployment, including when Deployment Protection is enabled"
+    },
+    {
+      "command": "vercel inspect monday-night-smashball-kzs10d54u-sam-bd37.vercel.app",
+      "when": "Inspect deployment"
+    },
+    {
+      "command": "vercel deploy --prod",
+      "when": "Promote to production"
+    }
+  ]
+}
+[web-hub] rebuild: node web/build.mjs
+hub bundle built: web\data\buffalo.json
+series monday-night-smashball:183 ub-smash-royale:78 | players 702 | finals 230 | games 5494
+[web-hub] deploy: npx vercel --prod in web
+<claude-code-hint v="1" type="plugin" value="vercel@claude-plugins-official" />
+Vercel CLI 65.8.0 (Node.js 22.23.4)
+  Inspect         https://vercel.com/sam-bd37/samatracker/9vhduS16hxYgSk4JKnu9hmzvAgcg
+  Production      https://samatracker-rgmqljabk-sam-bd37.vercel.app
+▲ Aliased         https://samatracker.vercel.app
+{
+  "status": "ok",
+  "deployment": {
+    "id": "dpl_9vhduS16hxYgSk4JKnu9hmzvAgcg",
+    "url": "https://samatracker-rgmqljabk-sam-bd37.vercel.app",
+    "productionUrl": "https://samatracker.vercel.app",
+    "inspectorUrl": "https://vercel.com/sam-bd37/samatracker/9vhduS16hxYgSk4JKnu9hmzvAgcg",
+    "readyState": "READY",
+    "target": "production",
+    "deploymentApiUrl": "https://api.vercel.com/v13/deployments/dpl_9vhduS16hxYgSk4JKnu9hmzvAgcg",
+    "buildMachine": {
+      "cores": 2,
+      "memory": 8192,
+      "machine": "basic",
+      "selectionType": "fixed",
+      "selectionSource": "plan-default"
+    },
+    "deploymentProtection": [
+      "vercel_authentication"
+    ]
+  },
+  "message": "Deployment samatracker-rgmqljabk-sam-bd37.vercel.app ready. Production URL: https://samatracker.vercel.app",
+  "next": [
+    {
+      "command": "vercel git connect",
+      "when": "Automatically deploy changes on every push"
+    },
+    {
+      "command": "vercel curl https://samatracker.vercel.app",
+      "when": "Verify deployment, including when Deployment Protection is enabled"
+    },
+    {
+      "command": "vercel inspect samatracker-rgmqljabk-sam-bd37.vercel.app",
+      "when": "Inspect deployment"
+    },
+    {
+      "command": "vercel deploy --prod",
+      "when": "Promote to production"
+    }
+  ]
+}

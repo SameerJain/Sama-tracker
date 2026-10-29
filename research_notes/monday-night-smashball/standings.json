@@ -13173,5 +13173,59 @@
         ]
       }
     ]
+  },
+  {
+    "tournamentId": 967162,
+    "tournamentName": "Monday Night SmashBall 184 Halloween Edition @ Heart Of The Game",
+    "slug": "tournament/monday-night-smashball-184-halloween-edition-heart-of-the-game",
+    "startAt": 1793053800,
+    "numAttendees": 17,
+    "eventId": 1739388,
+    "eventName": "Ultimate Singles",
+    "numEntrants": 17,
+    "game": "Ultimate",
+    "eventSlug": "tournament/monday-night-smashball-184-halloween-edition-heart-of-the-game/event/ultimate-singles",
+    "standings": [
+      {
+        "placement": 1,
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "placement": 2,
+        "name": "585Z | Clibs",
+        "players": [
+          {
+            "id": 1055253,
+            "tag": "Clibs"
+          }
+        ]
+      },
+      {
+        "placement": 3,
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "placement": 4,
+        "name": "TTD | SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          }
+        ]
+      }
+    ]
   }
 ]

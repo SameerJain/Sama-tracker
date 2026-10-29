@@ -39280,5 +39280,164 @@
         ]
       }
     ]
+  },
+  {
+    "eventId": 1739388,
+    "tournamentId": 967162,
+    "entrants": [
+      {
+        "name": "Fal | Eliminate",
+        "players": [
+          {
+            "id": 2676871,
+            "tag": "Eliminate"
+          }
+        ]
+      },
+      {
+        "name": "PPB | Tone",
+        "players": [
+          {
+            "id": 1285997,
+            "tag": "Tone"
+          }
+        ]
+      },
+      {
+        "name": "reverse",
+        "players": [
+          {
+            "id": 3563797,
+            "tag": "reverse"
+          }
+        ]
+      },
+      {
+        "name": "YorzTruly | Links",
+        "players": [
+          {
+            "id": 1584208,
+            "tag": "Links"
+          }
+        ]
+      },
+      {
+        "name": "Playmaker",
+        "players": [
+          {
+            "id": 2025333,
+            "tag": "Playmaker"
+          }
+        ]
+      },
+      {
+        "name": "TTD | ShotoWojo",
+        "players": [
+          {
+            "id": 4751166,
+            "tag": "ShotoWojo"
+          }
+        ]
+      },
+      {
+        "name": "TTD | SWISH",
+        "players": [
+          {
+            "id": 148134,
+            "tag": "SWISH"
+          }
+        ]
+      },
+      {
+        "name": "DrkF. | lucipawz",
+        "players": [
+          {
+            "id": 3331431,
+            "tag": "lucipawz"
+          }
+        ]
+      },
+      {
+        "name": "585Z | Clibs",
+        "players": [
+          {
+            "id": 1055253,
+            "tag": "Clibs"
+          }
+        ]
+      },
+      {
+        "name": "Dook",
+        "players": [
+          {
+            "id": 861679,
+            "tag": "Dook"
+          }
+        ]
+      },
+      {
+        "name": "TTD | PolarChan",
+        "players": [
+          {
+            "id": 155979,
+            "tag": "PolarChan"
+          }
+        ]
+      },
+      {
+        "name": "ICYoyo",
+        "players": [
+          {
+            "id": 177352,
+            "tag": "ICYoyo"
+          }
+        ]
+      },
+      {
+        "name": "Plush-Shark1824",
+        "players": [
+          {
+            "id": 5588138,
+            "tag": "Plush-Shark1824"
+          }
+        ]
+      },
+      {
+        "name": "Bishop",
+        "players": [
+          {
+            "id": 2530077,
+            "tag": "Bishop"
+          }
+        ]
+      },
+      {
+        "name": "SC | King David",
+        "players": [
+          {
+            "id": 1075630,
+            "tag": "King David"
+          }
+        ]
+      },
+      {
+        "name": "MRW",
+        "players": [
+          {
+            "id": 297614,
+            "tag": "MRW"
+          }
+        ]
+      },
+      {
+        "name": "716 | winters",
+        "players": [
+          {
+            "id": 997342,
+            "tag": "winters"
+          }
+        ]
+      }
+    ]
   }
 ]
