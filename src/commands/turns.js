@@ -41,10 +41,11 @@ async function inTurn(interaction, run) {
   // the queued line has to land before the command goes on, or it could replace the answer
   const wait = ahead && (() => (ahead.finished ? null : Promise.all([ahead.done, showQueued(interaction, ahead)])));
   try {
+    // by server too, so one busy server takes one turn a round in start.gg's line like any other
     await asCommand(() => {
       turn.progress = commandProgress();
       return run(turn.progress);
-    }, wait);
+    }, wait, interaction.guildId ?? '');
     return true;
   } finally {
     turn.finished = true;

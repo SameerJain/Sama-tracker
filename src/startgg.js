@@ -2,7 +2,7 @@
 // the queue in queue.js
 export {
   ULTIMATE, MELEE, startggUrl, setRequestGap, asCommand, inBackground, isBackground, queueLength, commandProgress, forgetMisses,
-  checkToken, badToken, startggDownSince, resetOutage,
+  checkToken, badToken, startggDownSince, resetOutage, sharingAcrossServers, isSharing,
 } from './startgg/queue.js';
 export {
   outcomeOf, namedGame, fromSide, singles, isMelee,

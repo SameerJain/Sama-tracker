@@ -1,4 +1,8 @@
-import { MELEE, ULTIMATE, aliases, allPages, cleanId, connectionPage, fitPage, lookupMany, pagesOf, query } from './queue.js';
+import { MELEE, ULTIMATE, aliases, allPages, cleanId, connectionPage, fitPage, isSharing, lookupMany, pagesOf, query } from './queue.js';
+
+// servers sharing a check pass ask for sets updated since a time rounded down to this, so two servers whose last
+// checks were seconds apart send the same request and share its answer
+const SHARED_SINCE_STEP = 5 * 60;
 
 const SET_SLOTS = `
   slots {
@@ -306,22 +310,27 @@ const eventSetsQuery = (fields) => `
 // every set in these events matching filters, whoever played. most checks find a few sets or none, so the
 // events share a request that splits when it runs over, and an event with more than a page gets the rest on its own
 async function setsInEvents(eventIds, filters, { fields = SET_FIELDS, perPage = EVENT_SETS_PER_PAGE } = {}) {
+  // the sets between the rounded time and the real one come back off below, so nobody gets more than they asked for
+  const { updatedAfter } = filters;
+  const rounded = updatedAfter && isSharing();
+  const asked = rounded ? { ...filters, updatedAfter: updatedAfter - (updatedAfter % SHARED_SINCE_STEP) } : filters;
   const data = await lookupMany(eventIds, (group) => `
     query ($filters: SetFilters) {
       ${aliases(group, 'e', 'event', `sets(perPage: ${perPage}, page: 1, sortType: RECENT, filters: $filters) { pageInfo { totalPages } nodes { ${fields} } }`)}
     }
-  `, { filters });
+  `, { filters: asked });
 
   const nodes = [];
   const rest = [];
   for (const id of eventIds) {
     const sets = data[`e${id}`]?.sets;
     nodes.push(...(sets?.nodes ?? []));
-    const getPage = pagesOf(eventSetsQuery(fields), { id: cleanId(id), filters }, (reply) => reply.event?.sets);
+    const getPage = pagesOf(eventSetsQuery(fields), { id: cleanId(id), filters: asked }, (reply) => reply.event?.sets);
     for (let page = 2; page <= (sets?.pageInfo?.totalPages ?? 0); page++) rest.push(fitPage(getPage, page, perPage));
   }
   for (const page of await Promise.all(rest)) nodes.push(...page.nodes);
-  return toSets(nodes);
+  const found = toSets(nodes);
+  return rounded ? found.filter((set) => set.updatedAt == null || set.updatedAt >= updatedAfter) : found;
 }
 
 // every set finished in these events since then, for a tracked tournament's set results

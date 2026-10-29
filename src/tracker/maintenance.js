@@ -150,21 +150,24 @@ export function setBotClient(client) {
 // own channel. single-server builds run the same checks once on the root, with CHANNEL_ID.
 // one run at a time (see queued below) so nothing posts twice. servers the bot already left
 // are skipped once the guild cache is up, so their saved entries don't cost a channel fetch
-export async function eachGuild(fn) {
-  const saved = new Set(guildIds());
-  const ids = new Set([...saved, ...(botClient?.guilds?.cache.keys() ?? [])]);
-  const gone = botClient?.guilds?.cache?.size ? (id) => saved.has(id) && !botClient.guilds.cache.has(id) : () => false;
-  for (const id of ids) {
-    if (gone(id)) continue;
-    forGuild(id);
-    const postChannel = await guildChannel(id);
-    if (!postChannel) continue;
-    try {
-      await guildLocal.run(id, () => inChannel(postChannel, () => fn(id, postChannel)));
-    } catch (err) {
-      console.error(`background check failed in ${id}:`, err.message);
+// the servers' parts share one pass of start.gg answers, so a tournament two servers track gets asked about once
+export function eachGuild(fn) {
+  return startgg.sharingAcrossServers(async () => {
+    const saved = new Set(guildIds());
+    const ids = new Set([...saved, ...(botClient?.guilds?.cache.keys() ?? [])]);
+    const gone = botClient?.guilds?.cache?.size ? (id) => saved.has(id) && !botClient.guilds.cache.has(id) : () => false;
+    for (const id of ids) {
+      if (gone(id)) continue;
+      forGuild(id);
+      const postChannel = await guildChannel(id);
+      if (!postChannel) continue;
+      try {
+        await guildLocal.run(id, () => inChannel(postChannel, () => fn(id, postChannel)));
+      } catch (err) {
+        console.error(`background check failed in ${id}:`, err.message);
+      }
     }
-  }
+  });
 }
 
 function runScoped(fn) {

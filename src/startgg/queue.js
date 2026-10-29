@@ -18,10 +18,13 @@ export function chunk(list, size) {
 
 // start.gg allows 80 requests a minute, so one goes out every 800ms.
 // requests for a command go ahead of the background checks, and commands take turns
-// so one that needs a lot of pages doesn't hold up everyone else's
+// so one that needs a lot of pages doesn't hold up everyone else's. servers take turns first, then
+// the commands inside each, so a busy server's ten commands get one turn per round like a quiet
+// server's one, instead of ten
 const fromCommand = new AsyncLocalStorage();
-// one queue per command, in here while it has requests waiting
-const commandQueues = [];
+// each server with commands waiting, in turn order, holding its commands' queues in their turn order.
+// a server is in here only while one of its commands has a request waiting
+const servers = [];
 const background = [];
 let requestGap = 800;
 let nextSlot = 0;
@@ -36,24 +39,40 @@ export function setRequestGap(ms) {
 
 // a command's queue also counts what it sent and how often start.gg said to slow down. wait, when given,
 // gets called on its first request and every request waits on what it returns, which is how someone's
-// next command holds its requests until their last one is done
-export const asCommand = (fn, wait) => fromCommand.run(Object.assign([], { sent: 0, limited: 0, wait }), fn);
+// next command holds its requests until their last one is done. server is the discord server it ran in,
+// left out for the single-server build and tests, which all share one turn
+export const asCommand = (fn, wait, server = '') => fromCommand.run(Object.assign([], { sent: 0, limited: 0, wait, server }), fn);
 export const inBackground = (fn) => fromCommand.run(background, fn);
 // slippi.js keeps its own line the same way
 export const isBackground = () => fromCommand.getStore() === background;
-export const queueLength = () => commandQueues.reduce((sum, queue) => sum + queue.length, background.length);
+const waitingIn = (list) => list.reduce((sum, queue) => sum + queue.length, 0);
+export const queueLength = () => servers.reduce((sum, server) => sum + waitingIn(server), background.length);
 
 // for the command that calls it, a function that says how many requests it has sent and has waiting, and
-// about how many seconds until the last one goes out. taking turns means another command gets a slot for
-// each of its own that's left
+// about how many seconds until the last one goes out. its server's other commands get a slot for each of
+// its own that's left, and every other server gets one for each of its server's turns
 export function commandProgress() {
   const queue = fromCommand.getStore();
   return () => {
     if (!queue || queue === background) return { sent: 0, waiting: 0, limited: 0, seconds: 0 };
-    const slots = commandQueues.reduce((sum, other) => sum + (other === queue ? 0 : Math.min(other.length, queue.length)), queue.length);
-    const seconds = queue.length ? Math.max(0, nextSlot - Date.now()) / 1000 + (slots * requestGap) / 1000 : 0;
+    if (!queue.length) return { sent: queue.sent, waiting: 0, limited: queue.limited, seconds: 0 };
+    const home = servers.find((server) => server.id === queue.server) ?? [queue];
+    const turns = home.reduce((sum, other) => sum + (other === queue ? queue.length : Math.min(other.length, queue.length)), 0);
+    const elsewhere = servers.reduce((sum, server) => sum + (server === home ? 0 : Math.min(waitingIn(server), turns)), 0);
+    const seconds = Math.max(0, nextSlot - Date.now()) / 1000 + ((turns + elsewhere) * requestGap) / 1000;
     return { sent: queue.sent, waiting: queue.length, limited: queue.limited, seconds };
   };
+}
+
+// a command with its first request waiting joins its server's turn, and the server joins the rotation
+// if none of its commands were waiting
+function lineUp(queue) {
+  let server = servers.find((each) => each.id === queue.server);
+  if (!server) {
+    server = Object.assign([], { id: queue.server });
+    servers.push(server);
+  }
+  server.push(queue);
 }
 
 async function takeTurn() {
@@ -63,7 +82,7 @@ async function takeTurn() {
     await queue.turn;
   }
   return new Promise((resolve) => {
-    if (queue !== background && !queue.length) commandQueues.push(queue);
+    if (queue !== background && !queue.length) lineUp(queue);
     queue.push(resolve);
     sendNext();
   });
@@ -78,13 +97,15 @@ function sendNext() {
     // commands go ahead, but every 10th slot goes to the background checks when
     // they have something waiting, so a busy night can't starve match calls
     dispatched++;
-    const queue = dispatched % 10 === 0 && background.length ? background : commandQueues.shift() ?? background;
+    const server = dispatched % 10 === 0 && background.length ? null : servers.shift();
+    const queue = server ? server.shift() : background;
     const next = queue.shift();
     if (!next) return;
-    // back of the line for its next one
-    if (queue !== background) {
+    // the command goes to the back of its server's line, and the server to the back of everyone's
+    if (server) {
       queue.sent++;
-      if (queue.length) commandQueues.push(queue);
+      if (queue.length) server.push(queue);
+      if (server.length) servers.push(server);
     }
     nextSlot = Date.now() + requestGap;
     next();
