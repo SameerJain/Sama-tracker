@@ -355,3 +355,6 @@ Vercel CLI 65.8.0 (Node.js 22.23.4)
     }
   ]
 }
+[monday-night-smashball] schedule: day 2 0:00 America/New_York: skip (last run 2026-10-29, next Tue 0:00 America/New_York)
+[ub-smash-royale] schedule: day 6 0:00 America/New_York: skip (last run 2026-10-24, next Sat 0:00 America/New_York)
+nothing due. use --now to force, --dry-run to preview.
